@@ -8,10 +8,11 @@ Outil local et open source (MIT) pour préparer un boss : timelines des meilleur
 
 | Élément | Rôle | État |
 |---|---|---|
-| `src/paf/` | paquet Python, commande `paf` | S1 faite : `paf setup`, `paf doctor` |
+| `src/paf/` | paquet Python, commande `paf` | S1 + R1 : `paf setup`, `paf doctor`, `paf profile` |
 | `tests/` | pytest ; marqueurs `network` et `simc` exclus par défaut | |
-| `Invoke-LocalTopGear.ps1` | prototype PowerShell de Top Gear (doc : `docs/legacy-topgear.md`) | jamais lancé contre le vrai simc ; à porter en R2 puis supprimer |
 | `.env` | `WCL_CLIENT_ID` / `WCL_CLIENT_SECRET` | ignoré par git |
+
+Le prototype PowerShell (`Invoke-LocalTopGear.ps1`, Top Gear 3 passes) a été retiré ; il reste dans le premier commit (`git show 243c53f:Invoke-LocalTopGear.ps1`) comme référence pour R2. Le profil courant de l'utilisateur est dans `~/.paf/profiles/current.simc`.
 
 ## Conventions Python
 
@@ -20,10 +21,6 @@ Outil local et open source (MIT) pour préparer un boss : timelines des meilleur
 - `.venv` local : `.venv/Scripts/python -m pip install -e .[dev]`.
 - simc installé par `paf setup` dans `~/.paf/simc/<version>/` (surcharges : `--simc`, `PAF_SIMC`, `PAF_HOME`). Le serveur des nightlies ne sert qu'en HTTP (certificat invalide en HTTPS).
 - Nombres passés à simc : format invariant (`.` décimal). Sorties de runs dans `runs/<horodatage>/`.
-
-## Conventions PowerShell (tant que le .ps1 existe)
-
-Compatibles Windows PowerShell 5.1 ; UTF-8 avec BOM + CRLF ; ASCII uniquement dans le code ; `[System.Collections.Generic.List[object]]::new()` et `.ToArray()` ; nombres en `InvariantCulture`.
 
 ## Faits SimC (sources : wiki simc, issues GitHub, code de l'addon)
 

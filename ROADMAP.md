@@ -46,7 +46,7 @@ Pistes de départ, à trier et à préciser avec Manu :
 ## Briques
 
 ### Socle
-- **S1** Dépôt : git, pyproject, CI, `paf setup` (téléchargement de simc).
+- **S1** ✅ Dépôt : git, pyproject, CI, `paf setup` (téléchargement de simc).
 - **S2** Client WCL : OAuth2, GraphQL, pagination, rate limit, cache.
 - **S3** Moteur SimC : lancement, profilesets, lecture du JSON ; options vérifiées (`save=`, override d'APL, PI externe, lust, durée fixe).
 
@@ -57,8 +57,8 @@ Pistes de départ, à trier et à préciser avec Manu :
 - **T4** Vue agrégée : quand les tops utilisent chaque CD, par phase et par vague.
 
 ### Partie 2 — Sims
-- **R1** Parse de l'export `/simc` (équipé, sac, coffre, liens).
-- **R2** Top Gear (portage du .ps1, multi-profils, regret). Le .ps1 est ensuite retiré.
+- **R1** ✅ Parse de l'export `/simc` (équipé, sac, coffre, liens) : `paf profile`, depuis le presse-papier ou un fichier.
+- **R2** Top Gear multi-profils avec regret (logique du prototype PowerShell, retiré ; il reste dans l'historique git).
 - **R3** Log → combat SimC (`fights/<boss>.simc`) à partir de T2, utilisé comme profil par R2.
 - **R4** Droptimizer : tables de loot via wago.tools, EV par source, loot inséré dans les meilleurs sets.
 
@@ -78,5 +78,5 @@ Pistes de départ, à trier et à préciser avec Manu :
 - **v0.3** = T4, R4, P1.
 - **v0.4+** = partie 3 et élargissement.
 
-Prochaine brique : **S1**, dès que le setup est prêt (identifiants WCL, email git).
+Prochaine brique : **S2** (client Warcraft Logs).
 

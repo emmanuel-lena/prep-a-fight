@@ -53,13 +53,9 @@ WCL_CLIENT_SECRET=...
 |---|---|
 | `paf setup` | Download / update SimulationCraft into `~/.paf/simc/` |
 | `paf doctor` | Check simc and Warcraft Logs credentials |
+| `paf profile [file]` | Load your character: in game type `/simc`, press Ctrl+A, Ctrl+C, then run `paf profile` (reads the clipboard). You can also drag a saved export file onto the terminal. The export becomes your current profile. |
 
 More commands land brick by brick (see the roadmap).
-
-## Legacy PowerShell Top Gear
-
-`Invoke-LocalTopGear.ps1` is the original Windows-only prototype (local multi-profile Top Gear). Its
-documentation is in [docs/legacy-topgear.md](docs/legacy-topgear.md). It will be replaced by `paf topgear`.
 
 ## License
 
