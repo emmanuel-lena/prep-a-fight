@@ -41,6 +41,9 @@ def _urllib_transport(url: str, body: bytes, headers: dict[str, str]) -> tuple[i
             return resp.status, resp.read()
     except urllib.error.HTTPError as e:
         return e.code, e.read()
+    except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+        # network hiccup: reported as a server error so the caller retries with backoff
+        return 599, str(e).encode()
 
 
 class WCLClient:

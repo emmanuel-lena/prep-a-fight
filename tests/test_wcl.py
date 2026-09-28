@@ -80,3 +80,8 @@ def test_missing_credentials(monkeypatch):
     monkeypatch.delenv("WCL_CLIENT_SECRET", raising=False)
     with pytest.raises(WCLError):
         WCLClient()
+
+
+def test_network_errors_are_retried(tmp_path):
+    fake = FakeWCL([(599, {}), (200, {"data": {"ok": 1}})])
+    assert make(tmp_path, fake).query("{ ok }") == {"ok": 1}
