@@ -412,6 +412,69 @@ def cmd_talents(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_cdplan(args: argparse.Namespace) -> int:
+    from paf import settings, simc
+    from paf.cdplan import apl_lines, dump_apl, parse_apl, plan_lines, standard_plans, tracked_actions
+    from paf.corpus import db
+    from paf.corpus.analyze import canonical_waves
+    from paf.corpus.template import template_path
+    from paf.corpus.timeline import build_timeline
+    from paf.fight import Fight
+
+    profile_text, origin = _load_profile(args.profile)
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    fpath = template_path(enc.name, diff_name)
+    if not fpath.is_file():
+        print(f"No fight template for {enc.name} {diff_name}: run `paf template \"{enc.name}\"` first.")
+        return 1
+    fight = Fight.load(fpath)
+    tl = build_timeline(db.connect(), enc.id, diff, enc.name, diff_name, settings.get("spec"), top=10_000)
+    offensive = [a for a in tl.abilities if not a.utility]
+    root = simc.new_run_dir(label="cdplan")
+    apl = parse_apl(dump_apl(profile_text, root))
+    tracked = tracked_actions(apl, [a.name for a in offensive])
+    if not tracked:
+        print("None of the top players' cooldowns match an action of the default APL.")
+        return 1
+    cds: dict[str, list[float]] = {}
+    long_cds: set[str] = set()
+    for ab in offensive:
+        act = tracked.get(ab.name)
+        if not act:
+            continue
+        per_player = [[(t, 1, 0.0, [""]) for t in p["casts"].get(ab.id, [])] for p in tl.players]
+        cds[act] = [w.t for w in canonical_waves(per_player) if w.support >= 0.4]
+        if ab.per_kill <= 6:
+            long_cds.add(act)
+    print(f"{enc.name} {diff_name}: cooldown plans for {origin}")
+    for act, times in cds.items():
+        print(f"  {act}: top players use it at {', '.join(_mmss(t) for t in times) or '(no common timing)'}")
+    plans = standard_plans(cds, long_cds)
+    sets = {p.name: plan_lines(apl, p) for p in plans if p.name != "default"}
+    sets = {k: v for k, v in sets.items() if v}
+    base = "\n".join([profile_text.rstrip(), *apl_lines(apl)])  # explicit APL: needed for overrides
+    res = simc.run(simc.build_input(base, fight.to_simc(), sets), root / "fight", target_error=args.error)
+    rows = []
+    for p in plans:
+        if p.name == "default":
+            rows.append((p, 0.0, 0.0))
+            continue
+        ps = next((x for x in res.profilesets if x.name == p.name), None)
+        if ps:
+            boss = res.delta_pct(ps, "prioritydps") if "prioritydps" in ps.metrics and "prioritydps" in res.baseline \
+                else 0.0
+            rows.append((p, res.delta_pct(ps, "dps"), boss))
+    w = args.objective
+    rows.sort(key=lambda r: -(w * r[2] + (1 - w) * r[1]))
+    err = res.baseline["dps"].error / res.baseline["dps"].mean * 100
+    print(f"\n{'plan':<26} {'total':>8} {'boss':>8}   on {fight.name}")
+    for p, tot, boss in rows:
+        print(f"{p.name:<26} {tot:+7.2f}% {boss:+7.2f}%   {p.description}")
+    print(f"\nStatistical error: about +/-{err:.2f}%. SimC evaluates these plans; it does not invent new ones.")
+    print(f"Runs: {root}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paf", description="prep-a-fight: prepare a boss fight from top logs.")
     p.add_argument("--version", action="version", version=f"paf {__version__}")
@@ -494,6 +557,15 @@ def build_parser() -> argparse.ArgumentParser:
     ta.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
     ta.add_argument("--error", type=float, default=0.2)
     ta.set_defaults(func=cmd_talents)
+
+    cp = sub.add_parser("cdplan", help="compare cooldown plans (default APL, on cooldown, hold for adds, "
+                                       "top players' timings) on the boss fight")
+    cp.add_argument("boss")
+    cp.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    cp.add_argument("--objective", type=_objective, default=0.0, help="total (default), boss, or a boss weight")
+    cp.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
+    cp.add_argument("--error", type=float, default=0.1)
+    cp.set_defaults(func=cmd_cdplan)
     return p
 
 

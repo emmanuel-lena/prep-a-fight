@@ -40,6 +40,7 @@ Le prototype PowerShell (`Invoke-LocalTopGear.ps1`, Top Gear 3 passes) a été r
 - JSON : `collected_data.prioritydps` (dégâts boss seul, existe seulement avec adds). Pas de détail par cible. `profileset_metric=dps,prioritydps` → `results[].additional_metrics[]` (libellé « Damage per Second to Priority Target/Boss »). Ne pas utiliser `profileset_output_data=all`.
 - Talents : `talents=<string>` et `class_talents=/spec_talents=/hero_talents=nom_snake:rang` (appliqués par-dessus), aussi en profileset ; `save_talents=` pour récupérer la chaîne.
 - APL Élém par défaut : listes `precombat`, défaut, `aoe`, `single_target` (pas de `cds`). Un profileset peut redéfinir une liste entière (`+=actions.single_target=...` puis `+=actions.single_target+=/...`) : vérifié.
+- **Piège** : un export `/simc` n'a pas d'APL ; simc génère alors l'APL par défaut et **ignore** les `actions.x=` d'un profileset. Toujours injecter l'APL complète (`save_actions=` puis `paf.cdplan.apl_lines`) dans le profil de base avant de surcharger des listes.
 - Les options de sim (lust, PI, raid_events) marchent **par profileset** → variantes de combat en un seul run.
 - Perf : baseline 340 s à target_error 0.2 ≈ 0,4 s ; +10 profilesets ≈ 2,7 s avec `profileset_work_threads=4`.
 - Git Bash réécrit `raid_events=/…` en chemin : `MSYS_NO_PATHCONV=1` ou passer par un fichier.
