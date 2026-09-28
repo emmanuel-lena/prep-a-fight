@@ -348,6 +348,70 @@ def cmd_topgear(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_talents(args: argparse.Namespace) -> int:
+    from paf import settings, simc
+    from paf.corpus import db
+    from paf.corpus.template import template_path
+    from paf.fight import Fight
+    from paf.gamedata import talent_entry_names
+    from paf.talent_sim import build_diff, fetch_codes, my_talent_entries, sim_builds, top_builds
+
+    profile_text, origin = _load_profile(args.profile)
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    con = db.connect()
+    spec = settings.get("spec")
+    builds = top_builds(con, enc.id, diff, spec, n=args.builds)
+    if not builds:
+        print(f"No ranked {spec} players in the corpus for {enc.name} {diff_name}: run `paf corpus` first.")
+        return 1
+    fetch_codes(client, con, builds)
+    names = talent_entry_names()
+    sample = sorted(builds[0].key)
+    mine = my_talent_entries(profile_text, sample)
+    fights: dict[str, list[str]] = {}
+    fpath = template_path(enc.name, diff_name)
+    duration = 300.0
+    if fpath.is_file():
+        fight = Fight.load(fpath)
+        fights[fpath.stem] = fight.to_simc()
+        duration = fight.duration
+    fights["patchwerk"] = ["fight_style=Patchwerk", f"max_time={simc.fmt(duration)}", "desired_targets=1"]
+    total_players = sum(b.count for b in builds)
+    print(f"{enc.name} {diff_name}: {len(builds)} most common {spec} builds ({total_players} players); "
+          f"simming them on your character ({origin})")
+    root = simc.new_run_dir(label="talents")
+    results = sim_builds(profile_text, builds, fights, root, target_error=args.error)
+    header = "  ".join(f"{n[:18]:>18}" for n in fights)
+    print(f"\n{'build':<12} {'players':>7} {'med.rank':>8}  {header}")
+    print(f"{'your build':<12} {'':>7} {'':>8}  " + "  ".join(f"{'ref':>18}" for _ in fights))
+    for i, b in enumerate(builds):
+        cols = []
+        for res in results.values():
+            ps = next((p for p in res.profilesets if p.name == f"b{i}"), None)
+            if not ps:
+                cols.append(f"{'n/a':>18}")
+                continue
+            tot = res.delta_pct(ps, "dps")
+            has_boss = "prioritydps" in ps.metrics and "prioritydps" in res.baseline
+            boss = res.delta_pct(ps, "prioritydps") if has_boss else None
+            cell = f"{tot:+.2f}%" + (f" (boss {boss:+.1f}%)" if boss is not None else "")
+            cols.append(f"{cell:>18}")
+        print(f"{b.label:<12} {b.count:>7} {b.median_rank:>8.0f}  " + "  ".join(cols))
+    err = max(r.baseline["dps"].error / r.baseline["dps"].mean * 100 for r in results.values())
+    print(f"\nStatistical error: about +/-{err:.2f}% per value.")
+    if mine:
+        print("\nWhat each build changes compared to yours:")
+        for b in builds:
+            add, drop = build_diff(mine, set(b.key), names)
+            if not add and not drop:
+                print(f"  {b.label}: same talents as yours")
+                continue
+            print(f"  {b.label}: take {', '.join(add) or '-'}")
+            print(f"  {'':<{len(b.label)}}  drop {', '.join(drop) or '-'}")
+    print(f"\nRuns: {root}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paf", description="prep-a-fight: prepare a boss fight from top logs.")
     p.add_argument("--version", action="version", version=f"paf {__version__}")
@@ -422,6 +486,14 @@ def build_parser() -> argparse.ArgumentParser:
     tg.add_argument("--min-tier", type=int, help="minimum tier pieces (default: as many as equipped, up to 4)")
     tg.add_argument("--top", type=int, default=10)
     tg.set_defaults(func=cmd_topgear)
+
+    ta = sub.add_parser("talents", help="sim the most common talent builds of the top players on your character")
+    ta.add_argument("boss")
+    ta.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    ta.add_argument("--builds", type=int, default=6, help="number of builds compared (default 6)")
+    ta.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
+    ta.add_argument("--error", type=float, default=0.2)
+    ta.set_defaults(func=cmd_talents)
     return p
 
 
