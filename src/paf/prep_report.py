@@ -49,6 +49,12 @@ class PrepData:
     loot_ilvl: int = 0
     loot_error: float = 0.0
     notes: list[str] = field(default_factory=list)
+    optimized: list = field(default_factory=list)  # paf.optimize.Plan per objective
+    mrt: dict[str, str] = field(default_factory=dict)  # objective -> MRT note
+    alignment: list = field(default_factory=list)  # paf.optimize.Alignment
+    fight: object | None = None  # paf.fight.Fight used by the sims
+    assigns: list[str] = field(default_factory=list)  # notes of the player's assignments
+    validation: tuple[float, float, float] | None = None  # simulated / real DPS of the top players (min, median, max)
 
 
 def headline(d: PrepData) -> list[str]:
@@ -64,6 +70,14 @@ def headline(d: PrepData) -> list[str]:
                        f"fight; it takes {take}.")
         else:
             out.append("Talents: your build is as good as the top players' builds on this fight.")
+    for p in d.optimized:
+        if p.objective == "total" and p.gain > 2 * p.error:
+            changed = [k.replace("use_item:", "") for k, r in p.choice.items() if r.name != "default"]
+            out.append(f"Cooldowns (total damage): {p.gain:+.1f}% vs the default priority list by changing "
+                       f"{', '.join(changed)}; boss damage {p.totals.get('boss', 0):+.1f}%.")
+    held = [a for a in d.alignment if a.units_cover and a.in_units > a.units_cover * 1.5 and a.in_units - a.units_cover > 0.1]
+    if held:
+        out.append("Top players hold " + ", ".join(a.ability for a in held) + " for the secondary targets.")
     if d.plans and d.plans.rows:
         p, tot, _ = d.plans.rows[0]
         if p.name != "default" and tot > 2 * d.plans.error:
@@ -173,6 +187,52 @@ def render(d: PrepData) -> str:
 <p class="small muted">Statistical error about +/-{pc.error:.2f}%. SimC evaluates these plans; it does not invent new ones.</p>
 </div>""")
 
+    # ideal play-by-play per objective
+    if d.optimized:
+        labels = {"boss": "Boss damage", "total": "Total damage (pad)", "adds": "Damage to adds"}
+        blocks = []
+        for p in d.optimized:
+            changed = {k: r for k, r in p.choice.items() if r.name != "default"}
+            rules = "".join(f"<tr><td>{e(k.replace('use_item:', ''))}</td><td>{e(r.description)}</td></tr>"
+                            for k, r in changed.items()) or "<tr><td colspan=2>the default priority list</td></tr>"
+            others = ", ".join(f"{o} {_pct(v, 1)}" for o, v in p.totals.items() if o != p.objective)
+            steps = ""
+            if p.timeline and d.fight is not None:
+                from paf.optimize import fight_context
+
+                steps = "".join(f"<tr><td>{_mmss(t)}</td><td>{e(label)}</td><td class='small muted'>"
+                                f"{e(fight_context(d.fight, t))}</td></tr>" for t, label in p.timeline)
+            note = d.mrt.get(p.objective, "")
+            blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{labels.get(p.objective, p.objective)}: {_pct(p.gain)}
+<span class="small muted">vs the default priority list{'; ' + others if others else ''}</span></h3>
+<table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
+<details><summary class="small">Play-by-play of one simulated pull</summary><div class="scroll"><table>
+<tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></details>
+<details><summary class="small">MRT note</summary><pre class="small" style="white-space:pre-wrap">{e(note)}</pre></details>
+</div>""")
+        parts.append("<h2>Ideal cooldown play-by-play, per objective</h2>" + "".join(blocks))
+
+    if d.alignment:
+        a0 = d.alignment[0]
+        rows = ""
+        for a in d.alignment:
+            held = []
+            if a.in_adds > a.adds_cover * 1.5 and a.in_adds - a.adds_cover > 0.1:
+                held.append("held for adds")
+            if a.units_cover and a.in_units > a.units_cover * 1.5 and a.in_units - a.units_cover > 0.1:
+                held.append("held for secondary targets")
+            rows += (f"<tr><td>{e(a.ability)}</td><td class='n'>{a.in_adds:.0%}</td><td class='n'>{a.in_units:.0%}</td>"
+                     f"<td>{e(' / '.join(held) or 'no clear hold')}</td></tr>")
+        parts.append(f"""<h2>What the top players do with their cooldowns</h2><div class="card scroll">
+<p class="small">Share of their casts (after the opener) during add waves, which cover {a0.adds_cover:.0%} of the fight,
+and on the secondary targets, which cover {a0.units_cover:.0%}. Much more than the coverage means they hold the cooldown.
+SimC does not know that a secondary target must die fast, so compare with the simulated plans above.</p>
+<table><tr><th>Cooldown</th><th>During adds</th><th>Secondary targets</th><th></th></tr>{rows}</table></div>""")
+
+    if d.assigns:
+        parts.append('<h2>Your assignments</h2><div class="card small"><ul>'
+                     + "".join(f"<li>{e(a)}</li>" for a in d.assigns) + "</ul></div>")
+
     # gear
     if d.gear:
         head = "".join(f"<th>{e(f)}</th>" for f in d.gear_fights)
@@ -190,6 +250,10 @@ def render(d: PrepData) -> str:
 <table><tr><th>Item</th><th>Slot</th><th>On this fight</th></tr>{body}</table>
 <p class="small muted">At item level {d.loot_ilvl}; statistical error about +/-{d.loot_error:.2f}%.</p></div>""")
 
+    if d.validation:
+        lo, med, hi = d.validation
+        d.notes.insert(0, f"Validation: the top players' own characters simmed on this rebuilt fight give {med:.0%} of "
+                          f"their real DPS (range {lo:.0%}-{hi:.0%}).")
     notes = d.notes + [
         "A rebuilt fight is an approximation: good to choose between builds, items and plans, not a prediction "
         "of your exact DPS.",

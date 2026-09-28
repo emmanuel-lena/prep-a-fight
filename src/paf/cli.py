@@ -602,6 +602,15 @@ def cmd_droptimizer(args: argparse.Namespace) -> int:
     return 0
 
 
+def tops_alignment_safe(timeline, fight) -> list:
+    from paf.optimize import tops_alignment
+
+    try:
+        return tops_alignment(timeline, fight)
+    except (ValueError, ZeroDivisionError):
+        return []
+
+
 def cmd_prep(args: argparse.Namespace) -> int:
     import statistics as st
     import webbrowser
@@ -661,9 +670,29 @@ def cmd_prep(args: argparse.Namespace) -> int:
                 f"SimC puts {got:.0%} of your damage on the boss vs {target:.0%} in the top players' logs, even "
                 f"with more adds: SimC keeps single-target spells on the boss while real players also spend them "
                 f"on adds and secondary targets. Boss-only numbers are optimistic, add damage pessimistic.")
+    if not args.no_validate:
+        from paf.validate import calibrate_movement, validate
+
+        step("Validating the fight on the top players' own characters")
+        checks = validate(con, client, enc.id, diff, spec, fight, root / "validate", players=4,
+                          race=profile.header.get("race", "orc"))
+        if checks:
+            scale, points = calibrate_movement(checks, fight, root / "validate-movement")
+            fight.movement_scale = scale
+            ratio = dict(points).get(scale) or min(points, key=lambda p: abs(p[0] - scale))[1]
+            d.validation = (min(r for _, r in points), ratio, max(r for _, r in points))
+            print(f"  simulated / real DPS of the top players: {ratio:.2f} with movement x{scale:g}")
+            if scale < 1:
+                d.notes.append(f"Movement inferred from the top players' trajectories is scaled by {scale:g}: they "
+                               f"keep casting while moving, which SimC's movement windows do not model.")
     fight.save(template_path(enc.name, diff_name))
     d.waves = [(w.time, max(1, round(w.count * fight.add_scale)) if w.scalable else w.count, w.lifetime, w.name)
                for w in fight.add_waves]
+    planned, ppath = _fight_with_plan(enc, diff_name)
+    if ppath is not None:
+        fight = planned
+        d.assigns = [f"from your plan {ppath.name}"]
+    d.fight = fight
 
     step("Simming your character on the fight")
     real = simc.run(simc.build_input(profile_text, fight.to_simc()), root / "fight", target_error=args.error)
@@ -685,10 +714,20 @@ def cmd_prep(args: argparse.Namespace) -> int:
     step("Talent builds of the top players")
     d.talents = compare_builds(profile_text, con, client, enc.id, diff, spec, fights, root / "talents",
                                target_error=args.error)
-    step("Cooldown plans")
     tl_all = build_timeline(con, enc.id, diff, enc.name, diff_name, spec, top=10_000)
-    d.plans = compare_plans(profile_text, tl_all, fight, root / "cdplan", target_error=args.error / 2,
-                            objective=args.objective)
+    if args.no_optimize:
+        step("Cooldown plans")
+        d.plans = compare_plans(profile_text, tl_all, fight, root / "cdplan", target_error=args.error / 2,
+                                objective=args.objective)
+    else:
+        from paf.optimize import mrt_note, optimize_all
+
+        step("Ideal cooldown plan per objective (boss / total / adds)")
+        d.optimized, _ = optimize_all(profile_text, fight, root / "optimize", target_error=args.error)
+        d.mrt = {p.objective: mrt_note(enc.name, p, fight) for p in d.optimized}
+        (reports / f"mrt-{_slug(enc.name)}-{diff_name}.txt").write_text("\n\n".join(d.mrt.values()) + "\n",
+                                                                         encoding="utf-8")
+    d.alignment = tops_alignment_safe(tl_all, fight)
 
     if not args.no_gear:
         pool = GearPool(profile, item_inventory_types(), item_sets())
@@ -1139,6 +1178,10 @@ def build_parser() -> argparse.ArgumentParser:
     pr2.add_argument("--ilvl", type=int, help="item level of the drops (default: median of your equipped items)")
     pr2.add_argument("--max-combos", type=int, default=300, help="Top Gear combination budget (default 300)")
     pr2.add_argument("--no-gear", action="store_true", help="skip Top Gear and loot (faster)")
+    pr2.add_argument("--no-optimize", action="store_true",
+                     help="simple cooldown plans instead of the full optimizer (faster)")
+    pr2.add_argument("--no-validate", action="store_true",
+                     help="skip the validation on the top players' characters (no movement calibration)")
     pr2.add_argument("--refresh", action="store_true", help="collect new kills first")
     pr2.add_argument("--open", action="store_true", help="open the sheet in the browser")
     pr2.set_defaults(func=cmd_prep)

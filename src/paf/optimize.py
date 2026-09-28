@@ -299,8 +299,10 @@ def mrt_note(boss: str, plan: Plan, fight: Fight) -> str:
     return "\n".join(lines)
 
 
-def cooldown_durations(profile_text: str, run_dir: Path, apl: OrderedDict[str, list[str]]) -> dict[str, float]:
-    """Base cooldowns (s) of the tracked actions, from a quick simulated pull (median gap between casts)."""
+def cooldown_durations(profile_text: str, run_dir: Path,
+                       apl: OrderedDict[str, list[str]]) -> tuple[dict[str, float], set[str]]:
+    """Base cooldowns (s) of the tracked actions from a quick simulated pull (median gap between casts),
+    and the set of actions the character actually used (other races' racials, items not equipped... are not)."""
     fight = Fight("probe", 300)
     plan = Plan("probe", {}, 0, 0)
     events = play_by_play(profile_text, apl, plan, fight, run_dir,
@@ -313,15 +315,19 @@ def cooldown_durations(profile_text: str, run_dir: Path, apl: OrderedDict[str, l
         gaps = sorted(b - a for a, b in zip(ts, ts[1:], strict=False))
         if gaps:
             out[k] = gaps[len(gaps) // 2]
-    return out
+    return out, set(by)
 
 
 def optimize_all(profile_text: str, fight: Fight, run_dir: Path, *, objectives: tuple[str, ...] = OBJECTIVES,
                  target_error: float = 0.2, log: Callable[[str], None] = print) -> tuple[list[Plan], list[Cooldown]]:
     apl = parse_apl(dump_apl(profile_text, run_dir / "apl"))
-    durations = cooldown_durations(profile_text, run_dir / "probe", apl)
+    durations, used = cooldown_durations(profile_text, run_dir / "probe", apl)
+    used_items = any(u not in TRACKED for u in used)  # on-use items show up under their own name
     # use_item keys are per slot in the APL but named by item in the log: long unless proven otherwise
-    cds = find_cooldowns(apl, fight, {k: v for k, v in durations.items()})
+    cds = [c for c in find_cooldowns(apl, fight, durations)
+           if (c.key in used)
+           or (c.key.startswith("use_item:") and c.key.split(":")[1] in used)
+           or (c.key in ("use_item:trinket1", "use_item:trinket2", "use_item:main_hand") and used_items)]
     log("Cooldowns found: " + ", ".join(f"{c.label} ({'long' if c.long else 'short'})" for c in cds))
     plans = [optimize_objective(profile_text, apl, cds, fight, obj, run_dir, target_error=target_error, log=log)
              for obj in objectives]
