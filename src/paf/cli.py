@@ -119,6 +119,56 @@ def cmd_config(args: argparse.Namespace) -> int:
     return 0
 
 
+def _encounter_and_difficulty(args: argparse.Namespace):
+    from paf import settings
+    from paf.encounters import find_encounter
+    from paf.wcl import WCLClient
+
+    client = WCLClient()
+    enc = find_encounter(client, args.boss)
+    diff_name = (args.difficulty or settings.get("difficulty")).lower()
+    return client, enc, diff_name, settings.DIFFICULTIES[diff_name]
+
+
+def cmd_corpus(args: argparse.Namespace) -> int:
+    from paf import settings
+    from paf.corpus import db
+    from paf.corpus.collect import collect, enumerate_kills, store_ranked
+
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    cls, spec = settings.get("class"), settings.get("spec")
+    count = args.kills or settings.get("corpus_size")
+    con = db.connect()
+
+    brackets: list[int | None] = [None]
+    cohort = "top"
+    pages = None
+    if args.ilvl:
+        b = enc.bracket_for_ilvl(args.ilvl)
+        if b is None:
+            print("This zone has no item level brackets; using the top cohort.")
+        else:
+            brackets = [x for x in (b - 1, b, b + 1) if x >= 1]
+            cohort = f"ilvl{args.ilvl:g}"
+            pages = [1, 3, 6, 10]
+    print(f"{enc.name} ({enc.zone_name}), {diff_name}: collecting {count} {spec} {cls} kills, cohort {cohort}")
+    kills = enumerate_kills(client, enc, diff, cls, spec, count=count, brackets=brackets, pages=pages,
+                            region=settings.get("region"))
+    new = store_ranked(con, enc, diff, cohort, kills)
+    print(f"  {len(kills)} ranked kills found ({new} new)")
+    if len(kills) < min(20, count):
+        lower = {"mythic": "heroic", "heroic": "normal", "normal": "lfr"}.get(diff_name)
+        hint = f" Try --difficulty {lower}." if lower else ""
+        print(f"  Only {len(kills)} ranked {spec} kills on {diff_name}: analyses will be noisy.{hint}")
+    if args.list_only:
+        return 0
+    stats = collect(client, con, enc, diff, retry_errors=args.retry)
+    total = con.execute("SELECT COUNT(*) FROM fight WHERE encounter_id=? AND difficulty=? AND status='done'",
+                        (enc.id, diff)).fetchone()[0]
+    print(f"Done: {stats['done']} fetched, {stats['error']} skipped; {total} kills in the corpus ({db.db_path()})")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paf", description="prep-a-fight: prepare a boss fight from top logs.")
     p.add_argument("--version", action="version", version=f"paf {__version__}")
@@ -144,10 +194,24 @@ def build_parser() -> argparse.ArgumentParser:
     cf.add_argument("key", nargs="?")
     cf.add_argument("value", nargs="?")
     cf.set_defaults(func=cmd_config)
+
+    co = sub.add_parser("corpus", help="collect ranked kills of a boss from Warcraft Logs (resumable)")
+    co.add_argument("boss", help="boss name (partial is fine) or encounter id")
+    co.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    co.add_argument("--kills", type=int, help="number of kills (default: `paf config corpus_size`)")
+    co.add_argument("--ilvl", type=float, help="cohort of players around this item level instead of the top")
+    co.add_argument("--list-only", action="store_true", help="only list ranked kills, fetch nothing")
+    co.add_argument("--retry", action="store_true", help="retry kills that failed before")
+    co.set_defaults(func=cmd_corpus)
     return p
 
 
 def main(argv: list[str] | None = None) -> int:
+    import sys
+
+    for stream in (sys.stdout, sys.stderr):  # names from logs can be CJK; never crash on a cp1252 console
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     load_dotenv()
     args = build_parser().parse_args(argv)
     return args.func(args)

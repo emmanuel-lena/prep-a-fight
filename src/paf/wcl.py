@@ -161,11 +161,12 @@ class WCLClient:
     EVENTS_QUERY = """
     query($code: String!, $fightIDs: [Int], $start: Float, $end: Float, $dataType: EventDataType,
           $hostility: HostilityType, $sourceID: Int, $targetID: Int, $abilityID: Float,
-          $filter: String, $limit: Int) {
+          $filter: String, $limit: Int, $res: Boolean) {
       reportData { report(code: $code) {
         events(fightIDs: $fightIDs, startTime: $start, endTime: $end, dataType: $dataType,
                hostilityType: $hostility, sourceID: $sourceID, targetID: $targetID,
-               abilityID: $abilityID, filterExpression: $filter, limit: $limit) {
+               abilityID: $abilityID, filterExpression: $filter, limit: $limit,
+               includeResources: $res) {
           data nextPageTimestamp
         }
       } }
@@ -176,7 +177,7 @@ class WCLClient:
                data_type: str = "All", hostility: str = "Friendlies", source_id: int | None = None,
                target_id: int | None = None, ability_id: int | None = None,
                filter_expression: str | None = None, limit: int = 10000,
-               cache: bool = True) -> Iterator[dict[str, Any]]:
+               include_resources: bool = False, cache: bool = True) -> Iterator[dict[str, Any]]:
         """Yield every event of a fight window, following ``nextPageTimestamp``."""
         page_start = start
         while True:
@@ -184,7 +185,7 @@ class WCLClient:
                 "code": code, "fightIDs": [fight_id], "start": page_start, "end": end,
                 "dataType": data_type, "hostility": hostility, "sourceID": source_id,
                 "targetID": target_id, "abilityID": ability_id, "filter": filter_expression,
-                "limit": limit,
+                "limit": limit, "res": include_resources or None,
             }
             variables = {k: v for k, v in variables.items() if v is not None}
             data = self.query(self.EVENTS_QUERY, variables, cache_ttl=0 if cache else None)
