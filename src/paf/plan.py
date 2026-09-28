@@ -114,9 +114,10 @@ def apply_plan(fight: Fight, plan: Plan, offsets: dict[int, float] | None = None
     offsets = offsets or {}
     f = Fight(**{**fight.__dict__})
     f.movement = list(fight.movement) if plan.keep_template_movement else []
+    f.personal_movement = list(fight.personal_movement)
     for i, m in enumerate(plan.moves):
         start = max(0.0, m.start + offsets.get(i, 0.0))
-        f.movement.append(Window(start, m.duration, m.distance))
+        f.personal_movement.append(Window(start, m.duration, m.distance))
     if plan.no_lust:
         f.lust_time = None
     elif plan.lust is not None:

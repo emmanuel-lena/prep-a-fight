@@ -40,7 +40,8 @@ def test_parse_plan_errors_point_to_the_line():
 def test_apply_plan_with_offsets():
     p = parse_plan(TEXT)
     f = apply_plan(fight(), p, {1: -4})
-    assert [w.start for w in f.movement] == [165, 326, 250]  # template movement dropped
+    assert f.movement == []  # template movement dropped
+    assert [w.start for w in f.personal_movement] == [165, 326, 250]
     assert f.lust_time == 30 and f.power_infusion == [20, 150]
     assert fight().movement[0].start == 100  # the template is not modified
 

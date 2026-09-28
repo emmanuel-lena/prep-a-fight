@@ -125,7 +125,7 @@ def mechanic_timings(con: sqlite3.Connection, encounter_id: int, difficulty: int
 def apply_assigns(fight: Fight, mechanics: list[Mechanic], chosen: list[str]) -> tuple[Fight, list[str]]:
     """Movement windows for every chosen mechanic (names or keys), each time it happens."""
     f = Fight(**{**fight.__dict__})
-    f.movement = list(fight.movement)
+    f.personal_movement = list(fight.personal_movement)
     notes = []
     by = {m.name.lower(): m for m in mechanics} | {m.key: m for m in mechanics}
     for c in chosen:
@@ -137,7 +137,7 @@ def apply_assigns(fight: Fight, mechanics: list[Mechanic], chosen: list[str]) ->
             notes.append(f"{m.name}: no measurable cost, only noted")
             continue
         for t in m.times:
-            f.movement.append(Window(t, m.cost))
+            f.personal_movement.append(Window(t, m.cost))
         notes.append(f"{m.name}: {m.cost:g}s of movement at " + ", ".join(f"{int(t // 60)}:{int(t % 60):02d}"
                                                                          for t in m.times))
     return f, notes

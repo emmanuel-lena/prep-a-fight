@@ -58,9 +58,14 @@ class Fight:
     power_infusion: list[float] = field(default_factory=list)
     source: str = ""  # free text: which logs / cohort this was built from
     add_scale: float = 1.0  # multiplies add counts (calibration: adds a player actually hits)
+    movement_scale: float = 1.0  # multiplies inferred movement durations (calibration on the top players' DPS)
+    personal_movement: list[Window] = field(default_factory=list)  # player's own moves: never scaled
 
-    def raid_event_lines(self, add_scale: float | None = None) -> list[str]:
+    def raid_event_lines(self, add_scale: float | None = None, movement_scale: float | None = None) -> list[str]:
         scale = self.add_scale if add_scale is None else add_scale
+        mscale = self.movement_scale if movement_scale is None else movement_scale
+        moves = [Window(w.start, w.duration * mscale, w.distance * mscale) for w in self.movement]
+        moves = [w for w in moves if w.duration >= 0.5 or w.distance] + list(self.personal_movement)
         events: list[str] = []
         for i, w in enumerate(sorted(self.add_waves, key=lambda w: w.time), 1):
             count = max(1, round(w.count * scale)) if w.scalable else w.count
@@ -69,7 +74,7 @@ class Fight:
         for w in self.invulnerable:
             events.append(f"invulnerable,first={fmt(round(w.start, 1))},"
                           f"duration={fmt(round(w.duration, 1))},cooldown=9999")
-        for w in merged_movement(self.movement):
+        for w in merged_movement(moves):
             ev = f"movement,first={fmt(round(w.start, 1))},cooldown=9999"
             if w.distance:
                 ev += f",distance={fmt(round(w.distance, 1))}"
@@ -106,6 +111,7 @@ class Fight:
         d["add_waves"] = [AddWave(**w) for w in d.get("add_waves", [])]
         d["invulnerable"] = [Window(**w) for w in d.get("invulnerable", [])]
         d["movement"] = [Window(**w) for w in d.get("movement", [])]
+        d["personal_movement"] = [Window(**w) for w in d.get("personal_movement", [])]
         return cls(**d)
 
 

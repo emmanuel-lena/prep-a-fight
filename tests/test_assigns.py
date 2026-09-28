@@ -19,8 +19,14 @@ def test_parse_assign_lines():
 def test_apply_assigns_adds_movement_each_time():
     f = Fight("B", 300, movement=[Window(10, 3)])
     g, notes = apply_assigns(f, mechs(), ["doomscale shell", "Malice", "Nope"])
-    assert [(w.start, w.duration) for w in g.movement] == [(10, 3), (60, 4), (180, 4)]
-    assert len(f.movement) == 1  # template untouched
+    assert [(w.start, w.duration) for w in g.movement] == [(10, 3)]
+    assert [(w.start, w.duration) for w in g.personal_movement] == [(60, 4), (180, 4)]
+    assert not f.personal_movement  # template untouched
+    # personal moves are not scaled by the movement calibration
+    g.movement_scale = 0.5
+    events = [e for e in g.raid_event_lines() if "movement" in e]
+    assert any("first=10" in e and "duration=1.5" in e for e in events)
+    assert any("first=60" in e and "duration=4" in e for e in events)
     assert any("no measurable cost" in n for n in notes) and any("unknown" in n for n in notes)
 
 

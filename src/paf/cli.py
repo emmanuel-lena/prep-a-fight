@@ -905,6 +905,55 @@ def _mechanics_from_corpus(enc, diff_name: str) -> None:
         print(f"  raid-wide (everyone): {', '.join(raid_wide[:10])}")
 
 
+def cmd_validate(args: argparse.Namespace) -> int:
+    from paf import settings, simc
+    from paf.corpus import db
+    from paf.corpus.template import _slug, template_path
+    from paf.fight import Fight
+    from paf.profile import parse_simc_export
+    from paf.validate import summary, validate
+
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    fpath = template_path(enc.name, diff_name)
+    if not fpath.is_file():
+        print(f"No fight template for {enc.name} {diff_name}: run `paf template \"{enc.name}\"` first.")
+        return 1
+    fight = Fight.load(fpath)
+    race = "orc"
+    try:
+        race = parse_simc_export(_load_profile(None)[0]).header.get("race", race)
+    except SystemExit:
+        pass
+    print(f"Simming the top {settings.get('spec')} players' own characters (gear and talents from their logs) "
+          f"on the rebuilt {fight.name}...")
+    checks = validate(db.connect(), client, enc.id, diff, settings.get("spec"), fight,
+                      simc.new_run_dir(label=f"validate-{_slug(enc.name)}"), players=args.players, race=race)
+    for c in checks:
+        print(f"  rank {c.rank:<4} real {c.real:>9,.0f}  simulated {c.sim:>9,.0f}  ratio {c.ratio:5.2f}")
+    if args.calibrate and checks:
+        from paf.validate import calibrate_movement
+
+        print("\nCalibrating the inferred movement on these players...")
+        scale, points = calibrate_movement(checks, fight, simc.new_run_dir(label="validate-movement"))
+        for s_, ratio in points:
+            print(f"  movement x{s_:<5} simulated / real {ratio:.2f}")
+        fight.movement_scale = scale
+        fight.save(fpath)
+        print(f"Movement durations scaled by {scale:g} in {fpath}")
+    s = summary(checks)
+    if s:
+        lo, med, hi = s
+        print(f"\nSimulated / real DPS: median {med:.2f} (range {lo:.2f}-{hi:.2f}).")
+        if med < 0.9:
+            print("The rebuilt fight is harder than reality (too much movement or too few targets?).")
+        elif med > 1.1:
+            print("The rebuilt fight is easier than reality (too many targets, too little movement?).")
+        else:
+            print("The rebuilt fight is in line with the logs (within 10%).")
+        print("Race is not in the logs (yours is used); secondary stats are the players' real ones from the logs.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paf", description="prep-a-fight: prepare a boss fight from top logs.")
     p.add_argument("--version", action="version", version=f"paf {__version__}")
@@ -1038,6 +1087,15 @@ def build_parser() -> argparse.ArgumentParser:
     asg.add_argument("boss")
     asg.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
     asg.set_defaults(func=cmd_assigns)
+
+    va = sub.add_parser("validate", help="sim the top players' own characters on the rebuilt fight and compare "
+                                         "with their real DPS")
+    va.add_argument("boss")
+    va.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    va.add_argument("--players", type=int, default=6)
+    va.add_argument("--calibrate", action="store_true",
+                    help="scale the inferred movement so the top players' simulated DPS matches their real DPS")
+    va.set_defaults(func=cmd_validate)
 
     op = sub.add_parser("optimize", help="ideal cooldown plan and play-by-play on the fight, per objective")
     op.add_argument("boss")
