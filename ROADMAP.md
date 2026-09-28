@@ -52,7 +52,7 @@ Pistes de départ, à trier et à préciser avec Manu :
 
 ### Partie 1 — Timelines
 - **T1** Top N d'une spec sur un boss (`paf top`), avec choix de la difficulté (`--difficulty lfr|normal|heroic|mythic`) et une difficulté par défaut réglable (`paf config difficulty heroic`). Si trop peu de logs classés, on le signale et on propose la difficulté du dessous.
-- **T2** Extraction par log : casts de CD du joueur, lust, PI, phases, casts du boss, adds, **talents du joueur**, et **positions x/y** (portées par les casts du joueur, quasi gratuites en quota ; ce n'est pas un GPS continu).
+- **T2** Extraction par log : casts de CD du joueur, lust, PI, phases, casts du boss, adds, **talents du joueur**, et **trajectoire x/y + orientation** (events dont le joueur est la source : ~1 point toutes les 0,1 s, quelques points de quota par combat).
 - **T3** Page HTML timeline : top N côte à côte + timeline du boss.
 - **T4** Vue agrégée : quand les tops utilisent chaque CD, par phase et par vague.
 
