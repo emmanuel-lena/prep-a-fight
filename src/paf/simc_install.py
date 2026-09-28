@@ -99,6 +99,15 @@ def find_simc(explicit: str | None = None) -> Path | None:
     return None
 
 
+def bundled_profile(pattern: str = "*_Shaman_Elemental.simc", simc: str | None = None) -> Path | None:
+    """A reference profile shipped with simc (newest tier folder first), e.g. MID2_Shaman_Elemental."""
+    exe = find_simc(simc)
+    if exe is None:
+        return None
+    hits = sorted((exe.parent / "profiles").glob(f"*/{pattern}"), reverse=True)
+    return hits[0] if hits else None
+
+
 def install_nightly(force: bool = False) -> Path:
     """Download the latest Windows nightly into <data_dir>/simc/<version>/ and return simc.exe."""
     if sys.platform != "win32":
