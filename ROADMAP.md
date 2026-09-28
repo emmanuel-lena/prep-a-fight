@@ -102,6 +102,12 @@ Chaque ligne vient d'une brique : vagues d'adds (T2), combat SimC (R3), objectif
 - **F2** ✅ **Éditeur de combat perso** : partir du template et dire « là je bouge 6 s », « là je soak », « là je garde Ascendance ». Chaque élément peut être **fixe** ou **décalable** (fenêtre au plus tôt / au plus tard, par exemple un déplacement qu'on peut avancer de 5 s).
 - **F3** ✅ **Optimiseur** : SimC teste les décalages possibles des éléments décalables et des CD (profilesets : les options de combat varient par profileset, c'est vérifié). Il ressort le meilleur placement, par exemple « bouge 4 s plus tôt et garde Stormkeeper pour après le déplacement : +2,1 % ».
 
+### Assigns et mécaniques (validé avec Manu, 2026-09-28)
+- **A1** **Catalogue automatique des mécaniques** par boss : sorts du boss depuis le Journal des rencontres (wago.tools : nom, description, drapeaux tank/heal/dps/interruptible) croisés avec les casts vus dans les logs.
+- **A2** **Pré-tri automatique depuis le corpus** : pour chaque mécanique, qui la gère dans les tops. Kicks via les events `interrupt`, soaks/orbes/debuffs via les dégâts et debuffs reçus. Une mécanique prise par 1 à 3 joueurs fixes est **assignée**, prise par tout le raid elle est **raid-wide**. On en tire les specs qui s'en chargent et le coût mesuré (déplacement, temps sans caster, DPS sur la fenêtre).
+- **A3** **Assigns joueur** : liste de cases à cocher par boss, pré-remplie selon la spec (« je kick l'add », « je ramène les orbes »). Chaque case devient des fenêtres de déplacement ou d'indisponibilité dans le combat simulé, avec les timings des logs. Dev manuel seulement pour les mécaniques exotiques.
+- **A4** **Déroulé idéal** (`paf optimize`, en cours) : règles de CD optimisées par objectif (boss / total / adds) avec les assigns, sortie dans la fiche HTML et en note MRT.
+
 ### Partie 3 — Prépa (briques définies ensemble le moment venu)
 - **P1** Atelier de conception avec Manu : choisir et ordonner les pistes ci-dessus.
 - P2… à définir.

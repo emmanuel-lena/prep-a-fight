@@ -719,6 +719,69 @@ def cmd_prep(args: argparse.Namespace) -> int:
     return 0
 
 
+def _fight_with_plan(enc, diff_name: str):
+    """The boss template with the user's plan file applied (moves, lust, PI), if there is one."""
+    from paf.corpus.template import template_path
+    from paf.fight import Fight
+    from paf.plan import apply_plan, parse_plan
+
+    fpath = template_path(enc.name, diff_name)
+    if not fpath.is_file():
+        return None, None
+    fight = Fight.load(fpath)
+    ppath = fpath.with_suffix(".plan.txt")
+    if ppath.is_file():
+        plan = parse_plan(ppath.read_text(encoding="utf-8"))
+        if plan.moves or plan.lust is not None or plan.pi is not None or plan.no_lust:
+            return apply_plan(fight, plan), ppath
+    return fight, None
+
+
+def print_optimized(plans, fight) -> None:
+    from paf.optimize import fight_context
+
+    labels = {"boss": "boss damage", "total": "total damage", "adds": "damage to adds"}
+    for p in plans:
+        others = ", ".join(f"{o} {v:+.2f}%" for o, v in p.totals.items() if o != p.objective)
+        print(f"\n## Best plan for {labels[p.objective]}: {p.gain:+.2f}% (+/-{p.error:.2f}%) vs the default APL"
+              + (f"  [{others}]" if others else ""))
+        changed = {k: r for k, r in p.choice.items() if r.name != "default"}
+        if not changed:
+            print("  the default APL is already the best for this objective")
+        for k, r in changed.items():
+            print(f"  {k.replace('use_item:', ''):<22} {r.description}")
+        if p.timeline:
+            print("  play-by-play (one simulated pull):")
+            for t, label in p.timeline:
+                ctx = fight_context(fight, t)
+                print(f"    {_mmss(t):>5}  {label:<24} {ctx}")
+
+
+def cmd_optimize(args: argparse.Namespace) -> int:
+    from paf import simc
+    from paf.config import data_dir
+    from paf.corpus.template import _slug
+    from paf.optimize import OBJECTIVES, mrt_note, optimize_all
+
+    profile_text, origin = _load_profile(args.profile)
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    fight, ppath = _fight_with_plan(enc, diff_name)
+    if fight is None:
+        print(f"No fight template for {enc.name} {diff_name}: run `paf template \"{enc.name}\"` first.")
+        return 1
+    objectives = OBJECTIVES if args.objective == "all" else (args.objective,)
+    print(f"{enc.name} {diff_name}: optimizing cooldowns for {', '.join(objectives)} ({origin})"
+          + (f", with your plan {ppath}" if ppath else ""))
+    root = simc.new_run_dir(label=f"optimize-{_slug(enc.name)}")
+    plans, _ = optimize_all(profile_text, fight, root, objectives=objectives, target_error=args.error)
+    print_optimized(plans, fight)
+    notes = data_dir() / "reports" / f"mrt-{_slug(enc.name)}-{diff_name}.txt"
+    notes.parent.mkdir(parents=True, exist_ok=True)
+    notes.write_text("\n\n".join(mrt_note(enc.name, p, fight) for p in plans) + "\n", encoding="utf-8")
+    print(f"\nMRT notes: {notes}\nRuns: {root}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paf", description="prep-a-fight: prepare a boss fight from top logs.")
     p.add_argument("--version", action="version", version=f"paf {__version__}")
@@ -839,6 +902,14 @@ def build_parser() -> argparse.ArgumentParser:
     dr.add_argument("--error", type=float, default=0.2)
     dr.add_argument("--top", type=int, default=25)
     dr.set_defaults(func=cmd_droptimizer)
+
+    op = sub.add_parser("optimize", help="ideal cooldown plan and play-by-play on the fight, per objective")
+    op.add_argument("boss")
+    op.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    op.add_argument("--objective", choices=["all", "boss", "total", "adds"], default="all")
+    op.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
+    op.add_argument("--error", type=float, default=0.2)
+    op.set_defaults(func=cmd_optimize)
 
     pr2 = sub.add_parser("prep", help="everything for one boss, as a one-page HTML prep sheet")
     pr2.add_argument("boss")
