@@ -252,6 +252,44 @@ def fight_context(fight: Fight, t: float) -> str:
     return ", ".join(dict.fromkeys(notes))
 
 
+@dataclass
+class Alignment:
+    ability: str
+    casts: int
+    in_adds: float  # share of the top players' casts during add waves
+    in_units: float  # ... during the windows of secondary targets (e.g. a heart)
+    adds_cover: float  # share of the fight covered by add waves (what random casts would give)
+    units_cover: float
+
+
+def _cover(windows_: list[tuple[float, float]], duration: float) -> float:
+    covered = set()
+    for t, length in windows_:
+        covered.update(range(max(0, int(t - 2)), min(int(duration), int(t + length) + 1)))
+    return len(covered) / duration if duration else 0.0
+
+
+def tops_alignment(timeline, fight: Fight) -> list[Alignment]:
+    """Do the top players hold their cooldowns for add waves / secondary targets? (timeline: paf Timeline)"""
+    adds = [(w.time, w.lifetime) for w in fight.add_waves if w.scalable]
+    units = [(w.time, w.lifetime) for w in fight.add_waves if not w.scalable]
+    adds_cover, units_cover = _cover(adds, fight.duration), _cover(units, fight.duration)
+
+    def inside(t: float, ws: list[tuple[float, float]]) -> bool:
+        return any(a - 2 <= t <= a + length for a, length in ws)
+
+    out = []
+    for ab in timeline.abilities:
+        if ab.utility:
+            continue
+        times = [t for p in timeline.players for t in p["casts"].get(ab.id, []) if t > 5]  # skip the opener
+        if len(times) < 10:
+            continue
+        out.append(Alignment(ab.name, len(times), sum(inside(t, adds) for t in times) / len(times),
+                             sum(inside(t, units) for t in times) / len(times), adds_cover, units_cover))
+    return out
+
+
 def mrt_note(boss: str, plan: Plan, fight: Fight) -> str:
     """A note for Method Raid Tools / NSRT: one line per cooldown cast, with its time."""
     lines = [f"prep-a-fight {boss} ({plan.objective}: {plan.gain:+.1f}%)"]

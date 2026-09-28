@@ -817,6 +817,30 @@ def print_optimized(plans, fight) -> None:
                 print(f"    {_mmss(t):>5}  {label:<24} {ctx}")
 
 
+def print_alignment(enc, diff_name: str, diff: int, fight) -> None:
+    """What the top players actually do with their cooldowns, to check the simulated plans against."""
+    from paf import settings
+    from paf.corpus import db
+    from paf.corpus.timeline import build_timeline
+    from paf.optimize import tops_alignment
+
+    tl = build_timeline(db.connect(), enc.id, diff, enc.name, diff_name, settings.get("spec"), top=10_000)
+    rows = tops_alignment(tl, fight)
+    if not rows:
+        return
+    a0 = rows[0]
+    print(f"\n## What the top players do (casts after the opener; add waves cover {a0.adds_cover:.0%} of the fight, "
+          f"secondary targets {a0.units_cover:.0%}):")
+    for a in rows:
+        held = []
+        if a.in_adds > a.adds_cover * 1.5 and a.in_adds - a.adds_cover > 0.1:
+            held.append("held for adds")
+        if a.units_cover and a.in_units > a.units_cover * 1.5 and a.in_units - a.units_cover > 0.1:
+            held.append("held for secondary targets")
+        print(f"  {a.ability:<24} {a.in_adds:5.0%} during adds, {a.in_units:5.0%} on secondary targets"
+              f"   {' / '.join(held) or 'no clear hold'}")
+
+
 def cmd_optimize(args: argparse.Namespace) -> int:
     from paf import simc
     from paf.config import data_dir
@@ -835,6 +859,7 @@ def cmd_optimize(args: argparse.Namespace) -> int:
     root = simc.new_run_dir(label=f"optimize-{_slug(enc.name)}")
     plans, _ = optimize_all(profile_text, fight, root, objectives=objectives, target_error=args.error)
     print_optimized(plans, fight)
+    print_alignment(enc, diff_name, diff, fight)
     notes = data_dir() / "reports" / f"mrt-{_slug(enc.name)}-{diff_name}.txt"
     notes.parent.mkdir(parents=True, exist_ok=True)
     notes.write_text("\n\n".join(mrt_note(enc.name, p, fight) for p in plans) + "\n", encoding="utf-8")
