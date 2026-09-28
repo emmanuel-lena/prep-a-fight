@@ -61,15 +61,44 @@ WCL_CLIENT_SECRET=...
 
 3. Check everything with `paf doctor`.
 
+## Prepare a boss in 6 commands
+
+```sh
+paf profile                  # in game: /simc, Ctrl+A, Ctrl+C, then this (reads the clipboard)
+paf corpus "Ula'tek"         # collect ~200 ranked kills of your spec from Warcraft Logs (resumable)
+paf analyze "Ula'tek"        # fight shape, add waves, who hits adds, talent pick rates
+paf timeline "Ula'tek" --open  # cooldown timelines of the top players, as an HTML page
+paf template "Ula'tek"       # the typical fight, rebuilt for SimC (editable JSON)
+paf topgear --boss "Ula'tek" --preset patchwerk   # your best items on that fight
+paf talents "Ula'tek"        # the top players' builds simmed on your character
+paf cdplan "Ula'tek"         # cooldown plans compared on that fight
+```
+
 ## Commands
 
 | Command | What it does |
 |---|---|
 | `paf setup` | Download / update SimulationCraft into `~/.paf/simc/` |
-| `paf doctor` | Check simc and Warcraft Logs credentials |
-| `paf profile [file]` | Load your character: in game type `/simc`, press Ctrl+A, Ctrl+C, then run `paf profile` (reads the clipboard). You can also drag a saved export file onto the terminal. The export becomes your current profile. |
+| `paf doctor` | Check simc, Warcraft Logs credentials and your API quota |
+| `paf config [key value]` | Settings: default difficulty, class/spec, corpus size, region |
+| `paf profile [file]` | Load your character from the `/simc` export (clipboard, file, or `-` for stdin) |
+| `paf corpus BOSS` | Collect ranked kills of your spec: fight, phases, adds, damage per target of every player, talents, gear, and the ranked player's casts with positions and buffs. Stored in `~/.paf/corpus.sqlite`. `--ilvl 318` samples players around an item level instead of the top. |
+| `paf analyze BOSS` | Phases, add waves across kills, share of damage on adds for every spec, talent pick rates |
+| `paf timeline BOSS` | Lorrgs-like HTML page: fight strip (phases, add waves, boss abilities), when the top players use each cooldown, one row per player. Cooldowns are detected automatically. |
+| `paf template BOSS` | Typical fight for SimC: duration, add waves (time, count, lifetime), intermission, lust, Power Infusion, movement windows from the top players' trajectories. Edit the JSON to customize it. |
+| `paf sim BOSS` | Your character on that fight vs a Patchwerk of the same length (total and boss-only DPS) |
+| `paf topgear` | Best combination of your items (bags, great vault, linked items) on boss fights and/or presets; `--objective boss` ranks on boss-only damage |
+| `paf talents BOSS` | Most common builds of the top players simmed on your character, with the talents they change vs yours |
+| `paf cdplan BOSS` | Cooldown plans (default APL, on cooldown, hold for adds, top players' timings) compared on the fight |
 
-More commands land brick by brick (see the roadmap).
+### How much to trust the numbers
+
+- Every delta comes with SimC's statistical error; smaller differences are noise.
+- A rebuilt fight is an approximation: add lifetimes and movement come from the top players' logs,
+  and SimC has no fine target priority. Good for choosing between builds, items and plans; not a
+  prediction of your exact DPS.
+- Analyses of the corpus are correlations (what the top players do). SimC is used to check them on
+  your character.
 
 ## License
 

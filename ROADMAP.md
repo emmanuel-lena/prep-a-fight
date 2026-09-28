@@ -69,29 +69,29 @@ Chaque ligne vient d'une brique : vagues d'adds (T2), combat SimC (R3), objectif
 ### Socle
 - **S1** ✅ Dépôt : git, pyproject, CI, `paf setup` (téléchargement de simc).
 - **S2** ✅ Client WCL : OAuth2, GraphQL, pagination, rate limit, cache.
-- **S3** Moteur SimC : lancement, profilesets, lecture du JSON ; options vérifiées (`save=`, override d'APL, PI externe, lust, durée fixe).
+- **S3** ✅ Moteur SimC : lancement, profilesets, lecture du JSON ; options vérifiées (`save=`, override d'APL, PI externe, lust, durée fixe).
 
 ### Partie 1 — Timelines et analyse
 - **T1** ✅ **Corpus** d'un boss (`paf corpus "Ula'tek"`) : collecte de N kills (200 par défaut) via `fightRankings` (tout le raid) et `characterRankings` (une spec). Pour chaque combat : compo, durée, guilde, dégâts de chaque joueur **par cible** (boss et chaque type d'add), talents, stuff, ilvl de chaque joueur. Stockage dans une base SQLite locale, collecte reprenable. Choix de la difficulté (`--difficulty lfr|normal|heroic|mythic`), difficulté par défaut réglable (`paf config difficulty heroic`) ; si trop peu de kills, on le signale et on propose la difficulté du dessous. Coût mesuré : ~5 points de quota par combat, soit ~1 000 points pour 200 kills (quota 3 600/h).
-- **T1b** Premières analyses du corpus :
+- **T1b** ✅ Premières analyses du corpus :
   - part des dégâts sur les adds par spec ;
   - qui est « assigné adds » ;
   - fréquence de chaque talent par spec, et lien avec les dégâts adds/boss ;
   - durée de vie des adds par cohorte.
-- **T2** Extraction par log : casts de CD du joueur, lust, PI, phases, casts du boss, adds, **talents du joueur**, et **trajectoire x/y + orientation** (events dont le joueur est la source : ~1 point toutes les 0,1 s, quelques points de quota par combat).
-- **T3** Page HTML timeline : top N côte à côte + timeline du boss.
-- **T4** Vue agrégée : quand les tops utilisent chaque CD, par phase et par vague.
+- **T2** ✅ Extraction par log : casts de CD du joueur, lust, PI, phases, casts du boss, adds, **talents du joueur**, et **trajectoire x/y + orientation** (events dont le joueur est la source : ~1 point toutes les 0,1 s, quelques points de quota par combat).
+- **T3** ✅ Page HTML timeline : top N côte à côte + timeline du boss.
+- **T4** ✅ Vue agrégée : quand les tops utilisent chaque CD, par phase et par vague.
 
 ### Partie 2 — Sims
 - **R1** ✅ Parse de l'export `/simc` (équipé, sac, coffre, liens) : `paf profile`, depuis le presse-papier ou un fichier.
-- **R2** Top Gear multi-profils avec regret (logique du prototype PowerShell, retiré ; il reste dans l'historique git).
-- **R3** Log → combat SimC (`fights/<boss>.simc`) à partir de T2, utilisé comme profil par R2.
+- **R2** ✅ Top Gear multi-profils avec regret (logique du prototype PowerShell, retiré ; il reste dans l'historique git).
+- **R3** ✅ Log → combat SimC (`fights/<boss>.simc`) à partir de T2, utilisé comme profil par R2.
 - **R4** Droptimizer : tables de loot via wago.tools, EV par source, loot inséré dans les meilleurs sets.
-- **R5** Objectif d'optimisation au choix : **dégâts boss** (cible prioritaire : métrique `prioritydps` de SimC), **cleave**, **pad** (dégâts totaux, adds compris), ou un mix pondéré. Même sim, classement différent selon ce que la strat demande.
-- **R6** Sim de talents : comparer des builds en profilesets (`talents=`) sur le vrai combat. Candidats : les builds des tops (récupérés dans leurs logs WCL), les builds de l'utilisateur, et des variantes (un talent échangé contre un autre).
+- **R5** ✅ (Top Gear, plans de CD) Objectif d'optimisation au choix : **dégâts boss** (cible prioritaire : métrique `prioritydps` de SimC), **cleave**, **pad** (dégâts totaux, adds compris), ou un mix pondéré. Même sim, classement différent selon ce que la strat demande.
+- **R6** ✅ Sim de talents : comparer des builds en profilesets (`talents=`) sur le vrai combat. Candidats : les builds des tops (récupérés dans leurs logs WCL), les builds de l'utilisateur, et des variantes (un talent échangé contre un autre).
 
 ### Templates de combat et combat personnalisé
-- **F1** **Template de combat par boss**, construit à partir du corpus (les 100 à 200 premiers logs), par cohorte :
+- **F1** ✅ **Template de combat par boss**, construit à partir du corpus (les 100 à 200 premiers logs), par cohorte :
   - timeline moyenne du boss : phases, casts du boss, vagues d'adds (moment, nombre, durée de vie) ;
   - pour chaque spec, **comment elle joue** :
     - fenêtres de mouvement typiques (tirées des trajectoires) ;
@@ -119,5 +119,7 @@ Chaque ligne vient d'une brique : vagues d'adds (T2), combat SimC (R3), objectif
 - **v0.3** = T4, R4, R5, R6, F2, F3, P1 : objectif boss / cleave / pad, sim de talents, combat perso + optimiseur de placement.
 - **v0.4+** = partie 3 et élargissement.
 
-Prochaine brique : **T1b** (premières analyses du corpus).
+Fait aussi : `paf cdplan` (plans de CD : APL par défaut, tout au CD, garder pour les adds, timings des tops).
+
+Prochaines briques : calibrage du combat reconstruit (comparer la part boss simulée à la réelle), **F2/F3** (éditeur de combat + optimiseur de placement), **R4** (Droptimizer), puis UI web.
 
