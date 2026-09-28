@@ -8,7 +8,7 @@ Outil local et open source (MIT) pour préparer un boss : timelines des meilleur
 
 | Élément | Rôle | État |
 |---|---|---|
-| `src/paf/` | paquet Python, commande `paf` | S1 + R1 : `paf setup`, `paf doctor`, `paf profile` |
+| `src/paf/` | paquet Python, commande `paf` | v0.3+ : corpus, timelines, template, validate, topgear, talents, droptimizer, mechanics, assigns, optimize, prep, serve (voir README) |
 | `tests/` | pytest ; marqueurs `network` et `simc` exclus par défaut | |
 | `.env` | `WCL_CLIENT_ID` / `WCL_CLIENT_SECRET` | ignoré par git |
 
@@ -44,6 +44,22 @@ Le prototype PowerShell (`Invoke-LocalTopGear.ps1`, Top Gear 3 passes) a été r
 - Les options de sim (lust, PI, raid_events) marchent **par profileset** → variantes de combat en un seul run.
 - Perf : baseline 340 s à target_error 0.2 ≈ 0,4 s ; +10 profilesets ≈ 2,7 s avec `profileset_work_threads=4`.
 - Git Bash réécrit `raid_events=/…` en chemin : `MSYS_NO_PATHCONV=1` ou passer par un fichier.
+- **Mouvement** : un event `movement` qui démarre pendant un autre le **remplace** (il peut le raccourcir). Toujours fusionner les fenêtres qui se chevauchent (`paf.fight.merged_movement`).
+- **Mouvement déduit des trajectoires** : trop pénalisant tel quel (les tops castent en bougeant). `paf validate --calibrate` le met à l'échelle ; sur Ula'tek HM, facteur 0 → 0,97 du DPS réel des tops. Les déplacements perso et les assigns (`personal_movement`) ne sont jamais mis à l'échelle.
+- **Calibrage des adds** : jamais au-dessus de ×1 (les nombres viennent des logs) ; l'écart de part boss restant vient de la priorité de cible de SimC.
+- `gear_crit_rating=` / `gear_haste_rating=` / … **remplacent** le total du stuff : sert à imposer les vraies stats des tops (les logs n'ont pas les stats des objets craftés).
+- Trinkets on-use : catégorie partagée 1141, **verrou de 20 s** (données 12.1.0.69933), bien modélisé par simc.
+
+## Prépa : ce que les données permettent (vérifié sur Ula'tek HM)
+
+- Mécaniques : Journal des rencontres (`JournalEncounterSection`, drapeaux `IconFlags` : 1 tank, 2 dps, 4 heal, 64 interruptible, 4096 mythique…) ; `DifficultyMask` 0 ou -1 = toutes difficultés.
+- Qui gère quoi : `events(dataType:Interrupts)` et `events(dataType:Debuffs, hostilityType:Friendlies, filterExpression:"type='applydebuff'")` par kill (~2 points). Les debuffs de classe (Forbearance, Stagger…) sont filtrés en gardant les noms du journal ou des sorts lancés par les ennemis.
+- Les tops gardent Ascendance et le Vile Vial pour le Heart (57 % des casts sur 10 % du combat), Stormkeeper pour les adds : `paf.optimize.tops_alignment`.
+
+## Environnement
+
+- Cette machine coupe 25 à 45 % des connexions HTTP locales (même avec un serveur stdlib minimal) : les tests web réessaient. À signaler si l'UI paraît instable.
+- Le vérificateur du mode auto plante parfois sur Bash : passer par l'outil PowerShell (`.venv\Scripts\...`).
 
 ## Warcraft Logs (S2)
 

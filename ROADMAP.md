@@ -103,10 +103,10 @@ Chaque ligne vient d'une brique : vagues d'adds (T2), combat SimC (R3), objectif
 - **F3** ✅ **Optimiseur** : SimC teste les décalages possibles des éléments décalables et des CD (profilesets : les options de combat varient par profileset, c'est vérifié). Il ressort le meilleur placement, par exemple « bouge 4 s plus tôt et garde Stormkeeper pour après le déplacement : +2,1 % ».
 
 ### Assigns et mécaniques (validé avec Manu, 2026-09-28)
-- **A1** **Catalogue automatique des mécaniques** par boss : sorts du boss depuis le Journal des rencontres (wago.tools : nom, description, drapeaux tank/heal/dps/interruptible) croisés avec les casts vus dans les logs.
-- **A2** **Pré-tri automatique depuis le corpus** : pour chaque mécanique, qui la gère dans les tops. Kicks via les events `interrupt`, soaks/orbes/debuffs via les dégâts et debuffs reçus. Une mécanique prise par 1 à 3 joueurs fixes est **assignée**, prise par tout le raid elle est **raid-wide**. On en tire les specs qui s'en chargent et le coût mesuré (déplacement, temps sans caster, DPS sur la fenêtre).
-- **A3** **Assigns joueur** : liste de cases à cocher par boss, pré-remplie selon la spec (« je kick l'add », « je ramène les orbes »). Chaque case devient des fenêtres de déplacement ou d'indisponibilité dans le combat simulé, avec les timings des logs. Dev manuel seulement pour les mécaniques exotiques.
-- **A4** **Déroulé idéal** (`paf optimize`, en cours) : règles de CD optimisées par objectif (boss / total / adds) avec les assigns, sortie dans la fiche HTML et en note MRT.
+- **A1** ✅ **Catalogue automatique des mécaniques** par boss : sorts du boss depuis le Journal des rencontres (wago.tools : nom, description, drapeaux tank/heal/dps/interruptible) croisés avec les casts vus dans les logs.
+- **A2** ✅ **Pré-tri automatique depuis le corpus** : pour chaque mécanique, qui la gère dans les tops. Kicks via les events `interrupt`, soaks/orbes/debuffs via les dégâts et debuffs reçus. Une mécanique prise par 1 à 3 joueurs fixes est **assignée**, prise par tout le raid elle est **raid-wide**. On en tire les specs qui s'en chargent et le coût mesuré (déplacement, temps sans caster, DPS sur la fenêtre).
+- **A3** ✅ **Assigns joueur** : liste de cases à cocher par boss, pré-remplie selon la spec (« je kick l'add », « je ramène les orbes »). Chaque case devient des fenêtres de déplacement ou d'indisponibilité dans le combat simulé, avec les timings des logs. Dev manuel seulement pour les mécaniques exotiques.
+- **A4** ✅ **Déroulé idéal** (`paf optimize`) : règles de CD optimisées par objectif (boss / total / adds) avec les assigns, sortie dans la fiche HTML et en note MRT.
 
 ### Partie 3 — Prépa (briques définies ensemble le moment venu)
 - **P1** Atelier de conception avec Manu : choisir et ordonner les pistes ci-dessus.
@@ -116,7 +116,7 @@ Chaque ligne vient d'une brique : vagues d'adds (T2), combat SimC (R3), objectif
 ### Plus tard
 - Autres specs (données par spec sorties du code).
 - M+ (DungeonRoute / MDT).
-- UI web locale.
+- ✅ UI web locale (`paf serve`).
 - Releases et installation en une commande.
 
 ## Jalons
@@ -130,4 +130,6 @@ Fait aussi :
 - `paf calibrate` : calibrage du combat sur la part de dégâts boss réelle. Limite trouvée : SimC garde ses sorts mono-cible sur le boss, donc l'écart résiduel est affiché dans la fiche ;
 - `paf prep` : **la fiche de boss d'une page**, qui enchaîne tout.
 
-Prochaines briques : UI web locale (coller `/simc`, choisir un boss, voir la fiche), autres specs (données par spec hors du code), passe « loot dans les meilleurs sets » du Droptimizer, M+.
+Fait aussi : `paf validate` (les persos des tops simmés sur le combat reconstruit contre leur DPS réel : 0,74 avec le mouvement brut, 0,97 une fois le mouvement calibré sur Ula'tek HM) et la comparaison avec ce que font les tops de leurs CD.
+
+Prochaines briques : valeur des cibles secondaires (le Heart doit mourir vite, SimC ne le sait pas), autres specs (données par spec hors du code), passe « loot dans les meilleurs sets » du Droptimizer, M+, releases.

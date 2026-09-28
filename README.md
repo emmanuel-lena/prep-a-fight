@@ -61,16 +61,31 @@ WCL_CLIENT_SECRET=...
 
 3. Check everything with `paf doctor`.
 
-## Prepare a boss in one command
+## Prepare a boss
+
+In your browser:
+
+```sh
+paf serve                    # opens http://127.0.0.1:8765: paste your /simc, pick a boss, tick your
+                             # assignments (kick, soak...), run: the prep sheet opens when it is ready
+```
+
+Or in one command:
 
 ```sh
 paf profile                  # in game: /simc, Ctrl+A, Ctrl+C, then this (reads the clipboard)
 paf prep "Ula'tek" --open    # everything below, as a one-page HTML prep sheet
 ```
 
-The prep sheet gives: the fight (phases, add waves, lust, movement), your DPS on the rebuilt fight vs a
-Patchwerk, the top players' talent builds simmed on your character, cooldown plans, your best items and
-what the boss drops for you, with a short "what to remember" list at the top.
+The prep sheet gives:
+- the fight: phases, add waves, lust, and the boss's mechanics;
+- your DPS on the rebuilt fight vs a Patchwerk;
+- a validation: the top players' own characters simmed on the rebuilt fight vs their real DPS;
+- the top players' talent builds simmed on your character;
+- the **ideal cooldown play-by-play for boss damage, total damage and damage to adds**, with an MRT note;
+- what the top players actually do with their cooldowns;
+- your best items and what the boss drops for you;
+- a short "what to remember" list at the top.
 
 ## Or step by step
 
@@ -104,7 +119,12 @@ paf cdplan "Ula'tek"         # cooldown plans compared on that fight
 | `paf calibrate BOSS` | Scale the add counts so your simulated share of damage on the boss matches the top players' logs |
 | `paf plan BOSS` | Your own plan on top of the template (moves, soaks, lust, PI) in a text file; `--optimize` finds the best timing of the moves you mark as shiftable |
 | `paf droptimizer` | Value of every item the raid (or `--boss`) drops for you, on the fights you choose; EV per boss |
+| `paf mechanics BOSS` | The boss's mechanics from the in-game Encounter Journal (roles, interruptible, mythic...); `--corpus` adds who handles each one in the top kills (assigned, several players, raid-wide, kicks) |
+| `paf assigns BOSS` | Mechanics you can be assigned to, with their timings and their cost (movement) measured on your spec in the logs; adds `# assign ...` lines to your plan file |
+| `paf validate BOSS` | Sims the top players' own characters (gear, talents, real stats from their logs) on the rebuilt fight and compares with their real DPS; `--calibrate` fixes the inferred movement accordingly |
+| `paf optimize BOSS` | Ideal cooldown rules per objective (boss / total / adds): on cooldown, hold for adds, secondary targets, lust/PI...; play-by-play and MRT note |
 | `paf prep BOSS` | All of the above for one boss, as an HTML prep sheet |
+| `paf serve` | Local web UI for all of this |
 
 ### How much to trust the numbers
 
@@ -112,6 +132,10 @@ paf cdplan "Ula'tek"         # cooldown plans compared on that fight
 - A rebuilt fight is an approximation: add lifetimes and movement come from the top players' logs,
   and SimC has no fine target priority. Good for choosing between builds, items and plans; not a
   prediction of your exact DPS.
+- `paf validate` tells you how close the rebuilt fight is to reality: on Ula'tek heroic, the top 6
+  Elementals simmed with their own gear reach 97% of their real DPS once the movement is calibrated.
+- SimC does not know that a secondary target (a heart, a shield) must die fast: compare the simulated
+  plans with what the top players do (shown next to them).
 - Analyses of the corpus are correlations (what the top players do). SimC is used to check them on
   your character.
 
