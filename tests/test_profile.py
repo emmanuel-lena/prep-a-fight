@@ -57,6 +57,8 @@ def test_header_and_equipped():
     assert p.equipped["head"].item_id == 271483
     assert p.equipped["neck"].fields["gem_id"] == "5"
     assert p.equipped["off_hand"].simc() == "off_hand=,id=268262"
+    assert (p.equipped["head"].name, p.equipped["head"].ilvl) == ("Some Helm", 318)
+    assert p.equipped["neck"].name == ""
 
 
 def test_candidates_by_source():

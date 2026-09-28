@@ -53,3 +53,33 @@ def talent_entry_names() -> dict[int, str]:
         if r.get("ID", "").isdigit():
             out[int(r["ID"])] = defs.get(int(r.get("TraitDefinitionID") or 0), "")
     return out
+
+
+# InventoryType values (Item.db2)
+INV_ONE_HAND = 13
+INV_SHIELD = 14
+INV_RANGED = 15
+INV_TWO_HAND = 17
+INV_MAIN_HAND = 21
+INV_OFF_HAND = 22
+INV_HOLDABLE = 23
+INV_RANGED_RIGHT = 26
+
+
+@cache
+def item_inventory_types() -> dict[int, int]:
+    return {int(r["ID"]): int(r["InventoryType"] or 0) for r in table_rows("Item") if r.get("ID", "").isdigit()}
+
+
+@cache
+def item_sets() -> dict[int, tuple[int, str]]:
+    """item id -> (set id, set name) for every item that belongs to a set (tier sets)."""
+    out: dict[int, tuple[int, str]] = {}
+    for r in table_rows("ItemSet"):
+        if not r.get("ID", "").isdigit():
+            continue
+        for i in range(17):
+            v = r.get(f"ItemID_{i}") or "0"
+            if v.isdigit() and int(v):
+                out[int(v)] = (int(r["ID"]), r.get("Name_lang", ""))
+    return out

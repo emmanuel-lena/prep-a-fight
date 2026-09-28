@@ -77,6 +77,7 @@ def parse_simc_export(text: str) -> Profile:
     p = Profile()
     source: str | None = None
     pending_name, pending_ilvl = "", None
+    equipped_name, equipped_ilvl = "", None
 
     for raw in text.splitlines():
         line = raw.strip().lstrip("﻿")
@@ -100,6 +101,9 @@ def parse_simc_export(text: str) -> Profile:
 
         if line.startswith("#"):
             body = line[1:].strip()
+            if source is None:
+                m = _NAME_ILVL.match(body)
+                equipped_name, equipped_ilvl = (m.group("name"), int(m.group("ilvl"))) if m else ("", None)
             if source is None or not body:
                 if not body:
                     pending_name, pending_ilvl = "", None
@@ -116,7 +120,8 @@ def parse_simc_export(text: str) -> Profile:
 
         slot = _split_slot(line)
         if slot:
-            p.equipped[slot[0]] = Item(slot[0], slot[1])
+            p.equipped[slot[0]] = Item(slot[0], slot[1], equipped_name, equipped_ilvl)
+            equipped_name, equipped_ilvl = "", None
             continue
 
         key, sep, value = line.partition("=")

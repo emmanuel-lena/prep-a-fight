@@ -293,6 +293,61 @@ def cmd_sim(args: argparse.Namespace) -> int:
     return 0
 
 
+def _objective(raw: str) -> float:
+    raw = raw.strip().lower()
+    if raw in ("total", "pad", "dps"):
+        return 0.0
+    if raw in ("boss", "priority", "st"):
+        return 1.0
+    v = float(raw.removeprefix("mix:"))
+    if not 0 <= v <= 1:
+        raise argparse.ArgumentTypeError("objective must be total, boss or a boss weight between 0 and 1")
+    return v
+
+
+def cmd_topgear(args: argparse.Namespace) -> int:
+    from paf import simc
+    from paf.corpus.template import template_path
+    from paf.fight import PRESETS, Fight
+    from paf.gamedata import item_inventory_types, item_sets
+    from paf.profile import parse_simc_export
+    from paf.topgear import FightProfile, GearPool, best_set_simc, format_result, run_topgear
+
+    profile_text, origin = _load_profile(args.profile)
+    profile = parse_simc_export(profile_text)
+    pool = GearPool(profile, item_inventory_types(), item_sets())
+    fights: list[FightProfile] = []
+    for boss in args.boss or []:
+        _, enc, diff_name, _ = _encounter_and_difficulty(argparse.Namespace(boss=boss, difficulty=args.difficulty))
+        fpath = template_path(enc.name, diff_name)
+        if not fpath.is_file():
+            print(f"No fight template for {enc.name} {diff_name}: run `paf template \"{enc.name}\"` first.")
+            return 1
+        fights.append(FightProfile(fpath.stem, Fight.load(fpath).to_simc()))
+    for preset in args.preset or ([] if fights else ["patchwerk"]):
+        fights.append(FightProfile(preset, PRESETS[preset]))
+    n_cand = len(pool.candidates)
+    tier = f", tier set {pool.tier_set}" if pool.tier_set else ""
+    print(f"{profile.name} ({origin}): {n_cand} candidate items{tier}; fights: {', '.join(f.name for f in fights)}")
+    if not n_cand:
+        print("No items in bags / great vault / links: export /simc with 'Bags' ticked,")
+        print("or link items in game with /simc [item].")
+        return 1
+    root = simc.new_run_dir(label="topgear")
+    res = run_topgear(profile_text, pool, fights, root, pass1_error=args.pass1_error,
+                      pass2_error=args.pass2_error, objective=args.objective, max_combos=args.max_combos,
+                      min_tier=args.min_tier)
+    report = format_result(res, pool, top=args.top)
+    print()
+    print(report)
+    (root / "results.txt").write_text(report + "\n", encoding="utf-8")
+    best = res.best()
+    if best:
+        (root / "best_set.simc").write_text(best_set_simc(pool, best), encoding="utf-8")
+    print(f"\nRuns and best set: {root}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paf", description="prep-a-fight: prepare a boss fight from top logs.")
     p.add_argument("--version", action="version", version=f"paf {__version__}")
@@ -352,6 +407,21 @@ def build_parser() -> argparse.ArgumentParser:
     tl.add_argument("--top", type=int, default=25, help="players shown one per row (default 25)")
     tl.add_argument("--open", action="store_true", help="open the page in the browser")
     tl.set_defaults(func=cmd_timeline)
+
+    tg = sub.add_parser("topgear", help="best combination of your items, on real boss fights and/or presets")
+    tg.add_argument("--boss", action="append", help="boss whose fight template to use (repeatable)")
+    tg.add_argument("--preset", action="append", choices=["patchwerk", "cleave2", "aoe5"],
+                    help="standard fight to add (repeatable; default patchwerk when no --boss)")
+    tg.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    tg.add_argument("--objective", type=_objective, default=0.0,
+                    help="total (default), boss (boss-only damage) or a boss weight like 0.7")
+    tg.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
+    tg.add_argument("--pass1-error", type=float, default=0.3)
+    tg.add_argument("--pass2-error", type=float, default=0.15)
+    tg.add_argument("--max-combos", type=int, default=1500)
+    tg.add_argument("--min-tier", type=int, help="minimum tier pieces (default: as many as equipped, up to 4)")
+    tg.add_argument("--top", type=int, default=10)
+    tg.set_defaults(func=cmd_topgear)
     return p
 
 
