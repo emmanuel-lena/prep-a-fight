@@ -162,6 +162,9 @@ def cmd_corpus(args: argparse.Namespace) -> int:
         print(f"  Only {len(kills)} ranked {spec} kills on {diff_name}: analyses will be noisy.{hint}")
     if args.list_only:
         return 0
+    if args.refetch:
+        con.execute("UPDATE fight SET status='pending' WHERE encounter_id=? AND difficulty=?", (enc.id, diff))
+        con.commit()
     stats = collect(client, con, enc, diff, retry_errors=args.retry)
     total = con.execute("SELECT COUNT(*) FROM fight WHERE encounter_id=? AND difficulty=? AND status='done'",
                         (enc.id, diff)).fetchone()[0]
@@ -225,6 +228,7 @@ def build_parser() -> argparse.ArgumentParser:
     co.add_argument("--ilvl", type=float, help="cohort of players around this item level instead of the top")
     co.add_argument("--list-only", action="store_true", help="only list ranked kills, fetch nothing")
     co.add_argument("--retry", action="store_true", help="retry kills that failed before")
+    co.add_argument("--refetch", action="store_true", help="fetch again kills already in the corpus")
     co.set_defaults(func=cmd_corpus)
 
     an = sub.add_parser("analyze", help="fight shape, add waves, who hits adds, talents (from the corpus)")

@@ -9,7 +9,7 @@ START = 1_000_000
 def payload():
     return {
         "fights": [{
-            "id": 7, "encounterID": 99, "kill": True, "difficulty": 4, "size": 20,
+            "id": 7, "name": "Boss", "encounterID": 99, "kill": True, "difficulty": 4, "size": 20,
             "startTime": START, "endTime": START + 300_000, "averageItemLevel": 310.0,
             "phaseTransitions": [{"id": 1, "startTime": START}, {"id": 2, "startTime": START + 120_000}],
             "enemyNPCs": [{"id": 50, "gameID": 1000, "instanceCount": 1, "petOwner": None},

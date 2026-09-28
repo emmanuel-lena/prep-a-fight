@@ -33,7 +33,7 @@ query($id:Int!, $diff:Int!, $page:Int, $bracket:Int, $region:String, $cls:String
 KILL_QUERY = """
 query($code:String!, $f:[Int]!) { reportData { report(code:$code) {
   archiveStatus { isAccessible }
-  fights(fightIDs:$f) { id encounterID kill difficulty size startTime endTime averageItemLevel
+  fights(fightIDs:$f) { id name encounterID kill difficulty size startTime endTime averageItemLevel
     phaseTransitions { id startTime } enemyNPCs { id gameID instanceCount petOwner } }
   phases { encounterID phases { id name isIntermission } }
   masterData { actors { id name gameID type subType petOwner } abilities { gameID name } }
@@ -176,7 +176,10 @@ def parse_kill(rep: dict[str, Any], fight_id: int, ranked_name: str | None,
     actors = {a["id"]: a for a in (rep.get("masterData") or {}).get("actors") or []}
     boss_ids = {i for i, a in actors.items() if a.get("subType") == "Boss" and i >= 0}
     enemy_ids = {n["id"] for n in f.get("enemyNPCs") or [] if not n.get("petOwner")}
-    add_ids = enemy_ids - boss_ids
+    # the main boss is the boss unit named like the fight; other boss units (e.g. a heart to burn)
+    # are tracked like adds so their timing is known
+    main_ids = {i for i in boss_ids if actors[i].get("name") == f.get("name")} or boss_ids
+    add_ids = enemy_ids - main_ids
 
     out: dict[str, Any] = {
         "fight": {"duration_s": round((end - start) / 1000, 3), "kill": int(bool(f.get("kill"))),
