@@ -52,7 +52,7 @@ Pistes de départ, à trier et à préciser avec Manu :
 
 ### Partie 1 — Timelines
 - **T1** Top N d'une spec sur un boss (`paf top`), avec choix de la difficulté (`--difficulty lfr|normal|heroic|mythic`) et une difficulté par défaut réglable (`paf config difficulty heroic`). Si trop peu de logs classés, on le signale et on propose la difficulté du dessous.
-- **T2** Extraction par log : casts de CD du joueur, lust, PI, phases, casts du boss, adds.
+- **T2** Extraction par log : casts de CD du joueur, lust, PI, phases, casts du boss, adds, **talents du joueur**, et **positions x/y** (portées par les casts du joueur, quasi gratuites en quota ; ce n'est pas un GPS continu).
 - **T3** Page HTML timeline : top N côte à côte + timeline du boss.
 - **T4** Vue agrégée : quand les tops utilisent chaque CD, par phase et par vague.
 
@@ -61,10 +61,13 @@ Pistes de départ, à trier et à préciser avec Manu :
 - **R2** Top Gear multi-profils avec regret (logique du prototype PowerShell, retiré ; il reste dans l'historique git).
 - **R3** Log → combat SimC (`fights/<boss>.simc`) à partir de T2, utilisé comme profil par R2.
 - **R4** Droptimizer : tables de loot via wago.tools, EV par source, loot inséré dans les meilleurs sets.
+- **R5** Objectif d'optimisation au choix : **dégâts boss** (cible prioritaire : métrique `prioritydps` de SimC), **cleave**, **pad** (dégâts totaux, adds compris), ou un mix pondéré. Même sim, classement différent selon ce que la strat demande.
+- **R6** Sim de talents : comparer des builds en profilesets (`talents=`) sur le vrai combat. Candidats : les builds des tops (récupérés dans leurs logs WCL), les builds de l'utilisateur, et des variantes (un talent échangé contre un autre).
 
 ### Partie 3 — Prépa (briques définies ensemble le moment venu)
 - **P1** Atelier de conception avec Manu : choisir et ordonner les pistes ci-dessus.
 - P2… à définir.
+- Principe : **tout doit être personnalisable**. L'utilisateur choisit son objectif (boss / cleave / pad), ses assigns, ses talents candidats, ses plans de CD. L'outil propose des défauts tirés des tops, mais n'impose rien.
 
 ### Plus tard
 - Autres specs (données par spec sorties du code).
@@ -75,7 +78,7 @@ Pistes de départ, à trier et à préciser avec Manu :
 ## Jalons
 - **v0.1** = S1, S2, T1 → T3 : les timelines Élém d'un boss. Premier truc utile, et vite montrable.
 - **v0.2** = S3, R1 → R3 : Top Gear sur le vrai combat.
-- **v0.3** = T4, R4, P1.
+- **v0.3** = T4, R4, R5, R6, P1 : objectif boss / cleave / pad, sim de talents.
 - **v0.4+** = partie 3 et élargissement.
 
 Prochaine brique : **T1** (top N d'une spec sur un boss).
