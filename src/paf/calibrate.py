@@ -17,7 +17,9 @@ from paf import simc
 from paf.corpus.analyze import kills_filter
 from paf.fight import Fight
 
-SCALES = (0.1, 0.2, 0.3, 0.45, 0.6, 0.8, 1.0, 1.3, 1.6, 2.0)  # beyond x2 counts stop being plausible
+# never above x1: add counts come from the logs; scaling them up inflates AoE value, while the remaining
+# gap in boss damage share comes from SimC keeping single-target spells on the boss
+SCALES = (0.1, 0.2, 0.3, 0.45, 0.6, 0.8, 1.0)
 
 
 def real_boss_share(con: sqlite3.Connection, encounter_id: int, difficulty: int, boss_name: str,
