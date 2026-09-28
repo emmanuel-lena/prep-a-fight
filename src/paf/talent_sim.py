@@ -120,3 +120,45 @@ def choice_rates(builds_all: dict[frozenset[int], int]) -> dict[int, float]:
         for e in key:
             rate[e] += n / total
     return rate
+
+
+@dataclass
+class TalentRow:
+    build: Build
+    per_fight: dict[str, tuple[float, float | None]]  # fight -> (total delta %, boss delta % or None)
+    add: list[str]
+    drop: list[str]
+
+
+@dataclass
+class TalentComparison:
+    fights: list[str]
+    rows: list[TalentRow]
+    error: float
+    run_dir: Path
+
+
+def compare_builds(profile_text: str, con: sqlite3.Connection, client: WCLClient, encounter_id: int,
+                   difficulty: int, spec: str, fights: dict[str, list[str]], run_dir: Path, *, n: int = 6,
+                   target_error: float = 0.2) -> TalentComparison | None:
+    from paf.gamedata import talent_entry_names
+
+    builds = top_builds(con, encounter_id, difficulty, spec, n=n)
+    if not builds:
+        return None
+    fetch_codes(client, con, builds)
+    names = talent_entry_names()
+    mine = my_talent_entries(profile_text, sorted(builds[0].key))
+    results = sim_builds(profile_text, builds, fights, run_dir, target_error=target_error)
+    rows = []
+    for i, b in enumerate(builds):
+        per: dict[str, tuple[float, float | None]] = {}
+        for fname, res in results.items():
+            ps = next((p for p in res.profilesets if p.name == f"b{i}"), None)
+            if ps:
+                has_boss = "prioritydps" in ps.metrics and "prioritydps" in res.baseline
+                per[fname] = (res.delta_pct(ps, "dps"), res.delta_pct(ps, "prioritydps") if has_boss else None)
+        add, drop = build_diff(mine, set(b.key), names) if mine else ([], [])
+        rows.append(TalentRow(b, per, add, drop))
+    err = max(r.baseline["dps"].error / r.baseline["dps"].mean * 100 for r in results.values())
+    return TalentComparison(list(fights), rows, err, run_dir)

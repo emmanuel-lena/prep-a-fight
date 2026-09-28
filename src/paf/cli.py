@@ -348,26 +348,12 @@ def cmd_topgear(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_talents(args: argparse.Namespace) -> int:
-    from paf import settings, simc
-    from paf.corpus import db
+def _boss_fights(enc, diff_name: str) -> dict[str, list[str]]:
+    """The boss template (if any) and a Patchwerk of the same length."""
+    from paf import simc
     from paf.corpus.template import template_path
     from paf.fight import Fight
-    from paf.gamedata import talent_entry_names
-    from paf.talent_sim import build_diff, fetch_codes, my_talent_entries, sim_builds, top_builds
 
-    profile_text, origin = _load_profile(args.profile)
-    client, enc, diff_name, diff = _encounter_and_difficulty(args)
-    con = db.connect()
-    spec = settings.get("spec")
-    builds = top_builds(con, enc.id, diff, spec, n=args.builds)
-    if not builds:
-        print(f"No ranked {spec} players in the corpus for {enc.name} {diff_name}: run `paf corpus` first.")
-        return 1
-    fetch_codes(client, con, builds)
-    names = talent_entry_names()
-    sample = sorted(builds[0].key)
-    mine = my_talent_entries(profile_text, sample)
     fights: dict[str, list[str]] = {}
     fpath = template_path(enc.name, diff_name)
     duration = 300.0
@@ -376,47 +362,66 @@ def cmd_talents(args: argparse.Namespace) -> int:
         fights[fpath.stem] = fight.to_simc()
         duration = fight.duration
     fights["patchwerk"] = ["fight_style=Patchwerk", f"max_time={simc.fmt(duration)}", "desired_targets=1"]
-    total_players = sum(b.count for b in builds)
-    print(f"{enc.name} {diff_name}: {len(builds)} most common {spec} builds ({total_players} players); "
-          f"simming them on your character ({origin})")
-    root = simc.new_run_dir(label="talents")
-    results = sim_builds(profile_text, builds, fights, root, target_error=args.error)
-    header = "  ".join(f"{n[:18]:>18}" for n in fights)
+    return fights
+
+
+def print_talents(tc) -> None:
+    header = "  ".join(f"{n[:18]:>18}" for n in tc.fights)
     print(f"\n{'build':<12} {'players':>7} {'med.rank':>8}  {header}")
-    print(f"{'your build':<12} {'':>7} {'':>8}  " + "  ".join(f"{'ref':>18}" for _ in fights))
-    for i, b in enumerate(builds):
+    print(f"{'your build':<12} {'':>7} {'':>8}  " + "  ".join(f"{'ref':>18}" for _ in tc.fights))
+    for r in tc.rows:
         cols = []
-        for res in results.values():
-            ps = next((p for p in res.profilesets if p.name == f"b{i}"), None)
-            if not ps:
+        for f in tc.fights:
+            if f not in r.per_fight:
                 cols.append(f"{'n/a':>18}")
                 continue
-            tot = res.delta_pct(ps, "dps")
-            has_boss = "prioritydps" in ps.metrics and "prioritydps" in res.baseline
-            boss = res.delta_pct(ps, "prioritydps") if has_boss else None
+            tot, boss = r.per_fight[f]
             cell = f"{tot:+.2f}%" + (f" (boss {boss:+.1f}%)" if boss is not None else "")
             cols.append(f"{cell:>18}")
-        print(f"{b.label:<12} {b.count:>7} {b.median_rank:>8.0f}  " + "  ".join(cols))
-    err = max(r.baseline["dps"].error / r.baseline["dps"].mean * 100 for r in results.values())
-    print(f"\nStatistical error: about +/-{err:.2f}% per value.")
-    if mine:
+        print(f"{r.build.label:<12} {r.build.count:>7} {r.build.median_rank:>8.0f}  " + "  ".join(cols))
+    print(f"\nStatistical error: about +/-{tc.error:.2f}% per value.")
+    if any(r.add or r.drop for r in tc.rows):
         print("\nWhat each build changes compared to yours:")
-        for b in builds:
-            add, drop = build_diff(mine, set(b.key), names)
-            if not add and not drop:
-                print(f"  {b.label}: same talents as yours")
+        for r in tc.rows:
+            if not r.add and not r.drop:
+                print(f"  {r.build.label}: same talents as yours")
                 continue
-            print(f"  {b.label}: take {', '.join(add) or '-'}")
-            print(f"  {'':<{len(b.label)}}  drop {', '.join(drop) or '-'}")
-    print(f"\nRuns: {root}")
+            print(f"  {r.build.label}: take {', '.join(r.add) or '-'}")
+            print(f"  {'':<{len(r.build.label)}}  drop {', '.join(r.drop) or '-'}")
+
+
+def cmd_talents(args: argparse.Namespace) -> int:
+    from paf import settings, simc
+    from paf.corpus import db
+    from paf.talent_sim import compare_builds
+
+    profile_text, origin = _load_profile(args.profile)
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    spec = settings.get("spec")
+    print(f"{enc.name} {diff_name}: most common {spec} builds simmed on your character ({origin})")
+    tc = compare_builds(profile_text, db.connect(), client, enc.id, diff, spec, _boss_fights(enc, diff_name),
+                        simc.new_run_dir(label="talents"), n=args.builds, target_error=args.error)
+    if tc is None:
+        print(f"No ranked {spec} players in the corpus for {enc.name} {diff_name}: run `paf corpus` first.")
+        return 1
+    print_talents(tc)
+    print(f"\nRuns: {tc.run_dir}")
     return 0
+
+
+def print_plans(pc) -> None:
+    for act, times in pc.cd_times.items():
+        print(f"  {act}: top players use it at {', '.join(_mmss(t) for t in times) or '(no common timing)'}")
+    print(f"\n{'plan':<26} {'total':>8} {'boss':>8}   on {pc.fight_name}")
+    for p, tot, boss in pc.rows:
+        print(f"{p.name:<26} {tot:+7.2f}% {boss:+7.2f}%   {p.description}")
+    print(f"\nStatistical error: about +/-{pc.error:.2f}%. SimC evaluates these plans; it does not invent new ones.")
 
 
 def cmd_cdplan(args: argparse.Namespace) -> int:
     from paf import settings, simc
-    from paf.cdplan import apl_lines, dump_apl, parse_apl, plan_lines, standard_plans, tracked_actions
+    from paf.cdplan import compare_plans
     from paf.corpus import db
-    from paf.corpus.analyze import canonical_waves
     from paf.corpus.template import template_path
     from paf.corpus.timeline import build_timeline
     from paf.fight import Fight
@@ -427,51 +432,15 @@ def cmd_cdplan(args: argparse.Namespace) -> int:
     if not fpath.is_file():
         print(f"No fight template for {enc.name} {diff_name}: run `paf template \"{enc.name}\"` first.")
         return 1
-    fight = Fight.load(fpath)
     tl = build_timeline(db.connect(), enc.id, diff, enc.name, diff_name, settings.get("spec"), top=10_000)
-    offensive = [a for a in tl.abilities if not a.utility]
-    root = simc.new_run_dir(label="cdplan")
-    apl = parse_apl(dump_apl(profile_text, root))
-    tracked = tracked_actions(apl, [a.name for a in offensive])
-    if not tracked:
+    print(f"{enc.name} {diff_name}: cooldown plans for {origin}")
+    pc = compare_plans(profile_text, tl, Fight.load(fpath), simc.new_run_dir(label="cdplan"),
+                       target_error=args.error, objective=args.objective)
+    if pc is None:
         print("None of the top players' cooldowns match an action of the default APL.")
         return 1
-    cds: dict[str, list[float]] = {}
-    long_cds: set[str] = set()
-    for ab in offensive:
-        act = tracked.get(ab.name)
-        if not act:
-            continue
-        per_player = [[(t, 1, 0.0, [""]) for t in p["casts"].get(ab.id, [])] for p in tl.players]
-        cds[act] = [w.t for w in canonical_waves(per_player) if w.support >= 0.4]
-        if ab.per_kill <= 6:
-            long_cds.add(act)
-    print(f"{enc.name} {diff_name}: cooldown plans for {origin}")
-    for act, times in cds.items():
-        print(f"  {act}: top players use it at {', '.join(_mmss(t) for t in times) or '(no common timing)'}")
-    plans = standard_plans(cds, long_cds)
-    sets = {p.name: plan_lines(apl, p) for p in plans if p.name != "default"}
-    sets = {k: v for k, v in sets.items() if v}
-    base = "\n".join([profile_text.rstrip(), *apl_lines(apl)])  # explicit APL: needed for overrides
-    res = simc.run(simc.build_input(base, fight.to_simc(), sets), root / "fight", target_error=args.error)
-    rows = []
-    for p in plans:
-        if p.name == "default":
-            rows.append((p, 0.0, 0.0))
-            continue
-        ps = next((x for x in res.profilesets if x.name == p.name), None)
-        if ps:
-            boss = res.delta_pct(ps, "prioritydps") if "prioritydps" in ps.metrics and "prioritydps" in res.baseline \
-                else 0.0
-            rows.append((p, res.delta_pct(ps, "dps"), boss))
-    w = args.objective
-    rows.sort(key=lambda r: -(w * r[2] + (1 - w) * r[1]))
-    err = res.baseline["dps"].error / res.baseline["dps"].mean * 100
-    print(f"\n{'plan':<26} {'total':>8} {'boss':>8}   on {fight.name}")
-    for p, tot, boss in rows:
-        print(f"{p.name:<26} {tot:+7.2f}% {boss:+7.2f}%   {p.description}")
-    print(f"\nStatistical error: about +/-{err:.2f}%. SimC evaluates these plans; it does not invent new ones.")
-    print(f"Runs: {root}")
+    print_plans(pc)
+    print(f"Runs: {pc.run_dir}")
     return 0
 
 

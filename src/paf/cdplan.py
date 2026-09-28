@@ -150,3 +150,51 @@ def apl_lines(apl: OrderedDict[str, list[str]]) -> list[str]:
         for i, a in enumerate(actions):
             out.append(f"{key}={a}" if i == 0 else f"{key}+=/{a}")
     return out
+
+
+@dataclass
+class PlanComparison:
+    cd_times: dict[str, list[float]]
+    rows: list[tuple[Plan, float, float]]  # plan, total delta %, boss delta %
+    error: float
+    fight_name: str
+    run_dir: Path
+
+
+def compare_plans(profile_text: str, timeline, fight, run_dir: Path, *, target_error: float = 0.1,
+                  objective: float = 0.0) -> PlanComparison | None:
+    """timeline: paf.corpus.timeline.Timeline of the top players; fight: paf.fight.Fight."""
+    from paf.corpus.analyze import canonical_waves
+
+    offensive = [a for a in timeline.abilities if not a.utility]
+    apl = parse_apl(dump_apl(profile_text, run_dir))
+    tracked = tracked_actions(apl, [a.name for a in offensive])
+    if not tracked:
+        return None
+    cds: dict[str, list[float]] = {}
+    long_cds: set[str] = set()
+    for ab in offensive:
+        act = tracked.get(ab.name)
+        if not act:
+            continue
+        per_player = [[(t, 1, 0.0, [""]) for t in p["casts"].get(ab.id, [])] for p in timeline.players]
+        cds[act] = [w.t for w in canonical_waves(per_player) if w.support >= 0.4]
+        if ab.per_kill <= 6:
+            long_cds.add(act)
+    plans = standard_plans(cds, long_cds)
+    sets = {p.name: plan_lines(apl, p) for p in plans if p.name != "default"}
+    sets = {k: v for k, v in sets.items() if v}
+    base = "\n".join([profile_text.rstrip(), *apl_lines(apl)])  # explicit APL: needed for overrides
+    res = simc.run(simc.build_input(base, fight.to_simc(), sets), run_dir / "fight", target_error=target_error)
+    rows: list[tuple[Plan, float, float]] = []
+    for p in plans:
+        if p.name == "default":
+            rows.append((p, 0.0, 0.0))
+            continue
+        ps = next((x for x in res.profilesets if x.name == p.name), None)
+        if ps:
+            has_boss = "prioritydps" in ps.metrics and "prioritydps" in res.baseline
+            rows.append((p, res.delta_pct(ps, "dps"), res.delta_pct(ps, "prioritydps") if has_boss else 0.0))
+    rows.sort(key=lambda r: -(objective * r[2] + (1 - objective) * r[1]))
+    err = res.baseline["dps"].error / res.baseline["dps"].mean * 100
+    return PlanComparison(cds, rows, err, fight.name, run_dir)
