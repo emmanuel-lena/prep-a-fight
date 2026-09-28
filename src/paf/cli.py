@@ -96,6 +96,29 @@ def cmd_profile(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_config(args: argparse.Namespace) -> int:
+    from paf import settings
+
+    if args.key and args.value is not None:
+        try:
+            v = settings.set_value(args.key, args.value)
+        except (KeyError, ValueError) as e:
+            print(e)
+            return 1
+        print(f"{args.key} = {v}")
+        return 0
+    values = settings.load()
+    keys = [args.key] if args.key else list(settings.SETTINGS)
+    for k in keys:
+        if k not in settings.SETTINGS:
+            print(f"unknown setting {k!r}")
+            return 1
+        s = settings.SETTINGS[k]
+        choices = f" ({'/'.join(s.choices)})" if s.choices else ""
+        print(f"{k:<12} = {values[k]!s:<12} {s.help}{choices}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paf", description="prep-a-fight: prepare a boss fight from top logs.")
     p.add_argument("--version", action="version", version=f"paf {__version__}")
@@ -116,6 +139,11 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("file", nargs="?", help="export file (drag it onto the terminal); '-' = stdin; "
                     "default = clipboard")
     pr.set_defaults(func=cmd_profile)
+
+    cf = sub.add_parser("config", help="show or change settings (e.g. `paf config difficulty mythic`)")
+    cf.add_argument("key", nargs="?")
+    cf.add_argument("value", nargs="?")
+    cf.set_defaults(func=cmd_config)
     return p
 
 
