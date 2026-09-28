@@ -504,6 +504,62 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_plan(args: argparse.Namespace) -> int:
+    import os
+
+    from paf import simc
+    from paf.corpus.template import template_path
+    from paf.fight import Fight
+    from paf.plan import apply_plan, mmss, optimize, parse_plan, plan_template
+
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    fpath = template_path(enc.name, diff_name)
+    if not fpath.is_file():
+        print(f"No fight template for {enc.name} {diff_name}: run `paf template \"{enc.name}\"` first.")
+        return 1
+    fight = Fight.load(fpath)
+    ppath = fpath.with_suffix(".plan.txt")
+    if not ppath.is_file():
+        ppath.write_text(plan_template(fight), encoding="utf-8")
+        print(f"Plan created: {ppath}\nEdit it (your moves, soaks, assignments), then run this command again "
+              f"with --optimize.")
+        if args.edit and os.name == "nt":
+            os.startfile(ppath)  # noqa: S606 - opens the user's own text file in their editor
+        return 0
+    if args.edit and os.name == "nt":
+        os.startfile(ppath)  # noqa: S606
+        return 0
+    try:
+        plan = parse_plan(ppath.read_text(encoding="utf-8"))
+    except ValueError as e:
+        print(f"{ppath}: {e}")
+        return 1
+    profile_text, origin = _load_profile(args.profile)
+    shiftable = [m for m in plan.moves if m.shiftable]
+    print(f"{fight.name} with your plan ({len(plan.moves)} moves, {len(shiftable)} shiftable)")
+    root = simc.new_run_dir(label="plan")
+    mine = apply_plan(fight, plan)
+    sets = {"template_only": fight.raid_event_lines()} if plan.moves else {}
+    res = simc.run(simc.build_input(profile_text, mine.to_simc(), sets), root / "plan", target_error=args.error)
+    d = res.baseline["dps"]
+    print(f"  your plan: {d.mean:,.0f} dps")
+    for ps in res.profilesets:
+        print(f"  without your moves: {res.delta_pct(ps):+.2f}% (cost of your moves: {-res.delta_pct(ps):.2f}%)")
+    if args.optimize and shiftable:
+        metric = "prioritydps" if args.objective >= 0.5 and "prioritydps" in res.baseline else "dps"
+        opt = optimize(profile_text, fight, plan, root / "optimize", metric=metric, target_error=args.error)
+        print(f"\nOptimizer ({opt.tried} placements tried, metric {metric}): {opt.gain_pct:+.2f}%")
+        for i, off in opt.offsets.items():
+            m = plan.moves[i]
+            when = mmss(m.start + off)
+            change = "keep it" if off == 0 else f"move it {abs(off):g}s {'later' if off > 0 else 'earlier'}"
+            print(f"  line {m.line}: {mmss(m.start)} move {m.duration:g}s -> {when} ({change})")
+    elif args.optimize:
+        print("Nothing to optimize: mark moves as shiftable, e.g. `5:30 move 8 shift -5..+5`.")
+    print(f"Plan: {ppath}\nRuns: {root}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paf", description="prep-a-fight: prepare a boss fight from top logs.")
     p.add_argument("--version", action="version", version=f"paf {__version__}")
@@ -602,6 +658,16 @@ def build_parser() -> argparse.ArgumentParser:
     ca.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
     ca.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
     ca.set_defaults(func=cmd_calibrate)
+
+    pl = sub.add_parser("plan", help="your own plan on the fight (moves, soaks, lust, PI) and its optimizer")
+    pl.add_argument("boss")
+    pl.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    pl.add_argument("--edit", action="store_true", help="open the plan file in your text editor")
+    pl.add_argument("--optimize", action="store_true", help="find the best timing of the shiftable moves")
+    pl.add_argument("--objective", type=_objective, default=0.0, help="total (default) or boss")
+    pl.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
+    pl.add_argument("--error", type=float, default=0.2)
+    pl.set_defaults(func=cmd_plan)
     return p
 
 
