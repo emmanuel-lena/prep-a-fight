@@ -51,7 +51,7 @@ Pistes de départ, à trier et à préciser avec Manu :
 - **S3** Moteur SimC : lancement, profilesets, lecture du JSON ; options vérifiées (`save=`, override d'APL, PI externe, lust, durée fixe).
 
 ### Partie 1 — Timelines
-- **T1** Top N d'une spec sur un boss (`paf top`).
+- **T1** Top N d'une spec sur un boss (`paf top`), avec choix de la difficulté (`--difficulty lfr|normal|heroic|mythic`) et une difficulté par défaut réglable (`paf config difficulty heroic`). Si trop peu de logs classés, on le signale et on propose la difficulté du dessous.
 - **T2** Extraction par log : casts de CD du joueur, lust, PI, phases, casts du boss, adds.
 - **T3** Page HTML timeline : top N côte à côte + timeline du boss.
 - **T4** Vue agrégée : quand les tops utilisent chaque CD, par phase et par vague.
