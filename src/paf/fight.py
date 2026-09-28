@@ -41,6 +41,26 @@ class Fight:
     lust_time: float | None = 0.0  # None = no lust
     power_infusion: list[float] = field(default_factory=list)
     source: str = ""  # free text: which logs / cohort this was built from
+    add_scale: float = 1.0  # multiplies add counts (calibration: adds a player actually hits)
+
+    def raid_event_lines(self, add_scale: float | None = None) -> list[str]:
+        scale = self.add_scale if add_scale is None else add_scale
+        events: list[str] = []
+        for i, w in enumerate(sorted(self.add_waves, key=lambda w: w.time), 1):
+            count = max(1, round(w.count * scale))
+            events.append(f"adds,name=wave{i},count={count},first={fmt(round(w.time, 1))},"
+                          f"duration={fmt(round(w.lifetime, 1))},cooldown=9999")
+        for w in self.invulnerable:
+            events.append(f"invulnerable,first={fmt(round(w.start, 1))},"
+                          f"duration={fmt(round(w.duration, 1))},cooldown=9999")
+        for w in self.movement:
+            ev = f"movement,first={fmt(round(w.start, 1))},cooldown=9999"
+            if w.distance:
+                ev += f",distance={fmt(round(w.distance, 1))}"
+            else:
+                ev += f",duration={fmt(round(w.duration, 1))}"
+            events.append(ev)
+        return [("raid_events=/" if j == 0 else "raid_events+=/") + ev for j, ev in enumerate(events)]
 
     def to_simc(self) -> list[str]:
         lines = [
@@ -57,22 +77,7 @@ class Fight:
             lines.append("external_buffs.power_infusion="
                          + "/".join(fmt(round(t, 1)) for t in self.power_infusion))
 
-        events: list[str] = []
-        for i, w in enumerate(sorted(self.add_waves, key=lambda w: w.time), 1):
-            name = f"wave{i}"
-            events.append(f"adds,name={name},count={w.count},first={fmt(round(w.time, 1))},"
-                          f"duration={fmt(round(w.lifetime, 1))},cooldown=9999")
-        for w in self.invulnerable:
-            events.append(f"invulnerable,first={fmt(round(w.start, 1))},"
-                          f"duration={fmt(round(w.duration, 1))},cooldown=9999")
-        for w in self.movement:
-            ev = f"movement,first={fmt(round(w.start, 1))},cooldown=9999"
-            ev += f",distance={fmt(round(w.distance, 1))}" if w.distance else \
-                  f",duration={fmt(round(w.duration, 1))}"
-            events.append(ev)
-        for j, ev in enumerate(events):
-            lines.append(("raid_events=/" if j == 0 else "raid_events+=/") + ev)
-        return lines
+        return lines + self.raid_event_lines()
 
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)

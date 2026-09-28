@@ -475,6 +475,35 @@ def cmd_cdplan(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_calibrate(args: argparse.Namespace) -> int:
+    from paf import settings, simc
+    from paf.calibrate import calibrate, real_boss_share
+    from paf.corpus import db
+    from paf.corpus.template import template_path
+    from paf.fight import Fight
+
+    profile_text, origin = _load_profile(args.profile)
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    fpath = template_path(enc.name, diff_name)
+    if not fpath.is_file():
+        print(f"No fight template for {enc.name} {diff_name}: run `paf template \"{enc.name}\"` first.")
+        return 1
+    spec = settings.get("spec")
+    target = real_boss_share(db.connect(), enc.id, diff, enc.name, spec)
+    if target is None:
+        print("No damage data for the ranked players in the corpus.")
+        return 1
+    fight = Fight.load(fpath)
+    print(f"Top {spec} players do {target:.0%} of their damage to {enc.name}. Calibrating the add counts...")
+    cal = calibrate(profile_text, fight, target, simc.new_run_dir(label="calibrate"))
+    for s, share, dps in cal.points:
+        print(f"  adds x{s:<4}  boss share {share:5.1%}  total {dps:10,.0f} dps")
+    fight.add_scale = cal.scale
+    fight.save(fpath)
+    print(f"Add counts scaled by {cal.scale:g} in {fpath}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paf", description="prep-a-fight: prepare a boss fight from top logs.")
     p.add_argument("--version", action="version", version=f"paf {__version__}")
@@ -566,6 +595,13 @@ def build_parser() -> argparse.ArgumentParser:
     cp.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
     cp.add_argument("--error", type=float, default=0.1)
     cp.set_defaults(func=cmd_cdplan)
+
+    ca = sub.add_parser("calibrate", help="scale the fight's add counts so your boss damage share matches "
+                                          "the top players' logs")
+    ca.add_argument("boss")
+    ca.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    ca.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
+    ca.set_defaults(func=cmd_calibrate)
     return p
 
 
