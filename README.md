@@ -61,7 +61,18 @@ WCL_CLIENT_SECRET=...
 
 3. Check everything with `paf doctor`.
 
-## Prepare a boss in 6 commands
+## Prepare a boss in one command
+
+```sh
+paf profile                  # in game: /simc, Ctrl+A, Ctrl+C, then this (reads the clipboard)
+paf prep "Ula'tek" --open    # everything below, as a one-page HTML prep sheet
+```
+
+The prep sheet gives: the fight (phases, add waves, lust, movement), your DPS on the rebuilt fight vs a
+Patchwerk, the top players' talent builds simmed on your character, cooldown plans, your best items and
+what the boss drops for you, with a short "what to remember" list at the top.
+
+## Or step by step
 
 ```sh
 paf profile                  # in game: /simc, Ctrl+A, Ctrl+C, then this (reads the clipboard)
@@ -90,6 +101,10 @@ paf cdplan "Ula'tek"         # cooldown plans compared on that fight
 | `paf topgear` | Best combination of your items (bags, great vault, linked items) on boss fights and/or presets; `--objective boss` ranks on boss-only damage |
 | `paf talents BOSS` | Most common builds of the top players simmed on your character, with the talents they change vs yours |
 | `paf cdplan BOSS` | Cooldown plans (default APL, on cooldown, hold for adds, top players' timings) compared on the fight |
+| `paf calibrate BOSS` | Scale the add counts so your simulated share of damage on the boss matches the top players' logs |
+| `paf plan BOSS` | Your own plan on top of the template (moves, soaks, lust, PI) in a text file; `--optimize` finds the best timing of the moves you mark as shiftable |
+| `paf droptimizer` | Value of every item the raid (or `--boss`) drops for you, on the fights you choose; EV per boss |
+| `paf prep BOSS` | All of the above for one boss, as an HTML prep sheet |
 
 ### How much to trust the numbers
 

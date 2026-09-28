@@ -86,7 +86,7 @@ Chaque ligne vient d'une brique : vagues d'adds (T2), combat SimC (R3), objectif
 - **R1** ✅ Parse de l'export `/simc` (équipé, sac, coffre, liens) : `paf profile`, depuis le presse-papier ou un fichier.
 - **R2** ✅ Top Gear multi-profils avec regret (logique du prototype PowerShell, retiré ; il reste dans l'historique git).
 - **R3** ✅ Log → combat SimC (`fights/<boss>.simc`) à partir de T2, utilisé comme profil par R2.
-- **R4** Droptimizer : tables de loot via wago.tools, EV par source, loot inséré dans les meilleurs sets.
+- **R4** ✅ Droptimizer : tables de loot via wago.tools, EV par source, loot inséré dans les meilleurs sets.
 - **R5** ✅ (Top Gear, plans de CD) Objectif d'optimisation au choix : **dégâts boss** (cible prioritaire : métrique `prioritydps` de SimC), **cleave**, **pad** (dégâts totaux, adds compris), ou un mix pondéré. Même sim, classement différent selon ce que la strat demande.
 - **R6** ✅ Sim de talents : comparer des builds en profilesets (`talents=`) sur le vrai combat. Candidats : les builds des tops (récupérés dans leurs logs WCL), les builds de l'utilisateur, et des variantes (un talent échangé contre un autre).
 
@@ -99,8 +99,8 @@ Chaque ligne vient d'une brique : vagues d'adds (T2), combat SimC (R3), objectif
     - part des dégâts sur les adds.
 
   Sortie : un fichier de combat lisible et modifiable, et directement simmable.
-- **F2** **Éditeur de combat perso** : partir du template et dire « là je bouge 6 s », « là je soak », « là je garde Ascendance ». Chaque élément peut être **fixe** ou **décalable** (fenêtre au plus tôt / au plus tard, par exemple un déplacement qu'on peut avancer de 5 s).
-- **F3** **Optimiseur** : SimC teste les décalages possibles des éléments décalables et des CD (profilesets : les options de combat varient par profileset, c'est vérifié). Il ressort le meilleur placement, par exemple « bouge 4 s plus tôt et garde Stormkeeper pour après le déplacement : +2,1 % ».
+- **F2** ✅ **Éditeur de combat perso** : partir du template et dire « là je bouge 6 s », « là je soak », « là je garde Ascendance ». Chaque élément peut être **fixe** ou **décalable** (fenêtre au plus tôt / au plus tard, par exemple un déplacement qu'on peut avancer de 5 s).
+- **F3** ✅ **Optimiseur** : SimC teste les décalages possibles des éléments décalables et des CD (profilesets : les options de combat varient par profileset, c'est vérifié). Il ressort le meilleur placement, par exemple « bouge 4 s plus tôt et garde Stormkeeper pour après le déplacement : +2,1 % ».
 
 ### Partie 3 — Prépa (briques définies ensemble le moment venu)
 - **P1** Atelier de conception avec Manu : choisir et ordonner les pistes ci-dessus.
@@ -119,7 +119,9 @@ Chaque ligne vient d'une brique : vagues d'adds (T2), combat SimC (R3), objectif
 - **v0.3** = T4, R4, R5, R6, F2, F3, P1 : objectif boss / cleave / pad, sim de talents, combat perso + optimiseur de placement.
 - **v0.4+** = partie 3 et élargissement.
 
-Fait aussi : `paf cdplan` (plans de CD : APL par défaut, tout au CD, garder pour les adds, timings des tops).
+Fait aussi :
+- `paf cdplan` : plans de CD (APL par défaut, tout au CD, garder pour les adds, timings des tops) ;
+- `paf calibrate` : calibrage du combat sur la part de dégâts boss réelle. Limite trouvée : SimC garde ses sorts mono-cible sur le boss, donc l'écart résiduel est affiché dans la fiche ;
+- `paf prep` : **la fiche de boss d'une page**, qui enchaîne tout.
 
-Prochaines briques : calibrage du combat reconstruit (comparer la part boss simulée à la réelle), **F2/F3** (éditeur de combat + optimiseur de placement), **R4** (Droptimizer), puis UI web.
-
+Prochaines briques : UI web locale (coller `/simc`, choisir un boss, voir la fiche), autres specs (données par spec hors du code), passe « loot dans les meilleurs sets » du Droptimizer, M+.
