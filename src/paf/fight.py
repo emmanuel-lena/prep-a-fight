@@ -32,6 +32,16 @@ class Window:
     distance: float = 0.0  # movement only (yards)
 
 
+@dataclass
+class Vulnerable:
+    """A window where the boss takes more damage, e.g. a heart that shares the boss's health with a
+    damage amplifier: damage done to it counts as boss damage (SimC raid event ``vulnerable``)."""
+    start: float
+    duration: float
+    multiplier: float
+    name: str = ""
+
+
 def merged_movement(windows: list[Window]) -> list[Window]:
     """Union of overlapping movement windows. In SimC a movement event that starts during another one
     replaces it (it can shorten it), so overlaps must be merged before being sent."""
@@ -60,6 +70,7 @@ class Fight:
     add_scale: float = 1.0  # multiplies add counts (calibration: adds a player actually hits)
     movement_scale: float = 1.0  # multiplies inferred movement durations (calibration on the top players' DPS)
     personal_movement: list[Window] = field(default_factory=list)  # player's own moves: never scaled
+    vulnerable: list[Vulnerable] = field(default_factory=list)  # boss damage amplification windows
 
     def raid_event_lines(self, add_scale: float | None = None, movement_scale: float | None = None) -> list[str]:
         scale = self.add_scale if add_scale is None else add_scale
@@ -74,6 +85,9 @@ class Fight:
         for w in self.invulnerable:
             events.append(f"invulnerable,first={fmt(round(w.start, 1))},"
                           f"duration={fmt(round(w.duration, 1))},cooldown=9999")
+        for v in self.vulnerable:
+            events.append(f"vulnerable,first={fmt(round(v.start, 1))},duration={fmt(round(v.duration, 1))},"
+                          f"cooldown=9999,multiplier={fmt(round(v.multiplier, 2))}")
         for w in merged_movement(moves):
             ev = f"movement,first={fmt(round(w.start, 1))},cooldown=9999"
             if w.distance:
@@ -112,6 +126,7 @@ class Fight:
         d["invulnerable"] = [Window(**w) for w in d.get("invulnerable", [])]
         d["movement"] = [Window(**w) for w in d.get("movement", [])]
         d["personal_movement"] = [Window(**w) for w in d.get("personal_movement", [])]
+        d["vulnerable"] = [Vulnerable(**w) for w in d.get("vulnerable", [])]
         return cls(**d)
 
 

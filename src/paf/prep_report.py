@@ -125,7 +125,7 @@ def render(d: PrepData) -> str:
 
     # the fight
     rows = "".join(f"<tr><td>{_mmss(t)}</td><td>{e(n)}</td></tr>" for n, t in d.phases)
-    waves = "".join(f"<tr><td>{_mmss(t)}</td><td class='n'>{c}</td><td class='n'>{life:.0f}s</td>"
+    waves = "".join(f"<tr><td>{_mmss(t)}</td><td class='n'>{c or '-'}</td><td class='n'>{life:.0f}s</td>"
                     f"<td>{e(names)}</td></tr>" for t, c, life, names in d.waves)
     extra = []
     if d.lust is not None:

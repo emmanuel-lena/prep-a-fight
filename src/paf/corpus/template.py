@@ -10,7 +10,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 from paf.corpus.analyze import KILLABLE_DEATH_RATE, _q, canonical_waves, fight_waves, kills_filter
-from paf.fight import AddWave, Fight, Window
+from paf.fight import AddWave, Fight, Vulnerable, Window
 
 LUST_NAMES = {"bloodlust", "heroism", "time warp", "primal rage", "fury of the aspects", "ancient hysteria",
               "netherwinds", "drums of fury", "drums of the mountain", "drums of the maelstrom",
@@ -111,6 +111,25 @@ def attack_windows(con: sqlite3.Connection, where: str, params: tuple, spec: str
     return [AddWave(w.t, 1, w.lifetime, ", ".join(w.types), scalable=False) for w in waves if w.lifetime >= 5]
 
 
+def boss_unit_multiplier(con: sqlite3.Connection, where: str, params: tuple, boss_name: str, units: set[str],
+                         units_time: float, duration: float, invulnerable_time: float, kills: int) -> float:
+    """Damage amplification of secondary boss units: the raid's damage rate on them during their windows
+    divided by its rate on the boss the rest of the attackable time (clamped to 1-5)."""
+    if not units or units_time <= 0 or not kills:
+        return 1.0
+    names = {n for u in units for n in u.split(", ")}
+    rows = dict(con.execute(
+        f"SELECT d.target, SUM(d.amount) FROM damage_by_target d JOIN fight f USING(report, fight_id) "
+        f"WHERE {where} GROUP BY d.target", params).fetchall())
+    unit_dmg = sum(rows.get(n) or 0 for n in names)
+    boss_dmg = rows.get(boss_name) or 0
+    boss_time = duration - invulnerable_time - units_time
+    if boss_dmg <= 0 or boss_time <= 0:
+        return 1.0
+    ratio = (unit_dmg / (kills * units_time)) / (boss_dmg / (kills * boss_time))
+    return round(min(5.0, max(1.0, ratio)), 2)
+
+
 def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, boss_name: str,
                    spec: str, diff_name: str = "") -> tuple[Fight, TemplateInfo]:
     where, params = kills_filter(encounter_id, difficulty)
@@ -182,10 +201,27 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
         if vals:
             by_phase.append((name, st.median(vals)))
 
+    # secondary boss units (e.g. a heart) share the boss's health: their windows become boss vulnerability
+    # windows, with the damage amplification measured in the logs
+    from paf.corpus.units import unit_windows
+
+    measured, ratios = unit_windows(con, encounter_id, difficulty)
+    if measured:  # damage-taken graphs of a few kills: real windows and damage rate ratio of each unit
+        waves = canonical_waves([[(s, 1, d, [nm]) for s, d, nm in kill] for kill in measured])
+        vulnerable = [Vulnerable(round(w.t, 1), round(w.lifetime, 1),
+                                 round(min(5.0, max(1.0, ratios.get(w.types[0], 1.0))), 2), ", ".join(w.types))
+                      for w in waves]
+    else:  # fallback: the ranked players' casts on the unit
+        mult = boss_unit_multiplier(con, where, params, boss_name, {w.name for w in boss_waves},
+                                    sum(w.lifetime for w in boss_waves), duration,
+                                    sum(w.duration for w in invulnerable), len(keys))
+        vulnerable = [Vulnerable(round(w.time, 1), round(w.lifetime, 1), mult, w.name) for w in boss_waves]
+
     fight = Fight(
         name=f"{boss_name} {diff_name}".strip(),
         duration=round(duration, 1),
-        add_waves=add_waves + boss_waves,
+        add_waves=add_waves,
+        vulnerable=vulnerable,
         invulnerable=invulnerable,
         movement=moves,
         lust_time=round(st.median(lust_times), 1) if lust_times else 0.0,

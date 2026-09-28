@@ -41,6 +41,17 @@ def test_secondary_fight_keeps_only_unique_targets():
     assert secondary_fight(Fight("B", 100, add_waves=[AddWave(1, 3, 10)])) is None
 
 
+def test_vulnerable_windows():
+    from paf.fight import Vulnerable
+
+    f = fight()
+    f.vulnerable = [Vulnerable(200, 20, 2.5, "Heart")]
+    assert any("vulnerable,first=200,duration=20,cooldown=9999,multiplier=2.5" in e for e in f.to_simc())
+    rules = {r.name for r in fight_rules(f, long_cd=True)}
+    assert {"vulnerable_windows", "hold_vulnerable_60"} <= rules
+    assert "Heart x2.5" in fight_context(f, 205)
+
+
 def test_fight_context():
     assert fight_context(fight(), 65) == "adds"
     assert fight_context(fight(), 35) == "lust, PI"

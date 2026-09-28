@@ -44,6 +44,9 @@ CREATE TABLE IF NOT EXISTS mech_event(       -- players hit by boss mechanics, a
   report TEXT, fight_id INT, kind TEXT, ability_id INT, actor_id INT, t REAL);
 CREATE TABLE IF NOT EXISTS mech_status(report TEXT, fight_id INT, fetched_at TEXT, PRIMARY KEY(report, fight_id));
 CREATE INDEX IF NOT EXISTS ix_me ON mech_event(report, fight_id);
+CREATE TABLE IF NOT EXISTS unit_window(      -- windows when secondary boss units take damage (damage-taken graph)
+  report TEXT, fight_id INT, name TEXT, t_start REAL, duration REAL, rate_ratio REAL);
+CREATE TABLE IF NOT EXISTS unit_status(report TEXT, fight_id INT, PRIMARY KEY(report, fight_id));
 CREATE INDEX IF NOT EXISTS ix_pc ON player_cast(report, fight_id);
 CREATE INDEX IF NOT EXISTS ix_ec ON enemy_cast(report, fight_id);
 CREATE INDEX IF NOT EXISTS ix_pb ON player_buff(report, fight_id);
@@ -76,5 +79,5 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
 def clear_fight_rows(con: sqlite3.Connection, report: str, fight_id: int) -> None:
     """Remove derived rows of a kill (before re-fetching it)."""
     for table in ("phase", "add_instance", "player", "damage_by_target", "enemy_cast",
-                  "player_cast", "player_buff", "mech_event", "mech_status"):
+                  "player_cast", "player_buff", "mech_event", "mech_status", "unit_window", "unit_status"):
         con.execute(f"DELETE FROM {table} WHERE report=? AND fight_id=?", (report, fight_id))

@@ -83,6 +83,14 @@ def fight_rules(fight: Fight, long_cd: bool) -> list[Rule]:
     if units:
         rules.append(Rule("secondary_targets", "only while the secondary targets are up",
                           both(windows(units) + "|fight_remains<20")))
+    vuln = [(v.start, v.duration) for v in fight.vulnerable]
+    if vuln:
+        name = fight.vulnerable[0].name or "vulnerability"
+        rules.append(Rule("vulnerable_windows", f"only while the boss takes more damage ({name})",
+                          both(windows(vuln) + "|fight_remains<20")))
+        for x in ((30, 60, 90) if long_cd else (15, 30)):
+            rules.append(Rule(f"hold_vulnerable_{x}", f"kept when the boss becomes vulnerable within {x} s ({name})",
+                              both(f"raid_event.vulnerable.up|raid_event.vulnerable.in>{x}|fight_remains<{x}")))
     if buffs:
         rules.append(Rule("lust_pi", "only with Bloodlust / Power Infusion",
                           both(windows(buffs, 1) + "|fight_remains<20")))
@@ -266,12 +274,15 @@ def fight_context(fight: Fight, t: float) -> str:
     for w in fight.add_waves:
         if w.time - 2 <= t <= w.time + w.lifetime:
             notes.append(w.name.split(",")[0] if not w.scalable else "adds")
+    for v in fight.vulnerable:
+        if v.start - 2 <= t <= v.start + v.duration:
+            notes.append(f"{(v.name or 'boss').split(',')[0]} x{v.multiplier:g}")
     if fight.lust_time is not None and fight.lust_time <= t <= fight.lust_time + 40:
         notes.append("lust")
     for pi in fight.power_infusion:
         if pi <= t <= pi + 15:
             notes.append("PI")
-    for m in fight.movement:
+    for m in fight.movement + fight.personal_movement:
         if m.start - 4 <= t < m.start:
             notes.append("move soon")
     for w in fight.invulnerable:
@@ -301,6 +312,7 @@ def tops_alignment(timeline, fight: Fight) -> list[Alignment]:
     """Do the top players hold their cooldowns for add waves / secondary targets? (timeline: paf Timeline)"""
     adds = [(w.time, w.lifetime) for w in fight.add_waves if w.scalable]
     units = [(w.time, w.lifetime) for w in fight.add_waves if not w.scalable]
+    units += [(v.start, v.duration) for v in fight.vulnerable]  # secondary targets sharing the boss's health
     adds_cover, units_cover = _cover(adds, fight.duration), _cover(units, fight.duration)
 
     def inside(t: float, ws: list[tuple[float, float]]) -> bool:

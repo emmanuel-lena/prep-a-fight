@@ -206,17 +206,28 @@ def cmd_template(args: argparse.Namespace) -> int:
 
     client, enc, diff_name, diff = _encounter_and_difficulty(args)
     con = db.connect()
+    from paf.corpus.units import fetch_unit_windows
+
+    fetch_unit_windows(client, con, enc.id, diff, enc.name)  # secondary units' real windows (cheap, cached)
     fight, info = build_template(con, enc.id, diff, enc.name, settings.get("spec"), diff_name)
     if info.kills == 0:
         print(f"No kills in the corpus for {enc.name} {diff_name}: run `paf corpus \"{enc.name}\"` first.")
         return 1
     path = template_path(enc.name, diff_name)
+    if path.is_file():  # keep the calibrations done on the previous version
+        from paf.fight import Fight
+
+        old = Fight.load(path)
+        fight.add_scale, fight.movement_scale = old.add_scale, old.movement_scale
     fight.save(path)
     print(f"{fight.name}: typical fight from {info.kills} kills, {_mmss(fight.duration)}")
     print(f"  bloodlust at {_mmss(fight.lust_time or 0)}; power infusion at "
           f"{', '.join(_mmss(t) for t in fight.power_infusion) or 'none'}")
     for w in fight.invulnerable:
         print(f"  boss not attackable {_mmss(w.start)}-{_mmss(w.start + w.duration)} (intermission)")
+    for v in fight.vulnerable:
+        print(f"  {_mmss(v.start)}-{_mmss(v.start + v.duration)}  {v.name}: shares the boss's health, "
+              f"boss takes x{v.multiplier:g} damage (measured in the logs)")
     print("  targets besides the boss:")
     for w in fight.add_waves:
         print(f"    {_mmss(w.time):>5}  x{w.count:<3} alive {w.lifetime:3.0f}s  {w.name}")
@@ -658,6 +669,9 @@ def cmd_prep(args: argparse.Namespace) -> int:
 
     step("Analyzing the corpus")
     rep = analyze(con, enc.id, diff, enc.name, spec)
+    from paf.corpus.units import fetch_unit_windows
+
+    fetch_unit_windows(client, con, enc.id, diff, enc.name)
     fight, info = build_template(con, enc.id, diff, enc.name, spec, diff_name)
     d = PrepData(enc.name, diff_name, spec, profile.name or origin, kills=rep.kills, duration=fight.duration)
     d.phases = [(n, m) for n, _, m, _ in rep.phases]
@@ -697,6 +711,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
     fight.save(template_path(enc.name, diff_name))
     d.waves = [(w.time, max(1, round(w.count * fight.add_scale)) if w.scalable else w.count, w.lifetime, w.name)
                for w in fight.add_waves]
+    d.waves += [(v.start, 0, v.duration, f"{v.name}: boss takes x{v.multiplier:g} damage") for v in fight.vulnerable]
+    d.waves.sort()
     planned, ppath = _fight_with_plan(enc, diff_name)
     if ppath is not None:
         fight = planned

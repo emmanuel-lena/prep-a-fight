@@ -13,7 +13,7 @@ from paf import web
 def fetch(url: str, data: bytes | None = None) -> str:
     """GET/POST with retries: some Windows machines reset a share of local connections (seen with a
     trivial stdlib server too), unrelated to the app."""
-    for attempt in range(8):
+    for attempt in range(25):
         try:
             req = urllib.request.Request(url, data=data, method="POST" if data is not None else "GET")
             return urllib.request.urlopen(req, timeout=10).read().decode()

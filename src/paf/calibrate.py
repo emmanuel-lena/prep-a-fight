@@ -24,8 +24,10 @@ SCALES = (0.1, 0.2, 0.3, 0.45, 0.6, 0.8, 1.0)
 
 def real_boss_share(con: sqlite3.Connection, encounter_id: int, difficulty: int, boss_name: str,
                     spec: str) -> float | None:
-    """Median share of the ranked players' damage done to the main boss."""
+    """Median share of the ranked players' damage done to the boss, secondary boss units included (they share
+    the boss's health, e.g. a heart; in the simulated fight their damage is boss damage through `vulnerable`)."""
     where, params = kills_filter(encounter_id, difficulty)
+    boss_units = {r[0] for r in con.execute("SELECT name FROM npc WHERE is_boss=1")} | {boss_name}
     rows = con.execute(
         f"SELECT d.report, d.fight_id, d.target, d.amount FROM damage_by_target d "
         f"JOIN fight f USING(report, fight_id) JOIN ranked r USING(report, fight_id) "
@@ -34,7 +36,7 @@ def real_boss_share(con: sqlite3.Connection, encounter_id: int, difficulty: int,
     for r in rows:
         acc = per[(r["report"], r["fight_id"])]
         acc[0] += r["amount"] or 0
-        if r["target"] == boss_name:
+        if r["target"] in boss_units:
             acc[1] += r["amount"] or 0
     shares = [b / t for t, b in per.values() if t > 0]
     return st.median(shares) if shares else None
