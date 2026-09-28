@@ -1,0 +1,11 @@
+.env
+.cache/
+runs/
+simc/
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+wowhead_names_cache.json
+CLAUDE.local.md
