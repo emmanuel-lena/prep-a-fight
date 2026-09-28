@@ -47,7 +47,7 @@ Pistes de départ, à trier et à préciser avec Manu :
 
 ### Socle
 - **S1** ✅ Dépôt : git, pyproject, CI, `paf setup` (téléchargement de simc).
-- **S2** Client WCL : OAuth2, GraphQL, pagination, rate limit, cache.
+- **S2** ✅ Client WCL : OAuth2, GraphQL, pagination, rate limit, cache.
 - **S3** Moteur SimC : lancement, profilesets, lecture du JSON ; options vérifiées (`save=`, override d'APL, PI externe, lust, durée fixe).
 
 ### Partie 1 — Timelines
@@ -78,5 +78,5 @@ Pistes de départ, à trier et à préciser avec Manu :
 - **v0.3** = T4, R4, P1.
 - **v0.4+** = partie 3 et élargissement.
 
-Prochaine brique : **S2** (client Warcraft Logs).
+Prochaine brique : **T1** (top N d'une spec sur un boss).
 

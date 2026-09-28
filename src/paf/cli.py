@@ -40,6 +40,16 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             ok = False
             print(f"[!!] {key} missing: create a client at https://www.warcraftlogs.com/api/clients")
             print("     and put it in a .env file (see README)")
+    if ok:
+        from paf.wcl import WCLClient, WCLError
+
+        try:
+            rl = WCLClient().rate_limit()
+            print(f"[ok] Warcraft Logs API: {rl['pointsSpentThisHour']:.0f} / {rl['limitPerHour']} points "
+                  f"used this hour (reset in {rl['pointsResetIn'] // 60} min)")
+        except (WCLError, OSError) as e:
+            ok = False
+            print(f"[!!] Warcraft Logs API: {e}")
     return 0 if ok else 1
 
 

@@ -9,3 +9,5 @@ __pycache__/
 .ruff_cache/
 wowhead_names_cache.json
 CLAUDE.local.md
+*.simc
+!tests/**/*.simc

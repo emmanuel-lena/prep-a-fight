@@ -48,3 +48,10 @@ Le prototype PowerShell (`Invoke-LocalTopGear.ps1`, Top Gear 3 passes) a été r
 - pybots (github.com/scatari69/pybots) : clone de Raidbots, catalogue via wago.tools ; exclut les armes (segfault de leur nightly sur profilesets d'armes).
 - QE Live (github.com/Voulk/QuestionablyEpic) : tout dans le navigateur, moteurs importables headless.
 - Lorrgs : inspiration pour les timelines.
+
+### Mesures live (S2, 2026-09-28)
+
+- Client : `src/paf/wcl.py` (`WCLClient.query(q, vars, cache_ttl)`, `.events(...)` paginé, `.rate_limit()`). Quota : 3600 points/h.
+- Zones Midnight : raid **The Venomous Abyss = zone 53** (10 boss, dont Ula'tek) ; M+ S2 = zone 55. Mythique = `difficulty:5`.
+- `characterRankings` Élém mythique Ula'tek : seulement 9 classés → prévoir heroic (`difficulty:4`) en repli.
+- Tous les events amis d'un kill de 10 min = ~590k events, ~60 pages, 190 s, ~70 points, 105 Mo de cache. **Toujours filtrer** (`sourceID` du joueur, `dataType: Casts/Buffs`, `abilityID`, `filterExpression`) dans les briques suivantes.
