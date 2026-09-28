@@ -61,6 +61,7 @@ Chaque ligne vient d'une brique : vagues d'adds (T2), combat SimC (R3), objectif
 - **Petit d'abord** : Chaman Élémentaire, un boss, puis on élargit.
 - Chiffré : delta %, erreur statistique, significativité ; « suivi par X % des tops ».
 - Honnête : SimC évalue des plans, il ne les invente pas ; un combat reconstruit reste une approximation.
+- **Outil d'analyste** : on ne regarde pas 5 logs, on analyse un **corpus** (200+ kills d'un boss), avec des distributions et des cohortes (top 50 vs guildes comparables à l'utilisateur). Le corpus formule les hypothèses (corrélations), SimC les vérifie.
 - Python, multi-OS. Rapports HTML locaux d'abord, UI web ensuite. Aucune donnée perso ni aucun pseudo réel dans le dépôt.
 
 ## Briques
@@ -70,8 +71,13 @@ Chaque ligne vient d'une brique : vagues d'adds (T2), combat SimC (R3), objectif
 - **S2** ✅ Client WCL : OAuth2, GraphQL, pagination, rate limit, cache.
 - **S3** Moteur SimC : lancement, profilesets, lecture du JSON ; options vérifiées (`save=`, override d'APL, PI externe, lust, durée fixe).
 
-### Partie 1 — Timelines
-- **T1** Top N d'une spec sur un boss (`paf top`), avec choix de la difficulté (`--difficulty lfr|normal|heroic|mythic`) et une difficulté par défaut réglable (`paf config difficulty heroic`). Si trop peu de logs classés, on le signale et on propose la difficulté du dessous.
+### Partie 1 — Timelines et analyse
+- **T1** **Corpus** d'un boss (`paf corpus "Ula'tek"`) : collecte de N kills (200 par défaut) via `fightRankings` (tout le raid) et `characterRankings` (une spec). Pour chaque combat : compo, durée, guilde, dégâts de chaque joueur **par cible** (boss et chaque type d'add), talents, stuff, ilvl de chaque joueur. Stockage dans une base SQLite locale, collecte reprenable. Choix de la difficulté (`--difficulty lfr|normal|heroic|mythic`), difficulté par défaut réglable (`paf config difficulty heroic`) ; si trop peu de kills, on le signale et on propose la difficulté du dessous. Coût mesuré : ~5 points de quota par combat, soit ~1 000 points pour 200 kills (quota 3 600/h).
+- **T1b** Premières analyses du corpus :
+  - part des dégâts sur les adds par spec ;
+  - qui est « assigné adds » ;
+  - fréquence de chaque talent par spec, et lien avec les dégâts adds/boss ;
+  - durée de vie des adds par cohorte.
 - **T2** Extraction par log : casts de CD du joueur, lust, PI, phases, casts du boss, adds, **talents du joueur**, et **trajectoire x/y + orientation** (events dont le joueur est la source : ~1 point toutes les 0,1 s, quelques points de quota par combat).
 - **T3** Page HTML timeline : top N côte à côte + timeline du boss.
 - **T4** Vue agrégée : quand les tops utilisent chaque CD, par phase et par vague.
@@ -96,10 +102,10 @@ Chaque ligne vient d'une brique : vagues d'adds (T2), combat SimC (R3), objectif
 - Releases et installation en une commande.
 
 ## Jalons
-- **v0.1** = S1, S2, T1 → T3 : les timelines Élém d'un boss. Premier truc utile, et vite montrable.
+- **v0.1** = S1, S2, T1, T1b, T2, T3 : corpus d'un boss + premières analyses + timelines Élém.
 - **v0.2** = S3, R1 → R3 : Top Gear sur le vrai combat.
 - **v0.3** = T4, R4, R5, R6, P1 : objectif boss / cleave / pad, sim de talents.
 - **v0.4+** = partie 3 et élargissement.
 
-Prochaine brique : **T1** (top N d'une spec sur un boss).
+Prochaine brique : **T1** (corpus d'un boss).
 
