@@ -72,7 +72,7 @@ Chaque ligne vient d'une brique : vagues d'adds (T2), combat SimC (R3), objectif
 - **S3** Moteur SimC : lancement, profilesets, lecture du JSON ; options vérifiées (`save=`, override d'APL, PI externe, lust, durée fixe).
 
 ### Partie 1 — Timelines et analyse
-- **T1** **Corpus** d'un boss (`paf corpus "Ula'tek"`) : collecte de N kills (200 par défaut) via `fightRankings` (tout le raid) et `characterRankings` (une spec). Pour chaque combat : compo, durée, guilde, dégâts de chaque joueur **par cible** (boss et chaque type d'add), talents, stuff, ilvl de chaque joueur. Stockage dans une base SQLite locale, collecte reprenable. Choix de la difficulté (`--difficulty lfr|normal|heroic|mythic`), difficulté par défaut réglable (`paf config difficulty heroic`) ; si trop peu de kills, on le signale et on propose la difficulté du dessous. Coût mesuré : ~5 points de quota par combat, soit ~1 000 points pour 200 kills (quota 3 600/h).
+- **T1** ✅ **Corpus** d'un boss (`paf corpus "Ula'tek"`) : collecte de N kills (200 par défaut) via `fightRankings` (tout le raid) et `characterRankings` (une spec). Pour chaque combat : compo, durée, guilde, dégâts de chaque joueur **par cible** (boss et chaque type d'add), talents, stuff, ilvl de chaque joueur. Stockage dans une base SQLite locale, collecte reprenable. Choix de la difficulté (`--difficulty lfr|normal|heroic|mythic`), difficulté par défaut réglable (`paf config difficulty heroic`) ; si trop peu de kills, on le signale et on propose la difficulté du dessous. Coût mesuré : ~5 points de quota par combat, soit ~1 000 points pour 200 kills (quota 3 600/h).
 - **T1b** Premières analyses du corpus :
   - part des dégâts sur les adds par spec ;
   - qui est « assigné adds » ;
@@ -90,6 +90,18 @@ Chaque ligne vient d'une brique : vagues d'adds (T2), combat SimC (R3), objectif
 - **R5** Objectif d'optimisation au choix : **dégâts boss** (cible prioritaire : métrique `prioritydps` de SimC), **cleave**, **pad** (dégâts totaux, adds compris), ou un mix pondéré. Même sim, classement différent selon ce que la strat demande.
 - **R6** Sim de talents : comparer des builds en profilesets (`talents=`) sur le vrai combat. Candidats : les builds des tops (récupérés dans leurs logs WCL), les builds de l'utilisateur, et des variantes (un talent échangé contre un autre).
 
+### Templates de combat et combat personnalisé
+- **F1** **Template de combat par boss**, construit à partir du corpus (les 100 à 200 premiers logs), par cohorte :
+  - timeline moyenne du boss : phases, casts du boss, vagues d'adds (moment, nombre, durée de vie) ;
+  - pour chaque spec, **comment elle joue** :
+    - fenêtres de mouvement typiques (tirées des trajectoires) ;
+    - usage des CD, calé sur les phases et les vagues ;
+    - part des dégâts sur les adds.
+
+  Sortie : un fichier de combat lisible et modifiable, et directement simmable.
+- **F2** **Éditeur de combat perso** : partir du template et dire « là je bouge 6 s », « là je soak », « là je garde Ascendance ». Chaque élément peut être **fixe** ou **décalable** (fenêtre au plus tôt / au plus tard, par exemple un déplacement qu'on peut avancer de 5 s).
+- **F3** **Optimiseur** : SimC teste les décalages possibles des éléments décalables et des CD (profilesets : les options de combat varient par profileset, c'est vérifié). Il ressort le meilleur placement, par exemple « bouge 4 s plus tôt et garde Stormkeeper pour après le déplacement : +2,1 % ».
+
 ### Partie 3 — Prépa (briques définies ensemble le moment venu)
 - **P1** Atelier de conception avec Manu : choisir et ordonner les pistes ci-dessus.
 - P2… à définir.
@@ -103,9 +115,9 @@ Chaque ligne vient d'une brique : vagues d'adds (T2), combat SimC (R3), objectif
 
 ## Jalons
 - **v0.1** = S1, S2, T1, T1b, T2, T3 : corpus d'un boss + premières analyses + timelines Élém.
-- **v0.2** = S3, R1 → R3 : Top Gear sur le vrai combat.
-- **v0.3** = T4, R4, R5, R6, P1 : objectif boss / cleave / pad, sim de talents.
+- **v0.2** = S3, R1 → R3, F1 : template de combat par boss + Top Gear sur le vrai combat.
+- **v0.3** = T4, R4, R5, R6, F2, F3, P1 : objectif boss / cleave / pad, sim de talents, combat perso + optimiseur de placement.
 - **v0.4+** = partie 3 et élargissement.
 
-Prochaine brique : **T1** (corpus d'un boss).
+Prochaine brique : **T1b** (premières analyses du corpus).
 
