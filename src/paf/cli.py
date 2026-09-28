@@ -782,6 +782,23 @@ def cmd_optimize(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_mechanics(args: argparse.Namespace) -> int:
+    from paf import settings
+    from paf.encounters import find_encounter
+    from paf.mechanics import encounter_sections, format_sections
+    from paf.wcl import WCLClient
+
+    enc = find_encounter(WCLClient(), args.boss)
+    diff_name = (args.difficulty or settings.get("difficulty")).lower()
+    sections = encounter_sections(enc.id)
+    if not sections:
+        print(f"No Encounter Journal entry found for {enc.name}.")
+        return 1
+    print(f"{enc.name} ({diff_name}), from the in-game Encounter Journal:\n")
+    print(format_sections(sections, diff_name, width=args.width))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paf", description="prep-a-fight: prepare a boss fight from top logs.")
     p.add_argument("--version", action="version", version=f"paf {__version__}")
@@ -902,6 +919,12 @@ def build_parser() -> argparse.ArgumentParser:
     dr.add_argument("--error", type=float, default=0.2)
     dr.add_argument("--top", type=int, default=25)
     dr.set_defaults(func=cmd_droptimizer)
+
+    me = sub.add_parser("mechanics", help="boss mechanics from the Encounter Journal (roles, interrupts, mythic)")
+    me.add_argument("boss")
+    me.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    me.add_argument("--width", type=int, default=110, help="characters of description shown")
+    me.set_defaults(func=cmd_mechanics)
 
     op = sub.add_parser("optimize", help="ideal cooldown plan and play-by-play on the fight, per objective")
     op.add_argument("boss")
