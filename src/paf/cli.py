@@ -816,8 +816,17 @@ def _mechanics_from_corpus(enc, diff_name: str) -> None:
     # debuffs are not filtered by the journal ids: logged spell ids often differ from the journal's
     fetch_mechanics(WCLClient(), con, enc.id, diff, [])
     names = {**spell_names(), **dict(con.execute("SELECT id, name FROM ability").fetchall())}
-    journal = {s.title.lower(): s for s in abilities(encounter_sections(enc.id), diff_name)}
-    stats = mechanic_stats(con, enc.id, diff, spec, names)
+    from paf.mechanics import walk
+
+    sections = encounter_sections(enc.id)
+    journal = {s.title.lower(): s for s in abilities(sections, diff_name)}
+    # keep boss mechanics only: names from the journal, or abilities cast by enemies in the logs
+    boss_names = {s.title.lower() for _, s in walk(sections)}
+    boss_names |= {(names.get(r[0]) or "").lower() for r in con.execute(
+        "SELECT DISTINCT e.ability_id FROM enemy_cast e JOIN fight f USING(report, fight_id) "
+        "WHERE f.encounter_id=? AND f.difficulty=?", (enc.id, diff))}
+    stats = [m for m in mechanic_stats(con, enc.id, diff, spec, names)
+             if m.kind == "interrupt" or m.name.lower() in boss_names]
     if not stats:
         print("No mechanic data.")
         return
