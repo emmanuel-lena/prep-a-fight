@@ -20,7 +20,10 @@ POWER_INFUSION = 10060
 MOVE_SPEED = 1.5  # yards/s between two consecutive casts above which the player is moving
 MAX_GAP = 4.0  # seconds; longer gaps between casts are not used to infer movement
 MOVE_SHARE = 0.5  # a second belongs to a movement window when at least half of the players move
-MIN_MOVE = 2.0  # seconds; shorter movement windows are ignored
+MIN_MOVE = 3.0  # seconds; shorter movement windows are ignored
+MERGE_GAP = 3  # seconds; movement windows closer than this are merged
+BOSS_UNIT_MIN_SHARE = 0.02  # secondary boss units taking less raid damage than this are mechanics, not targets
+ATTACK_GAP = 10.0  # seconds without a cast on a unit that end an attack window
 
 
 @dataclass
@@ -54,16 +57,58 @@ def movement_windows(per_kill: list[list[bool]], share: float = MOVE_SHARE) -> l
         return []
     length = min(len(f) for f in per_kill)
     frac = [sum(f[s] for f in per_kill) / len(per_kill) for s in range(length)]
-    out: list[Window] = []
+    raw: list[list[int]] = []
     start = None
     for s, v in enumerate(frac + [0.0]):
         if v >= share and start is None:
             start = s
         elif v < share and start is not None:
-            if s - start >= MIN_MOVE:
-                out.append(Window(float(start), float(s - start)))
+            if raw and start - raw[-1][1] <= MERGE_GAP:
+                raw[-1][1] = s
+            else:
+                raw.append([start, s])
             start = None
-    return out
+    return [Window(float(a), float(b - a)) for a, b in raw if b - a >= MIN_MOVE]
+
+
+def attack_windows(con: sqlite3.Connection, where: str, params: tuple, spec: str,
+                   keys: list[tuple[str, int]]) -> list[AddWave]:
+    """Windows when secondary boss units (e.g. a heart) are attacked, from the ranked players' casts.
+
+    Only units taking a real share of the raid's damage count; the others are mechanics.
+    """
+    shares = dict(con.execute(
+        f"SELECT d.target, SUM(d.amount) FROM damage_by_target d JOIN fight f USING(report, fight_id) "
+        f"WHERE {where} GROUP BY d.target", params).fetchall())
+    total = sum(v or 0 for v in shares.values()) or 1
+    units = {r[0] for r in con.execute("SELECT name FROM npc WHERE is_boss=1")
+             if (shares.get(r[0]) or 0) / total >= BOSS_UNIT_MIN_SHARE}
+    if not units:
+        return []
+    casts = con.execute(
+        f"SELECT c.report, c.fight_id, n.name, c.t FROM player_cast c JOIN fight f USING(report, fight_id) "
+        f"JOIN ranked r USING(report, fight_id) "
+        f"JOIN add_instance a ON a.report=c.report AND a.fight_id=c.fight_id AND a.actor_id=c.target_id "
+        f"AND a.instance=COALESCE(c.target_instance, 1) JOIN npc n ON n.game_id=a.game_id "
+        f"WHERE {where} AND c.actor_id=r.actor_id AND r.spec=? AND c.type='cast' "
+        f"AND n.name IN ({','.join('?' * len(units))}) ORDER BY c.t", (*params, spec, *units)).fetchall()
+    segments: dict[tuple[str, int], list] = defaultdict(list)
+    for name in units:
+        per_kill: dict[tuple[str, int], list[float]] = defaultdict(list)
+        for c in casts:
+            if c["name"] == name:
+                per_kill[(c["report"], c["fight_id"])].append(c["t"])
+        for k, times in per_kill.items():
+            seg_start = prev = times[0]
+            for tt in times[1:] + [None]:
+                if tt is None or tt - prev > ATTACK_GAP:
+                    segments[k].append((seg_start, prev - seg_start + 2.0, name))
+                    if tt is not None:
+                        seg_start = tt
+                if tt is not None:
+                    prev = tt
+    waves = canonical_waves([[(s, 1, d, [nm]) for s, d, nm in segments.get(k, [])] for k in keys])
+    return [AddWave(w.t, 1, w.lifetime, ", ".join(w.types)) for w in waves if w.lifetime >= 5]
 
 
 def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, boss_name: str,
@@ -82,16 +127,13 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
         death_rate[r["name"]].append(r["died"])
     killable = {n for n, d in death_rate.items() if sum(d) / len(d) >= KILLABLE_DEATH_RATE}
     adds: dict[tuple[str, int], list] = defaultdict(list)
-    bosses: dict[tuple[str, int], list] = defaultdict(list)
     for r in rows:
-        if r["t_spawn"] is None or (r["name"] not in killable and not r["is_boss"]):
+        if r["t_spawn"] is None or r["name"] not in killable or r["is_boss"]:
             continue
-        target = bosses if r["is_boss"] else adds
-        target[(r["report"], r["fight_id"])].append((r["t_spawn"], r["t_death"] - r["t_spawn"], r["name"]))
+        adds[(r["report"], r["fight_id"])].append((r["t_spawn"], r["t_death"] - r["t_spawn"], r["name"]))
     add_waves = [AddWave(w.t, max(1, round(w.count)), w.lifetime, ", ".join(w.types))
                  for w in canonical_waves([fight_waves(adds.get(k, [])) for k in keys])]
-    boss_waves = [AddWave(w.t, max(1, round(w.count)), w.lifetime, ", ".join(w.types))
-                  for w in canonical_waves([fight_waves(bosses.get(k, [])) for k in keys])]
+    boss_waves = attack_windows(con, where, params, spec, keys)
 
     # intermissions -> the main boss is not attackable
     phases = defaultdict(list)

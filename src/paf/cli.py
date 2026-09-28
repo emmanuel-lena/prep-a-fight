@@ -230,6 +230,69 @@ def cmd_template(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_timeline(args: argparse.Namespace) -> int:
+    import webbrowser
+
+    from paf import settings
+    from paf.config import data_dir
+    from paf.corpus import db
+    from paf.corpus.template import _slug
+    from paf.corpus.timeline import build_timeline, render_html
+
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    tl = build_timeline(db.connect(), enc.id, diff, enc.name, diff_name, settings.get("spec"), top=args.top)
+    if tl.kills == 0:
+        print(f"No kills in the corpus for {enc.name} {diff_name}: run `paf corpus \"{enc.name}\"` first.")
+        return 1
+    out = data_dir() / "reports" / f"timeline-{_slug(enc.name)}-{diff_name}.html"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(render_html(tl), encoding="utf-8")
+    print(f"{len(tl.players)} players, {len(tl.abilities)} cooldowns detected: "
+          + ", ".join(a.name for a in tl.abilities))
+    print(f"Report: {out}")
+    if args.open:
+        webbrowser.open(out.as_uri())
+    return 0
+
+
+def _load_profile(path: str | None) -> tuple[str, str]:
+    from pathlib import Path
+
+    from paf.config import data_dir
+
+    p = Path(path) if path else data_dir() / "profiles" / "current.simc"
+    if not p.is_file():
+        raise SystemExit("No profile: copy your /simc export and run `paf profile` (or pass --profile FILE).")
+    return p.read_text(encoding="utf-8-sig"), str(p)
+
+
+def cmd_sim(args: argparse.Namespace) -> int:
+    from paf import simc
+    from paf.corpus.template import template_path
+    from paf.fight import Fight
+
+    profile, origin = _load_profile(args.profile)
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    fpath = template_path(enc.name, diff_name)
+    if not fpath.is_file():
+        print(f"No fight template for {enc.name} {diff_name}: run `paf template \"{enc.name}\"` first.")
+        return 1
+    fight = Fight.load(fpath)
+    root = simc.new_run_dir(label=f"sim-{fpath.stem}")
+    print(f"Simming {origin} on {fight.name} ({_mmss(fight.duration)}) and on a Patchwerk of the same length...")
+    real = simc.run(simc.build_input(profile, fight.to_simc()), root / "fight", target_error=args.error)
+    dummy = simc.run(simc.build_input(profile, ["fight_style=Patchwerk", f"max_time={simc.fmt(fight.duration)}",
+                                                "desired_targets=1"]), root / "patchwerk", target_error=args.error)
+    d, b = real.baseline["dps"], real.baseline.get("prioritydps")
+    p = dummy.baseline["dps"]
+    print(f"  Patchwerk        {p.mean:10,.0f} dps")
+    print(f"  {fight.name:<16} {d.mean:10,.0f} dps total ({(d.mean / p.mean - 1):+.1%} vs Patchwerk)")
+    if b:
+        print(f"  {'':<16} {b.mean:10,.0f} dps on the boss ({b.mean / d.mean:.0%} of your damage)")
+    print(f"Runs: {root}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paf", description="prep-a-fight: prepare a boss fight from top logs.")
     p.add_argument("--version", action="version", version=f"paf {__version__}")
@@ -275,6 +338,20 @@ def build_parser() -> argparse.ArgumentParser:
     tp.add_argument("boss")
     tp.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
     tp.set_defaults(func=cmd_template)
+
+    sm = sub.add_parser("sim", help="sim your profile on the typical fight of a boss vs a Patchwerk")
+    sm.add_argument("boss")
+    sm.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    sm.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
+    sm.add_argument("--error", type=float, default=0.2, help="target error in %% (default 0.2)")
+    sm.set_defaults(func=cmd_sim)
+
+    tl = sub.add_parser("timeline", help="HTML page with the cooldown timelines of the top players (Lorrgs-like)")
+    tl.add_argument("boss")
+    tl.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    tl.add_argument("--top", type=int, default=25, help="players shown one per row (default 25)")
+    tl.add_argument("--open", action="store_true", help="open the page in the browser")
+    tl.set_defaults(func=cmd_timeline)
     return p
 
 
