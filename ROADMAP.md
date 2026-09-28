@@ -36,6 +36,26 @@ Pistes de départ, à trier et à préciser avec Manu :
 - mes logs comparés aux tops : CD perdus, DPS par phase, mécaniques prises en plus ;
 - une **fiche de boss** d'une page : stuff, plan de CD, points d'attention.
 
+### Rendu cible (exemple)
+
+```
+Ula'tek (heroic) - Elemental - objective: boss 70% / adds 30%
+Fight rebuilt from 20 top logs: 5:40, 3 add waves
+  wave 1  1:05  x3 adds, alive ~22 s
+  wave 2  2:50  x3 adds, alive ~25 s
+  wave 3  4:30  x5 adds, alive ~18 s
+
+Best talent builds on THIS fight        boss dps   add dmg   score
+  1. Build A (8 of the top 20)           -0.8%     +14.2%    +3.7%   <- best compromise
+  2. Build B (5 of the top 20)           +0.0%      +0.0%     ref
+  3. Your current build                  +0.3%      -6.1%    -1.6%
+
+What changes vs your build: take X instead of Y, Z instead of W
+Cooldowns: hold Ascendance for wave 2 (2:50): +1.9% vs on cooldown
+```
+
+Chaque ligne vient d'une brique : vagues d'adds (T2), combat SimC (R3), objectif boss/adds (R5), talents (R6), plan de CD (Prépa).
+
 ## Principes
 - Local et gratuit : simc sur le CPU de l'utilisateur, identifiants WCL de l'utilisateur.
 - **Petit d'abord** : Chaman Élémentaire, un boss, puis on élargit.
