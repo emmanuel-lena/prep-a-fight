@@ -591,6 +591,133 @@ def cmd_droptimizer(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_prep(args: argparse.Namespace) -> int:
+    import statistics as st
+    import webbrowser
+
+    from paf import settings, simc
+    from paf.calibrate import calibrate, real_boss_share
+    from paf.cdplan import compare_plans
+    from paf.config import data_dir
+    from paf.corpus import db
+    from paf.corpus.analyze import analyze
+    from paf.corpus.template import _slug, build_template, template_path
+    from paf.corpus.timeline import build_timeline, render_html
+    from paf.droptimizer import run_droptimizer, usable_loot
+    from paf.gamedata import encounter_loot, item_classes, item_inventory_types, item_names, item_sets
+    from paf.prep_report import PrepData, render
+    from paf.profile import parse_simc_export
+    from paf.talent_sim import compare_builds
+    from paf.topgear import FightProfile, GearPool, run_topgear
+
+    profile_text, origin = _load_profile(args.profile)
+    profile = parse_simc_export(profile_text)
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    spec = settings.get("spec")
+    con = db.connect()
+    root = simc.new_run_dir(label=f"prep-{_slug(enc.name)}")
+
+    def step(msg: str) -> None:
+        print(f"\n== {msg}", flush=True)
+
+    done = con.execute("SELECT COUNT(*) FROM fight WHERE encounter_id=? AND difficulty=? AND status='done'",
+                       (enc.id, diff)).fetchone()[0]
+    if done < 20 or args.refresh:
+        step("Collecting the corpus from Warcraft Logs")
+        cmd_corpus(argparse.Namespace(boss=args.boss, difficulty=args.difficulty, kills=None, ilvl=None,
+                                      list_only=False, retry=False, refetch=False))
+
+    step("Analyzing the corpus")
+    rep = analyze(con, enc.id, diff, enc.name, spec)
+    fight, info = build_template(con, enc.id, diff, enc.name, spec, diff_name)
+    d = PrepData(enc.name, diff_name, spec, profile.name or origin, kills=rep.kills, duration=fight.duration)
+    d.phases = [(n, m) for n, _, m, _ in rep.phases]
+    d.lust, d.pi, d.moving_share = fight.lust_time, fight.power_infusion, info.moving_share
+    d.add_share_spec = rep.ranked_add_share[1]
+    print(f"  {rep.kills} kills, {len(fight.add_waves)} add waves / targets, duration {_mmss(fight.duration)}")
+
+    step("Calibrating the fight on the logs")
+    target = real_boss_share(con, enc.id, diff, enc.name, spec)
+    if target is not None:
+        cal = calibrate(profile_text, fight, target, root / "calibrate")
+        fight.add_scale = cal.scale
+        d.boss_share_real, d.add_scale = target, cal.scale
+        got = cal.achieved
+        print(f"  top players: {target:.0%} of damage on the boss; add counts x{cal.scale:g}"
+              + (f" (simulated: {got:.0%})" if got is not None else ""))
+        if got is not None and abs(got - target) > 0.05:
+            d.notes.append(
+                f"SimC puts {got:.0%} of your damage on the boss vs {target:.0%} in the top players' logs, even "
+                f"with more adds: SimC keeps single-target spells on the boss while real players also spend them "
+                f"on adds and secondary targets. Boss-only numbers are optimistic, add damage pessimistic.")
+    fight.save(template_path(enc.name, diff_name))
+    d.waves = [(w.time, max(1, round(w.count * fight.add_scale)), w.lifetime, w.name) for w in fight.add_waves]
+
+    step("Simming your character on the fight")
+    real = simc.run(simc.build_input(profile_text, fight.to_simc()), root / "fight", target_error=args.error)
+    dummy = simc.run(simc.build_input(profile_text, ["fight_style=Patchwerk", f"max_time={simc.fmt(fight.duration)}",
+                                                     "desired_targets=1"]), root / "patchwerk", target_error=args.error)
+    d.sim_dps, d.patchwerk_dps = real.baseline["dps"].mean, dummy.baseline["dps"].mean
+    d.sim_boss_dps = real.baseline["prioritydps"].mean if "prioritydps" in real.baseline else None
+
+    step("Cooldown timelines of the top players")
+    tl = build_timeline(con, enc.id, diff, enc.name, diff_name, spec, top=25)
+    reports = data_dir() / "reports"
+    reports.mkdir(parents=True, exist_ok=True)
+    tl_file = reports / f"timeline-{_slug(enc.name)}-{diff_name}.html"
+    tl_file.write_text(render_html(tl), encoding="utf-8")
+    d.timeline_file = tl_file.name
+
+    fights = {"boss fight": fight.to_simc(),
+              "patchwerk": ["fight_style=Patchwerk", f"max_time={simc.fmt(fight.duration)}", "desired_targets=1"]}
+    step("Talent builds of the top players")
+    d.talents = compare_builds(profile_text, con, client, enc.id, diff, spec, fights, root / "talents",
+                               target_error=args.error)
+    step("Cooldown plans")
+    tl_all = build_timeline(con, enc.id, diff, enc.name, diff_name, spec, top=10_000)
+    d.plans = compare_plans(profile_text, tl_all, fight, root / "cdplan", target_error=args.error / 2,
+                            objective=args.objective)
+
+    if not args.no_gear:
+        pool = GearPool(profile, item_inventory_types(), item_sets())
+        if pool.candidates:
+            step(f"Top Gear with your {len(pool.candidates)} items")
+            gear_fights = [FightProfile("boss fight", fight.to_simc())]
+            res = run_topgear(profile_text, pool, gear_fights, root / "topgear", objective=args.objective,
+                              max_combos=args.max_combos)
+            weights = {f.name: f.weight for f in gear_fights}
+            ranked = sorted(res.combos, key=lambda c: -c.weighted(weights))
+            d.gear = [("; ".join(f"{o.fam}: {o.label()}" for o in c.options.values()), c.scores, c.weighted(weights))
+                      for c in ranked[:8]]
+            d.gear_fights = [f.name for f in gear_fights]
+            d.gear_error = max((err for c in ranked[:8] for err in c.errors.values()), default=0.0)
+
+        step("What this boss drops")
+        items = usable_loot([enc.id], profile.class_name, encounter_loot(), item_classes(), item_names())
+        ilvl = args.ilvl or round(st.median(i.ilvl for i in profile.equipped.values() if i.ilvl) or 0)
+        owned = {i.item_id: i.ilvl for i in profile.equipped.values() if i.item_id}
+        items = [it for it in items if (owned.get(it.item_id) or 0) < ilvl]
+        if items:
+            run_droptimizer(profile_text, profile, items, [FightProfile("boss fight", fight.to_simc())],
+                            root / "loot", ilvl, target_error=args.error, objective=args.objective)
+            ranked_items = sorted(items, key=lambda i: -i.deltas.get("boss fight", -1e9))
+            d.loot = [(i.name, i.slot, i.deltas.get("boss fight", 0.0)) for i in ranked_items]
+            d.loot_ilvl = ilvl
+            d.loot_error = max((i.error for i in ranked_items[:12]), default=0.0)
+
+    out = reports / f"prep-{_slug(enc.name)}-{diff_name}.html"
+    out.write_text(render(d), encoding="utf-8")
+    step("Done")
+    from paf.prep_report import headline
+
+    for line in headline(d):
+        print(f"  - {line}")
+    print(f"\nPrep sheet: {out}\nRuns: {root}")
+    if args.open:
+        webbrowser.open(out.as_uri())
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paf", description="prep-a-fight: prepare a boss fight from top logs.")
     p.add_argument("--version", action="version", version=f"paf {__version__}")
@@ -711,6 +838,19 @@ def build_parser() -> argparse.ArgumentParser:
     dr.add_argument("--error", type=float, default=0.2)
     dr.add_argument("--top", type=int, default=25)
     dr.set_defaults(func=cmd_droptimizer)
+
+    pr2 = sub.add_parser("prep", help="everything for one boss, as a one-page HTML prep sheet")
+    pr2.add_argument("boss")
+    pr2.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    pr2.add_argument("--objective", type=_objective, default=0.0, help="total (default), boss, or a boss weight")
+    pr2.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
+    pr2.add_argument("--error", type=float, default=0.2)
+    pr2.add_argument("--ilvl", type=int, help="item level of the drops (default: median of your equipped items)")
+    pr2.add_argument("--max-combos", type=int, default=600, help="Top Gear combination budget (default 600)")
+    pr2.add_argument("--no-gear", action="store_true", help="skip Top Gear and loot (faster)")
+    pr2.add_argument("--refresh", action="store_true", help="collect new kills first")
+    pr2.add_argument("--open", action="store_true", help="open the sheet in the browser")
+    pr2.set_defaults(func=cmd_prep)
     return p
 
 

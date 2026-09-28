@@ -17,7 +17,7 @@ from paf import simc
 from paf.corpus.analyze import kills_filter
 from paf.fight import Fight
 
-SCALES = (0.1, 0.2, 0.3, 0.45, 0.6, 0.8, 1.0)
+SCALES = (0.1, 0.2, 0.3, 0.45, 0.6, 0.8, 1.0, 1.3, 1.6, 2.0)  # beyond x2 counts stop being plausible
 
 
 def real_boss_share(con: sqlite3.Connection, encounter_id: int, difficulty: int, boss_name: str,
@@ -43,6 +43,15 @@ class Calibration:
     target: float
     points: list[tuple[float, float, float]]  # scale, simulated boss share, total dps
     scale: float
+
+    @property
+    def achieved(self) -> float | None:
+        """Simulated boss share at the chosen scale (linear interpolation)."""
+        pts = sorted(self.points)
+        for (s0, b0, _), (s1, b1, _) in zip(pts, pts[1:], strict=False):
+            if s0 <= self.scale <= s1:
+                return b0 + (b1 - b0) * (self.scale - s0) / (s1 - s0) if s1 != s0 else b0
+        return min(pts, key=lambda p: abs(p[0] - self.scale))[1] if pts else None
 
 
 def calibrate(profile_text: str, fight: Fight, target_share: float, run_dir: Path,
