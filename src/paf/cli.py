@@ -195,6 +195,41 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     return 0
 
 
+def _mmss(s: float) -> str:
+    return f"{int(s // 60)}:{int(s % 60):02d}"
+
+
+def cmd_template(args: argparse.Namespace) -> int:
+    from paf import settings
+    from paf.corpus import db
+    from paf.corpus.template import build_template, template_path
+
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    con = db.connect()
+    fight, info = build_template(con, enc.id, diff, enc.name, settings.get("spec"), diff_name)
+    if info.kills == 0:
+        print(f"No kills in the corpus for {enc.name} {diff_name}: run `paf corpus \"{enc.name}\"` first.")
+        return 1
+    path = template_path(enc.name, diff_name)
+    fight.save(path)
+    print(f"{fight.name}: typical fight from {info.kills} kills, {_mmss(fight.duration)}")
+    print(f"  bloodlust at {_mmss(fight.lust_time or 0)}; power infusion at "
+          f"{', '.join(_mmss(t) for t in fight.power_infusion) or 'none'}")
+    for w in fight.invulnerable:
+        print(f"  boss not attackable {_mmss(w.start)}-{_mmss(w.start + w.duration)} (intermission)")
+    print("  targets besides the boss:")
+    for w in fight.add_waves:
+        print(f"    {_mmss(w.time):>5}  x{w.count:<3} alive {w.lifetime:3.0f}s  {w.name}")
+    print(f"  movement: {settings.get('spec')} players move {info.moving_share:.0%} of the fight; by phase: "
+          + ", ".join(f"{n.split(':')[0]} {v:.0%}" for n, v in info.movement_by_phase))
+    if fight.movement:
+        print("  movement windows shared by most players: "
+              + ", ".join(f"{_mmss(w.start)} ({w.duration:.0f}s)" for w in fight.movement))
+    print(f"Saved: {path}\n       {path.with_suffix('.simc')}")
+    print("Edit the .json to customize the fight (times, counts, lifetimes, movement), then sim it.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paf", description="prep-a-fight: prepare a boss fight from top logs.")
     p.add_argument("--version", action="version", version=f"paf {__version__}")
@@ -235,6 +270,11 @@ def build_parser() -> argparse.ArgumentParser:
     an.add_argument("boss")
     an.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
     an.set_defaults(func=cmd_analyze)
+
+    tp = sub.add_parser("template", help="build the typical fight of a boss from the corpus (for SimC)")
+    tp.add_argument("boss")
+    tp.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    tp.set_defaults(func=cmd_template)
     return p
 
 

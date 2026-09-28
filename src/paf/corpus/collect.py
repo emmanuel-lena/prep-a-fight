@@ -324,12 +324,13 @@ def write_kill(con: sqlite3.Connection, report: str, fight_id: int, p: dict[str,
     con.executemany("INSERT INTO enemy_cast VALUES(?,?,?,?,?,?,?)", [(*fk, *r) for r in p["enemy_casts"]])
     actor = p["ranked_actor"]
     con.executemany(
-        "INSERT INTO player_cast VALUES(?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO player_cast(report, fight_id, actor_id, ability_id, type, t, x, y, facing, target_id,"
+        " target_instance) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
         [(*fk, actor, ev.get("abilityGameID"), ev.get("type"), t(ev["timestamp"]),
           ev["x"] / 100 if "x" in ev and ev.get("resourceActor", 1) == 1 else None,
           ev["y"] / 100 if "y" in ev and ev.get("resourceActor", 1) == 1 else None,
           ev.get("facing") / 100 if ev.get("facing") is not None and ev.get("resourceActor", 1) == 1
-          else None)
+          else None, ev.get("targetID"), ev.get("targetInstance"))
          for ev in pcasts])
     con.executemany(
         "INSERT INTO player_buff VALUES(?,?,?,?,?,?,?)",
@@ -343,7 +344,8 @@ def write_kill(con: sqlite3.Connection, report: str, fight_id: int, p: dict[str,
 
 def collect(client: WCLClient, con: sqlite3.Connection, enc: Encounter, difficulty: int, *,
             points_per_hour: float = 1500, retry_errors: bool = False,
-            log: Callable[[str], None] = print, sleep: Callable[[float], None] = time.sleep) -> dict[str, int]:
+            log: Callable[[str], None] = lambda s: print(s, flush=True),
+            sleep: Callable[[float], None] = time.sleep) -> dict[str, int]:
     """Fetch every pending kill of this encounter/difficulty. Resumable."""
     statuses = ("pending", "error") if retry_errors else ("pending",)
     todo = con.execute(

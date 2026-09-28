@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS enemy_cast(
   report TEXT, fight_id INT, source_id INT, source_instance INT, ability_id INT, type TEXT, t REAL);
 CREATE TABLE IF NOT EXISTS player_cast(
   report TEXT, fight_id INT, actor_id INT, ability_id INT, type TEXT, t REAL, x REAL, y REAL,
-  facing REAL);
+  facing REAL, target_id INT, target_instance INT);
 CREATE TABLE IF NOT EXISTS player_buff(
   report TEXT, fight_id INT, actor_id INT, ability_id INT, type TEXT, t REAL, source_id INT);
 CREATE TABLE IF NOT EXISTS ability(id INT PRIMARY KEY, name TEXT);
@@ -50,12 +50,22 @@ def db_path() -> Path:
     return data_dir() / "corpus.sqlite"
 
 
+MIGRATIONS = [
+    ("player_cast", "target_id", "INT"),
+    ("player_cast", "target_instance", "INT"),
+]
+
+
 def connect(path: Path | None = None) -> sqlite3.Connection:
     path = path or db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(path)
     con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)
+    for table, column, kind in MIGRATIONS:
+        cols = {r[1] for r in con.execute(f"PRAGMA table_info({table})")}
+        if column not in cols:
+            con.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
     return con
 
 
