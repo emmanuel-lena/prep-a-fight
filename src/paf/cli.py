@@ -169,6 +169,29 @@ def cmd_corpus(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_analyze(args: argparse.Namespace) -> int:
+    from paf import settings
+    from paf.corpus import db
+    from paf.corpus.analyze import analyze, format_report
+
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    spec = settings.get("spec")
+    con = db.connect()
+    names = {}
+    try:
+        from paf.gamedata import talent_entry_names
+
+        names = talent_entry_names()
+    except OSError as e:
+        print(f"(talent names unavailable: {e})")
+    rep = analyze(con, enc.id, diff, enc.name, spec, names)
+    if rep.kills == 0:
+        print(f"No kills in the corpus for {enc.name} {diff_name}: run `paf corpus \"{enc.name}\"` first.")
+        return 1
+    print(f"[{diff_name}] " + format_report(rep, spec))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paf", description="prep-a-fight: prepare a boss fight from top logs.")
     p.add_argument("--version", action="version", version=f"paf {__version__}")
@@ -203,6 +226,11 @@ def build_parser() -> argparse.ArgumentParser:
     co.add_argument("--list-only", action="store_true", help="only list ranked kills, fetch nothing")
     co.add_argument("--retry", action="store_true", help="retry kills that failed before")
     co.set_defaults(func=cmd_corpus)
+
+    an = sub.add_parser("analyze", help="fight shape, add waves, who hits adds, talents (from the corpus)")
+    an.add_argument("boss")
+    an.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    an.set_defaults(func=cmd_analyze)
     return p
 
 
