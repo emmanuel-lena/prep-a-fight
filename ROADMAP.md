@@ -102,6 +102,26 @@ Chaque ligne vient d'une brique : vagues d'adds (T2), combat SimC (R3), objectif
 - **F2** ✅ **Éditeur de combat perso** : partir du template et dire « là je bouge 6 s », « là je soak », « là je garde Ascendance ». Chaque élément peut être **fixe** ou **décalable** (fenêtre au plus tôt / au plus tard, par exemple un déplacement qu'on peut avancer de 5 s).
 - **F3** ✅ **Optimiseur** : SimC teste les décalages possibles des éléments décalables et des CD (profilesets : les options de combat varient par profileset, c'est vérifié). Il ressort le meilleur placement, par exemple « bouge 4 s plus tôt et garde Stormkeeper pour après le déplacement : +2,1 % ».
 
+### Leçons d'Ula'tek HM (2026-09-29) et ajustements
+Trois erreurs de modèle ont faussé des résultats avant d'être corrigées. Chacune a été trouvée par une confrontation au réel : les vrais logs ou la connaissance du joueur.
+- Adds mis à l'échelle ×2 : +21 % « gagnés » en gardant tout pour les adds, un artefact.
+- Mouvement déduit des trajectoires compté comme temps sans cast : la sim des tops ne donnait que 74 % de leur DPS réel.
+- Heart traité comme une cible séparée, alors qu'il partage la vie du boss avec une amp : il a fallu la remarque de Manu.
+
+Ajustements :
+- **V1** Validation systématique, affichée partout : chaque combat reconstruit est vérifié contre le DPS réel des tops (`paf validate`), et le résultat est en tête de fiche.
+- **V2** Garde-fous : un gain de plus de ~5 % ou un plan contraire à ce que font les tops est signalé « à vérifier », pas présenté comme une reco.
+- **V3** Sensibilité : les paramètres incertains (amp, mouvement, durée de vie des adds) sont testés sur une plage. On ne recommande que ce qui tient sur toute la plage.
+- **V4** Taxonomie explicite des mécaniques, chacune détectée avec sa preuve (données citées dans la fiche) :
+  - vague d'adds ;
+  - unité qui partage la vie du boss (vulnérabilité) ;
+  - cible prioritaire indépendante ;
+  - boss absent ;
+  - amp posée sur le boss (debuff) ;
+  - déplacement / soak / kick.
+- **V5** Fiche boss éditable (`paf boss-notes`) : l'outil propose ce qu'il a détecté (type d'unité, déclencheur, amp mesurée) et le joueur confirme ou corrige (« le Heart c'est +100 % »). À terme, ces notes peuvent être partagées entre joueurs, sans données perso.
+- **V6** La comparaison « sim vs ce que font les tops » devient un indicateur de santé du modèle : quand les deux divergent, soit le modèle est faux, soit les tops ont tort, et la fiche le dit.
+
 ### Assigns et mécaniques (validé avec Manu, 2026-09-28)
 - **A1** ✅ **Catalogue automatique des mécaniques** par boss : sorts du boss depuis le Journal des rencontres (wago.tools : nom, description, drapeaux tank/heal/dps/interruptible) croisés avec les casts vus dans les logs.
 - **A2** ✅ **Pré-tri automatique depuis le corpus** : pour chaque mécanique, qui la gère dans les tops. Kicks via les events `interrupt`, soaks/orbes/debuffs via les dégâts et debuffs reçus. Une mécanique prise par 1 à 3 joueurs fixes est **assignée**, prise par tout le raid elle est **raid-wide**. On en tire les specs qui s'en chargent et le coût mesuré (déplacement, temps sans caster, DPS sur la fenêtre).
