@@ -25,3 +25,14 @@ def test_baseline_and_profileset(profile_text, tmp_path):
     assert r.baseline["dps"].mean > 0
     assert len(r.profilesets) == 1
     assert r.delta_pct(r.profilesets[0]) < 0  # removing a trinket must lose dps
+
+
+def test_reconstructed_fight_has_boss_metric(profile_text, tmp_path):
+    from tests.test_fight import example
+
+    text = simc.build_input(profile_text, example().to_simc(), {"no_lust": ["override.bloodlust=0"]})
+    r = simc.run(text, tmp_path, target_error=1.0, threads=8)
+    assert 0 < r.baseline["prioritydps"].mean < r.baseline["dps"].mean  # adds were there
+    ps = r.profilesets[0]
+    assert "prioritydps" in ps.metrics
+    assert r.delta_pct(ps) < 0
