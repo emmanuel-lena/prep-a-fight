@@ -646,6 +646,15 @@ def cmd_prep(args: argparse.Namespace) -> int:
         step("Collecting the corpus from Warcraft Logs")
         cmd_corpus(argparse.Namespace(boss=args.boss, difficulty=args.difficulty, kills=None, ilvl=None,
                                       list_only=False, retry=False, refetch=False))
+    mech_missing = con.execute(
+        "SELECT COUNT(*) FROM fight f LEFT JOIN mech_status m USING(report, fight_id) "
+        "WHERE f.encounter_id=? AND f.difficulty=? AND f.status='done' AND m.report IS NULL",
+        (enc.id, diff)).fetchone()[0]
+    if mech_missing:
+        from paf.corpus.mechanics import fetch_mechanics
+
+        step(f"Collecting who handles each mechanic ({mech_missing} kills)")
+        fetch_mechanics(client, con, enc.id, diff, [])
 
     step("Analyzing the corpus")
     rep = analyze(con, enc.id, diff, enc.name, spec)
@@ -1018,6 +1027,13 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    from paf.web import serve
+
+    serve(args.port, open_browser=not args.no_browser)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paf", description="prep-a-fight: prepare a boss fight from top logs.")
     p.add_argument("--version", action="version", version=f"paf {__version__}")
@@ -1168,6 +1184,11 @@ def build_parser() -> argparse.ArgumentParser:
     op.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
     op.add_argument("--error", type=float, default=0.2)
     op.set_defaults(func=cmd_optimize)
+
+    sv = sub.add_parser("serve", help="local web UI: paste your /simc, pick a boss, tick your assignments")
+    sv.add_argument("--port", type=int, default=8765)
+    sv.add_argument("--no-browser", action="store_true")
+    sv.set_defaults(func=cmd_serve)
 
     pr2 = sub.add_parser("prep", help="everything for one boss, as a one-page HTML prep sheet")
     pr2.add_argument("boss")

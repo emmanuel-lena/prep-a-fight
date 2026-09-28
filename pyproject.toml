@@ -41,3 +41,4 @@ select = ["E", "F", "W", "I", "UP", "B"]
 # HTML templates: long lines are clearer than split strings
 "src/paf/prep_report.py" = ["E501"]
 "src/paf/corpus/timeline.py" = ["E501"]
+"src/paf/web.py" = ["E501"]
