@@ -203,14 +203,21 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
 
     # secondary boss units (e.g. a heart) share the boss's health: their windows become boss vulnerability
     # windows, with the damage amplification measured in the logs
-    from paf.corpus.units import unit_windows
+    from paf.corpus.units import trigger_casts, unit_windows
 
     measured, ratios = unit_windows(con, encounter_id, difficulty)
     if measured:  # damage-taken graphs of a few kills: real windows and damage rate ratio of each unit
-        waves = canonical_waves([[(s, 1, d, [nm]) for s, d, nm in kill] for kill in measured])
-        vulnerable = [Vulnerable(round(w.t, 1), round(w.lifetime, 1),
-                                 round(min(5.0, max(1.0, ratios.get(w.types[0], 1.0))), 2), ", ".join(w.types))
-                      for w in waves]
+        waves = canonical_waves([[(s, 1, d, [nm]) for s, d, nm in kill] for kill in measured.values()])
+        vulnerable = []
+        ability_names = dict(con.execute("SELECT id, name FROM ability").fetchall())
+        for w in waves:
+            start, end, label = w.t, w.t + w.lifetime, ", ".join(w.types)
+            trig = trigger_casts(con, measured, w.t, ability_names)
+            if trig:  # the window opens when the boss's cast ends (more precise than the damage graph)
+                start = trig[1]
+                label += f" (after {trig[0]})"
+            vulnerable.append(Vulnerable(round(start, 1), round(max(1.0, end - start), 1),
+                                         round(min(5.0, max(1.0, ratios.get(w.types[0], 1.0))), 2), label))
     else:  # fallback: the ranked players' casts on the unit
         mult = boss_unit_multiplier(con, where, params, boss_name, {w.name for w in boss_waves},
                                     sum(w.lifetime for w in boss_waves), duration,

@@ -81,9 +81,41 @@ def fetch_unit_windows(client: WCLClient, con: sqlite3.Connection, encounter_id:
     return len(todo)
 
 
-def unit_windows(con: sqlite3.Connection, encounter_id: int, difficulty: int,
-                 min_share: float = MIN_SHARE) -> tuple[list[list[tuple]], dict[str, float]]:
-    """Measured windows per kill [(start, duration, name)], and the median rate ratio of each unit.
+TRIGGER_BEFORE = 6.0  # a boss cast ending up to this many seconds before a window can be its trigger
+TRIGGER_AFTER = 3.0  # ... or slightly after (the damage graph has a resolution of a few seconds)
+TRIGGER_SUPPORT = 0.5  # share of the kills where that cast must precede the window
+
+
+def trigger_casts(con: sqlite3.Connection, measured: dict[tuple[str, int], list[tuple]],
+                  window_time: float, names: dict[int, str]) -> tuple[str, float] | None:
+    """The boss cast that opens a window (e.g. a 5 s cast exposing a heart): the ability whose cast
+    *ends* right before the window in most kills, and the median time of that cast end."""
+    ends: dict[int, list[float]] = {}
+    kills = 0
+    for (rep, fid), windows in measured.items():
+        near = [s for s, _d, _n in windows if abs(s - window_time) <= 15]
+        if not near:
+            continue
+        kills += 1
+        w0 = min(near, key=lambda s: abs(s - window_time))
+        seen: dict[int, float] = {}
+        for aid, t in con.execute(
+                "SELECT ability_id, t FROM enemy_cast WHERE report=? AND fight_id=? AND type='cast' "
+                "AND t BETWEEN ? AND ?", (rep, fid, w0 - TRIGGER_BEFORE, w0 + TRIGGER_AFTER)):
+            seen.setdefault(aid, t)
+        for aid, t in seen.items():
+            ends.setdefault(aid, []).append(t)
+    if not kills or not ends:
+        return None
+    aid, times = max(ends.items(), key=lambda kv: len(kv[1]))
+    if len(times) / kills < TRIGGER_SUPPORT:
+        return None
+    return names.get(aid, f"spell {aid}"), round(st.median(times), 1)
+
+
+def unit_windows(con: sqlite3.Connection, encounter_id: int, difficulty: int, min_share: float = MIN_SHARE
+                 ) -> tuple[dict[tuple[str, int], list[tuple]], dict[str, float]]:
+    """Measured windows per kill {kill: [(start, duration, name)]}, and the median rate ratio of each unit.
     Units taking less than `min_share` of the raid's damage over the corpus are mechanics and are dropped."""
     where, params = kills_filter(encounter_id, difficulty)
     totals = dict(con.execute(
@@ -94,10 +126,10 @@ def unit_windows(con: sqlite3.Connection, encounter_id: int, difficulty: int,
         f"SELECT w.* FROM unit_window w JOIN fight f USING(report, fight_id) WHERE {where}", params).fetchall()
         if (totals.get(r[2]) or 0) / raid >= min_share]
     if not rows:
-        return [], {}
+        return {}, {}
     per_kill: dict[tuple[str, int], list[tuple]] = {}
     ratios: dict[str, list[float]] = {}
     for r in rows:
         per_kill.setdefault((r[0], r[1]), []).append((r[3], r[4], r[2]))
         ratios.setdefault(r[2], []).append(r[5])
-    return list(per_kill.values()), {name: st.median(v) for name, v in ratios.items()}
+    return per_kill, {name: st.median(v) for name, v in ratios.items()}
