@@ -22,7 +22,20 @@ from paf.cdplan import action_name, apl_lines, dump_apl, parse_apl, split_if
 from paf.fight import Fight
 from paf.simc_install import find_simc
 
-OBJECTIVES = ("boss", "total", "adds")
+OBJECTIVES = ("boss", "total", "adds", "secondary")
+# "secondary": damage to the secondary targets (a heart, a shield...) that the raid needs dead fast. SimC
+# cannot tell them apart from adds, so it is measured on a variant of the fight where they are the only
+# extra targets (see secondary_fight).
+
+
+def secondary_fight(fight: Fight) -> Fight | None:
+    """The fight with only its unique secondary targets as extra targets (None if it has none)."""
+    units = [w for w in fight.add_waves if not w.scalable]
+    if not units:
+        return None
+    f = Fight(**{**fight.__dict__})
+    f.add_waves = units
+    return f
 TRACKED = ("ascendance", "stormkeeper", "ancestral_swiftness", "potion", "blood_fury", "berserking",
            "ancestral_call", "fireblood", "use_item")
 LONG_COOLDOWN = 100.0  # seconds; holds of up to 60 s only make sense for long cooldowns
@@ -126,6 +139,7 @@ def metric_delta(res: simc.SimResult, ps: simc.ProfilesetResult, objective: str)
         return res.delta_pct(ps, "dps"), max(ps.dps.error / b["dps"].mean * 100, base_err)
     if objective == "boss":
         return res.delta_pct(ps, "prioritydps"), max(p["prioritydps"].error / b["prioritydps"].mean * 100, base_err)
+    # "adds" and "secondary" (on the secondary-targets fight): damage not done to the main boss
     base_adds = b["dps"].mean - b["prioritydps"].mean
     adds = p["dps"].mean - p["prioritydps"].mean
     err = ((p["dps"].error ** 2 + p["prioritydps"].error ** 2) ** 0.5) / base_adds * 100 if base_adds else 0.0
@@ -148,7 +162,8 @@ def optimize_objective(profile_text: str, apl: OrderedDict[str, list[str]], cds:
                        log: Callable[[str], None] = print) -> Plan:
     default = {c.key: c.rules[0] for c in cds}
     choice = dict(default)
-    fight_lines = fight.to_simc()
+    used = secondary_fight(fight) if objective == "secondary" else fight
+    fight_lines = (used or fight).to_simc()
     for rnd in range(1, max_rounds + 1):
         base = "\n".join([profile_text.rstrip(), *apply_rules(apl, choice)])
         sets: dict[str, list[str]] = {}
@@ -195,10 +210,23 @@ def confirm(profile_text: str, apl: OrderedDict[str, list[str]], plans: list[Pla
         ps = by_name.get(p.objective)
         if ps is None:
             continue
-        for obj in OBJECTIVES:
+        for obj in ("boss", "total", "adds"):
             d, err = metric_delta(res, ps, obj)
             p.totals[obj] = d
             if obj == p.objective:
+                p.gain, p.error = d, err
+    sec = secondary_fight(fight)
+    if sec is not None:
+        res = simc.run(simc.build_input(base, sec.to_simc(), sets), run_dir / "confirm-secondary",
+                       target_error=target_error)
+        by_name = {ps.name: ps for ps in res.profilesets}
+        for p in plans:
+            ps = by_name.get(p.objective)
+            if ps is None:
+                continue
+            d, err = metric_delta(res, ps, "secondary")
+            p.totals["secondary"] = d
+            if p.objective == "secondary":
                 p.gain, p.error = d, err
 
 
@@ -329,6 +357,8 @@ def optimize_all(profile_text: str, fight: Fight, run_dir: Path, *, objectives: 
            or (c.key.startswith("use_item:") and c.key.split(":")[1] in used)
            or (c.key in ("use_item:trinket1", "use_item:trinket2", "use_item:main_hand") and used_items)]
     log("Cooldowns found: " + ", ".join(f"{c.label} ({'long' if c.long else 'short'})" for c in cds))
+    if secondary_fight(fight) is None:
+        objectives = tuple(o for o in objectives if o != "secondary")
     plans = [optimize_objective(profile_text, apl, cds, fight, obj, run_dir, target_error=target_error, log=log)
              for obj in objectives]
     confirm(profile_text, apl, plans, fight, run_dir)

@@ -848,7 +848,8 @@ def cmd_assigns(args: argparse.Namespace) -> int:
 def print_optimized(plans, fight) -> None:
     from paf.optimize import fight_context
 
-    labels = {"boss": "boss damage", "total": "total damage", "adds": "damage to adds"}
+    labels = {"boss": "boss damage", "total": "total damage", "adds": "damage to adds",
+              "secondary": "damage to secondary targets"}
     for p in plans:
         others = ", ".join(f"{o} {v:+.2f}%" for o, v in p.totals.items() if o != p.objective)
         print(f"\n## Best plan for {labels[p.objective]}: {p.gain:+.2f}% (+/-{p.error:.2f}%) vs the default APL"
@@ -1180,7 +1181,7 @@ def build_parser() -> argparse.ArgumentParser:
     op = sub.add_parser("optimize", help="ideal cooldown plan and play-by-play on the fight, per objective")
     op.add_argument("boss")
     op.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
-    op.add_argument("--objective", choices=["all", "boss", "total", "adds"], default="all")
+    op.add_argument("--objective", choices=["all", "boss", "total", "adds", "secondary"], default="all")
     op.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
     op.add_argument("--error", type=float, default=0.2)
     op.set_defaults(func=cmd_optimize)

@@ -189,7 +189,7 @@ def render(d: PrepData) -> str:
 
     # ideal play-by-play per objective
     if d.optimized:
-        labels = {"boss": "Boss damage", "total": "Total damage (pad)", "adds": "Damage to adds"}
+        labels = {"boss": "Boss damage", "total": "Total damage (pad)", "adds": "Damage to adds", "secondary": "Damage to secondary targets (burst them)"}
         blocks = []
         for p in d.optimized:
             changed = {k: r for k, r in p.choice.items() if r.name != "default"}

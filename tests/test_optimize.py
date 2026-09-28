@@ -1,0 +1,60 @@
+from collections import OrderedDict
+
+from paf.fight import AddWave, Fight, Window
+from paf.optimize import (
+    Rule,
+    apply_rules,
+    cd_key,
+    fight_context,
+    fight_rules,
+    secondary_fight,
+    tops_alignment,
+)
+
+
+def fight():
+    return Fight("B", 300, add_waves=[AddWave(60, 5, 20), AddWave(150, 1, 20, "Heart", scalable=False)],
+                 movement=[Window(100, 5)], lust_time=0, power_infusion=[30])
+
+
+def test_cd_key():
+    assert cd_key("ascendance,if=x") == "ascendance"
+    assert cd_key("use_item,slot=trinket1,if=x") == "use_item:trinket1"
+    assert cd_key("use_item,name=font_of_venomous_rage") == "use_item:font_of_venomous_rage"
+    assert cd_key("lightning_bolt") is None
+
+
+def test_rules_and_apply():
+    rules = {r.name: r for r in fight_rules(fight(), long_cd=True)}
+    assert {"default", "on_cooldown", "hold_adds_20", "hold_adds_60", "add_waves", "secondary_targets",
+            "lust_pi", "not_before_move"} <= set(rules)
+    assert rules["hold_adds_30"].condition("a") == "(a)&(raid_event.adds.up|raid_event.adds.in>30|fight_remains<30)"
+    assert rules["on_cooldown"].condition("a") is None
+    apl = OrderedDict([("", ["ascendance,if=a", "lightning_bolt"])])
+    lines = apply_rules(apl, {"ascendance": Rule("x", "", lambda old: "b")})
+    assert lines == ["actions=ascendance,if=b", "actions+=/lightning_bolt"]
+
+
+def test_secondary_fight_keeps_only_unique_targets():
+    f = secondary_fight(fight())
+    assert [w.name for w in f.add_waves] == ["Heart"]
+    assert secondary_fight(Fight("B", 100, add_waves=[AddWave(1, 3, 10)])) is None
+
+
+def test_fight_context():
+    assert fight_context(fight(), 65) == "adds"
+    assert fight_context(fight(), 35) == "lust, PI"
+    assert fight_context(fight(), 97) == "move soon"
+
+
+def test_tops_alignment():
+    class Ab:
+        id, name, utility = 1, "Ascendance", False
+
+    class TL:
+        abilities = [Ab()]
+        players = [{"casts": {1: [152.0, 155.0, 290.0]}} for _ in range(4)]
+
+    a = tops_alignment(TL(), fight())[0]
+    assert round(a.in_units, 2) == 0.67 and a.in_adds == 0.0
+    assert 0 < a.units_cover < a.in_units
