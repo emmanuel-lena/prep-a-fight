@@ -796,7 +796,44 @@ def cmd_mechanics(args: argparse.Namespace) -> int:
         return 1
     print(f"{enc.name} ({diff_name}), from the in-game Encounter Journal:\n")
     print(format_sections(sections, diff_name, width=args.width))
+    if args.corpus:
+        _mechanics_from_corpus(enc, diff_name)
     return 0
+
+
+def _mechanics_from_corpus(enc, diff_name: str) -> None:
+    from paf import settings
+    from paf.corpus import db
+    from paf.corpus.mechanics import fetch_mechanics, mechanic_stats
+    from paf.gamedata import spell_names
+    from paf.mechanics import abilities, encounter_sections
+    from paf.wcl import WCLClient
+
+    diff = settings.DIFFICULTIES[diff_name]
+    spec = settings.get("spec")
+    con = db.connect()
+    print("\nFetching who handles each mechanic in the corpus (interrupts, debuffs on players)...")
+    # debuffs are not filtered by the journal ids: logged spell ids often differ from the journal's
+    fetch_mechanics(WCLClient(), con, enc.id, diff, [])
+    names = {**spell_names(), **dict(con.execute("SELECT id, name FROM ability").fetchall())}
+    journal = {s.title.lower(): s for s in abilities(encounter_sections(enc.id), diff_name)}
+    stats = mechanic_stats(con, enc.id, diff, spec, names)
+    if not stats:
+        print("No mechanic data.")
+        return
+    print(f"\nWho handles what in the top kills ({spec} = share of kills where one of them does it):")
+    print(f"  {'mechanic':<32} {'type':<9} {'players':>7} {spec[:8]:>8}  handled by")
+    for m in stats:
+        if m.kind == "debuff" and m.players_per_kill > 12:
+            continue  # raid-wide
+        j = journal.get(m.name.lower())
+        tag = f" [{', '.join(j.flags)}]" if j and j.flags else ""
+        who = ", ".join(f"{s} {v:.0%}" for s, v in m.specs[:3])
+        kind = "kick" if m.kind == "interrupt" else ("assigned" if m.assigned else "several")
+        print(f"  {m.name[:32]:<32} {kind:<9} {m.players_per_kill:>7.0f} {m.my_spec_rate:>8.0%}  {who}{tag}")
+    raid_wide = [m.name for m in stats if m.kind == "debuff" and m.players_per_kill > 12]
+    if raid_wide:
+        print(f"  raid-wide (everyone): {', '.join(raid_wide[:10])}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -924,6 +961,8 @@ def build_parser() -> argparse.ArgumentParser:
     me.add_argument("boss")
     me.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
     me.add_argument("--width", type=int, default=110, help="characters of description shown")
+    me.add_argument("--corpus", action="store_true",
+                    help="also show who handles each mechanic in the corpus kills (fetches ~2 points per kill)")
     me.set_defaults(func=cmd_mechanics)
 
     op = sub.add_parser("optimize", help="ideal cooldown plan and play-by-play on the fight, per objective")
