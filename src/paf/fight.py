@@ -32,6 +32,21 @@ class Window:
     distance: float = 0.0  # movement only (yards)
 
 
+def merged_movement(windows: list[Window]) -> list[Window]:
+    """Union of overlapping movement windows. In SimC a movement event that starts during another one
+    replaces it (it can shorten it), so overlaps must be merged before being sent."""
+    timed = sorted((w for w in windows if not w.distance), key=lambda w: w.start)
+    out: list[Window] = []
+    for w in timed:
+        if out and w.start <= out[-1].start + out[-1].duration:
+            last = out[-1]
+            end = max(last.start + last.duration, w.start + w.duration)
+            out[-1] = Window(last.start, end - last.start)
+        else:
+            out.append(Window(w.start, w.duration))
+    return out + [w for w in windows if w.distance]
+
+
 @dataclass
 class Fight:
     name: str
@@ -54,7 +69,7 @@ class Fight:
         for w in self.invulnerable:
             events.append(f"invulnerable,first={fmt(round(w.start, 1))},"
                           f"duration={fmt(round(w.duration, 1))},cooldown=9999")
-        for w in self.movement:
+        for w in merged_movement(self.movement):
             ev = f"movement,first={fmt(round(w.start, 1))},cooldown=9999"
             if w.distance:
                 ev += f",distance={fmt(round(w.distance, 1))}"

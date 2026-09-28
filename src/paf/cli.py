@@ -504,11 +504,22 @@ def cmd_plan(args: argparse.Namespace) -> int:
         print(f"{ppath}: {e}")
         return 1
     profile_text, origin = _load_profile(args.profile)
+    template_fight = fight
+    if plan.assigns:
+        from paf import settings
+        from paf.assigns import apply_assigns, load_mechanics
+        from paf.corpus import db
+
+        mechs = load_mechanics(db.connect(), enc.id, diff, settings.get("spec"))
+        fight, notes = apply_assigns(fight, mechs, plan.assigns)
+        for n in notes:
+            print(f"  assign: {n}")
     shiftable = [m for m in plan.moves if m.shiftable]
-    print(f"{fight.name} with your plan ({len(plan.moves)} moves, {len(shiftable)} shiftable)")
+    print(f"{fight.name} with your plan ({len(plan.moves)} moves, {len(plan.assigns)} assignments, "
+          f"{len(shiftable)} shiftable)")
     root = simc.new_run_dir(label="plan")
     mine = apply_plan(fight, plan)
-    sets = {"template_only": fight.raid_event_lines()} if plan.moves else {}
+    sets = {"template_only": template_fight.raid_event_lines()} if plan.moves or plan.assigns else {}
     res = simc.run(simc.build_input(profile_text, mine.to_simc(), sets), root / "plan", target_error=args.error)
     d = res.baseline["dps"]
     print(f"  your plan: {d.mean:,.0f} dps")
@@ -732,9 +743,58 @@ def _fight_with_plan(enc, diff_name: str):
     ppath = fpath.with_suffix(".plan.txt")
     if ppath.is_file():
         plan = parse_plan(ppath.read_text(encoding="utf-8"))
-        if plan.moves or plan.lust is not None or plan.pi is not None or plan.no_lust:
-            return apply_plan(fight, plan), ppath
+        if not plan.empty:
+            fight = apply_plan(fight, plan)
+            if plan.assigns:
+                from paf import settings
+                from paf.assigns import apply_assigns, load_mechanics
+                from paf.corpus import db
+
+                mechs = load_mechanics(db.connect(), enc.id, settings.DIFFICULTIES[diff_name], settings.get("spec"))
+                fight, notes = apply_assigns(fight, mechs, plan.assigns)
+                for n in notes:
+                    print(f"  assign: {n}")
+            return fight, ppath
     return fight, None
+
+
+def cmd_assigns(args: argparse.Namespace) -> int:
+    from paf import settings
+    from paf.assigns import MIN_SAMPLES, assigns_template, load_mechanics
+    from paf.corpus import db
+    from paf.corpus.template import template_path
+    from paf.fight import Fight
+    from paf.plan import plan_template
+
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    spec = settings.get("spec")
+    con = db.connect()
+    have = con.execute("SELECT COUNT(*) FROM mech_status m JOIN fight f USING(report, fight_id) "
+                       "WHERE f.encounter_id=? AND f.difficulty=?", (enc.id, diff)).fetchone()[0]
+    if not have:
+        _mechanics_from_corpus(enc, diff_name)
+    mechs = load_mechanics(con, enc.id, diff, spec)
+    if not mechs:
+        print("No assignable mechanic found in the corpus.")
+        return 1
+    print(f"{enc.name} {diff_name}: mechanics players get assigned to (cost measured on {spec} players)\n")
+    for m in mechs:
+        when = ", ".join(_mmss(t) for t in m.times[:8]) + (" ..." if len(m.times) > 8 else "")
+        what = "kick" if m.kind == "interrupt" else f"{m.players_per_kill:.0f}/kill"
+        cost = f"{m.cost:g}s" + ("" if m.samples >= MIN_SAMPLES else " (default)")
+        print(f"  {m.name:<28} {what:<8} cost {cost:<14} at {when}")
+    fpath = template_path(enc.name, diff_name)
+    if fpath.is_file():
+        ppath = fpath.with_suffix(".plan.txt")
+        text = ppath.read_text(encoding="utf-8") if ppath.is_file() else plan_template(Fight.load(fpath))
+        # refresh the commented suggestions, keep everything the user wrote (uncommented `assign` lines too)
+        kept = [line for line in text.splitlines()
+                if not line.startswith("# assign ") and not line.startswith("# Boss mechanics you may be assigned")]
+        while kept and not kept[-1].strip():
+            kept.pop()
+        ppath.write_text("\n".join(kept) + "\n" + assigns_template(mechs, spec), encoding="utf-8")
+        print(f"\nIn your plan (uncomment the `# assign ...` lines of your assignments): {ppath}")
+    return 0
 
 
 def print_optimized(plans, fight) -> None:
@@ -973,6 +1033,11 @@ def build_parser() -> argparse.ArgumentParser:
     me.add_argument("--corpus", action="store_true",
                     help="also show who handles each mechanic in the corpus kills (fetches ~2 points per kill)")
     me.set_defaults(func=cmd_mechanics)
+
+    asg = sub.add_parser("assigns", help="boss mechanics you can be assigned to, with timings and cost from logs")
+    asg.add_argument("boss")
+    asg.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    asg.set_defaults(func=cmd_assigns)
 
     op = sub.add_parser("optimize", help="ideal cooldown plan and play-by-play on the fight, per objective")
     op.add_argument("boss")

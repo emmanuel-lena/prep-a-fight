@@ -37,6 +37,15 @@ def test_save_load_roundtrip(tmp_path):
     assert (tmp_path / "boss.simc").read_text().startswith("# fight: Test boss")
 
 
+def test_overlapping_movement_is_merged():
+    from paf.fight import merged_movement
+
+    out = merged_movement([Window(165, 13), Window(176, 1), Window(189, 3), Window(300, 5, distance=20)])
+    assert [(w.start, w.duration, w.distance) for w in out] == [(165, 13, 0), (189, 3, 0), (300, 5, 20)]
+    out = merged_movement([Window(10, 5), Window(12, 8)])
+    assert [(w.start, w.duration) for w in out] == [(10, 10)]
+
+
 def test_unique_units_are_not_scaled():
     f = Fight("B", 100, add_waves=[AddWave(10, 4, 20), AddWave(50, 1, 20, "Heart", scalable=False)], add_scale=2.0)
     events = [e for e in f.to_simc() if "adds" in e]

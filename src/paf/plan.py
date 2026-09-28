@@ -6,6 +6,7 @@ Format, one action per line (``#`` starts a comment):
     2:45 move 6            # soak: 6 s of movement at 2:45, fixed
     5:30 move 8 shift -5..+5   # can be done up to 5 s earlier or later
     4:10 move 4 distance 20    # movement of 20 yards (SimC computes the duration)
+    assign Doomscale Shell     # a boss mechanic you handle: timings and cost come from the logs
     no boss-movement           # ignore the movement windows inferred from the top players
     lust 0:00                  # override the bloodlust time
     pi 0:20 2:30               # override Power Infusion times
@@ -58,10 +59,17 @@ class Plan:
     lust: float | None = None
     no_lust: bool = False
     pi: list[float] | None = None
+    assigns: list[str] = field(default_factory=list)  # boss mechanics the player handles (names)
+
+    @property
+    def empty(self) -> bool:
+        return not (self.moves or self.assigns or self.lust is not None or self.pi is not None or self.no_lust
+                    or not self.keep_template_movement)
 
 
 def parse_plan(text: str) -> Plan:
     p = Plan()
+    text = text.lstrip("﻿")  # files saved by Notepad / PowerShell start with a BOM
     for n, raw in enumerate(text.splitlines(), 1):
         line = raw.split("#", 1)[0].strip().lower()
         if not line:
@@ -77,6 +85,8 @@ def parse_plan(text: str) -> Plan:
                     p.lust = parse_time(tok[1])
             elif tok[0] == "pi":
                 p.pi = [parse_time(x) for x in tok[1:]]
+            elif tok[0] == "assign" and len(tok) > 1:
+                p.assigns.append(raw.split("#", 1)[0].strip()[len("assign"):].strip())
             elif len(tok) >= 3 and tok[1] == "move":
                 m = Move(parse_time(tok[0]), float(tok[2]), line=n)
                 rest = tok[3:]
@@ -92,8 +102,8 @@ def parse_plan(text: str) -> Plan:
                         raise ValueError(f"unknown option {rest[0]!r}")
                 p.moves.append(m)
             else:
-                raise ValueError("expected '<time> move <seconds> [shift a..b] [distance y]', 'lust', 'pi' "
-                                 "or 'no boss-movement'")
+                raise ValueError("expected '<time> move <seconds> [shift a..b] [distance y]', 'assign <mechanic>', "
+                                 "'lust', 'pi' or 'no boss-movement'")
         except (ValueError, IndexError) as e:
             raise ValueError(f"line {n}: {e}") from None
     return p
