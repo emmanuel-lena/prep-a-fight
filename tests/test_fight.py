@@ -35,3 +35,9 @@ def test_save_load_roundtrip(tmp_path):
     g = Fight.load(tmp_path / "boss.json")
     assert g == f
     assert (tmp_path / "boss.simc").read_text().startswith("# fight: Test boss")
+
+
+def test_unique_units_are_not_scaled():
+    f = Fight("B", 100, add_waves=[AddWave(10, 4, 20), AddWave(50, 1, 20, "Heart", scalable=False)], add_scale=2.0)
+    events = [e for e in f.to_simc() if "adds" in e]
+    assert "count=8" in events[0] and "count=1" in events[1]

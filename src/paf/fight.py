@@ -22,6 +22,7 @@ class AddWave:
     count: int
     lifetime: float  # seconds the adds stay alive
     name: str = ""
+    scalable: bool = True  # False for unique units (e.g. a secondary boss): calibration never changes the count
 
 
 @dataclass
@@ -47,7 +48,7 @@ class Fight:
         scale = self.add_scale if add_scale is None else add_scale
         events: list[str] = []
         for i, w in enumerate(sorted(self.add_waves, key=lambda w: w.time), 1):
-            count = max(1, round(w.count * scale))
+            count = max(1, round(w.count * scale)) if w.scalable else w.count
             events.append(f"adds,name=wave{i},count={count},first={fmt(round(w.time, 1))},"
                           f"duration={fmt(round(w.lifetime, 1))},cooldown=9999")
         for w in self.invulnerable:

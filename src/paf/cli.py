@@ -651,7 +651,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
                 f"with more adds: SimC keeps single-target spells on the boss while real players also spend them "
                 f"on adds and secondary targets. Boss-only numbers are optimistic, add damage pessimistic.")
     fight.save(template_path(enc.name, diff_name))
-    d.waves = [(w.time, max(1, round(w.count * fight.add_scale)), w.lifetime, w.name) for w in fight.add_waves]
+    d.waves = [(w.time, max(1, round(w.count * fight.add_scale)) if w.scalable else w.count, w.lifetime, w.name)
+               for w in fight.add_waves]
 
     step("Simming your character on the fight")
     real = simc.run(simc.build_input(profile_text, fight.to_simc()), root / "fight", target_error=args.error)
@@ -684,7 +685,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
             step(f"Top Gear with your {len(pool.candidates)} items")
             gear_fights = [FightProfile("boss fight", fight.to_simc())]
             res = run_topgear(profile_text, pool, gear_fights, root / "topgear", objective=args.objective,
-                              max_combos=args.max_combos)
+                              max_combos=args.max_combos, pass2_error=0.3)
             weights = {f.name: f.weight for f in gear_fights}
             ranked = sorted(res.combos, key=lambda c: -c.weighted(weights))
             d.gear = [("; ".join(f"{o.fam}: {o.label()}" for o in c.options.values()), c.scores, c.weighted(weights))
@@ -846,7 +847,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr2.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
     pr2.add_argument("--error", type=float, default=0.2)
     pr2.add_argument("--ilvl", type=int, help="item level of the drops (default: median of your equipped items)")
-    pr2.add_argument("--max-combos", type=int, default=600, help="Top Gear combination budget (default 600)")
+    pr2.add_argument("--max-combos", type=int, default=300, help="Top Gear combination budget (default 300)")
     pr2.add_argument("--no-gear", action="store_true", help="skip Top Gear and loot (faster)")
     pr2.add_argument("--refresh", action="store_true", help="collect new kills first")
     pr2.add_argument("--open", action="store_true", help="open the sheet in the browser")

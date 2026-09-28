@@ -108,7 +108,7 @@ def attack_windows(con: sqlite3.Connection, where: str, params: tuple, spec: str
                 if tt is not None:
                     prev = tt
     waves = canonical_waves([[(s, 1, d, [nm]) for s, d, nm in segments.get(k, [])] for k in keys])
-    return [AddWave(w.t, 1, w.lifetime, ", ".join(w.types)) for w in waves if w.lifetime >= 5]
+    return [AddWave(w.t, 1, w.lifetime, ", ".join(w.types), scalable=False) for w in waves if w.lifetime >= 5]
 
 
 def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, boss_name: str,
