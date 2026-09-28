@@ -29,10 +29,20 @@ Le prototype PowerShell (`Invoke-LocalTopGear.ps1`, Top Gear 3 passes) a été r
 - **Profilesets** (CLI seulement) : `profileset."Nom"+=option`, noms uniques sans `.`, plusieurs lignes par profileset. `profileset_work_threads=N`. Pas d'`armory=` avec des profilesets. Enemies définis **après** le profil joueur.
 - **JSON (`json2=`)** : `sim.players[0].collected_data.dps.mean` / `.mean_std_dev`, `sim.profilesets.results[].{name,mean,mean_error,mean_stddev,median,iterations}`. Lecture défensive.
 - **Raid events** : `adds,count=,first=,cooldown=,duration=,distance=` (`duration` = durée de vie) ; `movement,first=,cooldown=,distance=` ; `vulnerable,duration=,timestamps=` (bonus de dégâts subis, pas une phase) ; `invulnerable` ; `absorb` (branche midnight).
-- Reproduire un log : `fixed_time=1`, `vary_combat_length=0`, `max_time=<durée du kill>` (à vérifier en S3).
 - **DungeonRoute** : `fight_style=DungeonRoute`, pulls via `raid_events+=/pull,pull=01,…,enemies="nom":PV|…`, `BOSS_` = boss. Export depuis Method Dungeon Tools. DungeonSlice = caricature, à éviter.
 - **Export addon `/simc`** : équipé = `slot=,id=…` ; `### Gear from Bags` (par item `#`, `# Nom (ilvl)`, `# upgrade_levels=…`, `# slot=,id=…`) ; `### Weekly Reward Choices … ### End of Weekly Reward Choices` ; `### Linked gear`. `shoulder`/`wrist` au singulier. 1H sans off-hand équipée = lignes d'armes fausses.
-- À **vérifier** (S3) : `external_buffs.power_infusion=`, `bloodlust_percent=` / `bloodlust_time=`, override d'une sous-liste d'APL dans un profileset, `save=` pour dumper l'APL par défaut.
+
+### Vérifié sur simc 1210-01 (détails : `docs/research/simc-experiments.md`)
+
+- **`fight_style=Patchwerk` efface silencieusement les `raid_events`** : ne pas mettre de fight_style dans un combat reconstruit.
+- Adds : **impossible de les tuer par les dégâts** (`health=` ignoré) → durée de vie = `duration=`, tirée des logs. Une ligne par vague : `first=X,cooldown=9999` (`last=` est exclusif) ou `timestamps=30:90:150`.
+- `invulnerable,first=,duration=,cooldown=9999` OK. `bloodlust_time=60` (négatif = depuis la fin) ; `override.bloodlust=0` pour retirer. `external_buffs.power_infusion=10/130/250` (séparateur `/` obligatoire).
+- JSON : `collected_data.prioritydps` (dégâts boss seul, existe seulement avec adds). Pas de détail par cible. `profileset_metric=dps,prioritydps` → `results[].additional_metrics[]` (libellé « Damage per Second to Priority Target/Boss »). Ne pas utiliser `profileset_output_data=all`.
+- Talents : `talents=<string>` et `class_talents=/spec_talents=/hero_talents=nom_snake:rang` (appliqués par-dessus), aussi en profileset ; `save_talents=` pour récupérer la chaîne.
+- APL Élém par défaut : listes `precombat`, défaut, `aoe`, `single_target` (pas de `cds`). Un profileset peut redéfinir une liste entière (`+=actions.single_target=...` puis `+=actions.single_target+=/...`) : vérifié.
+- Les options de sim (lust, PI, raid_events) marchent **par profileset** → variantes de combat en un seul run.
+- Perf : baseline 340 s à target_error 0.2 ≈ 0,4 s ; +10 profilesets ≈ 2,7 s avec `profileset_work_threads=4`.
+- Git Bash réécrit `raid_events=/…` en chemin : `MSYS_NO_PATHCONV=1` ou passer par un fichier.
 
 ## Warcraft Logs (S2)
 

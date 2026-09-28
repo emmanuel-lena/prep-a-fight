@@ -61,6 +61,7 @@ _METRIC_KEYS = {
     "damage per second": "dps",
     "dps": "dps",
     "priority target damage per second": "prioritydps",
+    "damage per second to priority target/boss": "prioritydps",
     "priority dps": "prioritydps",
     "prioritydps": "prioritydps",
     "damage per second (effective)": "dpse",
@@ -127,7 +128,11 @@ def new_run_dir(root: Path | None = None, label: str = "") -> Path:
 
 def build_input(profile: str, fight_lines: list[str] | None = None,
                 profilesets: dict[str, list[str]] | None = None) -> str:
-    """Character first, then fight options (enemies after the player), then profilesets."""
+    """Character first, then fight options (enemies after the player), then profilesets.
+
+    Beware: ``fight_style=Patchwerk`` silently discards raid_events; leave fight_style out of
+    reconstructed fights.
+    """
     lines = [profile.rstrip(), ""]
     if fight_lines:
         lines += fight_lines + [""]
@@ -142,8 +147,13 @@ def build_input(profile: str, fight_lines: list[str] | None = None,
 
 
 def run(input_text: str, run_dir: Path, *, target_error: float = 0.2, iterations: int | None = None,
-        threads: int = 0, extra: list[str] | None = None, simc: str | None = None,
+        threads: int = 0, metrics: tuple[str, ...] = ("dps", "prioritydps"), work_threads: int = 4,
+        extra: list[str] | None = None, simc: str | None = None,
         html: bool = False, timeout: float | None = None) -> SimResult:
+    """Run simc. Profilesets are ranked by metrics[0]; the others come back as additional metrics.
+
+    work_threads: profileset_work_threads (2-4 measured ~30% faster than 1 on small sims).
+    """
     exe = find_simc(simc)
     if exe is None:
         raise SimcError("simc not found: run `paf setup`")
@@ -156,6 +166,10 @@ def run(input_text: str, run_dir: Path, *, target_error: float = 0.2, iterations
         args.append(f"iterations={iterations}")
     if threads:
         args.append(f"threads={threads}")
+    if "profileset." in input_text:
+        args.append(f"profileset_metric={','.join(metrics)}")
+        if work_threads > 1:
+            args.append(f"profileset_work_threads={work_threads}")
     if html:
         args.append(f"html={run_dir / 'report.html'}")
     args += extra or []
