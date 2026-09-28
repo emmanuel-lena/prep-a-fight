@@ -560,6 +560,68 @@ def cmd_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_droptimizer(args: argparse.Namespace) -> int:
+    import statistics as st
+
+    from paf import simc
+    from paf.corpus.template import template_path
+    from paf.droptimizer import boss_ev, run_droptimizer, usable_loot
+    from paf.encounters import find_encounter, raid_encounters
+    from paf.fight import PRESETS, Fight
+    from paf.gamedata import encounter_loot, item_classes, item_names
+    from paf.profile import parse_simc_export
+    from paf.topgear import FightProfile
+    from paf.wcl import WCLClient
+
+    profile_text, origin = _load_profile(args.profile)
+    profile = parse_simc_export(profile_text)
+    client = WCLClient()
+    if args.boss:
+        encs = [find_encounter(client, b) for b in args.boss]
+    else:
+        encs = raid_encounters(client)
+        zone = max(e.zone_id for e in encs)
+        encs = [e for e in encs if e.zone_id == zone]
+    ilvl = args.ilvl or round(st.median(i.ilvl for i in profile.equipped.values() if i.ilvl) or 0)
+    items = usable_loot([e.id for e in encs], profile.class_name, encounter_loot(), item_classes(), item_names())
+    owned = {i.item_id: i.ilvl for i in profile.equipped.values() if i.item_id}
+    skipped = [it for it in items if (owned.get(it.item_id) or 0) >= ilvl]
+    items = [it for it in items if it not in skipped]
+    for it in skipped:
+        print(f"  skipped {it.name}: already equipped at item level {owned[it.item_id]}")
+    if not items:
+        print("No usable loot found for these bosses.")
+        return 1
+    fights: list[FightProfile] = []
+    for name in args.fight or []:
+        _, enc, diff_name, _ = _encounter_and_difficulty(argparse.Namespace(boss=name, difficulty=args.difficulty))
+        fpath = template_path(enc.name, diff_name)
+        if not fpath.is_file():
+            print(f"No fight template for {enc.name} {diff_name}: run `paf template \"{enc.name}\"` first.")
+            return 1
+        fights.append(FightProfile(fpath.stem, Fight.load(fpath).to_simc()))
+    for preset in args.preset or ([] if fights else ["patchwerk"]):
+        fights.append(FightProfile(preset, PRESETS[preset]))
+    print(f"{profile.name} ({origin}): loot of {', '.join(e.name for e in encs)}")
+    root = simc.new_run_dir(label="droptimizer")
+    run_droptimizer(profile_text, profile, items, fights, root, ilvl, target_error=args.error,
+                    objective=args.objective)
+    weights = {f.name: f.weight for f in fights}
+    names = [f.name for f in fights]
+    ranked = sorted(items, key=lambda i: -i.weighted(weights))
+    print(f"\n{'item':<40} {'slot':<9} {'boss':<22} " + "  ".join(f"{n[:14]:>14}" for n in names))
+    for it in ranked[:args.top]:
+        cols = "  ".join(f"{it.deltas.get(n, float('nan')):+13.2f}%" for n in names)
+        print(f"{it.name[:40]:<40} {it.slot:<9} {it.boss[:22]:<22} {cols}")
+    print("\nExpected value per boss (mean gain of its items, losses count as 0):")
+    for boss, ev, n in boss_ev(items, weights):
+        print(f"  {ev:+6.2f}%  {boss} ({n} usable items)")
+    err = max((i.error for i in ranked[:args.top]), default=0)
+    print(f"\nStatistical error: about +/-{err:.2f}%. Items are simmed at item level {ilvl} (--ilvl to change).")
+    print(f"Runs: {root}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paf", description="prep-a-fight: prepare a boss fight from top logs.")
     p.add_argument("--version", action="version", version=f"paf {__version__}")
@@ -668,6 +730,18 @@ def build_parser() -> argparse.ArgumentParser:
     pl.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
     pl.add_argument("--error", type=float, default=0.2)
     pl.set_defaults(func=cmd_plan)
+
+    dr = sub.add_parser("droptimizer", help="value of every item the bosses drop, on the fights you choose")
+    dr.add_argument("--boss", action="append", help="boss whose loot to test (repeatable; default: whole raid)")
+    dr.add_argument("--fight", action="append", help="boss fight template to sim on (repeatable)")
+    dr.add_argument("--preset", action="append", choices=["patchwerk", "cleave2", "aoe5"])
+    dr.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    dr.add_argument("--ilvl", type=int, help="item level of the drops (default: median of your equipped items)")
+    dr.add_argument("--objective", type=_objective, default=0.0)
+    dr.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
+    dr.add_argument("--error", type=float, default=0.2)
+    dr.add_argument("--top", type=int, default=25)
+    dr.set_defaults(func=cmd_droptimizer)
     return p
 
 

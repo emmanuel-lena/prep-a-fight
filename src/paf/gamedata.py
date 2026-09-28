@@ -83,3 +83,41 @@ def item_sets() -> dict[int, tuple[int, str]]:
             if v.isdigit() and int(v):
                 out[int(v)] = (int(r["ID"]), r.get("Name_lang", ""))
     return out
+
+
+@cache
+def item_names() -> dict[int, tuple[str, int]]:
+    """item id -> (name, AllowableClass bitmask; -1 = every class)."""
+    out: dict[int, tuple[str, int]] = {}
+    for r in table_rows("ItemSearchName"):
+        if r.get("ID", "").isdigit():
+            try:
+                allow = int(r.get("AllowableClass") or -1)
+            except ValueError:
+                allow = -1
+            out[int(r["ID"])] = (r.get("Display_lang", ""), allow)
+    return out
+
+
+@cache
+def item_classes() -> dict[int, tuple[int, int, int]]:
+    """item id -> (ClassID, SubclassID, InventoryType)."""
+    return {int(r["ID"]): (int(r["ClassID"] or 0), int(r["SubclassID"] or 0), int(r["InventoryType"] or 0))
+            for r in table_rows("Item") if r.get("ID", "").isdigit()}
+
+
+@cache
+def encounter_loot() -> dict[int, tuple[str, list[int]]]:
+    """Warcraft Logs / DungeonEncounter id -> (boss name, item ids of its Encounter Journal loot table)."""
+    journal: dict[int, tuple[int, str]] = {}
+    for r in table_rows("JournalEncounter"):
+        if r.get("DungeonEncounterID", "").lstrip("-").isdigit() and r.get("ID", "").isdigit():
+            journal[int(r["ID"])] = (int(r["DungeonEncounterID"]), r.get("Name_lang", ""))
+    out: dict[int, tuple[str, list[int]]] = {}
+    for r in table_rows("JournalEncounterItem"):
+        if not r.get("JournalEncounterID", "").isdigit():
+            continue
+        je = journal.get(int(r["JournalEncounterID"]))
+        if je:
+            out.setdefault(je[0], (je[1], []))[1].append(int(r["ItemID"]))
+    return out
