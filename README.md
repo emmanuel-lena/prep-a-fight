@@ -126,6 +126,21 @@ paf cdplan "Ula'tek"         # cooldown plans compared on that fight
 | `paf prep BOSS` | All of the above for one boss, as an HTML prep sheet |
 | `paf serve` | Local web UI for all of this |
 
+### Boss notes: what the logs cannot tell
+
+Each rebuilt fight comes with `~/.paf/fights/<boss>-<difficulty>.notes.txt`, also editable in the web UI. It
+lists what was detected, with the evidence (a unit sharing the boss's health and the damage amp measured in the
+logs, possible amps on the boss...), and takes your corrections:
+
+```text
+amp Venomous Heart 2.0     # the real damage amp while the heart is up
+separate Some Shield       # an independent priority target, not the boss's health
+ignore Some Totem          # a mechanic, not a target
+```
+
+Plans that look too good (over 5%), that do not survive pessimistic variants of the fight (amp halved, adds dying
+faster, more movement) or that contradict what the top players do are flagged "to double-check" in the prep sheet.
+
 ### How much to trust the numbers
 
 - Every delta comes with SimC's statistical error; smaller differences are noise.

@@ -109,17 +109,17 @@ Trois erreurs de modèle ont faussé des résultats avant d'être corrigées. Ch
 - Heart traité comme une cible séparée, alors qu'il partage la vie du boss avec une amp : il a fallu la remarque de Manu.
 
 Ajustements :
-- **V1** Validation systématique, affichée partout : chaque combat reconstruit est vérifié contre le DPS réel des tops (`paf validate`), et le résultat est en tête de fiche.
-- **V2** Garde-fous : un gain de plus de ~5 % ou un plan contraire à ce que font les tops est signalé « à vérifier », pas présenté comme une reco.
-- **V3** Sensibilité : les paramètres incertains (amp, mouvement, durée de vie des adds) sont testés sur une plage. On ne recommande que ce qui tient sur toute la plage.
-- **V4** Taxonomie explicite des mécaniques, chacune détectée avec sa preuve (données citées dans la fiche) :
+- **V1** ✅ Validation systématique, affichée partout : chaque combat reconstruit est vérifié contre le DPS réel des tops (`paf validate`), et le résultat est en tête de fiche.
+- **V2** ✅ Garde-fous : un gain de plus de ~5 % ou un plan contraire à ce que font les tops est signalé « à vérifier », pas présenté comme une reco.
+- **V3** ✅ Sensibilité : les paramètres incertains (amp, mouvement, durée de vie des adds) sont testés sur une plage. On ne recommande que ce qui tient sur toute la plage.
+- **V4** (en partie : unités qui partagent la vie du boss avec leur cast déclencheur, amps posées sur le boss proposées dans les notes) Taxonomie explicite des mécaniques, chacune détectée avec sa preuve (données citées dans la fiche) :
   - vague d'adds ;
   - unité qui partage la vie du boss (vulnérabilité) ;
   - cible prioritaire indépendante ;
   - boss absent ;
   - amp posée sur le boss (debuff) ;
   - déplacement / soak / kick.
-- **V5** Fiche boss éditable (`paf boss-notes`) : l'outil propose ce qu'il a détecté (type d'unité, déclencheur, amp mesurée) et le joueur confirme ou corrige (« le Heart c'est +100 % »). À terme, ces notes peuvent être partagées entre joueurs, sans données perso.
+- **V5** ✅ Fiche boss éditable (`paf boss-notes`) : l'outil propose ce qu'il a détecté (type d'unité, déclencheur, amp mesurée) et le joueur confirme ou corrige (« le Heart c'est +100 % »). À terme, ces notes peuvent être partagées entre joueurs, sans données perso.
 - **V6** La comparaison « sim vs ce que font les tops » devient un indicateur de santé du modèle : quand les deux divergent, soit le modèle est faux, soit les tops ont tort, et la fiche le dit.
 
 ### Assigns et mécaniques (validé avec Manu, 2026-09-28)
