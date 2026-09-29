@@ -46,7 +46,8 @@ class PrepData:
     gear_fights: list[str] = field(default_factory=list)
     gear_error: float = 0.0
     gear_plan: str = ""  # which cooldown plan the Top Gear was simmed with ("" = default APL)
-    loot: list[tuple[str, str, float]] = field(default_factory=list)  # item, slot, delta on the boss fight
+    # item, slot, delta as a single swap on the equipped set, delta in your best sets (None = not measured)
+    loot: list[tuple[str, str, float, float | None]] = field(default_factory=list)
     loot_ilvl: int = 0
     loot_error: float = 0.0
     notes: list[str] = field(default_factory=list)
@@ -98,7 +99,8 @@ def headline(d: PrepData) -> list[str]:
         else:
             out.append("Gear: your equipped set is already the best among your items on this fight.")
     if d.loot:
-        item, slot, delta = d.loot[0]
+        item, slot, simple, real = d.loot[0]
+        delta = real if real is not None else simple
         if delta > 2 * d.loot_error:
             out.append(f"Loot to hope for: {item} ({slot}, {delta:+.2f}% at item level {d.loot_ilvl}).")
     return out
@@ -260,9 +262,12 @@ SimC does not know that a secondary target must die fast, so compare with the si
 
     # loot
     if d.loot:
-        body = "".join(f"<tr><td>{e(i)}</td><td>{e(s)}</td><td class='n'>{_pct(v)}</td></tr>" for i, s, v in d.loot[:12])
+        body = "".join(f"<tr><td>{e(i)}</td><td>{e(s)}</td><td class='n'>{_pct(real) if real is not None else '-'}</td>"
+                       f"<td class='n'>{_pct(v)}</td></tr>" for i, s, v, real in d.loot[:12])
         parts.append(f"""<h2>What this boss drops, for you</h2><div class="card scroll">
-<table><tr><th>Item</th><th>Slot</th><th>On this fight</th></tr>{body}</table>
+<p class="small muted">"In your best sets": the item inserted in your best Top Gear sets, the rest of your gear
+rearranged around it (its real value). "Single swap": the classic droptimizer value, on your equipped set.</p>
+<table><tr><th>Item</th><th>Slot</th><th>In your best sets</th><th>Single swap</th></tr>{body}</table>
 <p class="small muted">At item level {d.loot_ilvl}; statistical error about +/-{d.loot_error:.2f}%.</p></div>""")
 
     if d.validation:

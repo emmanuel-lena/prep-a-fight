@@ -129,6 +129,33 @@ def run_droptimizer(profile_text: str, profile: Profile, items: list[LootItem], 
     return items
 
 
+def loot_in_best_sets(profile_text: str, profile: Profile, items: list[LootItem], base_sets: list[list[str]],
+                      fight: FightProfile, run_dir: Path, ilvl: int, *, target_error: float = 0.2,
+                      objective: float = 0.0) -> dict[int, float]:
+    """Real value of each drop: the best of your top sets once the item is inserted in it, minus the best of
+    those sets without it (the rest of the gear rearranged around the item, not a single swap on your
+    equipped set). base_sets: gear lines of each base set, relative to the equipped set ([] = equipped)."""
+    sets: dict[str, list[str]] = {}
+    for b, lines in enumerate(base_sets):
+        if lines:
+            sets[f"b{b}"] = lines
+        for n, it in enumerate(items):
+            for k, opt in enumerate(item_options(it, profile, ilvl)):
+                slots = {line.split("=", 1)[0] for line in opt}
+                # the item replaces what the base set had in that slot; a 2H also empties the off-hand
+                kept = [line for line in lines if line.split("=", 1)[0] not in slots]
+                sets[f"b{b}_i{n}_{k}"] = kept + opt
+    res = simc.run(simc.build_input(profile_text, fight.lines, sets), run_dir, target_error=target_error)
+    by = {ps.name: score_of(res, ps, objective) for ps in res.profilesets}
+    best_without = max([0.0] + [by.get(f"b{b}", float("-inf")) for b in range(len(base_sets)) if base_sets[b]])
+    out = {}
+    for n, it in enumerate(items):
+        with_item = [v for name, v in by.items() if f"_i{n}_" in name]
+        if with_item:
+            out[it.item_id] = max(with_item) - best_without
+    return out
+
+
 def boss_ev(items: list[LootItem], weights: dict[str, float]) -> list[tuple[str, float, int]]:
     per: dict[str, list[float]] = {}
     for it in items:

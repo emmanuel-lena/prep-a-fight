@@ -765,8 +765,9 @@ def cmd_prep(args: argparse.Namespace) -> int:
 
     if not args.no_gear:
         pool = GearPool(profile, item_inventory_types(), item_sets())
+        gear_profile = profile_text
+        best_sets: list[list[str]] = []
         if pool.candidates:
-            gear_profile = profile_text
             want = "boss" if args.objective >= 0.5 else "total"
             plan = next((p for p in d.optimized if p.objective == want), None)
             if plan is not None and any(r.name != "default" for r in plan.choice.values()):
@@ -787,6 +788,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
                       for c in ranked[:8]]
             d.gear_fights = [f.name for f in gear_fights]
             d.gear_error = max((err for c in ranked[:8] for err in c.errors.values()), default=0.0)
+            best_sets = [[line for o in c.options.values() for line in o.lines()] for c in ranked[:4]
+                         if c.weighted(weights) > 0]
 
         step("What this boss drops")
         items = usable_loot([enc.id], profile.class_name, encounter_loot(), item_classes(), item_names())
@@ -794,10 +797,18 @@ def cmd_prep(args: argparse.Namespace) -> int:
         owned = {i.item_id: i.ilvl for i in profile.equipped.values() if i.item_id}
         items = [it for it in items if (owned.get(it.item_id) or 0) < ilvl]
         if items:
-            run_droptimizer(profile_text, profile, items, [FightProfile("boss fight", fight.to_simc())],
-                            root / "loot", ilvl, target_error=args.error, objective=args.objective)
-            ranked_items = sorted(items, key=lambda i: -i.deltas.get("boss fight", -1e9))
-            d.loot = [(i.name, i.slot, i.deltas.get("boss fight", 0.0)) for i in ranked_items]
+            boss_fight = FightProfile("boss fight", fight.to_simc())
+            run_droptimizer(gear_profile, profile, items, [boss_fight], root / "loot", ilvl,
+                            target_error=args.error, objective=args.objective)
+            real: dict[int, float] = {}
+            if best_sets:  # the item inserted in your best sets, the rest rearranged around it
+                from paf.droptimizer import loot_in_best_sets
+
+                real = loot_in_best_sets(gear_profile, profile, items, [[], *best_sets], boss_fight,
+                                         root / "loot-best-sets", ilvl, target_error=args.error,
+                                         objective=args.objective)
+            ranked_items = sorted(items, key=lambda i: -real.get(i.item_id, i.deltas.get("boss fight", -1e9)))
+            d.loot = [(i.name, i.slot, i.deltas.get("boss fight", 0.0), real.get(i.item_id)) for i in ranked_items]
             d.loot_ilvl = ilvl
             d.loot_error = max((i.error for i in ranked_items[:12]), default=0.0)
 
