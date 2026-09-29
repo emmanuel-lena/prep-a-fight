@@ -57,6 +57,80 @@ class PrepData:
     fight: object | None = None  # paf.fight.Fight used by the sims
     assigns: list[str] = field(default_factory=list)  # notes of the player's assignments
     validation: tuple[float, float, float] | None = None  # simulated / real DPS of the top players (min, median, max)
+    tops_casts: dict[str, list[float]] = field(default_factory=dict)  # cooldown key -> top players' cast times
+    tops_players: int = 0
+
+
+PALETTE = ["#e8590c", "#1c7ed6", "#2f9e44", "#ae3ec9", "#f59f00", "#d6336c", "#15aabf", "#5c7cfa", "#74b816"]
+
+
+def _key(label: str) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in label.lower()).strip("_")
+
+
+def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: int, px: float = 1.4) -> str:
+    """Lorrgs-like strip for a plan: the fight (phases, add waves, vulnerability windows, lust) then one row per
+    cooldown with the plan's casts (dots) over the top players' casts of the same cooldown (bars)."""
+    if fight is None or not plan.timeline:
+        return ""
+    dur = fight.duration
+    W = int(dur * px) + 170
+    x0 = 160
+
+    def x(t: float) -> float:
+        return round(x0 + t * px, 1)
+
+    rows: list[str] = []
+    y = 18
+    # time axis
+    axis = "".join(f'<line x1="{x(s)}" y1="14" x2="{x(s)}" y2="100%" stroke="var(--line)"/>'
+                   f'<text x="{x(s) + 2}" y="11" font-size="10" fill="var(--muted)">{_mmss(s)}</text>'
+                   for s in range(0, int(dur) + 1, 60))
+    # fight strip
+    fight_row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">Fight</text>']
+    for w in fight.add_waves:
+        fight_row.append(f'<rect x="{x(w.time)}" y="{y}" width="{max(2, w.lifetime * px):.1f}" height="16" '
+                         f'fill="#2f9e44" opacity="0.35"><title>{_mmss(w.time)} adds x{w.count}</title></rect>')
+    for v in fight.vulnerable:
+        fight_row.append(f'<rect x="{x(v.start)}" y="{y}" width="{max(2, v.duration * px):.1f}" height="16" '
+                         f'fill="#e8590c" opacity="0.45"><title>{e(v.name)} x{v.multiplier:g}</title></rect>'
+                         f'<text x="{x(v.start) + 2}" y="{y + 12}" font-size="10" fill="var(--fg)">x{v.multiplier:g}</text>')
+    for w in fight.invulnerable:
+        fight_row.append(f'<rect x="{x(w.start)}" y="{y}" width="{w.duration * px:.1f}" height="16" fill="#868e96" '
+                         f'opacity="0.4"><title>boss away</title></rect>')
+    if fight.lust_time is not None:
+        fight_row.append(f'<rect x="{x(fight.lust_time)}" y="{y - 2}" width="{40 * px:.1f}" height="3" fill="#d6336c">'
+                         f'<title>Bloodlust {_mmss(fight.lust_time)}</title></rect>')
+    rows.append("".join(fight_row))
+    y += 26
+    # one row per cooldown
+    labels: list[str] = []
+    for _, label in plan.timeline:
+        if label not in labels:
+            labels.append(label)
+    for i, label in enumerate(labels):
+        color = PALETTE[i % len(PALETTE)]
+        row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">{e(label[:24])}</text>']
+        tt = tops.get(_key(label)) or []
+        if tt and tops_players:
+            bins: dict[int, int] = {}
+            for t in tt:
+                bins[int(t // 5)] = bins.get(int(t // 5), 0) + 1
+            peak = max(bins.values())
+            for b, n in bins.items():
+                h = 16 * n / peak
+                row.append(f'<rect x="{x(b * 5)}" y="{y + 16 - h:.1f}" width="{5 * px - 0.5:.1f}" height="{h:.1f}" '
+                           f'fill="{color}" opacity="0.25"><title>top players: {n} casts at {_mmss(b * 5)}</title></rect>')
+        for t, lab in plan.timeline:
+            if lab == label:
+                row.append(f'<circle cx="{x(t)}" cy="{y + 8}" r="5" fill="{color}" stroke="var(--card)" stroke-width="1.5">'
+                           f'<title>{e(label)} {_mmss(t)}</title></circle>')
+        rows.append("".join(row))
+        y += 22
+    return (f'<div class="scroll"><svg width="{W}" height="{y + 4}" style="font-family:system-ui">{axis}'
+            f'{"".join(rows)}</svg></div><p class="small muted">Dots: this plan (one simulated pull). Pale bars: '
+            f'when the top players cast the same cooldown. Green: add waves; orange: boss vulnerability windows '
+            f'(x = damage taken); grey: boss away; pink line: Bloodlust.</p>')
 
 
 def headline(d: PrepData) -> list[str]:
@@ -221,7 +295,8 @@ def render(d: PrepData) -> str:
                 checks += "<ul class='small'>" + "".join(f"<li>&#9888; {e(f)}</li>" for f in p.flags) + "</ul>"
             blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{labels.get(p.objective, p.objective)}: {_pct(p.gain)}
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span></h3>
-{checks}<table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
+{checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players)}
+<table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
 <details><summary class="small">Play-by-play of one simulated pull</summary><div class="scroll"><table>
 <tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></details>
 <details><summary class="small">MRT note</summary><pre class="small" style="white-space:pre-wrap">{e(note)}</pre></details>

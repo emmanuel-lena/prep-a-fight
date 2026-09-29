@@ -115,13 +115,26 @@ def aura_windows(events: list[dict], boss_ids: set[int], enemy_ids: set[int], st
     return out
 
 
-def rate_ratio(series: list[float], step: float, windows: list[tuple[float, float]]) -> float | None:
+def rate_ratio(series: list[float], step: float, windows: list[tuple[float, float]],
+               zero_ok: bool = False) -> float | None:
+    """Mean damage-taken rate inside the windows / outside. zero_ok: count empty points inside (to detect
+    phases where the boss takes no damage at all)."""
     inside = {i for s, d in windows for i in range(int(s / step), min(len(series), int((s + d) / step) + 1))}
-    a = [series[i] for i in inside if series[i] > 0]
+    a = [series[i] for i in inside if series[i] > 0 or zero_ok]
     b = [v for i, v in enumerate(series) if i not in inside and v > 0]
     if len(a) < 2 or len(b) < 2:
         return None
     return (sum(a) / len(a)) / (sum(b) / len(b))
+
+
+def phase_attackable(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> dict[int, float]:
+    """Median boss damage-taken rate ratio of each phase (≈0: the boss is away)."""
+    where, params = kills_filter(encounter_id, difficulty)
+    per: dict[int, list[float]] = {}
+    for pid, ratio in con.execute(f"SELECT p.phase_id, p.rate_ratio FROM phase_rate p JOIN fight f "
+                                  f"USING(report, fight_id) WHERE {where}", params):
+        per.setdefault(pid, []).append(ratio)
+    return {pid: st.median(v) for pid, v in per.items()}
 
 
 def fetch_boss_auras(client: WCLClient, con: sqlite3.Connection, encounter_id: int, difficulty: int,
@@ -156,6 +169,16 @@ def fetch_boss_auras(client: WCLClient, con: sqlite3.Connection, encounter_id: i
             ratio = rate_ratio(series, step, ws) if series else None
             rows += [(r[0], r[1], aid, "aura", round(t0, 1), round(d, 1), ratio) for t0, d in ws]
         con.executemany("INSERT INTO boss_aura VALUES(?,?,?,?,?,?,?)", rows)
+        # is the boss attackable during each phase? (intermissions are not always "boss away")
+        if series:
+            phases = con.execute("SELECT phase_id, t_start FROM phase WHERE report=? AND fight_id=? ORDER BY t_start",
+                                 (r[0], r[1])).fetchall()
+            total = (e - s) / 1000
+            for i, (pid, t0) in enumerate(phases):
+                t1 = phases[i + 1][1] if i + 1 < len(phases) else total
+                ratio = rate_ratio(series, step, [(t0, t1 - t0)], zero_ok=True)
+                if ratio is not None:
+                    con.execute("INSERT OR REPLACE INTO phase_rate VALUES(?,?,?,?)", (r[0], r[1], pid, ratio))
         con.execute("INSERT OR REPLACE INTO aura_status VALUES(?,?)", (r[0], r[1]))
         con.commit()
     return len(todo)
@@ -192,8 +215,12 @@ TRIGGER_AFTER = 3.0  # ... or slightly after (the damage graph has a resolution 
 TRIGGER_SUPPORT = 0.5  # share of the kills where that cast must precede the window
 
 
+MAX_TRIGGER_CASTS = 6  # a boss cast used more often than this per kill is a rotation spell, not a trigger
+
+
 def trigger_casts(con: sqlite3.Connection, measured: dict[tuple[str, int], list[tuple]],
-                  window_time: float, names: dict[int, str]) -> tuple[str, float] | None:
+                  window_time: float, names: dict[int, str], journal: set[str] | None = None
+                  ) -> tuple[str, float] | None:
     """The boss cast that opens a window (e.g. a 5 s cast exposing a heart): the ability whose cast
     *ends* right before the window in most kills, and the median time of that cast end."""
     ends: dict[int, list[float]] = {}
@@ -213,7 +240,18 @@ def trigger_casts(con: sqlite3.Connection, measured: dict[tuple[str, int], list[
             ends.setdefault(aid, []).append(t)
     if not kills or not ends:
         return None
-    aid, times = max(ends.items(), key=lambda kv: len(kv[1]))
+    # a trigger is a boss mechanic (journal) cast a few times per kill, not a player ability or a spam
+    per_kill_casts = {}
+    for aid in ends:
+        counts = [con.execute("SELECT COUNT(*) FROM enemy_cast WHERE report=? AND fight_id=? AND ability_id=? "
+                              "AND type='cast'", (rep, fid, aid)).fetchone()[0] for rep, fid in measured]
+        per_kill_casts[aid] = st.median(counts) if counts else 0
+    candidates = {aid: t for aid, t in ends.items()
+                  if (journal is None or (names.get(aid) or "").lower() in journal)
+                  and per_kill_casts.get(aid, 0) <= MAX_TRIGGER_CASTS}
+    if not candidates:
+        return None
+    aid, times = max(candidates.items(), key=lambda kv: len(kv[1]))
     if len(times) / kills < TRIGGER_SUPPORT:
         return None
     return names.get(aid, f"spell {aid}"), round(st.median(times), 1)

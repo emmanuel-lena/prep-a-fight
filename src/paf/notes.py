@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from paf.fight import AddWave, Fight
+from paf.fight import AddWave, Fight, Vulnerable
 
 
 @dataclass
@@ -82,6 +82,11 @@ def apply_notes(fight: Fight, notes: Notes) -> tuple[Fight, list[str]]:
         if _match(w.name, notes.ignore):
             changes.append(f"ignored {w.name} at {w.time:.0f}s")
             continue
+        key = _match(w.name, notes.amp) if not w.scalable else None
+        if key:  # a separate unit that actually shares the boss's health with a damage amp
+            vulnerable.append(Vulnerable(w.time, w.lifetime, notes.amp[key], w.name, "your boss notes"))
+            changes.append(f"{w.name} at {w.time:.0f}s: shares the boss's health, x{notes.amp[key]:g}")
+            continue
         kept_waves.append(w)
     f.vulnerable, f.add_waves = vulnerable, kept_waves
     return f, changes
@@ -109,6 +114,14 @@ def notes_template(fight: Fight) -> str:
                         "keeps for it, so the real amp is probably lower.")
         lines.append(f"#   {base}: {what}, boss damage x{v.multiplier:g} while it is up; {evidence}")
         lines.append(f"# amp {base} {v.multiplier:g}")
+    for w in fight.add_waves:
+        base = w.name.split(" (after")[0]
+        if w.scalable or base in seen:
+            continue
+        seen.add(base)
+        lines.append(f"#   {base}: a boss-type unit with no damage amp in the game data: modeled as a separate target "
+                     "with its own health while it is up. If it shares the boss's health, write its amp:")
+        lines.append(f"# amp {base} 1")
     cands: dict[str, list] = {}
     for v in fight.candidate_vulnerable:
         cands.setdefault(v.name.split(" (boss aura)")[0], []).append(v)

@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS unit_status(report TEXT, fight_id INT, PRIMARY KEY(re
 CREATE TABLE IF NOT EXISTS boss_aura(        -- buffs/debuffs applied to the boss by enemies (possible damage amps)
   report TEXT, fight_id INT, ability_id INT, kind TEXT, t_start REAL, duration REAL, rate_ratio REAL);
 CREATE TABLE IF NOT EXISTS aura_status(report TEXT, fight_id INT, PRIMARY KEY(report, fight_id));
+CREATE TABLE IF NOT EXISTS phase_rate(       -- boss damage-taken rate during a phase vs the rest of the fight
+  report TEXT, fight_id INT, phase_id INT, rate_ratio REAL, PRIMARY KEY(report, fight_id, phase_id));
 CREATE INDEX IF NOT EXISTS ix_pc ON player_cast(report, fight_id);
 CREATE INDEX IF NOT EXISTS ix_ec ON enemy_cast(report, fight_id);
 CREATE INDEX IF NOT EXISTS ix_pb ON player_buff(report, fight_id);

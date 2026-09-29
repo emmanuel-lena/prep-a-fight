@@ -7,6 +7,7 @@ import subprocess
 
 from paf import __version__
 from paf.config import load_dotenv
+from paf.corpus.analyze import main_boss
 from paf.notes import load_fight
 from paf.simc_install import find_simc, install_nightly
 
@@ -188,7 +189,7 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         names = talent_entry_names()
     except OSError as e:
         print(f"(talent names unavailable: {e})")
-    rep = analyze(con, enc.id, diff, enc.name, spec, names)
+    rep = analyze(con, enc.id, diff, main_boss(con, enc.id, diff, enc.name), spec, names)
     if rep.kills == 0:
         print(f"No kills in the corpus for {enc.name} {diff_name}: run `paf corpus \"{enc.name}\"` first.")
         return 1
@@ -209,9 +210,10 @@ def cmd_template(args: argparse.Namespace) -> int:
     con = db.connect()
     from paf.corpus.units import fetch_boss_auras, fetch_unit_windows
 
-    fetch_unit_windows(client, con, enc.id, diff, enc.name)  # secondary units' real windows (cheap, cached)
-    fetch_boss_auras(client, con, enc.id, diff, enc.name)  # auras on the boss: possible damage amps
-    fight, info = build_template(con, enc.id, diff, enc.name, settings.get("spec"), diff_name)
+    boss = main_boss(con, enc.id, diff, enc.name)
+    fetch_unit_windows(client, con, enc.id, diff, boss)  # secondary units' real windows (cheap, cached)
+    fetch_boss_auras(client, con, enc.id, diff, boss)  # auras on the boss: possible damage amps
+    fight, info = build_template(con, enc.id, diff, boss, settings.get("spec"), diff_name, title=enc.name)
     if info.kills == 0:
         print(f"No kills in the corpus for {enc.name} {diff_name}: run `paf corpus \"{enc.name}\"` first.")
         return 1
@@ -471,7 +473,7 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
         print(f"No fight template for {enc.name} {diff_name}: run `paf template \"{enc.name}\"` first.")
         return 1
     spec = settings.get("spec")
-    target = real_boss_share(db.connect(), enc.id, diff, enc.name, spec)
+    target = real_boss_share(db.connect(), enc.id, diff, main_boss(db.connect(), enc.id, diff, enc.name), spec)
     if target is None:
         print("No damage data for the ranked players in the corpus.")
         return 1
@@ -670,12 +672,13 @@ def cmd_prep(args: argparse.Namespace) -> int:
         fetch_mechanics(client, con, enc.id, diff, [])
 
     step("Analyzing the corpus")
-    rep = analyze(con, enc.id, diff, enc.name, spec)
+    boss = main_boss(con, enc.id, diff, enc.name)
+    rep = analyze(con, enc.id, diff, boss, spec)
     from paf.corpus.units import fetch_boss_auras, fetch_unit_windows
 
-    fetch_unit_windows(client, con, enc.id, diff, enc.name)
-    fetch_boss_auras(client, con, enc.id, diff, enc.name)
-    raw, info = build_template(con, enc.id, diff, enc.name, spec, diff_name)
+    fetch_unit_windows(client, con, enc.id, diff, boss)
+    fetch_boss_auras(client, con, enc.id, diff, boss)
+    raw, info = build_template(con, enc.id, diff, boss, spec, diff_name, title=enc.name)
     from paf.notes import refresh_notes, with_notes
 
     refresh_notes(template_path(enc.name, diff_name), raw)
@@ -687,7 +690,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
     print(f"  {rep.kills} kills, {len(fight.add_waves)} add waves / targets, duration {_mmss(fight.duration)}")
 
     step("Calibrating the fight on the logs")
-    target = real_boss_share(con, enc.id, diff, enc.name, spec)
+    target = real_boss_share(con, enc.id, diff, boss, spec)
     if target is not None:
         cal = calibrate(profile_text, fight, target, root / "calibrate")
         fight.add_scale = cal.scale
@@ -748,6 +751,11 @@ def cmd_prep(args: argparse.Namespace) -> int:
     d.talents = compare_builds(profile_text, con, client, enc.id, diff, spec, fights, root / "talents",
                                target_error=args.error)
     tl_all = build_timeline(con, enc.id, diff, enc.name, diff_name, spec, top=10_000)
+    from paf.prep_report import _key as cd_key_of
+
+    for ab in tl_all.abilities:  # when the top players cast each cooldown (for the plan timelines)
+        d.tops_casts[cd_key_of(ab.name)] = [t for p in tl_all.players for t in p["casts"].get(ab.id, [])]
+    d.tops_players = len(tl_all.players)
     d.alignment = tops_alignment_safe(tl_all, fight)
     if args.no_optimize:
         step("Cooldown plans")

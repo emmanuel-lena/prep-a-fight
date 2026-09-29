@@ -49,6 +49,17 @@ class Report:
     talents: list[tuple[str, float, float | None]]  # name, pick rate, add share delta (picked - not)
 
 
+def main_boss(con: sqlite3.Connection, encounter_id: int, difficulty: int, default: str) -> str:
+    """The boss unit that takes the most damage in the kills (an encounter is not always named after its
+    boss: The Coiled Altar is Zul'jan, then Zul'jan and Hex Lord Malacrass)."""
+    where, params = kills_filter(encounter_id, difficulty)
+    row = con.execute(
+        f"SELECT d.target, SUM(d.amount) AS s FROM damage_by_target d JOIN fight f USING(report, fight_id) "
+        f"JOIN npc n ON n.name = d.target WHERE {where} AND n.is_boss = 1 GROUP BY d.target ORDER BY s DESC LIMIT 1",
+        params).fetchone()
+    return row[0] if row else default
+
+
 def kills_filter(encounter_id: int, difficulty: int) -> tuple[str, tuple]:
     return ("f.encounter_id=? AND f.difficulty=? AND f.status='done'", (encounter_id, difficulty))
 

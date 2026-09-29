@@ -1,6 +1,17 @@
 from paf.corpus.timeline import Ability, Timeline, render_html
 
 
+def test_plan_timeline_svg():
+    from paf.fight import AddWave, Fight, Vulnerable
+    from paf.optimize import Plan
+    from paf.prep_report import plan_timeline_svg
+
+    f = Fight("B", 300, add_waves=[AddWave(60, 5, 20)], vulnerable=[Vulnerable(120, 40, 2.0, "Heart")])
+    p = Plan("boss", {}, 1.0, 0.1, timeline=[(0.0, "ascendance"), (122.0, "ascendance"), (5.0, "stormkeeper")])
+    svg = plan_timeline_svg(p, f, {"ascendance": [3.0, 125.0, 126.0]}, tops_players=2)
+    assert svg.count("<circle") == 3 and "x2" in svg and "top players: 2 casts" in svg
+
+
 def test_render_html_contains_rows_and_escapes_names():
     tl = Timeline(
         boss="Boss <X>", difficulty="heroic", spec="Elemental", kills=3, duration=300,

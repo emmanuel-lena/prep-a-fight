@@ -160,7 +160,8 @@ def boss_unit_multiplier(con: sqlite3.Connection, where: str, params: tuple, bos
 
 
 def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, boss_name: str,
-                   spec: str, diff_name: str = "") -> tuple[Fight, TemplateInfo]:
+                   spec: str, diff_name: str = "", title: str = "") -> tuple[Fight, TemplateInfo]:
+    """boss_name: the main boss unit (paf.corpus.analyze.main_boss); title: the encounter's name."""
     where, params = kills_filter(encounter_id, difficulty)
     fights = con.execute(f"SELECT report, fight_id, duration_s FROM fight f WHERE {where}", params).fetchall()
     keys = sorted((r["report"], r["fight_id"]) for r in fights)
@@ -188,9 +189,15 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
     for r in con.execute(f"SELECT p.* FROM phase p JOIN fight f USING(report, fight_id) WHERE {where}", params):
         phases[r["phase_id"]].append((r["t_start"], r["is_intermission"], r["name"]))
     ordered = sorted((pid, st.median(v[0] for v in vals), vals[0][1], vals[0][2]) for pid, vals in phases.items())
+    from paf.corpus.units import phase_attackable
+
+    attackable = phase_attackable(con, encounter_id, difficulty)  # measured on damage-taken graphs
     invulnerable = []
-    for i, (_, start, inter, _name) in enumerate(ordered):
-        if inter:
+    for i, (pid, start, inter, _name) in enumerate(ordered):
+        # a phase is "boss away" when the graphs show (almost) no damage on the boss; without measurements,
+        # intermissions are assumed to be
+        away = attackable[pid] < 0.2 if pid in attackable else bool(inter)
+        if away:
             end = ordered[i + 1][1] if i + 1 < len(ordered) else duration
             invulnerable.append(Window(round(start, 1), round(end - start, 1)))
 
@@ -239,16 +246,24 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
         waves = canonical_waves([[(s, 1, d, [nm]) for s, d, nm in kill] for kill in measured.values()])
         vulnerable = []
         ability_names = dict(con.execute("SELECT id, name FROM ability").fetchall())
+        from paf.mechanics import encounter_sections, walk
+
+        try:
+            journal = {s.title.lower() for _, s in walk(encounter_sections(encounter_id))}
+        except OSError:
+            journal = None
         for w in waves:
             start, end, label = w.t, w.t + w.lifetime, ", ".join(w.types)
-            trig = trigger_casts(con, measured, w.t, ability_names)
+            trig = trigger_casts(con, measured, w.t, ability_names, journal)
             if trig:  # the window opens when the boss's cast ends (more precise than the damage graph)
                 start = trig[1]
                 label += f" (after {trig[0]})"
             amp, source = game_amp(encounter_id, w.types[0], diff_name or "heroic")
             if amp is None:
-                amp = round(min(5.0, max(1.0, ratios.get(w.types[0], 1.0))), 2)
-                source = "measured in the logs (includes the raid's cooldowns)"
+                # no damage amp in the game data: a second boss with its own health (e.g. a council member),
+                # modeled as a separate target while it is up; the boss notes can turn it into an amp
+                add_waves.append(AddWave(round(start, 1), 1, round(max(1.0, end - start), 1), label, scalable=False))
+                continue
             vulnerable.append(Vulnerable(round(start, 1), round(max(1.0, end - start), 1), amp, label, source))
     else:  # fallback: the ranked players' casts on the unit
         mult = boss_unit_multiplier(con, where, params, boss_name, {w.name for w in boss_waves},
@@ -274,7 +289,7 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
                                              "measured in the logs, not confirmed"))
 
     fight = Fight(
-        name=f"{boss_name} {diff_name}".strip(),
+        name=f"{title or boss_name} {diff_name}".strip(),
         duration=round(duration, 1),
         add_waves=add_waves,
         vulnerable=vulnerable,
