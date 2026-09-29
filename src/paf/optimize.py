@@ -413,6 +413,36 @@ def tops_alignment(timeline, fight: Fight) -> list[Alignment]:
     return out
 
 
+def adjust_alignment(alignment: list[Alignment], default_timeline: list[tuple[float, str]],
+                     fight: Fight) -> list[Alignment]:
+    """Compare the top players to what the default priority list does in the sim, not to random casts:
+    a cooldown cast on cooldown by the APL can land in add waves more often than their coverage (AoE
+    conditions), which is not "holding" it. The coverages are raised to the APL's own shares."""
+    adds = [(w.time, w.lifetime) for w in fight.add_waves if w.scalable]
+    units = [(w.time, w.lifetime) for w in fight.add_waves if not w.scalable]
+    units += [(v.start, v.duration) for v in fight.vulnerable]
+
+    def inside(t: float, ws: list[tuple[float, float]]) -> bool:
+        return any(a - 2 <= t <= a + length for a, length in ws)
+
+    by: dict[str, list[float]] = {}
+    for t, label in default_timeline:
+        if t > 5:
+            by.setdefault(re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_"), []).append(t)
+    out = []
+    for a in alignment:
+        key = re.sub(r"[^a-z0-9]+", "_", a.ability.lower()).strip("_")
+        times = by.get(key)
+        if not times:
+            out.append(a)
+            continue
+        sim_adds = sum(inside(t, adds) for t in times) / len(times)
+        sim_units = sum(inside(t, units) for t in times) / len(times)
+        out.append(Alignment(a.ability, a.casts, a.in_adds, a.in_units, max(a.adds_cover, sim_adds),
+                             max(a.units_cover, sim_units)))
+    return out
+
+
 def mrt_note(boss: str, plan: Plan, fight: Fight) -> str:
     """A note for Method Raid Tools / NSRT: one line per cooldown cast, with its time."""
     lines = [f"prep-a-fight {boss} ({plan.objective}: {plan.gain:+.1f}%)"]
@@ -462,6 +492,9 @@ def optimize_all(profile_text: str, fight: Fight, run_dir: Path, *, objectives: 
              for obj in objectives]
     confirm(profile_text, apl, plans, fight, run_dir)
     sensitivity(profile_text, apl, plans, fight, run_dir)
+    if alignment:
+        default_pull = play_by_play(profile_text, apl, Plan("default", {}, 0, 0), fight, run_dir, cds)
+        alignment = adjust_alignment(alignment, default_pull, fight)
     for p in plans:
         p.flags = sanity_flags(p, alignment or [], validation)
         p.timeline = play_by_play(profile_text, apl, p, fight, run_dir, cds)

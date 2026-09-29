@@ -84,6 +84,17 @@ def test_large_gain_not_flagged_when_validated_robust_and_agreeing():
     assert any("not validated" in f for f in sanity_flags(plan, [], validation=0.74))
 
 
+def test_adjust_alignment_uses_the_default_apl_as_baseline():
+    from paf.optimize import Alignment, adjust_alignment
+
+    align = [Alignment("Stormkeeper", 40, 0.36, 0.05, 0.21, 0.10)]
+    # the default APL itself casts it in the add waves (60-80 s) 2 times out of 3
+    default = [(62.0, "stormkeeper"), (70.0, "stormkeeper"), (200.0, "stormkeeper")]
+    a = adjust_alignment(align, default, fight())[0]
+    assert round(a.adds_cover, 2) == 0.67  # 36% of the top players is then not "holding it for adds"
+    assert a.units_cover == 0.10
+
+
 def test_fight_context():
     assert fight_context(fight(), 65) == "adds"
     assert fight_context(fight(), 35) == "lust, PI"
