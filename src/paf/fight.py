@@ -40,6 +40,7 @@ class Vulnerable:
     duration: float
     multiplier: float
     name: str = ""
+    source: str = ""  # where the multiplier comes from: "game data (spell N)", "measured in the logs", "notes"
 
 
 def merged_movement(windows: list[Window]) -> list[Window]:

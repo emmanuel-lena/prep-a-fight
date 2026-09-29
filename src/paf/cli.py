@@ -229,7 +229,7 @@ def cmd_template(args: argparse.Namespace) -> int:
         print(f"  boss not attackable {_mmss(w.start)}-{_mmss(w.start + w.duration)} (intermission)")
     for v in fight.vulnerable:
         print(f"  {_mmss(v.start)}-{_mmss(v.start + v.duration)}  {v.name}: shares the boss's health, "
-              f"boss takes x{v.multiplier:g} damage (measured in the logs)")
+              f"boss takes x{v.multiplier:g} damage ({v.source or 'measured in the logs'})")
     print("  targets besides the boss:")
     for w in fight.add_waves:
         print(f"    {_mmss(w.time):>5}  x{w.count:<3} alive {w.lifetime:3.0f}s  {w.name}")

@@ -162,9 +162,9 @@ def fetch_boss_auras(client: WCLClient, con: sqlite3.Connection, encounter_id: i
 
 
 def amp_candidates(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: dict[int, str],
-                   min_ratio: float = AMP_MIN_RATIO) -> list[tuple[str, float, list[tuple[float, float]], int]]:
+                   min_ratio: float = AMP_MIN_RATIO) -> list[tuple[str, float, list[tuple[float, float]], int, int]]:
     """Boss auras during which the boss takes damage faster in most kills: (name, median ratio, typical
-    windows, kills seen). They are suggestions for the boss notes, never applied automatically."""
+    windows, kills seen, ability id). Suggestions for the boss notes, unless the game data confirms the amp."""
     from paf.corpus.analyze import canonical_waves
 
     where, params = kills_filter(encounter_id, difficulty)
@@ -183,7 +183,7 @@ def amp_candidates(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
         waves = canonical_waves([[(t, 1, d, [""]) for t, d, _ in v] for v in per_kill.values()])
         wins = [(w.t, w.lifetime) for w in waves if w.lifetime >= 2]
         if wins:
-            out.append((names.get(aid, f"spell {aid}"), round(st.median(ratios), 2), wins, len(per_kill)))
+            out.append((names.get(aid, f"spell {aid}"), round(st.median(ratios), 2), wins, len(per_kill), aid))
     return sorted(out, key=lambda x: -x[1])
 
 

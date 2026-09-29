@@ -70,12 +70,12 @@ def apply_notes(fight: Fight, notes: Notes) -> tuple[Fight, list[str]]:
         key = _match(v.name, notes.amp)
         if key:
             changes.append(f"{v.name} at {v.start:.0f}s: amp x{v.multiplier:g} -> x{notes.amp[key]:g}")
-            v = type(v)(v.start, v.duration, notes.amp[key], v.name)
+            v = type(v)(v.start, v.duration, notes.amp[key], v.name, "your boss notes")
         vulnerable.append(v)
     for v in fight.candidate_vulnerable:  # possible amps detected on the boss: only when confirmed
         key = _match(v.name, notes.amp)
         if key:
-            vulnerable.append(type(v)(v.start, v.duration, notes.amp[key], v.name))
+            vulnerable.append(type(v)(v.start, v.duration, notes.amp[key], v.name, "your boss notes"))
             changes.append(f"{v.name} at {v.start:.0f}s: confirmed, boss takes x{notes.amp[key]:g} damage")
     kept_waves = []
     for w in add_waves:
@@ -100,9 +100,14 @@ def notes_template(fight: Fight) -> str:
         if base in seen:
             continue
         seen.add(base)
-        lines.append(f"#   {base}: shares the boss's health (it is a boss-type unit), boss damage x{v.multiplier:g} "
-                     "while it is up. Measured as the raid's damage rate on it vs on the boss: includes the cooldowns "
-                     "the raid keeps for it, so the real amp is probably lower.")
+        what = ("shares the boss's health (a boss-type unit)" if "(boss aura)" not in base
+                else "an aura on the boss")
+        if v.source.startswith("game data"):
+            evidence = f"from the {v.source}: reliable."
+        else:
+            evidence = ("measured as the raid's damage rate on it vs on the boss: includes the cooldowns the raid "
+                        "keeps for it, so the real amp is probably lower.")
+        lines.append(f"#   {base}: {what}, boss damage x{v.multiplier:g} while it is up; {evidence}")
         lines.append(f"# amp {base} {v.multiplier:g}")
     cands: dict[str, list] = {}
     for v in fight.candidate_vulnerable:

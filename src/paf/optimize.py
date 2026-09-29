@@ -248,9 +248,11 @@ def confirm(profile_text: str, apl: OrderedDict[str, list[str]], plans: list[Pla
 def fight_variants(fight: Fight) -> dict[str, Fight]:
     """The fight with its uncertain parameters pushed to the pessimistic side of their plausible range."""
     out: dict[str, Fight] = {}
-    if fight.vulnerable:
+    uncertain = [v for v in fight.vulnerable if not v.source.startswith("game data")]
+    if uncertain:  # amps read in the game data are exact: only the measured ones are uncertain
         f = Fight(**{**fight.__dict__})
-        f.vulnerable = [type(v)(v.start, v.duration, round(1 + (v.multiplier - 1) / 2, 2), v.name)
+        f.vulnerable = [v if v.source.startswith("game data")
+                        else type(v)(v.start, v.duration, round(1 + (v.multiplier - 1) / 2, 2), v.name, v.source)
                         for v in fight.vulnerable]
         out["amp halved"] = f
     if any(w.scalable for w in fight.add_waves):

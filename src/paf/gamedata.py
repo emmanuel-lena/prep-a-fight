@@ -85,6 +85,51 @@ def item_sets() -> dict[int, tuple[int, str]]:
     return out
 
 
+AURA_MOD_DAMAGE_PERCENT_TAKEN = 87
+# Difficulty ids of the game data (Difficulty.db2)
+GAME_DIFFICULTY = {"lfr": 17, "normal": 14, "heroic": 15, "mythic": 16}
+
+
+def _filtered_rows(table: str, column: str, value: int) -> list[dict[str, str]]:
+    """A few rows of a big DB2 table, fetched with the wago.tools filter (cached per value)."""
+    p = data_dir() / "gamedata" / "filtered" / f"{table}-{column}-{value}.csv"
+    if not p.is_file():
+        url = WAGO_CSV.format(table=table) + f"?filter[{column}]={value}"
+        req = urllib.request.Request(url, headers={"User-Agent": "prep-a-fight"})
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = resp.read()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(data)
+    text = p.read_text(encoding="utf-8-sig", errors="replace")
+    if text.lstrip().startswith("{"):  # {"errors": ...}
+        return []
+    return list(csv.DictReader(io.StringIO(text)))
+
+
+def damage_taken_amp(spell_id: int, difficulty: str = "heroic") -> float | None:
+    """Multiplier of damage taken applied by a spell (aura 'mod damage % taken'), from the game data:
+    e.g. Venomous Heart +100% -> 2.0. Difficulty-specific effects win over the default ones."""
+    rows = [r for r in _filtered_rows("SpellEffect", "SpellID", spell_id)
+            if r.get("EffectAura") == str(AURA_MOD_DAMAGE_PERCENT_TAKEN)]
+    if not rows:
+        return None
+    want = str(GAME_DIFFICULTY.get(difficulty, 15))
+    row = next((r for r in rows if r.get("DifficultyID") == want), None) or \
+        next((r for r in rows if r.get("DifficultyID") in ("0", "")), None)
+    if row is None:
+        return None
+    try:
+        pct = float(row.get("EffectBasePointsF") or row.get("EffectBasePoints") or 0)
+    except ValueError:
+        return None
+    return round(1 + pct / 100, 2) if pct > 0 else None
+
+
+def spell_description(spell_id: int) -> str:
+    rows = _filtered_rows("Spell", "ID", spell_id)
+    return (rows[0].get("Description_lang") or "") if rows else ""
+
+
 @cache
 def item_names() -> dict[int, tuple[str, int]]:
     """item id -> (name, AllowableClass bitmask; -1 = every class)."""

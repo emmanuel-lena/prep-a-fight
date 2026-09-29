@@ -111,6 +111,24 @@ def attack_windows(con: sqlite3.Connection, where: str, params: tuple, spec: str
     return [AddWave(w.t, 1, w.lifetime, ", ".join(w.types), scalable=False) for w in waves if w.lifetime >= 5]
 
 
+def game_amp(encounter_id: int, unit_name: str, difficulty: str) -> tuple[float | None, str]:
+    """Damage-taken multiplier of a unit from the game data: the Encounter Journal section named like the
+    unit gives its spell, whose 'mod damage % taken' effect is the amp (e.g. Venomous Heart: +100%)."""
+    from paf.gamedata import damage_taken_amp
+    from paf.mechanics import encounter_sections, walk
+
+    try:
+        spells = {s.spell_id for _, s in walk(encounter_sections(encounter_id))
+                  if s.spell_id and s.title.lower() == unit_name.lower()}
+        for sid in sorted(spells):
+            amp = damage_taken_amp(sid, difficulty)
+            if amp:
+                return amp, f"game data (spell {sid}: damage taken +{round((amp - 1) * 100)}%)"
+    except OSError:
+        pass
+    return None, ""
+
+
 def ability_names_all(con: sqlite3.Connection) -> dict[int, str]:
     from paf.gamedata import spell_names
 
@@ -227,8 +245,11 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
             if trig:  # the window opens when the boss's cast ends (more precise than the damage graph)
                 start = trig[1]
                 label += f" (after {trig[0]})"
-            vulnerable.append(Vulnerable(round(start, 1), round(max(1.0, end - start), 1),
-                                         round(min(5.0, max(1.0, ratios.get(w.types[0], 1.0))), 2), label))
+            amp, source = game_amp(encounter_id, w.types[0], diff_name or "heroic")
+            if amp is None:
+                amp = round(min(5.0, max(1.0, ratios.get(w.types[0], 1.0))), 2)
+                source = "measured in the logs (includes the raid's cooldowns)"
+            vulnerable.append(Vulnerable(round(start, 1), round(max(1.0, end - start), 1), amp, label, source))
     else:  # fallback: the ranked players' casts on the unit
         mult = boss_unit_multiplier(con, where, params, boss_name, {w.name for w in boss_waves},
                                     sum(w.lifetime for w in boss_waves), duration,
@@ -236,10 +257,21 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
         vulnerable = [Vulnerable(round(w.time, 1), round(w.lifetime, 1), mult, w.name) for w in boss_waves]
 
     from paf.corpus.units import amp_candidates
+    from paf.gamedata import damage_taken_amp
 
-    candidates = [Vulnerable(round(t, 1), round(d, 1), ratio, f"{name} (boss aura)")
-                  for name, ratio, wins, _k in amp_candidates(con, encounter_id, difficulty, ability_names_all(con))
-                  for t, d in wins]
+    candidates = []
+    for name, ratio, wins, _k, aid in amp_candidates(con, encounter_id, difficulty, ability_names_all(con)):
+        try:
+            amp = damage_taken_amp(aid, diff_name or "heroic")
+        except OSError:
+            amp = None
+        for t, d in wins:
+            if amp:  # the game data confirms it: a real amp on the boss
+                vulnerable.append(Vulnerable(round(t, 1), round(d, 1), amp, f"{name} (boss aura)",
+                                             f"game data (spell {aid}: damage taken +{round((amp - 1) * 100)}%)"))
+            else:
+                candidates.append(Vulnerable(round(t, 1), round(d, 1), ratio, f"{name} (boss aura)",
+                                             "measured in the logs, not confirmed"))
 
     fight = Fight(
         name=f"{boss_name} {diff_name}".strip(),
