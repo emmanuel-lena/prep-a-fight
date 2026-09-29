@@ -7,6 +7,7 @@ input file holds the character (+ fight) and profilesets, and run options go on 
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -14,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from paf import cache as sim_cache
 from paf.simc_install import find_simc
 
 
@@ -149,8 +151,10 @@ def build_input(profile: str, fight_lines: list[str] | None = None,
 def run(input_text: str, run_dir: Path, *, target_error: float = 0.2, iterations: int | None = None,
         threads: int = 0, metrics: tuple[str, ...] = ("dps", "prioritydps"), work_threads: int = 4,
         extra: list[str] | None = None, simc: str | None = None,
-        html: bool = False, timeout: float | None = None) -> SimResult:
+        html: bool = False, timeout: float | None = None, cache: bool = True) -> SimResult:
     """Run simc. Profilesets are ranked by metrics[0]; the others come back as additional metrics.
+
+    cache: reuse the result of an identical earlier run (same simc, input and options), see paf.cache.
 
     work_threads: profileset_work_threads (2-4 measured ~30% faster than 1 on small sims).
     """
@@ -174,6 +178,17 @@ def run(input_text: str, run_dir: Path, *, target_error: float = 0.2, iterations
         args.append(f"html={run_dir / 'report.html'}")
     args += extra or []
 
+    key = None
+    if cache and not html:
+        options = [a for a in args[2:] if not a.startswith("json2=")]
+        key = sim_cache.sim_key(exe, input_text, options)
+        hit = sim_cache.sim_get(key)
+        if hit is not None:
+            shutil.copyfile(hit, json_path)
+            res = parse_json(json_path)
+            res.elapsed = 0.0
+            return res
+
     t0 = time.time()
     with (run_dir / "simc.log").open("w", encoding="utf-8", errors="replace") as log:
         proc = subprocess.run(args, stdout=log, stderr=subprocess.STDOUT, timeout=timeout,
@@ -184,4 +199,6 @@ def run(input_text: str, run_dir: Path, *, target_error: float = 0.2, iterations
         raise SimcError(f"simc failed (exit {proc.returncode}):\n{tail}")
     res = parse_json(json_path)
     res.elapsed = elapsed
+    if key:
+        sim_cache.sim_put(key, json_path)
     return res

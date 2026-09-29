@@ -1285,4 +1285,11 @@ def main(argv: list[str] | None = None) -> int:
             stream.reconfigure(errors="replace")
     load_dotenv()
     args = build_parser().parse_args(argv)
-    return args.func(args)
+    try:
+        return args.func(args)
+    finally:
+        from paf.cache import prune_all
+        try:
+            prune_all()
+        except OSError:
+            pass

@@ -24,6 +24,7 @@ SETTINGS: dict[str, Setting] = {
     "class": Setting("Shaman", "class analyzed by default (Warcraft Logs name)"),
     "spec": Setting("Elemental", "spec analyzed by default (Warcraft Logs name)"),
     "corpus_size": Setting(200, "number of kills collected per boss", kind=int),
+    "cache_max_mb": Setting(2000, "disk cache cap in MB (sim results + Warcraft Logs responses)", kind=int),
     "region": Setting("", "restrict rankings to a region (EU, US, KR, TW, CN); empty = all"),
 }
 
