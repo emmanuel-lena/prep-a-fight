@@ -758,7 +758,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
 
         step("Ideal cooldown plan per objective, with sensitivity checks")
         d.optimized, _ = optimize_all(profile_text, fight, root / "optimize", target_error=args.error,
-                                      alignment=d.alignment)
+                                      alignment=d.alignment, validation=d.validation[1] if d.validation else None)
         d.mrt = {p.objective: mrt_note(enc.name, p, fight) for p in d.optimized}
         (reports / f"mrt-{_slug(enc.name)}-{diff_name}.txt").write_text("\n\n".join(d.mrt.values()) + "\n",
                                                                          encoding="utf-8")
@@ -766,9 +766,20 @@ def cmd_prep(args: argparse.Namespace) -> int:
     if not args.no_gear:
         pool = GearPool(profile, item_inventory_types(), item_sets())
         if pool.candidates:
-            step(f"Top Gear with your {len(pool.candidates)} items")
+            gear_profile = profile_text
+            want = "boss" if args.objective >= 0.5 else "total"
+            plan = next((p for p in d.optimized if p.objective == want), None)
+            if plan is not None and any(r.name != "default" for r in plan.choice.values()):
+                # the best items depend on how cooldowns are played: sim them with the chosen plan
+                from paf.cdplan import dump_apl, parse_apl
+                from paf.optimize import apply_rules
+
+                apl = parse_apl(dump_apl(profile_text, root / "apl-gear"))
+                gear_profile = "\n".join([profile_text.rstrip(), *apply_rules(apl, plan.choice)])
+                d.gear_plan = f"with the cooldown plan for {want} damage"
+            step(f"Top Gear with your {len(pool.candidates)} items {d.gear_plan}".rstrip())
             gear_fights = [FightProfile("boss fight", fight.to_simc())]
-            res = run_topgear(profile_text, pool, gear_fights, root / "topgear", objective=args.objective,
+            res = run_topgear(gear_profile, pool, gear_fights, root / "topgear", objective=args.objective,
                               max_combos=args.max_combos, pass2_error=0.3)
             weights = {f.name: f.weight for f in gear_fights}
             ranked = sorted(res.combos, key=lambda c: -c.weighted(weights))

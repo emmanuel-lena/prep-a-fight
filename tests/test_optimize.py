@@ -73,6 +73,17 @@ def test_fight_variants_and_flags():
     assert not plan.robust
 
 
+def test_large_gain_not_flagged_when_validated_robust_and_agreeing():
+    from paf.optimize import Plan, sanity_flags
+
+    rules = {r.name: r for r in fight_rules(fight(), long_cd=True)}
+    plan = Plan("boss", {"ascendance": rules["secondary_targets"]}, gain=10.0, error=0.1,
+                sensitivity={"adds die 25% faster": 9.0})
+    assert sanity_flags(plan, [], validation=0.97) == []
+    assert any("not validated" in f for f in sanity_flags(plan, [], validation=None))
+    assert any("not validated" in f for f in sanity_flags(plan, [], validation=0.74))
+
+
 def test_fight_context():
     assert fight_context(fight(), 65) == "adds"
     assert fight_context(fight(), 35) == "lust, PI"

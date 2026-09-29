@@ -45,6 +45,7 @@ class PrepData:
     gear: list[tuple[str, dict[str, float], float]] = field(default_factory=list)  # changes, per fight, weighted
     gear_fights: list[str] = field(default_factory=list)
     gear_error: float = 0.0
+    gear_plan: str = ""  # which cooldown plan the Top Gear was simmed with ("" = default APL)
     loot: list[tuple[str, str, float]] = field(default_factory=list)  # item, slot, delta on the boss fight
     loot_ilvl: int = 0
     loot_error: float = 0.0
@@ -253,6 +254,7 @@ SimC does not know that a secondary target must die fast, so compare with the si
                        + "".join(f"<td class='n'>{_pct(per.get(f))}</td>" for f in d.gear_fights) + "</tr>"
                        for ch, per, w in d.gear[:8])
         parts.append(f"""<h2>Best gear from your bags</h2><div class="card scroll">
+<p class="small muted">Simmed {e(d.gear_plan or 'with the default priority list')}.</p>
 <table><tr><th>Changes vs equipped</th><th>Weighted</th>{head}</tr>{body}</table>
 <p class="small muted">Statistical error about +/-{d.gear_error:.2f}%.</p></div>""")
 

@@ -288,11 +288,13 @@ def sensitivity(profile_text: str, apl: OrderedDict[str, list[str]], plans: list
 LARGE_GAIN = 5.0  # % above which a gain is shown as "check the model" rather than as a plain recommendation
 
 
-def sanity_flags(plan: Plan, alignment: list) -> list[str]:
-    """V2: reasons to double-check a plan before following it."""
+def sanity_flags(plan: Plan, alignment: list, validation: float | None = None) -> list[str]:
+    """V2: reasons to double-check a plan before following it.
+
+    validation: simulated / real DPS of the top players on this fight (paf validate). A large gain is only
+    flagged when something else is shaky: fight not validated (or off by more than 10%), gain not robust,
+    or the plan contradicts what the top players do."""
     flags = []
-    if plan.gain > LARGE_GAIN:
-        flags.append(f"large gain ({plan.gain:+.1f}%): check the rebuilt fight (validation score, boss notes)")
     for variant, g in plan.sensitivity.items():
         if g <= max(2 * plan.error, 0.1):
             flags.append(f"not robust: {g:+.1f}% if {variant}")
@@ -312,6 +314,10 @@ def sanity_flags(plan: Plan, alignment: list) -> list[str]:
         if (for_adds and "secondary" in tops) or (for_units and tops == "add waves"):
             flags.append(f"{key}: the plan keeps it for {'add waves' if for_adds else 'the vulnerability windows'}, "
                          f"the top players keep it for {tops}")
+    validated = validation is not None and abs(validation - 1) <= 0.1
+    if plan.gain > LARGE_GAIN and (flags or not validated):
+        why = "fight not validated on the top players (paf validate)" if not validated else "see the other checks"
+        flags.insert(0, f"large gain ({plan.gain:+.1f}%): {why}")
     return flags
 
 
@@ -437,8 +443,10 @@ def cooldown_durations(profile_text: str, run_dir: Path,
 
 def optimize_all(profile_text: str, fight: Fight, run_dir: Path, *, objectives: tuple[str, ...] = OBJECTIVES,
                  target_error: float = 0.2, log: Callable[[str], None] = print,
-                 alignment: list | None = None) -> tuple[list[Plan], list[Cooldown]]:
-    """alignment: what the top players do with their cooldowns (tops_alignment), to flag contradictions."""
+                 alignment: list | None = None,
+                 validation: float | None = None) -> tuple[list[Plan], list[Cooldown]]:
+    """alignment: what the top players do with their cooldowns (tops_alignment), to flag contradictions;
+    validation: simulated / real DPS of the top players on this fight."""
     apl = parse_apl(dump_apl(profile_text, run_dir / "apl"))
     durations, used = cooldown_durations(profile_text, run_dir / "probe", apl)
     used_items = any(u not in TRACKED for u in used)  # on-use items show up under their own name
@@ -455,6 +463,6 @@ def optimize_all(profile_text: str, fight: Fight, run_dir: Path, *, objectives: 
     confirm(profile_text, apl, plans, fight, run_dir)
     sensitivity(profile_text, apl, plans, fight, run_dir)
     for p in plans:
-        p.flags = sanity_flags(p, alignment or [])
+        p.flags = sanity_flags(p, alignment or [], validation)
         p.timeline = play_by_play(profile_text, apl, p, fight, run_dir, cds)
     return plans, cds
