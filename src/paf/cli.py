@@ -239,11 +239,9 @@ def cmd_template(args: argparse.Namespace) -> int:
         print("  movement windows shared by most players: "
               + ", ".join(f"{_mmss(w.start)} ({w.duration:.0f}s)" for w in fight.movement))
     print(f"Saved: {path}\n       {path.with_suffix('.simc')}")
-    from paf.notes import notes_path, notes_template
+    from paf.notes import refresh_notes
 
-    npath = notes_path(path)
-    if not npath.is_file():
-        npath.write_text(notes_template(fight), encoding="utf-8")
+    npath = refresh_notes(path, fight)
     print(f"Boss notes (correct what the logs cannot tell, e.g. a damage amp): {npath}")
     return 0
 
@@ -678,12 +676,9 @@ def cmd_prep(args: argparse.Namespace) -> int:
     fetch_unit_windows(client, con, enc.id, diff, enc.name)
     fetch_boss_auras(client, con, enc.id, diff, enc.name)
     raw, info = build_template(con, enc.id, diff, enc.name, spec, diff_name)
-    from paf.notes import notes_path, notes_template, with_notes
+    from paf.notes import refresh_notes, with_notes
 
-    npath = notes_path(template_path(enc.name, diff_name))
-    if not npath.is_file():
-        npath.parent.mkdir(parents=True, exist_ok=True)
-        npath.write_text(notes_template(raw), encoding="utf-8")
+    refresh_notes(template_path(enc.name, diff_name), raw)
     fight = with_notes(raw, template_path(enc.name, diff_name), verbose=True)
     d = PrepData(enc.name, diff_name, spec, profile.name or origin, kills=rep.kills, duration=fight.duration)
     d.phases = [(n, m) for n, _, m, _ in rep.phases]

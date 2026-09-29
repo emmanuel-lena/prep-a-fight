@@ -120,6 +120,21 @@ def notes_path(fight_json: Path) -> Path:
     return fight_json.with_suffix(".notes.txt")
 
 
+def refresh_notes(fight_json: Path, fight: Fight) -> Path:
+    """Write the notes file: the detected part (comments) is regenerated, the player's lines are kept."""
+    p = notes_path(fight_json)
+    mine = []
+    if p.is_file():
+        mine = [line for line in p.read_text(encoding="utf-8-sig").splitlines()
+                if line.strip() and not line.lstrip().startswith("#")]
+    p.parent.mkdir(parents=True, exist_ok=True)
+    text = notes_template(fight)
+    if mine:
+        text += "\n# Your notes:\n" + "\n".join(mine) + "\n"
+    p.write_text(text, encoding="utf-8")
+    return p
+
+
 def with_notes(fight: Fight, fight_json: Path, verbose: bool = False) -> Fight:
     """The fight with the boss notes next to its JSON applied (unchanged if there are none)."""
     p = notes_path(fight_json)

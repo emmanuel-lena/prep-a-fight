@@ -26,6 +26,16 @@ def test_apply_notes_amp_ignore_separate():
     assert not g.vulnerable and [w.name for w in g.add_waves if not w.scalable].count("Venomous Heart") == 1
 
 
+def test_refresh_notes_keeps_player_lines(tmp_path):
+    from paf.notes import notes_path, refresh_notes
+
+    fj = tmp_path / "boss-heroic.json"
+    notes_path(fj).write_text("# old detected stuff\namp Venomous Heart 2\n")
+    text = refresh_notes(fj, fight()).read_text()
+    assert "# amp Venomous Heart 2.64" in text and "\namp Venomous Heart 2\n" in text
+    assert parse_notes(text).amp == {"venomous heart": 2.0}
+
+
 def test_notes_template_lists_detected_units_once():
     text = notes_template(fight())
     assert text.count("# amp Venomous Heart 2.64") == 1
