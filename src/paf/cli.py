@@ -7,6 +7,7 @@ import subprocess
 
 from paf import __version__
 from paf.config import load_dotenv
+from paf.notes import load_fight
 from paf.simc_install import find_simc, install_nightly
 
 
@@ -237,7 +238,12 @@ def cmd_template(args: argparse.Namespace) -> int:
         print("  movement windows shared by most players: "
               + ", ".join(f"{_mmss(w.start)} ({w.duration:.0f}s)" for w in fight.movement))
     print(f"Saved: {path}\n       {path.with_suffix('.simc')}")
-    print("Edit the .json to customize the fight (times, counts, lifetimes, movement), then sim it.")
+    from paf.notes import notes_path, notes_template
+
+    npath = notes_path(path)
+    if not npath.is_file():
+        npath.write_text(notes_template(fight), encoding="utf-8")
+    print(f"Boss notes (correct what the logs cannot tell, e.g. a damage amp): {npath}")
     return 0
 
 
@@ -280,7 +286,6 @@ def _load_profile(path: str | None) -> tuple[str, str]:
 def cmd_sim(args: argparse.Namespace) -> int:
     from paf import simc
     from paf.corpus.template import template_path
-    from paf.fight import Fight
 
     profile, origin = _load_profile(args.profile)
     client, enc, diff_name, diff = _encounter_and_difficulty(args)
@@ -288,7 +293,7 @@ def cmd_sim(args: argparse.Namespace) -> int:
     if not fpath.is_file():
         print(f"No fight template for {enc.name} {diff_name}: run `paf template \"{enc.name}\"` first.")
         return 1
-    fight = Fight.load(fpath)
+    fight = load_fight(fpath)
     root = simc.new_run_dir(label=f"sim-{fpath.stem}")
     print(f"Simming {origin} on {fight.name} ({_mmss(fight.duration)}) and on a Patchwerk of the same length...")
     real = simc.run(simc.build_input(profile, fight.to_simc()), root / "fight", target_error=args.error)
@@ -319,7 +324,7 @@ def _objective(raw: str) -> float:
 def cmd_topgear(args: argparse.Namespace) -> int:
     from paf import simc
     from paf.corpus.template import template_path
-    from paf.fight import PRESETS, Fight
+    from paf.fight import PRESETS
     from paf.gamedata import item_inventory_types, item_sets
     from paf.profile import parse_simc_export
     from paf.topgear import FightProfile, GearPool, best_set_simc, format_result, run_topgear
@@ -334,7 +339,7 @@ def cmd_topgear(args: argparse.Namespace) -> int:
         if not fpath.is_file():
             print(f"No fight template for {enc.name} {diff_name}: run `paf template \"{enc.name}\"` first.")
             return 1
-        fights.append(FightProfile(fpath.stem, Fight.load(fpath).to_simc()))
+        fights.append(FightProfile(fpath.stem, load_fight(fpath).to_simc()))
     for preset in args.preset or ([] if fights else ["patchwerk"]):
         fights.append(FightProfile(preset, PRESETS[preset]))
     n_cand = len(pool.candidates)
@@ -363,13 +368,12 @@ def _boss_fights(enc, diff_name: str) -> dict[str, list[str]]:
     """The boss template (if any) and a Patchwerk of the same length."""
     from paf import simc
     from paf.corpus.template import template_path
-    from paf.fight import Fight
 
     fights: dict[str, list[str]] = {}
     fpath = template_path(enc.name, diff_name)
     duration = 300.0
     if fpath.is_file():
-        fight = Fight.load(fpath)
+        fight = load_fight(fpath)
         fights[fpath.stem] = fight.to_simc()
         duration = fight.duration
     fights["patchwerk"] = ["fight_style=Patchwerk", f"max_time={simc.fmt(duration)}", "desired_targets=1"]
@@ -435,7 +439,6 @@ def cmd_cdplan(args: argparse.Namespace) -> int:
     from paf.corpus import db
     from paf.corpus.template import template_path
     from paf.corpus.timeline import build_timeline
-    from paf.fight import Fight
 
     profile_text, origin = _load_profile(args.profile)
     client, enc, diff_name, diff = _encounter_and_difficulty(args)
@@ -445,7 +448,7 @@ def cmd_cdplan(args: argparse.Namespace) -> int:
         return 1
     tl = build_timeline(db.connect(), enc.id, diff, enc.name, diff_name, settings.get("spec"), top=10_000)
     print(f"{enc.name} {diff_name}: cooldown plans for {origin}")
-    pc = compare_plans(profile_text, tl, Fight.load(fpath), simc.new_run_dir(label="cdplan"),
+    pc = compare_plans(profile_text, tl, load_fight(fpath), simc.new_run_dir(label="cdplan"),
                        target_error=args.error, objective=args.objective)
     if pc is None:
         print("None of the top players' cooldowns match an action of the default APL.")
@@ -473,13 +476,14 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
     if target is None:
         print("No damage data for the ranked players in the corpus.")
         return 1
-    fight = Fight.load(fpath)
+    raw = Fight.load(fpath)
+    fight = load_fight(fpath, verbose=True)
     print(f"Top {spec} players do {target:.0%} of their damage to {enc.name}. Calibrating the add counts...")
     cal = calibrate(profile_text, fight, target, simc.new_run_dir(label="calibrate"))
     for s, share, dps in cal.points:
         print(f"  adds x{s:<4}  boss share {share:5.1%}  total {dps:10,.0f} dps")
-    fight.add_scale = cal.scale
-    fight.save(fpath)
+    raw.add_scale = cal.scale
+    raw.save(fpath)
     print(f"Add counts scaled by {cal.scale:g} in {fpath}")
     return 0
 
@@ -489,7 +493,6 @@ def cmd_plan(args: argparse.Namespace) -> int:
 
     from paf import simc
     from paf.corpus.template import template_path
-    from paf.fight import Fight
     from paf.plan import apply_plan, mmss, optimize, parse_plan, plan_template
 
     client, enc, diff_name, diff = _encounter_and_difficulty(args)
@@ -497,7 +500,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     if not fpath.is_file():
         print(f"No fight template for {enc.name} {diff_name}: run `paf template \"{enc.name}\"` first.")
         return 1
-    fight = Fight.load(fpath)
+    fight = load_fight(fpath)
     ppath = fpath.with_suffix(".plan.txt")
     if not ppath.is_file():
         ppath.write_text(plan_template(fight), encoding="utf-8")
@@ -558,7 +561,7 @@ def cmd_droptimizer(args: argparse.Namespace) -> int:
     from paf.corpus.template import template_path
     from paf.droptimizer import boss_ev, run_droptimizer, usable_loot
     from paf.encounters import find_encounter, raid_encounters
-    from paf.fight import PRESETS, Fight
+    from paf.fight import PRESETS
     from paf.gamedata import encounter_loot, item_classes, item_names
     from paf.profile import parse_simc_export
     from paf.topgear import FightProfile
@@ -590,7 +593,7 @@ def cmd_droptimizer(args: argparse.Namespace) -> int:
         if not fpath.is_file():
             print(f"No fight template for {enc.name} {diff_name}: run `paf template \"{enc.name}\"` first.")
             return 1
-        fights.append(FightProfile(fpath.stem, Fight.load(fpath).to_simc()))
+        fights.append(FightProfile(fpath.stem, load_fight(fpath).to_simc()))
     for preset in args.preset or ([] if fights else ["patchwerk"]):
         fights.append(FightProfile(preset, PRESETS[preset]))
     print(f"{profile.name} ({origin}): loot of {', '.join(e.name for e in encs)}")
@@ -672,7 +675,14 @@ def cmd_prep(args: argparse.Namespace) -> int:
     from paf.corpus.units import fetch_unit_windows
 
     fetch_unit_windows(client, con, enc.id, diff, enc.name)
-    fight, info = build_template(con, enc.id, diff, enc.name, spec, diff_name)
+    raw, info = build_template(con, enc.id, diff, enc.name, spec, diff_name)
+    from paf.notes import notes_path, notes_template, with_notes
+
+    npath = notes_path(template_path(enc.name, diff_name))
+    if not npath.is_file():
+        npath.parent.mkdir(parents=True, exist_ok=True)
+        npath.write_text(notes_template(raw), encoding="utf-8")
+    fight = with_notes(raw, template_path(enc.name, diff_name), verbose=True)
     d = PrepData(enc.name, diff_name, spec, profile.name or origin, kills=rep.kills, duration=fight.duration)
     d.phases = [(n, m) for n, _, m, _ in rep.phases]
     d.lust, d.pi, d.moving_share = fight.lust_time, fight.power_infusion, info.moving_share
@@ -708,7 +718,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
             if scale < 1:
                 d.notes.append(f"Movement inferred from the top players' trajectories is scaled by {scale:g}: they "
                                f"keep casting while moving, which SimC's movement windows do not model.")
-    fight.save(template_path(enc.name, diff_name))
+    raw.add_scale, raw.movement_scale = fight.add_scale, fight.movement_scale
+    raw.save(template_path(enc.name, diff_name))
     d.waves = [(w.time, max(1, round(w.count * fight.add_scale)) if w.scalable else w.count, w.lifetime, w.name)
                for w in fight.add_waves]
     d.waves += [(v.start, 0, v.duration, f"{v.name}: boss takes x{v.multiplier:g} damage") for v in fight.vulnerable]
@@ -797,13 +808,12 @@ def cmd_prep(args: argparse.Namespace) -> int:
 def _fight_with_plan(enc, diff_name: str):
     """The boss template with the user's plan file applied (moves, lust, PI), if there is one."""
     from paf.corpus.template import template_path
-    from paf.fight import Fight
     from paf.plan import apply_plan, parse_plan
 
     fpath = template_path(enc.name, diff_name)
     if not fpath.is_file():
         return None, None
-    fight = Fight.load(fpath)
+    fight = load_fight(fpath)
     ppath = fpath.with_suffix(".plan.txt")
     if ppath.is_file():
         plan = parse_plan(ppath.read_text(encoding="utf-8"))
@@ -1008,7 +1018,8 @@ def cmd_validate(args: argparse.Namespace) -> int:
     if not fpath.is_file():
         print(f"No fight template for {enc.name} {diff_name}: run `paf template \"{enc.name}\"` first.")
         return 1
-    fight = Fight.load(fpath)
+    raw = Fight.load(fpath)
+    fight = load_fight(fpath, verbose=True)
     race = "orc"
     try:
         race = parse_simc_export(_load_profile(None)[0]).header.get("race", race)
@@ -1027,8 +1038,8 @@ def cmd_validate(args: argparse.Namespace) -> int:
         scale, points = calibrate_movement(checks, fight, simc.new_run_dir(label="validate-movement"))
         for s_, ratio in points:
             print(f"  movement x{s_:<5} simulated / real {ratio:.2f}")
-        fight.movement_scale = scale
-        fight.save(fpath)
+        raw.movement_scale = scale
+        raw.save(fpath)
         print(f"Movement durations scaled by {scale:g} in {fpath}")
     s = summary(checks)
     if s:

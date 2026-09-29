@@ -1,0 +1,127 @@
+"""Boss notes: what the player knows about a boss and the logs cannot tell, applied on top of the detected
+fight. One directive per line (``#`` starts a comment), unit names are matched on their beginning:
+
+    amp Venomous Heart 2.0     # the boss takes x2.0 damage while this unit is up (overrides the measured value)
+    separate Venomous Heart    # an independent priority target: its own health, not the boss's
+    ignore Gore Rattle         # a mechanic, do not model it
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from paf.fight import AddWave, Fight
+
+
+@dataclass
+class Notes:
+    amp: dict[str, float] = field(default_factory=dict)
+    separate: set[str] = field(default_factory=set)
+    ignore: set[str] = field(default_factory=set)
+
+    @property
+    def empty(self) -> bool:
+        return not (self.amp or self.separate or self.ignore)
+
+
+def parse_notes(text: str) -> Notes:
+    n = Notes()
+    for i, raw in enumerate(text.lstrip("﻿").splitlines(), 1):
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        verb, _, rest = line.partition(" ")
+        verb, rest = verb.lower(), rest.strip()
+        if verb == "amp":
+            name, _, value = rest.rpartition(" ")
+            try:
+                n.amp[name.strip().lower()] = float(value)
+            except ValueError:
+                raise ValueError(f"line {i}: expected 'amp <unit> <multiplier>'") from None
+        elif verb == "separate" and rest:
+            n.separate.add(rest.lower())
+        elif verb == "ignore" and rest:
+            n.ignore.add(rest.lower())
+        else:
+            raise ValueError(f"line {i}: expected 'amp <unit> <x>', 'separate <unit>' or 'ignore <unit>'")
+    return n
+
+
+def _match(label: str, names: set[str] | dict) -> str | None:
+    low = label.lower()
+    return next((n for n in names if low.startswith(n)), None)
+
+
+def apply_notes(fight: Fight, notes: Notes) -> tuple[Fight, list[str]]:
+    """The fight with the player's corrections; returns the list of what changed."""
+    f = Fight(**{**fight.__dict__})
+    changes = []
+    vulnerable = []
+    add_waves = list(fight.add_waves)
+    for v in fight.vulnerable:
+        if _match(v.name, notes.ignore):
+            changes.append(f"ignored {v.name} at {v.start:.0f}s")
+            continue
+        if _match(v.name, notes.separate):
+            add_waves.append(AddWave(v.start, 1, v.duration, v.name, scalable=False))
+            changes.append(f"{v.name} at {v.start:.0f}s modeled as a separate target")
+            continue
+        key = _match(v.name, notes.amp)
+        if key:
+            changes.append(f"{v.name} at {v.start:.0f}s: amp x{v.multiplier:g} -> x{notes.amp[key]:g}")
+            v = type(v)(v.start, v.duration, notes.amp[key], v.name)
+        vulnerable.append(v)
+    kept_waves = []
+    for w in add_waves:
+        if _match(w.name, notes.ignore):
+            changes.append(f"ignored {w.name} at {w.time:.0f}s")
+            continue
+        kept_waves.append(w)
+    f.vulnerable, f.add_waves = vulnerable, kept_waves
+    return f, changes
+
+
+def notes_template(fight: Fight) -> str:
+    lines = [f"# Boss notes for {fight.name}: correct what the logs cannot tell. Uncomment / edit, then rerun.",
+             "#   amp <unit> <x>      the boss takes x times the damage while this unit is up",
+             "#   separate <unit>     an independent priority target (its own health)",
+             "#   ignore <unit>       a mechanic, not a target",
+             "#",
+             "# Detected in the logs:"]
+    seen = set()
+    for v in fight.vulnerable:
+        base = v.name.split(" (after")[0]
+        if base in seen:
+            continue
+        seen.add(base)
+        lines.append(f"#   {base}: shares the boss's health (it is a boss-type unit), boss damage x{v.multiplier:g} "
+                     "while it is up. Measured as the raid's damage rate on it vs on the boss: includes the cooldowns "
+                     "the raid keeps for it, so the real amp is probably lower.")
+        lines.append(f"# amp {base} {v.multiplier:g}")
+    return "\n".join(lines) + "\n"
+
+
+def notes_path(fight_json: Path) -> Path:
+    return fight_json.with_suffix(".notes.txt")
+
+
+def with_notes(fight: Fight, fight_json: Path, verbose: bool = False) -> Fight:
+    """The fight with the boss notes next to its JSON applied (unchanged if there are none)."""
+    p = notes_path(fight_json)
+    if not p.is_file():
+        return fight
+    notes = parse_notes(p.read_text(encoding="utf-8-sig"))
+    if notes.empty:
+        return fight
+    out, changes = apply_notes(fight, notes)
+    if verbose:
+        for c in changes:
+            print(f"  boss notes: {c}")
+    return out
+
+
+def load_fight(fight_json: Path, verbose: bool = False) -> Fight:
+    """Load a fight template with the player's boss notes applied. Save calibrations on the raw template
+    (Fight.load), never on this corrected copy."""
+    return with_notes(Fight.load(fight_json), fight_json, verbose)
