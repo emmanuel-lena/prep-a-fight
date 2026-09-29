@@ -70,11 +70,17 @@ def headline(d: PrepData) -> list[str]:
                        f"fight; it takes {take}.")
         else:
             out.append("Talents: your build is as good as the top players' builds on this fight.")
+    labels = {"boss": "boss damage", "total": "total damage (pad)", "adds": "damage to adds",
+              "secondary": "damage to secondary targets"}
     for p in d.optimized:
-        if p.objective == "total" and p.gain > 2 * p.error:
-            changed = [k.replace("use_item:", "") for k, r in p.choice.items() if r.name != "default"]
-            out.append(f"Cooldowns (total damage): {p.gain:+.1f}% vs the default priority list by changing "
-                       f"{', '.join(changed)}; boss damage {p.totals.get('boss', 0):+.1f}%.")
+        if p.objective == "adds" or p.gain <= 2 * p.error:
+            continue
+        changed = [f"{k.replace('use_item:', '')} {r.name.replace('_', ' ')}"
+                   for k, r in p.choice.items() if r.name != "default"]
+        others = ", ".join(f"{o} {v:+.1f}%" for o, v in p.totals.items() if o not in (p.objective, "adds"))
+        trust = "robust" if p.robust and not p.flags else "to double-check (see the plan)"
+        out.append(f"Cooldowns for {labels[p.objective]}: {p.gain:+.1f}% ({trust}); {'; '.join(changed)}"
+                   + (f" [{others}]" if others else "") + ".")
     held = [a for a in d.alignment if a.units_cover and a.in_units > a.units_cover * 1.5 and a.in_units - a.units_cover > 0.1]
     if held:
         out.append("Top players hold " + ", ".join(a.ability for a in held) + " for the secondary targets.")
@@ -203,9 +209,16 @@ def render(d: PrepData) -> str:
                 steps = "".join(f"<tr><td>{_mmss(t)}</td><td>{e(label)}</td><td class='small muted'>"
                                 f"{e(fight_context(d.fight, t))}</td></tr>" for t, label in p.timeline)
             note = d.mrt.get(p.objective, "")
+            checks = ""
+            if p.sensitivity:
+                checks += ("<p class='small'>Sensitivity (pessimistic variants of the fight): "
+                           + ", ".join(f"{e(v)} {_pct(g, 1)}" for v, g in p.sensitivity.items())
+                           + (" &rarr; <b>robust</b>" if p.robust else " &rarr; <b>not robust</b>") + "</p>")
+            if p.flags:
+                checks += "<ul class='small'>" + "".join(f"<li>&#9888; {e(f)}</li>" for f in p.flags) + "</ul>"
             blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{labels.get(p.objective, p.objective)}: {_pct(p.gain)}
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span></h3>
-<table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
+{checks}<table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
 <details><summary class="small">Play-by-play of one simulated pull</summary><div class="scroll"><table>
 <tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></details>
 <details><summary class="small">MRT note</summary><pre class="small" style="white-space:pre-wrap">{e(note)}</pre></details>

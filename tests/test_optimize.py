@@ -52,6 +52,27 @@ def test_vulnerable_windows():
     assert "Heart x2.5" in fight_context(f, 205)
 
 
+def test_fight_variants_and_flags():
+    from paf.fight import Vulnerable
+    from paf.optimize import Alignment, Plan, fight_variants, sanity_flags
+
+    f = fight()
+    f.vulnerable = [Vulnerable(200, 20, 3.0, "Heart")]
+    v = fight_variants(f)
+    assert v["amp halved"].vulnerable[0].multiplier == 2.0
+    assert v["adds die 25% faster"].add_waves[0].lifetime == 15.0
+    assert v["adds die 25% faster"].add_waves[1].lifetime == 20  # unique units untouched
+    rules = {r.name: r for r in fight_rules(f, long_cd=True)}
+    plan = Plan("total", {"ascendance": rules["hold_adds_20"]}, gain=8.0, error=0.1,
+                sensitivity={"amp halved": 7.0, "adds die 25% faster": 0.05})
+    align = [Alignment("Ascendance", 50, 0.2, 0.6, 0.2, 0.1)]
+    flags = sanity_flags(plan, align)
+    assert any("large gain" in x for x in flags)
+    assert any("not robust" in x and "adds die" in x for x in flags)
+    assert any("top players keep it for the secondary target" in x for x in flags)
+    assert not plan.robust
+
+
 def test_fight_context():
     assert fight_context(fight(), 65) == "adds"
     assert fight_context(fight(), 35) == "lust, PI"

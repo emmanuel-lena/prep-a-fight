@@ -163,6 +163,13 @@ class Plan:
     totals: dict[str, float] = field(default_factory=dict)  # confirmed delta % for every objective
     rounds: int = 0
     timeline: list[tuple[float, str]] = field(default_factory=list)
+    sensitivity: dict[str, float] = field(default_factory=dict)  # uncertain-parameter variant -> gain %
+    flags: list[str] = field(default_factory=list)  # reasons to double-check this plan
+
+    @property
+    def robust(self) -> bool:
+        """The gain holds on every variant of the uncertain parameters."""
+        return all(g > max(2 * self.error, 0.1) for g in self.sensitivity.values()) if self.sensitivity else True
 
 
 def optimize_objective(profile_text: str, apl: OrderedDict[str, list[str]], cds: list[Cooldown], fight: Fight,
@@ -236,6 +243,74 @@ def confirm(profile_text: str, apl: OrderedDict[str, list[str]], plans: list[Pla
             p.totals["secondary"] = d
             if p.objective == "secondary":
                 p.gain, p.error = d, err
+
+
+def fight_variants(fight: Fight) -> dict[str, Fight]:
+    """The fight with its uncertain parameters pushed to the pessimistic side of their plausible range."""
+    out: dict[str, Fight] = {}
+    if fight.vulnerable:
+        f = Fight(**{**fight.__dict__})
+        f.vulnerable = [type(v)(v.start, v.duration, round(1 + (v.multiplier - 1) / 2, 2), v.name)
+                        for v in fight.vulnerable]
+        out["amp halved"] = f
+    if any(w.scalable for w in fight.add_waves):
+        f = Fight(**{**fight.__dict__})
+        f.add_waves = [type(w)(w.time, w.count, round(w.lifetime * 0.75, 1), w.name, w.scalable) if w.scalable else w
+                       for w in fight.add_waves]
+        out["adds die 25% faster"] = f
+    if fight.movement:
+        f = Fight(**{**fight.__dict__})
+        f.movement_scale = min(1.0, fight.movement_scale + 0.25)
+        out["more movement"] = f
+    return out
+
+
+def sensitivity(profile_text: str, apl: OrderedDict[str, list[str]], plans: list[Plan], fight: Fight,
+                run_dir: Path, target_error: float = 0.1) -> None:
+    """Gain of every plan on each pessimistic variant of the fight (V3: only robust plans are recommended)."""
+    sets = {p.objective: apply_rules(apl, p.choice) for p in plans
+            if p.objective != "secondary" and any(r.name != "default" for r in p.choice.values())}
+    if not sets:
+        return
+    base = "\n".join([profile_text.rstrip(), *apl_lines(apl)])
+    for name, variant in fight_variants(fight).items():
+        res = simc.run(simc.build_input(base, variant.to_simc(), sets),
+                       run_dir / f"sensitivity-{re.sub(r'[^a-z0-9]+', '-', name)}", target_error=target_error)
+        by_name = {ps.name: ps for ps in res.profilesets}
+        for p in plans:
+            ps = by_name.get(p.objective)
+            if ps is not None:
+                p.sensitivity[name] = metric_delta(res, ps, p.objective)[0]
+
+
+LARGE_GAIN = 5.0  # % above which a gain is shown as "check the model" rather than as a plain recommendation
+
+
+def sanity_flags(plan: Plan, alignment: list) -> list[str]:
+    """V2: reasons to double-check a plan before following it."""
+    flags = []
+    if plan.gain > LARGE_GAIN:
+        flags.append(f"large gain ({plan.gain:+.1f}%): check the rebuilt fight (validation score, boss notes)")
+    for variant, g in plan.sensitivity.items():
+        if g <= max(2 * plan.error, 0.1):
+            flags.append(f"not robust: {g:+.1f}% if {variant}")
+    held = {}
+    for a in alignment:
+        key = re.sub(r"[^a-z0-9]+", "_", a.ability.lower()).strip("_")
+        if a.units_cover and a.in_units > a.units_cover * 1.5 and a.in_units - a.units_cover > 0.1:
+            held[key] = "the secondary target / vulnerability windows"
+        elif a.in_adds > a.adds_cover * 1.5 and a.in_adds - a.adds_cover > 0.1:
+            held[key] = "add waves"
+    for key, rule in plan.choice.items():
+        tops = held.get(key)
+        if not tops or rule.name == "default":
+            continue
+        for_adds = rule.name.startswith(("hold_adds", "add_waves"))
+        for_units = rule.name.startswith(("hold_vulnerable", "vulnerable_windows", "secondary_targets"))
+        if (for_adds and "secondary" in tops) or (for_units and tops == "add waves"):
+            flags.append(f"{key}: the plan keeps it for {'add waves' if for_adds else 'the vulnerability windows'}, "
+                         f"the top players keep it for {tops}")
+    return flags
 
 
 def play_by_play(profile_text: str, apl: OrderedDict[str, list[str]], plan: Plan, fight: Fight, run_dir: Path,
@@ -359,7 +434,9 @@ def cooldown_durations(profile_text: str, run_dir: Path,
 
 
 def optimize_all(profile_text: str, fight: Fight, run_dir: Path, *, objectives: tuple[str, ...] = OBJECTIVES,
-                 target_error: float = 0.2, log: Callable[[str], None] = print) -> tuple[list[Plan], list[Cooldown]]:
+                 target_error: float = 0.2, log: Callable[[str], None] = print,
+                 alignment: list | None = None) -> tuple[list[Plan], list[Cooldown]]:
+    """alignment: what the top players do with their cooldowns (tops_alignment), to flag contradictions."""
     apl = parse_apl(dump_apl(profile_text, run_dir / "apl"))
     durations, used = cooldown_durations(profile_text, run_dir / "probe", apl)
     used_items = any(u not in TRACKED for u in used)  # on-use items show up under their own name
@@ -374,6 +451,8 @@ def optimize_all(profile_text: str, fight: Fight, run_dir: Path, *, objectives: 
     plans = [optimize_objective(profile_text, apl, cds, fight, obj, run_dir, target_error=target_error, log=log)
              for obj in objectives]
     confirm(profile_text, apl, plans, fight, run_dir)
+    sensitivity(profile_text, apl, plans, fight, run_dir)
     for p in plans:
+        p.flags = sanity_flags(p, alignment or [])
         p.timeline = play_by_play(profile_text, apl, p, fight, run_dir, cds)
     return plans, cds

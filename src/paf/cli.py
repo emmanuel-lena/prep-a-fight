@@ -751,6 +751,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
     d.talents = compare_builds(profile_text, con, client, enc.id, diff, spec, fights, root / "talents",
                                target_error=args.error)
     tl_all = build_timeline(con, enc.id, diff, enc.name, diff_name, spec, top=10_000)
+    d.alignment = tops_alignment_safe(tl_all, fight)
     if args.no_optimize:
         step("Cooldown plans")
         d.plans = compare_plans(profile_text, tl_all, fight, root / "cdplan", target_error=args.error / 2,
@@ -758,12 +759,12 @@ def cmd_prep(args: argparse.Namespace) -> int:
     else:
         from paf.optimize import mrt_note, optimize_all
 
-        step("Ideal cooldown plan per objective (boss / total / adds)")
-        d.optimized, _ = optimize_all(profile_text, fight, root / "optimize", target_error=args.error)
+        step("Ideal cooldown plan per objective, with sensitivity checks")
+        d.optimized, _ = optimize_all(profile_text, fight, root / "optimize", target_error=args.error,
+                                      alignment=d.alignment)
         d.mrt = {p.objective: mrt_note(enc.name, p, fight) for p in d.optimized}
         (reports / f"mrt-{_slug(enc.name)}-{diff_name}.txt").write_text("\n\n".join(d.mrt.values()) + "\n",
                                                                          encoding="utf-8")
-    d.alignment = tops_alignment_safe(tl_all, fight)
 
     if not args.no_gear:
         pool = GearPool(profile, item_inventory_types(), item_sets())
@@ -885,6 +886,11 @@ def print_optimized(plans, fight) -> None:
             print("  the default APL is already the best for this objective")
         for k, r in changed.items():
             print(f"  {k.replace('use_item:', ''):<22} {r.description}")
+        if p.sensitivity:
+            print("  sensitivity: " + ", ".join(f"{v} {g:+.1f}%" for v, g in p.sensitivity.items())
+                  + ("  -> robust" if p.robust else "  -> NOT robust"))
+        for flag in p.flags:
+            print(f"  ! check: {flag}")
         if p.timeline:
             print("  play-by-play (one simulated pull):")
             for t, label in p.timeline:
@@ -932,7 +938,14 @@ def cmd_optimize(args: argparse.Namespace) -> int:
     print(f"{enc.name} {diff_name}: optimizing cooldowns for {', '.join(objectives)} ({origin})"
           + (f", with your plan {ppath}" if ppath else ""))
     root = simc.new_run_dir(label=f"optimize-{_slug(enc.name)}")
-    plans, _ = optimize_all(profile_text, fight, root, objectives=objectives, target_error=args.error)
+    from paf import settings
+    from paf.corpus import db
+    from paf.corpus.timeline import build_timeline
+    from paf.optimize import tops_alignment
+
+    tl = build_timeline(db.connect(), enc.id, diff, enc.name, diff_name, settings.get("spec"), top=10_000)
+    plans, _ = optimize_all(profile_text, fight, root, objectives=objectives, target_error=args.error,
+                            alignment=tops_alignment(tl, fight))
     print_optimized(plans, fight)
     print_alignment(enc, diff_name, diff, fight)
     notes = data_dir() / "reports" / f"mrt-{_slug(enc.name)}-{diff_name}.txt"
