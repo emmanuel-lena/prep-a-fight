@@ -159,8 +159,26 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
 <h2>4. Options</h2><div class="card">
 <label><input type="checkbox" name="gear" checked> Top Gear with your bags and this boss's loot (slower)</label>
 <label><input type="checkbox" name="optimize" checked> Ideal cooldown plan per objective (slowest, 20-40 min)</label>
-</div><p><button>Prepare this fight</button></p></form>"""
+</div><p><button>Prepare this fight</button></p></form>{notes_block(enc, difficulty)}"""
     return page(enc.name, body)
+
+
+def notes_block(enc, difficulty: str) -> str:
+    """What the player knows about the boss: the detected mechanics with their evidence, editable."""
+    from paf.corpus.template import template_path
+    from paf.notes import notes_path
+
+    p = notes_path(template_path(enc.name, difficulty))
+    if not p.is_file():
+        return ('<h2>What you know about this boss</h2><div class="card muted">Available after the first prep: '
+                "the detected mechanics (units sharing the boss's health, damage amps...) with their evidence.</div>")
+    text = p.read_text(encoding="utf-8-sig")
+    return f"""<h2>What you know about this boss</h2><div class="card">
+<p class="small muted">Detected in the logs, with the evidence. Correct what the logs cannot tell (e.g. the real damage
+amp of a heart: <code>amp Venomous Heart 2.0</code>), save, then prepare the fight again.</p>
+<form method="post" action="/notes"><input type="hidden" name="boss" value="{enc.id}">
+<input type="hidden" name="difficulty" value="{e(difficulty)}"><textarea name="notes">{e(text)}</textarea>
+<p><button>Save the notes</button></p></form></div>"""
 
 
 def write_assigns(boss_id: int, difficulty: str, chosen: list[str]) -> None:
@@ -254,6 +272,23 @@ class Handler(BaseHTTPRequestHandler):
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text(text.replace("\r\n", "\n"), encoding="utf-8")
                 self._redirect("/")
+            elif self.path == "/notes":
+                from paf.corpus.template import template_path
+                from paf.encounters import raid_encounters
+                from paf.notes import notes_path, parse_notes
+                from paf.wcl import WCLClient
+
+                boss_id = int(form["boss"][0])
+                difficulty = form.get("difficulty", ["heroic"])[0]
+                text = (form.get("notes") or [""])[0].replace("\r\n", "\n")
+                try:
+                    parse_notes(text)
+                except ValueError as ex:
+                    self._send(page("Invalid notes", f"<p>{e(str(ex))}. <a href='javascript:history.back()'>Back</a></p>"), 400)
+                    return
+                enc = next(x for x in raid_encounters(WCLClient()) if x.id == boss_id)
+                notes_path(template_path(enc.name, difficulty)).write_text(text, encoding="utf-8")
+                self._redirect(f"/boss?boss={boss_id}&difficulty={difficulty}")
             elif self.path == "/prep":
                 from paf.corpus.template import _slug
                 from paf.encounters import raid_encounters
