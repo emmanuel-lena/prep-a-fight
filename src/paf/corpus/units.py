@@ -81,6 +81,112 @@ def fetch_unit_windows(client: WCLClient, con: sqlite3.Connection, encounter_id:
     return len(todo)
 
 
+AURA_QUERY = """query($code:String!,$f:[Int]!,$s:Float,$e:Float){ reportData { report(code:$code) {
+  masterData { actors(type:"NPC") { id name subType } }
+  debuffs: events(fightIDs:$f, startTime:$s, endTime:$e, dataType:Debuffs, hostilityType:Enemies, limit:10000) {
+    data nextPageTimestamp }
+  buffs: events(fightIDs:$f, startTime:$s, endTime:$e, dataType:Buffs, hostilityType:Enemies, limit:10000) {
+    data nextPageTimestamp }
+  graph(fightIDs:$f, startTime:$s, endTime:$e, dataType:DamageTaken, hostilityType:Enemies)
+} } }"""
+AMP_MIN_RATIO = 1.3  # a boss aura during which the boss takes damage this much faster is a candidate amp
+
+
+def aura_windows(events: list[dict], boss_ids: set[int], enemy_ids: set[int], start: float, end: float
+                 ) -> dict[int, list[tuple[float, float]]]:
+    """Windows of the auras applied to the boss by enemies (or the environment), per ability."""
+    open_: dict[tuple[int, int], float] = {}
+    out: dict[int, list[tuple[float, float]]] = {}
+    for ev in events:
+        if ev.get("targetID") not in boss_ids:
+            continue
+        src = ev.get("sourceID", -1)
+        if src not in enemy_ids and src != -1:
+            continue  # applied by a player: dots, raid debuffs...
+        aid, t = ev.get("abilityGameID"), (ev["timestamp"] - start) / 1000
+        typ = ev.get("type", "")
+        if typ.startswith("apply") and not typ.endswith("stack"):
+            open_[(aid, ev["targetID"])] = t
+        elif typ.startswith("remove") and not typ.endswith("stack") and (aid, ev["targetID"]) in open_:
+            t0 = open_.pop((aid, ev["targetID"]))
+            out.setdefault(aid, []).append((t0, t - t0))
+    for (aid, _), t0 in open_.items():
+        out.setdefault(aid, []).append((t0, (end - start) / 1000 - t0))
+    return out
+
+
+def rate_ratio(series: list[float], step: float, windows: list[tuple[float, float]]) -> float | None:
+    inside = {i for s, d in windows for i in range(int(s / step), min(len(series), int((s + d) / step) + 1))}
+    a = [series[i] for i in inside if series[i] > 0]
+    b = [v for i, v in enumerate(series) if i not in inside and v > 0]
+    if len(a) < 2 or len(b) < 2:
+        return None
+    return (sum(a) / len(a)) / (sum(b) / len(b))
+
+
+def fetch_boss_auras(client: WCLClient, con: sqlite3.Connection, encounter_id: int, difficulty: int,
+                     boss_name: str, kills: int = 12,
+                     log: Callable[[str], None] = lambda s: print(s, flush=True)) -> int:
+    where, params = kills_filter(encounter_id, difficulty)
+    have = con.execute(f"SELECT COUNT(*) FROM aura_status a JOIN fight f USING(report, fight_id) WHERE {where}",
+                       params).fetchone()[0]
+    todo = con.execute(
+        f"SELECT f.report, f.fight_id FROM fight f LEFT JOIN aura_status a USING(report, fight_id) "
+        f"WHERE {where} AND a.report IS NULL ORDER BY f.report LIMIT ?", (*params, max(0, kills - have))).fetchall()
+    for r in todo:
+        try:
+            fr = client.query(FIGHT_QUERY, {"code": r[0], "f": [r[1]]},
+                              cache_ttl=0)["reportData"]["report"]["fights"][0]
+            s, e = fr["startTime"], fr["endTime"]
+            rep = client.query(AURA_QUERY, {"code": r[0], "f": [r[1]], "s": s, "e": e},
+                               cache_ttl=0)["reportData"]["report"]
+        except (WCLError, KeyError, TypeError, IndexError, OSError) as ex:
+            log(f"  auras skipped: {str(ex)[:100]}")
+            continue
+        actors = (rep.get("masterData") or {}).get("actors") or []
+        boss_ids = {a["id"] for a in actors if a.get("name") == boss_name}
+        enemy_ids = {a["id"] for a in actors}
+        events = ((rep.get("debuffs") or {}).get("data") or []) + ((rep.get("buffs") or {}).get("data") or [])
+        g = rep.get("graph") or {}
+        g = g.get("data", g) if isinstance(g, dict) else {}
+        series = next((x.get("data") or [] for x in g.get("series") or [] if x.get("name") == boss_name), [])
+        step = (e - s) / 1000 / len(series) if series else 0
+        rows = []
+        for aid, ws in aura_windows(sorted(events, key=lambda x: x["timestamp"]), boss_ids, enemy_ids, s, e).items():
+            ratio = rate_ratio(series, step, ws) if series else None
+            rows += [(r[0], r[1], aid, "aura", round(t0, 1), round(d, 1), ratio) for t0, d in ws]
+        con.executemany("INSERT INTO boss_aura VALUES(?,?,?,?,?,?,?)", rows)
+        con.execute("INSERT OR REPLACE INTO aura_status VALUES(?,?)", (r[0], r[1]))
+        con.commit()
+    return len(todo)
+
+
+def amp_candidates(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: dict[int, str],
+                   min_ratio: float = AMP_MIN_RATIO) -> list[tuple[str, float, list[tuple[float, float]], int]]:
+    """Boss auras during which the boss takes damage faster in most kills: (name, median ratio, typical
+    windows, kills seen). They are suggestions for the boss notes, never applied automatically."""
+    from paf.corpus.analyze import canonical_waves
+
+    where, params = kills_filter(encounter_id, difficulty)
+    kills = con.execute(f"SELECT COUNT(*) FROM aura_status a JOIN fight f USING(report, fight_id) WHERE {where}",
+                        params).fetchone()[0]
+    by: dict[int, dict[tuple[str, int], list]] = {}
+    for r in con.execute(f"SELECT b.* FROM boss_aura b JOIN fight f USING(report, fight_id) WHERE {where}", params):
+        by.setdefault(r[2], {}).setdefault((r[0], r[1]), []).append((r[4], r[5], r[6]))
+    out = []
+    for aid, per_kill in by.items():
+        if not kills or len(per_kill) < max(3, kills * 0.5):
+            continue
+        ratios = [x[2] for v in per_kill.values() for x in v if x[2] is not None]
+        if not ratios or st.median(ratios) < min_ratio:
+            continue
+        waves = canonical_waves([[(t, 1, d, [""]) for t, d, _ in v] for v in per_kill.values()])
+        wins = [(w.t, w.lifetime) for w in waves if w.lifetime >= 2]
+        if wins:
+            out.append((names.get(aid, f"spell {aid}"), round(st.median(ratios), 2), wins, len(per_kill)))
+    return sorted(out, key=lambda x: -x[1])
+
+
 TRIGGER_BEFORE = 6.0  # a boss cast ending up to this many seconds before a window can be its trigger
 TRIGGER_AFTER = 3.0  # ... or slightly after (the damage graph has a resolution of a few seconds)
 TRIGGER_SUPPORT = 0.5  # share of the kills where that cast must precede the window

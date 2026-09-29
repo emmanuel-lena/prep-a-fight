@@ -71,6 +71,8 @@ class Fight:
     movement_scale: float = 1.0  # multiplies inferred movement durations (calibration on the top players' DPS)
     personal_movement: list[Window] = field(default_factory=list)  # player's own moves: never scaled
     vulnerable: list[Vulnerable] = field(default_factory=list)  # boss damage amplification windows
+    # possible amps detected in the logs (auras on the boss): not simulated until confirmed in the boss notes
+    candidate_vulnerable: list[Vulnerable] = field(default_factory=list)
 
     def raid_event_lines(self, add_scale: float | None = None, movement_scale: float | None = None) -> list[str]:
         scale = self.add_scale if add_scale is None else add_scale
@@ -127,6 +129,7 @@ class Fight:
         d["movement"] = [Window(**w) for w in d.get("movement", [])]
         d["personal_movement"] = [Window(**w) for w in d.get("personal_movement", [])]
         d["vulnerable"] = [Vulnerable(**w) for w in d.get("vulnerable", [])]
+        d["candidate_vulnerable"] = [Vulnerable(**w) for w in d.get("candidate_vulnerable", [])]
         return cls(**d)
 
 

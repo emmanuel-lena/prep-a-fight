@@ -72,6 +72,11 @@ def apply_notes(fight: Fight, notes: Notes) -> tuple[Fight, list[str]]:
             changes.append(f"{v.name} at {v.start:.0f}s: amp x{v.multiplier:g} -> x{notes.amp[key]:g}")
             v = type(v)(v.start, v.duration, notes.amp[key], v.name)
         vulnerable.append(v)
+    for v in fight.candidate_vulnerable:  # possible amps detected on the boss: only when confirmed
+        key = _match(v.name, notes.amp)
+        if key:
+            vulnerable.append(type(v)(v.start, v.duration, notes.amp[key], v.name))
+            changes.append(f"{v.name} at {v.start:.0f}s: confirmed, boss takes x{notes.amp[key]:g} damage")
     kept_waves = []
     for w in add_waves:
         if _match(w.name, notes.ignore):
@@ -99,6 +104,15 @@ def notes_template(fight: Fight) -> str:
                      "while it is up. Measured as the raid's damage rate on it vs on the boss: includes the cooldowns "
                      "the raid keeps for it, so the real amp is probably lower.")
         lines.append(f"# amp {base} {v.multiplier:g}")
+    cands: dict[str, list] = {}
+    for v in fight.candidate_vulnerable:
+        cands.setdefault(v.name.split(" (boss aura)")[0], []).append(v)
+    for base, vs in cands.items():
+        when = ", ".join(f"{int(v.start // 60)}:{int(v.start % 60):02d} ({v.duration:.0f}s)" for v in vs[:6])
+        lines.append(f"#   Possible amp: the boss takes damage x{vs[0].multiplier:g} faster while it has the aura "
+                     f"'{base}' ({when}). Not simulated: raid cooldowns can explain it too. If it really is a damage "
+                     f"amp, uncomment and set the real value:")
+        lines.append(f"# amp {base} {vs[0].multiplier:g}")
     return "\n".join(lines) + "\n"
 
 

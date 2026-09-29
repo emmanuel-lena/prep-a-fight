@@ -207,9 +207,10 @@ def cmd_template(args: argparse.Namespace) -> int:
 
     client, enc, diff_name, diff = _encounter_and_difficulty(args)
     con = db.connect()
-    from paf.corpus.units import fetch_unit_windows
+    from paf.corpus.units import fetch_boss_auras, fetch_unit_windows
 
     fetch_unit_windows(client, con, enc.id, diff, enc.name)  # secondary units' real windows (cheap, cached)
+    fetch_boss_auras(client, con, enc.id, diff, enc.name)  # auras on the boss: possible damage amps
     fight, info = build_template(con, enc.id, diff, enc.name, settings.get("spec"), diff_name)
     if info.kills == 0:
         print(f"No kills in the corpus for {enc.name} {diff_name}: run `paf corpus \"{enc.name}\"` first.")
@@ -672,9 +673,10 @@ def cmd_prep(args: argparse.Namespace) -> int:
 
     step("Analyzing the corpus")
     rep = analyze(con, enc.id, diff, enc.name, spec)
-    from paf.corpus.units import fetch_unit_windows
+    from paf.corpus.units import fetch_boss_auras, fetch_unit_windows
 
     fetch_unit_windows(client, con, enc.id, diff, enc.name)
+    fetch_boss_auras(client, con, enc.id, diff, enc.name)
     raw, info = build_template(con, enc.id, diff, enc.name, spec, diff_name)
     from paf.notes import notes_path, notes_template, with_notes
 

@@ -111,6 +111,17 @@ def attack_windows(con: sqlite3.Connection, where: str, params: tuple, spec: str
     return [AddWave(w.t, 1, w.lifetime, ", ".join(w.types), scalable=False) for w in waves if w.lifetime >= 5]
 
 
+def ability_names_all(con: sqlite3.Connection) -> dict[int, str]:
+    from paf.gamedata import spell_names
+
+    try:
+        names = dict(spell_names())
+    except OSError:
+        names = {}
+    names.update(dict(con.execute("SELECT id, name FROM ability").fetchall()))
+    return names
+
+
 def boss_unit_multiplier(con: sqlite3.Connection, where: str, params: tuple, boss_name: str, units: set[str],
                          units_time: float, duration: float, invulnerable_time: float, kills: int) -> float:
     """Damage amplification of secondary boss units: the raid's damage rate on them during their windows
@@ -224,11 +235,18 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
                                     sum(w.duration for w in invulnerable), len(keys))
         vulnerable = [Vulnerable(round(w.time, 1), round(w.lifetime, 1), mult, w.name) for w in boss_waves]
 
+    from paf.corpus.units import amp_candidates
+
+    candidates = [Vulnerable(round(t, 1), round(d, 1), ratio, f"{name} (boss aura)")
+                  for name, ratio, wins, _k in amp_candidates(con, encounter_id, difficulty, ability_names_all(con))
+                  for t, d in wins]
+
     fight = Fight(
         name=f"{boss_name} {diff_name}".strip(),
         duration=round(duration, 1),
         add_waves=add_waves,
         vulnerable=vulnerable,
+        candidate_vulnerable=candidates,
         invulnerable=invulnerable,
         movement=moves,
         lust_time=round(st.median(lust_times), 1) if lust_times else 0.0,
