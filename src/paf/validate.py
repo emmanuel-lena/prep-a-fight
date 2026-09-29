@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from paf import simc
+from paf.cdplan import apl_lines, dump_apl, parse_apl
 from paf.corpus.analyze import kills_filter
 from paf.fight import Fight
 from paf.talent_sim import IMPORT_CODE_QUERY
@@ -78,20 +79,44 @@ class Check:
     sim: float
     sim_boss: float | None
     profile: str = field(default="", repr=False)
+    sim_default: float | None = None  # with the default APL, when sim is with cooldowns held like the tops
 
     @property
     def ratio(self) -> float:
         return self.sim / self.real if self.real else 0.0
 
 
+def aligned_apl(profile: str, fight: Fight, run_dir: Path) -> tuple[list[str], list[str]] | None:
+    """(default APL, APL with the long cooldowns kept for the vulnerability windows) as profile lines, or None
+    when the fight has no such window. Top players stack their cooldowns in these windows (Coiled Altar: 100%
+    of the Ascendance casts in the intermission) while the default APL casts them on cooldown, so simming
+    them with the default APL underestimates what they do."""
+    if not fight.vulnerable:
+        return None
+    from paf.optimize import apply_rules, cooldown_durations, find_cooldowns
+
+    apl = parse_apl(dump_apl(profile, run_dir / "apl"))
+    durations, _ = cooldown_durations(profile, run_dir / "probe", apl)
+    choice = {}
+    for c in find_cooldowns(apl, fight, durations):
+        want = "hold_vulnerable_90" if c.long else "hold_vulnerable_30"
+        rule = next((r for r in c.rules if r.name == want), None)
+        if rule:
+            choice[c.key] = rule
+    return apl_lines(apl), apply_rules(apl, choice)
+
+
 def validate(con: sqlite3.Connection, client: WCLClient, encounter_id: int, difficulty: int, spec: str,
              fight: Fight, run_dir: Path, *, players: int = 6, race: str = "orc",
-             target_error: float = 0.3) -> list[Check]:
+             target_error: float = 0.3, align: bool = True) -> list[Check]:
+    """align: sim the tops with their long cooldowns kept for the vulnerability windows (as they play), the
+    default APL being reported next to it."""
     where, params = kills_filter(encounter_id, difficulty)
     rows = con.execute(
         f"SELECT r.* FROM ranked r JOIN fight f USING(report, fight_id) WHERE {where} AND r.spec=? "
         f"AND r.actor_id IS NOT NULL ORDER BY r.rank_pos", (*params, spec)).fetchall()
     checks: list[Check] = []
+    apls = None
     for r in rows:
         if len(checks) >= players:
             break
@@ -111,6 +136,18 @@ def validate(con: sqlite3.Connection, client: WCLClient, encounter_id: int, diff
             continue
         prof = profile_from_log(f"rank{r['rank_pos']}", r["class"], r["spec"], race, code, gear)
         prof += "\n".join(stat_overrides(client, r["report"], r["fight_id"], r["actor_id"])) + "\n"
+        if align and apls is None:
+            apls = aligned_apl(prof, fight, run_dir) or False
+        if apls:
+            default_lines, held_lines = apls
+            res = simc.run(simc.build_input(prof + "\n".join(default_lines) + "\n", fight.to_simc(),
+                                            {"held": held_lines}),
+                           run_dir / f"rank{r['rank_pos']}", target_error=target_error)
+            ps = next(p for p in res.profilesets if p.name == "held")
+            boss = ps.metrics.get("prioritydps")
+            checks.append(Check(r["rank_pos"], r["dps"], ps.dps.mean, boss.mean if boss else None,
+                                prof + "\n".join(held_lines) + "\n", res.baseline["dps"].mean))
+            continue
         res = simc.run(simc.build_input(prof, fight.to_simc()), run_dir / f"rank{r['rank_pos']}",
                        target_error=target_error)
         boss = res.baseline.get("prioritydps")

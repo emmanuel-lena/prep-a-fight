@@ -17,11 +17,14 @@ GRAPH_QUERY = """query($code:String!,$f:[Int]!,$s:Float,$e:Float){ reportData { 
 MIN_SHARE = 0.05  # a boss-type unit must take this share of the enemies' damage to count (else: a mechanic)
 
 
-def windows_from_series(values: list[float], step: float) -> list[tuple[float, float]]:
-    """Contiguous runs of non-zero points -> (start s, duration s)."""
+UP_SHARE = 0.2  # a unit is attackable where it takes at least this share of its usual damage rate
+
+
+def windows_from_series(values: list[float], step: float, min_value: float = 0.0) -> list[tuple[float, float]]:
+    """Contiguous runs of points above `min_value` -> (start s, duration s)."""
     out, cur = [], None
     for i, v in enumerate(values):
-        if v > 0:
+        if v > min_value:
             if cur and i == cur[1] + 1:
                 cur[1] = i
             else:
@@ -44,12 +47,14 @@ def analyze_graph(series: list[dict], boss_name: str, duration: float) -> list[t
             continue
         if sum(data) / (total or 1) < MIN_SHARE:
             continue
-        up = {i for i, v in enumerate(data) if v > 0}
+        # leftover dots and cleave on an unattackable unit (e.g. during an intermission) are not a window
+        floor = UP_SHARE * st.median([v for v in data if v > 0] or [0])
+        up = {i for i, v in enumerate(data) if v > floor}
         outside = [v for i, v in enumerate(boss) if v > 0 and i not in up]
         if not up or not outside:
             continue
         ratio = (sum(data[i] for i in up) / len(up)) / (sum(outside) / len(outside))
-        for start, dur in windows_from_series(data, step):
+        for start, dur in windows_from_series(data, step, floor):
             if dur >= 2 * step:
                 out.append((name, round(start, 1), round(dur, 1), round(ratio, 2)))
     return out

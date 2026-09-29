@@ -85,9 +85,9 @@ class Fight:
             count = max(1, round(w.count * scale)) if w.scalable else w.count
             events.append(f"adds,name=wave{i},count={count},first={fmt(round(w.time, 1))},"
                           f"duration={fmt(round(w.lifetime, 1))},cooldown=9999")
-        for w in self.invulnerable:
+        for w in self.invulnerable:  # retarget: without it the player keeps hitting the immune boss
             events.append(f"invulnerable,first={fmt(round(w.start, 1))},"
-                          f"duration={fmt(round(w.duration, 1))},cooldown=9999")
+                          f"duration={fmt(round(w.duration, 1))},cooldown=9999,retarget=1")
         for v in self.vulnerable:
             events.append(f"vulnerable,first={fmt(round(v.start, 1))},duration={fmt(round(v.duration, 1))},"
                           f"cooldown=9999,multiplier={fmt(round(v.multiplier, 2))}")

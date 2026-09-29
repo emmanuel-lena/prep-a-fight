@@ -715,6 +715,11 @@ def cmd_prep(args: argparse.Namespace) -> int:
             ratio = dict(points).get(scale) or min(points, key=lambda p: abs(p[0] - scale))[1]
             d.validation = (min(r for _, r in points), ratio, max(r for _, r in points))
             print(f"  simulated / real DPS of the top players: {ratio:.2f} with movement x{scale:g}")
+            defaults = [c.sim_default / c.real for c in checks if c.sim_default and c.real]
+            if defaults:
+                import statistics
+                print(f"  (cooldowns held for the vulnerability windows like the tops; default APL, movement x0: "
+                      f"{statistics.median(defaults):.2f})")
             if scale < 1:
                 d.notes.append(f"Movement inferred from the top players' trajectories is scaled by {scale:g}: they "
                                f"keep casting while moving, which SimC's movement windows do not model.")
@@ -1070,7 +1075,8 @@ def cmd_validate(args: argparse.Namespace) -> int:
     checks = validate(db.connect(), client, enc.id, diff, settings.get("spec"), fight,
                       simc.new_run_dir(label=f"validate-{_slug(enc.name)}"), players=args.players, race=race)
     for c in checks:
-        print(f"  rank {c.rank:<4} real {c.real:>9,.0f}  simulated {c.sim:>9,.0f}  ratio {c.ratio:5.2f}")
+        print(f"  rank {c.rank:<4} real {c.real:>9,.0f}  simulated {c.sim:>9,.0f}  ratio {c.ratio:5.2f}"
+              + (f"  (default APL {c.sim_default / c.real:.2f})" if c.sim_default and c.real else ""))
     if args.calibrate and checks:
         from paf.validate import calibrate_movement
 
