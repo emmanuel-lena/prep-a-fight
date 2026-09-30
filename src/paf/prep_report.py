@@ -196,9 +196,17 @@ def headline(d: PrepData) -> list[str]:
         else:
             out.append("Talents: your build is as good as the top players' builds on this fight.")
     short = {"boss": "boss", "total": "pad", "secondary": "burst"}
+    done: dict[tuple, int] = {}  # same rules as an objective already listed -> merged into it
     for p in d.optimized:
         if p.objective == "adds" or p.gain <= 2 * p.error:
             continue
+        sig = tuple(sorted((k, r.name) for k, r in p.choice.items() if r.name != "default"))
+        if sig in done:
+            i = done[sig]
+            head, _, rest = out[i].partition(": ")
+            out[i] = f"{head} and {short.get(p.objective, p.objective)}, same plan: {rest}"
+            continue
+        done[sig] = len(out)
         by_rule: dict[str, list[str]] = {}
         for k, r in p.choice.items():
             if r.name != "default":
