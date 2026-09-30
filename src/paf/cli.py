@@ -773,8 +773,12 @@ def cmd_prep(args: argparse.Namespace) -> int:
     for ab in tl_all.abilities:
         d.links.setdefault(ab.name, spell_ref(ab.id))
         d.links.setdefault(cd_key_of(ab.name), spell_ref(ab.id))  # cooldown keys of the plans
+    for ab in tl_all.abilities:
+        d.cd_names.setdefault(cd_key_of(ab.name), ab.name)
     for slot in ("trinket1", "trinket2", "main_hand"):
         it = profile.equipped.get(slot)
+        if it and it.name:
+            d.cd_names[slot] = d.cd_names[f"use_item:{slot}"] = it.name
         if it and it.name in d.links:
             d.links[f"use_item:{slot}"] = d.links[it.name]
     d.alignment = tops_alignment_safe(tl_all, fight)

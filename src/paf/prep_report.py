@@ -63,6 +63,7 @@ class PrepData:
     tops_casts: dict[str, list[float]] = field(default_factory=dict)  # cooldown key -> top players' cast times
     tops_players: int = 0
     links: dict[str, str] = field(default_factory=dict)  # spell / item name -> Wowhead reference
+    cd_names: dict[str, str] = field(default_factory=dict)  # cooldown key (ascendance, trinket1) -> in-game name
 
 
 PALETTE = ["#e8590c", "#1c7ed6", "#2f9e44", "#ae3ec9", "#f59f00", "#d6336c", "#15aabf", "#5c7cfa", "#74b816"]
@@ -72,7 +73,8 @@ def _key(label: str) -> str:
     return "".join(ch if ch.isalnum() else "_" for ch in label.lower()).strip("_")
 
 
-def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: int, px: float = 1.4) -> str:
+def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: int, px: float = 1.4,
+                      names: dict[str, str] | None = None) -> str:
     """Lorrgs-like strip for a plan: the fight (phases, add waves, vulnerability windows, lust) then one row per
     cooldown with the plan's casts (dots) over the top players' casts of the same cooldown (bars)."""
     if fight is None or not plan.timeline:
@@ -114,7 +116,8 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
             labels.append(label)
     for i, label in enumerate(labels):
         color = PALETTE[i % len(PALETTE)]
-        row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">{e(label[:24])}</text>']
+        shown = (names or {}).get(_key(label)) or label.title()
+        row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">{e(shown[:24])}</text>']
         tt = tops.get(_key(label)) or []
         if tt and tops_players:
             bins: dict[int, int] = {}
@@ -137,8 +140,50 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
             f'(x = damage taken); grey: boss away; pink line: Bloodlust.</p>')
 
 
+def _base(name: str) -> str:
+    return name.split(" (after")[0].split(" (boss aura)")[0].strip()
+
+
+def cd_name(d: PrepData, key: str) -> str:
+    """A cooldown key of the plans as the player knows it (the trinket's name, not 'trinket1')."""
+    k = key.replace("use_item:", "")
+    return d.cd_names.get(key) or d.cd_names.get(k) or k.replace("_", " ").title()
+
+
+def burst_names(d: PrepData) -> tuple[str, str]:
+    """(vulnerability windows, separate priority targets) of the fight, by name."""
+    f = d.fight
+    if f is None:
+        return "", ""
+    vuln = list(dict.fromkeys(_base(v.name) for v in f.vulnerable if v.name))
+    units = list(dict.fromkeys(_base(w.name) for w in f.add_waves if not w.scalable and w.name))
+    return " / ".join(vuln), " / ".join(units)
+
+
+def rule_phrase(d: PrepData, rule: str) -> str:
+    """A rule of the optimizer in the player's words, with the fight's real names."""
+    import re
+
+    vuln, units = burst_names(d)
+    m = re.fullmatch(r"hold_(adds|vulnerable)_(\d+)", rule)
+    if m:
+        what = "the next add wave" if m.group(1) == "adds" else (vuln or "the damage amp")
+        return f"keep for {what} if it comes within {m.group(2)} s"
+    return {"default": "as SimC's default priority list", "on_cooldown": "on cooldown",
+            "add_waves": "only on add waves", "secondary_targets": f"only on {units or 'the secondary targets'}",
+            "vulnerable_windows": f"only during {vuln or 'the damage amp'}", "lust_pi": "with Bloodlust",
+            "not_before_move": "not in the 4 s before moving"}.get(rule, rule.replace("_", " "))
+
+
+def objective_name(d: PrepData, objective: str) -> str:
+    _, units = burst_names(d)
+    return {"boss": "Boss damage", "total": "Pad (total damage)", "adds": "Damage to adds",
+            "secondary": f"Burst {units or 'the secondary targets'}"}.get(objective, objective)
+
+
 def headline(d: PrepData) -> list[str]:
-    """The few things to remember, computed from the results."""
+    """The few things to remember, computed from the results, in the player's words (one string per point,
+    '\\n' separates its lines)."""
     out = []
     if d.talents and d.talents.rows:
         fight = d.talents.fights[0]
@@ -150,20 +195,26 @@ def headline(d: PrepData) -> list[str]:
                        f"fight; it takes {take}.")
         else:
             out.append("Talents: your build is as good as the top players' builds on this fight.")
-    labels = {"boss": "boss damage", "total": "total damage (pad)", "adds": "damage to adds",
-              "secondary": "damage to secondary targets"}
+    short = {"boss": "boss", "total": "pad", "secondary": "burst"}
     for p in d.optimized:
         if p.objective == "adds" or p.gain <= 2 * p.error:
             continue
-        changed = [f"{k.replace('use_item:', '')} {r.name.replace('_', ' ')}"
-                   for k, r in p.choice.items() if r.name != "default"]
-        others = ", ".join(f"{o} {v:+.1f}%" for o, v in p.totals.items() if o not in (p.objective, "adds"))
-        trust = "robust" if p.robust and not p.flags else "to double-check (see the plan)"
-        out.append(f"Cooldowns for {labels[p.objective]}: {p.gain:+.1f}% ({trust}); {'; '.join(changed)}"
-                   + (f" [{others}]" if others else "") + ".")
+        by_rule: dict[str, list[str]] = {}
+        for k, r in p.choice.items():
+            if r.name != "default":
+                by_rule.setdefault(rule_phrase(d, r.name), []).append(cd_name(d, k))
+        others = ", ".join(f"{short.get(o, o)} {v:+.1f}%" for o, v in p.totals.items() if o not in (p.objective, "adds"))
+        trust = ("holds up on pessimistic variants of the fight" if p.robust and not p.flags
+                 else "check the warnings in its plan below")
+        lines = [f"{objective_name(d, p.objective)}: {p.gain:+.1f}% vs SimC's default priority list"
+                 + (f" ({others})" if others else "") + f"; {trust}."]
+        lines += [f"{', '.join(cds)}: {phrase}" for phrase, cds in by_rule.items()]
+        out.append("\n".join(lines))
     held = [a for a in d.alignment if a.units_cover and a.in_units > a.units_cover * 1.5 and a.in_units - a.units_cover > 0.1]
     if held:
-        out.append("Top players hold " + ", ".join(a.ability for a in held) + " for the secondary targets.")
+        vuln, units = burst_names(d)
+        out.append("The top players keep " + ", ".join(a.ability for a in held) + " for "
+                   + (" / ".join(x for x in (vuln, units) if x) or "the burst windows") + ".")
     if d.plans and d.plans.rows:
         p, tot, _ = d.plans.rows[0]
         if p.name != "default" and tot > 2 * d.plans.error:
@@ -173,7 +224,7 @@ def headline(d: PrepData) -> list[str]:
     if d.gear:
         changes, _, w = d.gear[0]
         if w > 2 * d.gear_error:
-            out.append(f"Gear: {changes} ({w:+.2f}%).")
+            out.append(f"Gear ({w:+.2f}%): " + "\n".join(changes.split("; ")))
         else:
             out.append("Gear: your equipped set is already the best among your items on this fight.")
     if d.loot:
@@ -211,7 +262,8 @@ def render(d: PrepData) -> str:
     key = headline(d)
     if key:
         parts.append('<h2>What to remember</h2><div class="card key"><ul>'
-                     + "".join(f"<li>{lk(k)}</li>" for k in key) + "</ul></div>")
+                     + "".join("<li>" + "<br>".join(lk(line) for line in k.split("\n")) + "</li>" for k in key)
+                     + "</ul></div>")
 
     # the fight
     rows = "".join(f"<tr><td>{_mmss(t)}</td><td>{e(n)}</td></tr>" for n, t in d.phases)
@@ -279,11 +331,10 @@ def render(d: PrepData) -> str:
 
     # ideal play-by-play per objective
     if d.optimized:
-        labels = {"boss": "Boss damage", "total": "Total damage (pad)", "adds": "Damage to adds", "secondary": "Damage to secondary targets (burst them)"}
         blocks = []
         for p in d.optimized:
             changed = {k: r for k, r in p.choice.items() if r.name != "default"}
-            rules = "".join(f"<tr><td>{link(k.replace('use_item:', ''), d.links.get(k))}</td><td>{e(r.description)}</td></tr>"
+            rules = "".join(f"<tr><td>{link(cd_name(d, k), d.links.get(k))}</td><td>{e(rule_phrase(d, r.name))}</td></tr>"
                             for k, r in changed.items()) or "<tr><td colspan=2>the default priority list</td></tr>"
             others = ", ".join(f"{o} {_pct(v, 1)}" for o, v in p.totals.items() if o != p.objective)
             steps = ""
@@ -300,9 +351,9 @@ def render(d: PrepData) -> str:
                            + (" &rarr; <b>robust</b>" if p.robust else " &rarr; <b>not robust</b>") + "</p>")
             if p.flags:
                 checks += "<ul class='small'>" + "".join(f"<li>&#9888; {e(f)}</li>" for f in p.flags) + "</ul>"
-            blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{labels.get(p.objective, p.objective)}: {_pct(p.gain)}
+            blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain)}
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span></h3>
-{checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players)}
+{checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names)}
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
 <details><summary class="small">Play-by-play of one simulated pull</summary><div class="scroll"><table>
 <tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></details>

@@ -1,4 +1,27 @@
-from paf.prep_report import PrepData, render
+from paf.prep_report import PrepData, headline, render
+
+
+def test_headline_speaks_the_players_language():
+    from paf.fight import AddWave, Fight, Vulnerable
+    from paf.optimize import Plan, Rule
+
+    d = PrepData("Ula'tek", "heroic", "Elemental", "Char")
+    d.fight = Fight("U", 600, add_waves=[AddWave(60, 5, 20)],
+                    vulnerable=[Vulnerable(120, 40, 2.0, "Venomous Heart (after Mother's Wrath)")])
+    d.cd_names = {"use_item:trinket1": "Vile Vial", "ascendance": "Ascendance"}
+
+    def rule(name):
+        return Rule(name, "", lambda old: old)
+
+    p = Plan("boss", {"ascendance": rule("hold_vulnerable_60"), "use_item:trinket1": rule("hold_vulnerable_60"),
+                      "stormkeeper": rule("add_waves")}, 10.3, 0.1)
+    p.totals = {"boss": 10.3, "total": 6.8}
+    d.optimized = [p]
+    text = "\n".join(headline(d))
+    assert "Boss damage: +10.3%" in text and "pad +6.8%" in text
+    assert "Ascendance, Vile Vial: keep for Venomous Heart if it comes within 60 s" in text
+    assert "Stormkeeper: only on add waves" in text
+    assert "trinket1" not in text and "secondary" not in text and "hold vulnerable" not in text
 
 
 def test_render_prep_sheet_with_wowhead_links():
