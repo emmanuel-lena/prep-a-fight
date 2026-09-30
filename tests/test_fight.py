@@ -23,6 +23,17 @@ def test_to_simc():
     assert any("movement,first=120,cooldown=9999,duration=6" in e for e in events)
 
 
+def test_adds_alive_when_the_boss_comes_back_are_split():
+    f = Fight("B", 400, add_waves=[AddWave(148, 1, 114, "Echo", scalable=False), AddWave(10, 3, 20, "Amani"),
+                                   AddWave(250, 2, 30, "Late")],
+              invulnerable=[Window(158.7, 103)])
+    events = [e for e in f.raid_event_lines() if "adds" in e]
+    assert "first=10,duration=20" in events[0]  # untouched
+    assert "first=148,duration=112.7" in events[1]  # dies 1 s before the boss comes back at 261.7; 0.3 s left: gone
+    assert "first=250,duration=10.7" in events[2] and "first=262.2,duration=17.8" in events[3]  # split
+    assert len(events) == 4
+
+
 def test_no_lust():
     f = example()
     f.lust_time = None

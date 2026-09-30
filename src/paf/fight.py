@@ -75,16 +75,37 @@ class Fight:
     # possible amps detected in the logs (auras on the boss): not simulated until confirmed in the boss notes
     candidate_vulnerable: list[Vulnerable] = field(default_factory=list)
 
+    def _spawns(self) -> list[tuple[float, float, AddWave]]:
+        """(spawn, lifetime, wave) as simulated. SimC never goes back to the boss if an add is still alive when
+        an invulnerability ends (retarget=1; verified on Nek'zali: 0 DPS until the end), so an add alive at that
+        moment dies 1 s before the boss comes back and, if it outlives it, respawns 0.5 s after."""
+        out = []
+        for w in sorted(self.add_waves, key=lambda w: w.time):
+            parts = [(w.time, w.time + w.lifetime)]
+            for inv in self.invulnerable:
+                back = inv.start + inv.duration
+                nxt = []
+                for a, b in parts:
+                    if a < back - 1 and b > back - 1:
+                        nxt.append((a, back - 1))
+                        if b > back + 1.5:
+                            nxt.append((back + 0.5, b))
+                    else:
+                        nxt.append((a, b))
+                parts = nxt
+            out += [(a, b - a, w) for a, b in parts if b - a >= 1]
+        return out
+
     def raid_event_lines(self, add_scale: float | None = None, movement_scale: float | None = None) -> list[str]:
         scale = self.add_scale if add_scale is None else add_scale
         mscale = self.movement_scale if movement_scale is None else movement_scale
         moves = [Window(w.start, w.duration * mscale, w.distance * mscale) for w in self.movement]
         moves = [w for w in moves if w.duration >= 0.5 or w.distance] + list(self.personal_movement)
         events: list[str] = []
-        for i, w in enumerate(sorted(self.add_waves, key=lambda w: w.time), 1):
+        for i, (t, life, w) in enumerate(self._spawns(), 1):
             count = max(1, round(w.count * scale)) if w.scalable else w.count
-            events.append(f"adds,name=wave{i},count={count},first={fmt(round(w.time, 1))},"
-                          f"duration={fmt(round(w.lifetime, 1))},cooldown=9999")
+            events.append(f"adds,name=wave{i},count={count},first={fmt(round(t, 1))},"
+                          f"duration={fmt(round(life, 1))},cooldown=9999")
         for w in self.invulnerable:  # retarget: without it the player keeps hitting the immune boss
             events.append(f"invulnerable,first={fmt(round(w.start, 1))},"
                           f"duration={fmt(round(w.duration, 1))},cooldown=9999,retarget=1")
