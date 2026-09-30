@@ -25,3 +25,18 @@ def test_render_html_contains_rows_and_escapes_names():
     assert "Boss &lt;X&gt;" in page
     assert page.count("<circle") == 2  # utility abilities are not drawn on player rows
     assert "Big Hit" in page and "Defensives, movement and utility" in page
+
+
+def test_target_segments_and_rows():
+    from paf.corpus.timeline import target_kind, target_segments
+
+    assert target_kind("Zul'jan", True, "zul'jan") == ""
+    assert target_kind("Hex Lord", True, "Zul'jan") == "Hex Lord"
+    assert target_kind("Soulcoiler", False, "Zul'jan") == "adds"
+    casts = [(0.0, ""), (2.0, ""), (4.0, "Hex Lord"), (6.0, "Hex Lord"), (30.0, "adds")]
+    assert target_segments(casts) == [(0.0, 5.5, ""), (4.0, 7.5, "Hex Lord"), (30.0, 31.5, "adds")]
+    tl = Timeline(boss="Zul'jan", difficulty="heroic", spec="Elemental", kills=1, duration=60, phases=[], waves=[],
+                  abilities=[], players=[{"rank": 1, "dps": 1, "ilvl": 1, "duration": 60, "casts": {},
+                                          "targets": target_segments(casts)}])
+    page = render_html(tl)
+    assert "On Hex Lord" in page and "On adds" in page and "on Hex Lord" in page

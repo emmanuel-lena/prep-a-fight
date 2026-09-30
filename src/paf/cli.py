@@ -254,11 +254,14 @@ def cmd_timeline(args: argparse.Namespace) -> int:
     from paf import settings
     from paf.config import data_dir
     from paf.corpus import db
+    from paf.corpus.collect import backfill_npc_actors
     from paf.corpus.template import _slug
     from paf.corpus.timeline import build_timeline, render_html
 
     client, enc, diff_name, diff = _encounter_and_difficulty(args)
-    tl = build_timeline(db.connect(), enc.id, diff, enc.name, diff_name, settings.get("spec"), top=args.top)
+    con = db.connect()
+    backfill_npc_actors(client, con, enc.id, diff)
+    tl = build_timeline(con, enc.id, diff, enc.name, diff_name, settings.get("spec"), top=args.top)
     if tl.kills == 0:
         print(f"No kills in the corpus for {enc.name} {diff_name}: run `paf corpus \"{enc.name}\"` first.")
         return 1
@@ -743,6 +746,9 @@ def cmd_prep(args: argparse.Namespace) -> int:
     d.sim_boss_dps = real.baseline["prioritydps"].mean if "prioritydps" in real.baseline else None
 
     step("Cooldown timelines of the top players")
+    from paf.corpus.collect import backfill_npc_actors
+
+    backfill_npc_actors(client, con, enc.id, diff)
     tl = build_timeline(con, enc.id, diff, enc.name, diff_name, spec, top=25)
     reports = data_dir() / "reports"
     reports.mkdir(parents=True, exist_ok=True)

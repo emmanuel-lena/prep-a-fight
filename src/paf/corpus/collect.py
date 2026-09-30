@@ -189,6 +189,7 @@ def parse_kill(rep: dict[str, Any], fight_id: int, ranked_name: str | None,
         "abilities": [(a["gameID"], a["name"]) for a in (rep.get("masterData") or {}).get("abilities") or []],
         "ranked_actor": None,
     }
+    out["npc_actors"] = [(n["id"], n["gameID"]) for n in f.get("enemyNPCs") or []]
     for n in f.get("enemyNPCs") or []:
         a = actors.get(n["id"], {})
         out["npcs"].append((n["gameID"], a.get("name", ""), int(n["id"] in boss_ids)))
@@ -314,6 +315,8 @@ def write_kill(con: sqlite3.Connection, report: str, fight_id: int, p: dict[str,
                 "difficulty=COALESCE(?, difficulty) WHERE report=? AND fight_id=?",
                 (fi["duration_s"], fi["kill"], fi["avg_ilvl"], fi["size"], fi["difficulty"], *fk))
     con.executemany("INSERT OR REPLACE INTO npc VALUES(?,?,?)", p["npcs"])
+    con.executemany("INSERT OR REPLACE INTO npc_actor VALUES(?,?,?)",
+                    [(report, *r) for r in p.get("npc_actors", [])])
     con.executemany("INSERT OR IGNORE INTO ability VALUES(?,?)", p["abilities"])
     con.executemany("INSERT INTO phase VALUES(?,?,?,?,?,?)", [(*fk, *r) for r in p["phases"]])
     con.executemany("INSERT OR REPLACE INTO add_instance VALUES(?,?,?,?,?,?,?,?)",
@@ -340,6 +343,30 @@ def write_kill(con: sqlite3.Connection, report: str, fight_id: int, p: dict[str,
     con.execute("UPDATE fight SET status='done', error=NULL, fetched_at=? WHERE report=? AND fight_id=?",
                 (_now(), *fk))
     con.commit()
+
+
+NPC_ACTORS_QUERY = """query($code:String!){ reportData { report(code:$code) {
+  masterData { actors(type:"NPC") { id gameID } } } } }"""
+
+
+def backfill_npc_actors(client: WCLClient, con: sqlite3.Connection, encounter_id: int, difficulty: int,
+                        log: Callable[[str], None] = lambda s: print(s, flush=True)) -> int:
+    """Enemy actor -> NPC for kills collected before npc_actor existed (1 small query per report)."""
+    todo = [r[0] for r in con.execute(
+        "SELECT DISTINCT f.report FROM fight f WHERE f.encounter_id=? AND f.difficulty=? AND f.status='done' "
+        "AND NOT EXISTS (SELECT 1 FROM npc_actor n WHERE n.report=f.report)", (encounter_id, difficulty))]
+    if todo:
+        log(f"  mapping enemy units of {len(todo)} reports...")
+    for code in todo:
+        try:
+            rep = client.query(NPC_ACTORS_QUERY, {"code": code}, cache_ttl=0)["reportData"]["report"] or {}
+        except (WCLError, KeyError, TypeError, OSError) as e:
+            log(f"  skipped: {str(e)[:100]}")
+            continue
+        rows = [(code, a["id"], a["gameID"]) for a in (rep.get("masterData") or {}).get("actors") or []]
+        con.executemany("INSERT OR REPLACE INTO npc_actor VALUES(?,?,?)", rows)
+        con.commit()
+    return len(todo)
 
 
 def collect(client: WCLClient, con: sqlite3.Connection, enc: Encounter, difficulty: int, *,

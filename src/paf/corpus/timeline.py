@@ -8,7 +8,7 @@ import statistics as st
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from paf.corpus.analyze import _q, canonical_waves, fight_waves, kills_filter
+from paf.corpus.analyze import _q, canonical_waves, fight_waves, kills_filter, main_boss
 
 MAX_CASTS_PER_MIN = 2.6  # abilities cast more often than this are rotation, not cooldowns
 MIN_USERS = 0.3  # an ability must be used by at least 30% of the players to be shown
@@ -25,6 +25,7 @@ UTILITY_HINTS = ("astral shift", "gust of wind", "ghost wolf", "spiritwalker", "
                  "heroic leap", "intervene", "defensive stance")
 PALETTE = ["#e8590c", "#1c7ed6", "#2f9e44", "#ae3ec9", "#f59f00", "#d6336c", "#15aabf", "#5c7cfa",
            "#74b816", "#fd7e14", "#0ca678", "#be4bdb", "#868e96", "#fab005"]
+TARGET_PALETTE = ["#ae3ec9", "#1c7ed6", "#d6336c", "#f59f00"]  # other boss units; adds are green
 
 
 @dataclass
@@ -49,6 +50,31 @@ class Timeline:
     abilities: list[Ability]
     players: list[dict] = field(default_factory=list)  # rank, dps, ilvl, duration, casts {ability: [t]}
     boss_casts: list[tuple[str, list[float]]] = field(default_factory=list)  # ability name, median times
+    main_boss: str = ""  # the unit taking most of the damage (the encounter can be named otherwise)
+
+
+TARGET_GAP = 6.0  # seconds: a target segment ends this long after its last cast when nothing follows
+ADDS = "adds"
+
+
+def target_kind(name: str, is_boss: bool, boss_name: str) -> str:
+    """'' for the main boss, the unit's name for another boss unit (a second boss, a heart...), 'adds' else."""
+    if name.lower() == boss_name.lower():
+        return ""
+    return name if is_boss else ADDS
+
+
+def target_segments(casts: list[tuple[float, str]]) -> list[tuple[float, float, str]]:
+    """Casts (t, target kind) -> (start, end, kind) segments of consecutive casts on the same kind of target."""
+    out: list[list] = []
+    for t, kind in sorted(casts):
+        if out and out[-1][2] == kind and t - out[-1][1] <= TARGET_GAP:
+            out[-1][1] = t
+        else:
+            if out and t - out[-1][1] <= TARGET_GAP:
+                out[-1][1] = t  # the previous segment lasts until the switch
+            out.append([t, t, kind])
+    return [(a, b + 1.5, k) for a, b, k in out]
 
 
 def build_timeline(con: sqlite3.Connection, encounter_id: int, difficulty: int, boss_name: str,
@@ -58,16 +84,23 @@ def build_timeline(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
     keys = sorted((r["report"], r["fight_id"]) for r in fights)
     duration = st.median(r["duration_s"] for r in fights) if fights else 0
     names = dict(con.execute("SELECT id, name FROM ability").fetchall())
+    main = main_boss(con, encounter_id, difficulty, boss_name)
 
     ranked = con.execute(
         f"SELECT r.* FROM ranked r JOIN fight f USING(report, fight_id) WHERE {where} AND r.spec=? "
         f"AND r.actor_id IS NOT NULL ORDER BY r.rank_pos", (*params, spec)).fetchall()
     casts: dict[tuple[str, int], dict[int, list[float]]] = defaultdict(lambda: defaultdict(list))
+    targets: dict[tuple[str, int], list[tuple[float, str]]] = defaultdict(list)
     for c in con.execute(
-            f"SELECT c.report, c.fight_id, c.ability_id, c.t FROM player_cast c JOIN fight f USING(report, fight_id) "
-            f"JOIN ranked r USING(report, fight_id) WHERE {where} AND c.actor_id=r.actor_id AND r.spec=? "
-            f"AND c.type='cast' ORDER BY c.t", (*params, spec)):
-        casts[(c["report"], c["fight_id"])][c["ability_id"]].append(c["t"])
+            f"SELECT c.report, c.fight_id, c.ability_id, c.t, n.name AS target, n.is_boss FROM player_cast c "
+            f"JOIN fight f USING(report, fight_id) JOIN ranked r USING(report, fight_id) "
+            f"LEFT JOIN npc_actor a ON a.report=c.report AND a.actor_id=c.target_id "
+            f"LEFT JOIN npc n ON n.game_id=a.game_id "
+            f"WHERE {where} AND c.actor_id=r.actor_id AND r.spec=? AND c.type='cast' ORDER BY c.t", (*params, spec)):
+        k = (c["report"], c["fight_id"])
+        casts[k][c["ability_id"]].append(c["t"])
+        if c["target"]:
+            targets[k].append((c["t"], target_kind(c["target"], bool(c["is_boss"]), main)))
 
     n = len(casts) or 1
     counts: dict[int, list[int]] = defaultdict(list)
@@ -91,7 +124,8 @@ def build_timeline(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
         k = (r["report"], r["fight_id"])
         dur = next((f["duration_s"] for f in fights if (f["report"], f["fight_id"]) == k), duration)
         players.append({"rank": r["rank_pos"], "dps": r["dps"], "ilvl": r["ilvl"], "duration": dur,
-                        "casts": {a: ts for a, ts in casts.get(k, {}).items() if a in shown}})
+                        "casts": {a: ts for a, ts in casts.get(k, {}).items() if a in shown},
+                        "targets": target_segments(targets.get(k, []))})
 
     phases: dict[int, list] = defaultdict(list)
     for r in con.execute(f"SELECT p.* FROM phase p JOIN fight f USING(report, fight_id) WHERE {where}", params):
@@ -134,7 +168,7 @@ def build_timeline(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
     boss_casts.sort(key=lambda x: x[1][0])
 
     return Timeline(boss_name, diff_name, spec, len(keys), duration, phase_rows, waves, abilities, players,
-                    boss_casts)
+                    boss_casts, main)
 
 
 def _mmss(s: float) -> str:
@@ -208,10 +242,27 @@ def render_html(tl: Timeline, px_per_s: float = 1.6) -> str:
         (util if ab.utility else agg).append(
             row(ab.name, body, h=24, sub=f"{ab.users:.0%} use it, {ab.per_kill:g}/kill"))
 
+    # targets: when the top players leave the main boss (share of players, per bin)
+    kinds = sorted({k for p in tl.players for _, _, k in p.get("targets", []) if k}, key=lambda k: (k == ADDS, k))
+    tcolor = {k: ("#2f9e44" if k == ADDS else TARGET_PALETTE[i % len(TARGET_PALETTE)]) for i, k in enumerate(kinds)}
+    for k in kinds:
+        bins = []
+        for i in range(nb):
+            mid = i * BIN + BIN / 2
+            alive = [p for p in tl.players if p["duration"] > mid]
+            on = sum(any(a <= mid <= b and kk == k for a, b, kk in p.get("targets", [])) for p in alive)
+            bins.append(on / len(alive) if alive else 0)
+        body = "".join(f'<rect x="{x(i * BIN)}" y="{22 - 20 * v:.1f}" width="{x(BIN) - 0.5}" height="{20 * v:.1f}" '
+                       f'fill="{tcolor[k]}"><title>{_mmss(i * BIN)}: {v:.0%} of the players on {e(k)}</title></rect>'
+                       for i, v in enumerate(bins) if v)
+        parts.append(row(f"On {k}", body, h=24, sub="share of top players"))
+
     # per player
     players = [ruler()]
     for p in tl.players:
-        body = []
+        body = [f'<rect x="{x(a)}" y="18.5" width="{max(1, x(b) - x(a))}" height="3.5" fill="{tcolor[k]}">'
+                f'<title>{e(k)} {_mmss(a)}-{_mmss(b)}</title></rect>'
+                for a, b, k in p.get("targets", []) if k]
         for ab in [a for a in tl.abilities if not a.utility]:
             for t in p["casts"].get(ab.id, []):
                 body.append(f'<circle cx="{x(t)}" cy="11" r="4.5" fill="{ab.color}">'
@@ -222,6 +273,10 @@ def render_html(tl: Timeline, px_per_s: float = 1.6) -> str:
 
     legend = "".join(f'<span class="lg"><i style="background:{a.color}"></i>{e(a.name)}</span>'
                      for a in tl.abilities if not a.utility)
+    tlegend = "".join(f'<span class="lg"><i style="background:{c};border-radius:1px;height:4px"></i>on {e(k)}</span>'
+                      for k, c in tcolor.items())
+    if tlegend:
+        tlegend = f'<div>Target strip under each player (nothing = on {e(tl.main_boss or tl.boss)}): {tlegend}</div>'
     lust_note = ""
     return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>{e(tl.boss)} timelines</title>
@@ -252,7 +307,7 @@ abilities used by at least {MIN_USERS:.0%} of players and cast at most {MAX_CAST
 <h2>The fight</h2><div class="scroll">{"".join(parts)}</div>
 <h2>When the top players use each cooldown ({len(tl.players)} players, {BIN}s bins)</h2>
 <div class="scroll">{"".join(agg)}</div>
-<h2>Top players, one row each (rank, DPS): offensive cooldowns</h2><div class="scroll">{"".join(players)}</div>
+<h2>Top players, one row each (rank, DPS): offensive cooldowns</h2>{tlegend}<div class="scroll">{"".join(players)}</div>
 <h2>Defensives, movement and utility</h2>
 <p>Movement abilities show where the fight forces players to move.</p>
 <div class="scroll">{"".join(util)}</div>
