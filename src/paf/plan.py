@@ -127,6 +127,24 @@ def apply_plan(fight: Fight, plan: Plan, offsets: dict[int, float] | None = None
     return f
 
 
+def describe_plan(plan: Plan) -> list[str]:
+    """The plan's own actions (assignments aside), in the player's words."""
+    out = []
+    for m in plan.moves:
+        what = f"{m.distance:g} yards" if m.distance else f"{m.duration:g}s"
+        shift = f" (can shift {m.shift_min:+g}..{m.shift_max:+g}s)" if m.shiftable else ""
+        out.append(f"You move {what} at {mmss(m.start)}{shift}")
+    if plan.no_lust:
+        out.append("No Bloodlust")
+    elif plan.lust is not None:
+        out.append(f"Bloodlust at {mmss(plan.lust)}")
+    if plan.pi is not None:
+        out.append("Power Infusion at " + (", ".join(mmss(t) for t in plan.pi) or "none"))
+    if not plan.keep_template_movement:
+        out.append("Movement inferred from the top players ignored")
+    return out
+
+
 def plan_template(fight: Fight) -> str:
     """Starting plan file: instructions plus the fight's events as comments."""
     lines = [

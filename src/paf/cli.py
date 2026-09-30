@@ -732,10 +732,11 @@ def cmd_prep(args: argparse.Namespace) -> int:
                for w in fight.add_waves]
     d.waves += [(v.start, 0, v.duration, f"{v.name}: boss takes x{v.multiplier:g} damage") for v in fight.vulnerable]
     d.waves.sort()
-    planned, ppath = _fight_with_plan(enc, diff_name)
+    described: list[str] = []
+    planned, ppath = _fight_with_plan(enc, diff_name, described)
     if ppath is not None:
         fight = planned
-        d.assigns = [f"from your plan {ppath.name}"]
+        d.assigns = described or [f"from your plan {ppath.name}"]
     d.fight = fight
 
     step("Simming your character on the fight")
@@ -862,10 +863,11 @@ def cmd_prep(args: argparse.Namespace) -> int:
     return 0
 
 
-def _fight_with_plan(enc, diff_name: str):
-    """The boss template with the user's plan file applied (moves, lust, PI), if there is one."""
+def _fight_with_plan(enc, diff_name: str, described: list[str] | None = None):
+    """The boss template with the user's plan file applied (moves, lust, PI, assignments), if there is one.
+    `described` receives what was applied, in the player's words."""
     from paf.corpus.template import template_path
-    from paf.plan import apply_plan, parse_plan
+    from paf.plan import apply_plan, describe_plan, parse_plan
 
     fpath = template_path(enc.name, diff_name)
     if not fpath.is_file():
@@ -876,6 +878,7 @@ def _fight_with_plan(enc, diff_name: str):
         plan = parse_plan(ppath.read_text(encoding="utf-8"))
         if not plan.empty:
             fight = apply_plan(fight, plan)
+            notes = []
             if plan.assigns:
                 from paf import settings
                 from paf.assigns import apply_assigns, load_mechanics
@@ -885,6 +888,8 @@ def _fight_with_plan(enc, diff_name: str):
                 fight, notes = apply_assigns(fight, mechs, plan.assigns)
                 for n in notes:
                     print(f"  assign: {n}")
+            if described is not None:
+                described += [f"Assignment: {n}" for n in notes] + describe_plan(plan)
             return fight, ppath
     return fight, None
 

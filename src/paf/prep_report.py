@@ -232,7 +232,8 @@ def headline(d: PrepData) -> list[str]:
     if d.gear:
         changes, _, w = d.gear[0]
         if w > 2 * d.gear_error:
-            out.append(f"Gear ({w:+.2f}%): " + "\n".join(changes.split("; ")))
+            out.append(f"Gear for this fight{' with your assignments' if d.assigns else ''} ({w:+.2f}%): "
+                       + "\n".join(changes.split("; ")))
         else:
             out.append("Gear: your equipped set is already the best among your items on this fight.")
     if d.loot:
@@ -396,8 +397,10 @@ SimC does not know that a secondary target must die fast, so compare with the si
         body = "".join(f"<tr><td class='small'>{lk(ch)}</td><td class='n'>{_pct(w)}</td>"
                        + "".join(f"<td class='n'>{_pct(per.get(f))}</td>" for f in d.gear_fights) + "</tr>"
                        for ch, per, w in d.gear[:8])
-        parts.append(f"""<h2>Best gear from your bags</h2><div class="card scroll">
-<p class="small muted">Simmed {e(d.gear_plan or 'with the default priority list')}.</p>
+        mine = ("on the fight with your assignments and plan: " + "; ".join(d.assigns)) if d.assigns else \
+            "on the fight without personal assignments (tick yours in `paf serve` to see if they change your gear)"
+        parts.append(f"""<h2>Best gear from your bags, for this fight</h2><div class="card scroll">
+<p class="small">Simmed {e(d.gear_plan or 'with the default priority list')}, {e(mine)}.</p>
 <table><tr><th>Changes vs equipped</th><th>Weighted</th>{head}</tr>{body}</table>
 <p class="small muted">Statistical error about +/-{d.gear_error:.2f}%.</p></div>""")
 

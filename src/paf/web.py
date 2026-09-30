@@ -205,12 +205,14 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
             mechs = load_mechanics(con, enc.id, diff, spec)
         except Exception:  # noqa: BLE001
             mechs = []
+    current = {a.lower() for a in current_assigns(enc, difficulty)}
     if mechs:
         rows = ""
         for m in mechs:
             when = ", ".join(f"{int(t // 60)}:{int(t % 60):02d}" for t in m.times[:6])
             what = "kick" if m.kind == "interrupt" else f"{m.players_per_kill:.0f} players / kill"
-            rows += (f'<tr><td><label><input type="checkbox" name="assign" value="{e(m.name)}"> {e(m.name)}</label></td>'
+            checked = " checked" if m.name.lower() in current or m.key in current else ""
+            rows += (f'<tr><td><label><input type="checkbox" name="assign" value="{e(m.name)}"{checked}> {e(m.name)}</label></td>'
                      f"<td>{what}</td><td>{m.cost:g}s moving</td><td class='small'>{when}</td></tr>")
         assigns = f"""<table><tr><th>Mechanic</th><th>Who</th><th>Cost for {e(spec)}</th><th>When</th></tr>{rows}</table>"""
     elif kills:
@@ -220,15 +222,65 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
         assigns = ('<p class="muted">No kill collected yet: the prep starts by collecting ~200 ranked kills from '
                    'Warcraft Logs (a few minutes to an hour depending on your API quota).</p>')
     body = f"""<h1>{e(enc.name)} <span class="muted">({e(difficulty)})</span></h1>
-<p class="muted">{kills} kills in your corpus.</p>
+<p class="muted">{kills} kills in your corpus.{prepared_link(enc, difficulty)}</p>
 <form method="post" action="/prep">
 <input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
 <h2>3. Your assignments</h2><div class="card">{assigns}</div>
 <h2>4. Options</h2><div class="card">
 <label><input type="checkbox" name="gear" checked> Top Gear with your bags and this boss's loot (slower)</label>
 <label><input type="checkbox" name="optimize" checked> Ideal cooldown plan per objective (slowest, 20-40 min)</label>
-</div><p><button>Prepare this fight</button></p></form>{notes_block(enc, difficulty)}"""
+</div><p><button>Prepare this fight</button></p></form>{plan_block(enc, difficulty)}{notes_block(enc, difficulty)}"""
     return page(enc.name, body)
+
+
+def prepared_link(enc, difficulty: str) -> str:
+    from paf.corpus.template import _slug
+
+    key = f"{_slug(enc.name)}-{difficulty}"
+    return f' <a href="/view/{e(key)}">Open the last prep sheet</a>.' if any(
+        x["key"] == key for x in prepared()) else ""
+
+
+def _plan_path(enc, difficulty: str) -> Path:
+    from paf.corpus.template import template_path
+
+    return template_path(enc.name, difficulty).with_suffix(".plan.txt")
+
+
+def current_assigns(enc, difficulty: str) -> list[str]:
+    from paf.plan import parse_plan
+
+    p = _plan_path(enc, difficulty)
+    if not p.is_file():
+        return []
+    try:
+        return parse_plan(p.read_text(encoding="utf-8-sig")).assigns
+    except ValueError:
+        return []
+
+
+def plan_block(enc, difficulty: str) -> str:
+    """The player's own fight plan (moves, lust, PI), editable; assignments are the ticked mechanics above."""
+    from paf.corpus.template import template_path
+    from paf.fight import Fight
+    from paf.plan import plan_template
+
+    p = _plan_path(enc, difficulty)
+    if p.is_file():
+        text = p.read_text(encoding="utf-8-sig")
+    elif template_path(enc.name, difficulty).is_file():
+        text = plan_template(Fight.load(template_path(enc.name, difficulty)))
+    else:
+        return ('<h2>Your fight plan</h2><div class="card muted">Available after the first prep: your own movements '
+                "(a soak at 2:45, a dodge...), Bloodlust and Power Infusion timings, on top of the rebuilt fight.</div>")
+    return f"""<h2>Your fight plan</h2><div class="card">
+<p class="small muted">What you do on this fight that the logs cannot guess, one line each: <code>2:45 move 6</code>
+(6 s of movement), <code>5:30 move 8 shift -5..+5</code> (the optimizer picks the best moment), <code>lust 0:00</code>,
+<code>pi 0:20 2:30</code>, <code>no boss-movement</code>. The mechanics ticked above are added as <code>assign</code> lines.
+Every sim of the prep (gear, talents, cooldowns) runs on this fight.</p>
+<form method="post" action="/plan"><input type="hidden" name="boss" value="{enc.id}">
+<input type="hidden" name="difficulty" value="{e(difficulty)}"><textarea name="plan">{e(text)}</textarea>
+<p><button>Save the plan</button></p></form></div>"""
 
 
 def notes_block(enc, difficulty: str) -> str:
@@ -359,6 +411,24 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 enc = next(x for x in raid_encounters(WCLClient()) if x.id == boss_id)
                 notes_path(template_path(enc.name, difficulty)).write_text(text, encoding="utf-8")
+                self._redirect(f"/boss?boss={boss_id}&difficulty={difficulty}")
+            elif self.path == "/plan":
+                from paf.encounters import raid_encounters
+                from paf.plan import parse_plan
+                from paf.wcl import WCLClient
+
+                boss_id = int(form["boss"][0])
+                difficulty = form.get("difficulty", ["heroic"])[0]
+                text = (form.get("plan") or [""])[0].replace("\r\n", "\n")
+                try:
+                    parse_plan(text)
+                except ValueError as ex:
+                    self._send(page("Invalid plan", f"<p>{e(str(ex))}. <a href='javascript:history.back()'>Back</a></p>"), 400)
+                    return
+                enc = next(x for x in raid_encounters(WCLClient()) if x.id == boss_id)
+                p = _plan_path(enc, difficulty)
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text(text, encoding="utf-8")
                 self._redirect(f"/boss?boss={boss_id}&difficulty={difficulty}")
             elif self.path == "/prep":
                 from paf.corpus.template import _slug
