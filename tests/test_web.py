@@ -51,6 +51,23 @@ def test_reports_are_served_and_other_files_are_not(server):
         fetch(url + "/report/..%2F..%2Fsecret.txt")
 
 
+def test_prepared_bosses_and_view_tabs(tmp_path, monkeypatch):
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    rep = tmp_path / "reports"
+    rep.mkdir()
+    (rep / "prep-the-altar-heroic.html").write_text("<title>The Altar prep</title>")
+    (rep / "timeline-the-altar-heroic.html").write_text("<title>The Altar timelines</title>")
+    (rep / "timeline-other-mythic.html").write_text("<title>Other timelines</title>")
+    items = {x["key"]: x for x in web.prepared()}
+    assert items["the-altar-heroic"]["name"] == "The Altar" and items["the-altar-heroic"]["difficulty"] == "heroic"
+    assert set(items["the-altar-heroic"]["files"]) == {"prep", "timeline"}
+    page = web.view_page("the-altar-heroic", "timeline").decode()
+    assert 'src="/report/timeline-the-altar-heroic.html"' in page and "Prep sheet" in page
+    # only a timeline: the prep tab falls back to it
+    assert 'src="/report/timeline-other-mythic.html"' in web.view_page("other-mythic", "prep").decode()
+    assert "Your prepared bosses" in web.prepared_block()
+
+
 def test_write_assigns_keeps_other_lines(tmp_path, monkeypatch):
     monkeypatch.setenv("PAF_HOME", str(tmp_path))
 

@@ -767,6 +767,16 @@ def cmd_prep(args: argparse.Namespace) -> int:
     for ab in tl_all.abilities:  # when the top players cast each cooldown (for the plan timelines)
         d.tops_casts[cd_key_of(ab.name)] = [t for p in tl_all.players for t in p["casts"].get(ab.id, [])]
     d.tops_players = len(tl_all.players)
+    from paf.wowhead import profile_refs, spell_ref
+
+    d.links.update(profile_refs(profile))
+    for ab in tl_all.abilities:
+        d.links.setdefault(ab.name, spell_ref(ab.id))
+        d.links.setdefault(cd_key_of(ab.name), spell_ref(ab.id))  # cooldown keys of the plans
+    for slot in ("trinket1", "trinket2", "main_hand"):
+        it = profile.equipped.get(slot)
+        if it and it.name in d.links:
+            d.links[f"use_item:{slot}"] = d.links[it.name]
     d.alignment = tops_alignment_safe(tl_all, fight)
     if args.no_optimize:
         step("Cooldown plans")
@@ -828,6 +838,10 @@ def cmd_prep(args: argparse.Namespace) -> int:
                                          objective=args.objective)
             ranked_items = sorted(items, key=lambda i: -real.get(i.item_id, i.deltas.get("boss fight", -1e9)))
             d.loot = [(i.name, i.slot, i.deltas.get("boss fight", 0.0), real.get(i.item_id)) for i in ranked_items]
+            from paf.wowhead import item_ref
+
+            for i in ranked_items:
+                d.links.setdefault(i.name, item_ref(i.item_id, ilvl))
             d.loot_ilvl = ilvl
             d.loot_error = max((i.error for i in ranked_items[:12]), default=0.0)
 

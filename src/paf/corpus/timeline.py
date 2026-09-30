@@ -9,6 +9,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 from paf.corpus.analyze import _q, canonical_waves, fight_waves, kills_filter, main_boss
+from paf.wowhead import SCRIPT as WH_SCRIPT
+from paf.wowhead import link, spell_ref
 
 MAX_CASTS_PER_MIN = 2.6  # abilities cast more often than this are rotation, not cooldowns
 MIN_USERS = 0.3  # an ability must be used by at least 30% of the players to be shown
@@ -51,6 +53,7 @@ class Timeline:
     players: list[dict] = field(default_factory=list)  # rank, dps, ilvl, duration, casts {ability: [t]}
     boss_casts: list[tuple[str, list[float]]] = field(default_factory=list)  # ability name, median times
     main_boss: str = ""  # the unit taking most of the damage (the encounter can be named otherwise)
+    boss_spell_ids: dict[str, int] = field(default_factory=dict)  # boss ability name -> spell id (Wowhead links)
 
 
 TARGET_GAP = 6.0  # seconds: a target segment ends this long after its last cast when nothing follows
@@ -151,12 +154,14 @@ def build_timeline(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
         f"SELECT a.report, a.fight_id, a.actor_id FROM add_instance a JOIN fight f USING(report, fight_id) "
         f"WHERE {where}", params)}
     per_ab: dict[str, dict[tuple[str, int], list[float]]] = defaultdict(lambda: defaultdict(list))
+    spell_ids: dict[str, int] = {}
     for c in con.execute(
             f"SELECT e.report, e.fight_id, e.source_id, e.ability_id, e.t FROM enemy_cast e "
             f"JOIN fight f USING(report, fight_id) WHERE {where} AND e.type='cast' AND e.source_id >= 0", params):
         if (c["report"], c["fight_id"], c["source_id"]) not in add_actors:
             nm = names.get(c["ability_id"]) or f"spell {c['ability_id']}"
             per_ab[nm][(c["report"], c["fight_id"])].append(c["t"])
+            spell_ids.setdefault(nm, c["ability_id"])
     boss_casts = []
     for a, per_kill in per_ab.items():
         if len(per_kill) / max(1, len(keys)) < 0.8:
@@ -168,7 +173,7 @@ def build_timeline(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
     boss_casts.sort(key=lambda x: x[1][0])
 
     return Timeline(boss_name, diff_name, spec, len(keys), duration, phase_rows, waves, abilities, players,
-                    boss_casts, main)
+                    boss_casts, main, spell_ids)
 
 
 def _mmss(s: float) -> str:
@@ -193,12 +198,12 @@ def render_html(tl: Timeline, px_per_s: float = 1.6) -> str:
         return (f'<div class="row"><div class="label" style="height:16px"></div>'
                 f'<svg width="{W}" height="16">{axis()}{body}</svg></div>')
 
-    def row(label: str, body: str, h: int = 22, sub: str = "") -> str:
+    def row(label: str, body: str, h: int = 22, sub: str = "", ref: str | None = None) -> str:
         if sub:
             h = max(h, 32)
         subl = f'<div class="sub">{e(sub)}</div>' if sub else ""
         dy = (h - 22) / 2
-        return (f'<div class="row"><div class="label" style="height:{h}px"><div>{e(label)}</div>{subl}</div>'
+        return (f'<div class="row"><div class="label" style="height:{h}px"><div>{link(label, ref)}</div>{subl}</div>'
                 f'<svg width="{W}" height="{h}">{axis()}<g transform="translate(0,{dy})">{body}</g></svg></div>')
 
     parts: list[str] = [ruler()]
@@ -223,7 +228,8 @@ def render_html(tl: Timeline, px_per_s: float = 1.6) -> str:
     for name, times in tl.boss_casts[:12]:
         body = "".join(f'<line x1="{x(t)}" y1="4" x2="{x(t)}" y2="18" class="bc"><title>{_mmss(t)}</title></line>'
                        for t in times)
-        parts.append(row(name, body, h=22))
+        sid = tl.boss_spell_ids.get(name)
+        parts.append(row(name, body, h=22, ref=spell_ref(sid) if sid else None))
 
     # aggregated cooldown usage
     agg = [ruler()]
@@ -240,7 +246,7 @@ def render_html(tl: Timeline, px_per_s: float = 1.6) -> str:
                        f'height="{20 * v / peak:.1f}" fill="{ab.color}"><title>{_mmss(i * BIN)}: {v} casts'
                        f'</title></rect>' for i, v in enumerate(bins) if v)
         (util if ab.utility else agg).append(
-            row(ab.name, body, h=24, sub=f"{ab.users:.0%} use it, {ab.per_kill:g}/kill"))
+            row(ab.name, body, h=24, sub=f"{ab.users:.0%} use it, {ab.per_kill:g}/kill", ref=spell_ref(ab.id)))
 
     # targets: when the top players leave the main boss (share of players, per bin)
     kinds = sorted({k for p in tl.players for _, _, k in p.get("targets", []) if k}, key=lambda k: (k == ADDS, k))
@@ -271,7 +277,7 @@ def render_html(tl: Timeline, px_per_s: float = 1.6) -> str:
         players.append(row(f"#{p['rank']}  {p['dps'] / 1000:,.0f}k", "".join(body) + end,
                            sub=f"ilvl {p['ilvl']:g}, {_mmss(p['duration'])}"))
 
-    legend = "".join(f'<span class="lg"><i style="background:{a.color}"></i>{e(a.name)}</span>'
+    legend = "".join(f'<span class="lg"><i style="background:{a.color}"></i>{link(a.name, spell_ref(a.id))}</span>'
                      for a in tl.abilities if not a.utility)
     tlegend = "".join(f'<span class="lg"><i style="background:{c};border-radius:1px;height:4px"></i>on {e(k)}</span>'
                       for k, c in tcolor.items())
@@ -279,8 +285,9 @@ def render_html(tl: Timeline, px_per_s: float = 1.6) -> str:
         tlegend = f'<div>Target strip under each player (nothing = on {e(tl.main_boss or tl.boss)}): {tlegend}</div>'
     lust_note = ""
     return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
-<title>{e(tl.boss)} timelines</title>
+<title>{e(tl.boss)} timelines</title>{WH_SCRIPT}
 <style>
+a.wh{{color:inherit;text-decoration:none;border-bottom:1px dotted var(--muted)}}
 :root{{--bg:#fbfaf7;--fg:#1d1d1f;--muted:#6b6b70;--grid:#e6e3dc;--ph0:#e9eef7;--ph1:#dfe8f3;--inter:#f3e1d6;
 --wave:#c9dfc4;--bc:#8a5a44;--card:#fff}}
 @media (prefers-color-scheme:dark){{:root{{--bg:#16161a;--fg:#ececf0;--muted:#9a9aa3;--grid:#2a2a31;

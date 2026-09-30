@@ -93,6 +93,74 @@ def _encounters() -> list:
     return [x for x in encs if x.zone_id == zone]
 
 
+DIFF_NAMES = tuple(settings.DIFFICULTIES)
+
+
+def prepared() -> list[dict]:
+    """Bosses with a prep sheet or a timeline in the reports folder, newest first."""
+    import re
+
+    reports = data_dir() / "reports"
+    out: dict[str, dict] = {}
+    for f in reports.glob("*.html") if reports.is_dir() else []:
+        kind, _, key = f.stem.partition("-")
+        if kind not in ("prep", "timeline") or not key:
+            continue
+        item = out.setdefault(key, {"key": key, "files": {}, "mtime": 0.0, "name": "", "difficulty": ""})
+        item["files"][kind] = f.name
+        item["mtime"] = max(item["mtime"], f.stat().st_mtime)
+        diff = next((d for d in DIFF_NAMES if key.endswith("-" + d)), "")
+        item["difficulty"] = diff
+        if not item["name"] or kind == "prep":
+            m = re.search(rb"<title>(.*?)</title>", f.read_bytes()[:4000], re.S)
+            title = html.unescape(m.group(1).decode("utf-8", "replace")) if m else key
+            item["name"] = re.sub(r"\s+(prep|timelines)$", "", title).strip()
+    return sorted(out.values(), key=lambda x: -x["mtime"])
+
+
+def prepared_block() -> str:
+    items = prepared()
+    if not items:
+        return ""
+    rows = "".join(
+        f'<tr><td><a href="/view/{e(x["key"])}"><b>{e(x["name"])}</b></a></td><td>{e(x["difficulty"])}</td>'
+        f'<td class="small muted">{"prep sheet + timelines" if len(x["files"]) == 2 else ", ".join(x["files"])}'
+        f'</td><td class="small muted">{time.strftime("%Y-%m-%d %H:%M", time.localtime(x["mtime"]))}</td></tr>'
+        for x in items)
+    return f'<h2>Your prepared bosses</h2><div class="card"><table>{rows}</table></div>'
+
+
+TABS = (("prep", "Prep sheet"), ("timeline", "Top players' timelines"))
+
+
+def view_page(key: str, tab: str) -> bytes:
+    """One place per boss: the prep sheet and the top players' timelines as tabs (the reports stay standalone
+    files, shown in a frame)."""
+    item = next((x for x in prepared() if x["key"] == key), None)
+    if item is None:
+        return page("Not found", "<p>Nothing prepared for this boss yet.</p>")
+    if tab not in item["files"]:
+        tab = next(iter(k for k, _ in TABS if k in item["files"]))
+    tabs = "".join(
+        (f'<b class="tab on">{e(label)}</b>' if k == tab else
+         f'<a class="tab" href="/view/{e(key)}?tab={k}">{e(label)}</a>') if k in item["files"] else
+        f'<span class="tab muted">{e(label)}</span>'
+        for k, label in TABS)
+    others = "".join(f'<option value="/view/{e(x["key"])}"{" selected" if x["key"] == key else ""}>'
+                     f'{e(x["name"])} ({e(x["difficulty"])})</option>' for x in prepared())
+    src = f'/report/{e(item["files"][tab])}'
+    body = f"""<div class="bar"><a href="/"><b>prep-a-fight</b></a>
+<select onchange="location=this.value">{others}</select>
+<nav>{tabs}</nav><a class="small" href="{src}" target="_blank">open alone</a></div>
+<iframe src="{src}" title="{e(item['name'])}"></iframe>"""
+    css = """body{padding:0;margin:0}.bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:8px 16px;
+border-bottom:1px solid var(--line);background:var(--card)}.bar a{color:inherit}nav{display:flex;gap:4px}
+.tab{padding:6px 12px;border-radius:6px;text-decoration:none}.tab.on{background:var(--acc);color:var(--acc-fg)}
+a.tab:hover{background:var(--line)}iframe{border:0;width:100%;height:calc(100vh - 52px);display:block}"""
+    return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
+            f"<title>{e(item['name'])}</title><style>{CSS}{css}</style></head><body>{body}</body></html>").encode()
+
+
 def home() -> bytes:
     from paf.profile import parse_simc_export
 
@@ -109,7 +177,7 @@ def home() -> bytes:
 <select name="boss">{options}</select><select name="difficulty">{diffs}</select><button>Next</button></form>"""
                  if encs else '<p class="muted">Warcraft Logs credentials missing: run <code>paf doctor</code>.</p>')
     body = f"""<h1>Prepare a boss fight</h1>
-<p class="muted">Top players' logs, your character, SimulationCraft: the plan for this fight.</p>
+<p class="muted">Top players' logs, your character, SimulationCraft: the plan for this fight.</p>{prepared_block()}
 <h2>1. Your character</h2><div class="card"><p>{status}</p>
 <form method="post" action="/profile"><textarea name="simc" placeholder="In game: /simc, Ctrl+A, Ctrl+C, paste here"></textarea>
 <p><button>Load this character</button></p></form></div>
@@ -205,7 +273,8 @@ def job_page(jid: str) -> bytes:
     log = job["log"].read_text(encoding="utf-8", errors="replace") if job["log"].is_file() else ""
     elapsed = int(time.time() - job["started"])
     if job["status"] == "done" and job["result"] and job["result"].is_file():
-        return page("Done", f'<h1>Done</h1><p><a class="btn" href="/report/{e(job["result"].name)}">Open the prep sheet</a>'
+        key = job["result"].stem.partition("-")[2]
+        return page("Done", f'<h1>Done</h1><p><a class="btn" href="/view/{e(key)}">Open the prep sheet</a>'
                             f'</p><details><summary>Log</summary><pre>{e(log[-20000:])}</pre></details>')
     status = job["status"]
     refresh = 5 if status == "running" else None
@@ -238,6 +307,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(home())
             elif url.path == "/boss":
                 self._send(boss_page(q.get("boss", ""), q.get("difficulty", settings.get("difficulty"))))
+            elif url.path.startswith("/view/"):
+                self._send(view_page(url.path.rsplit("/", 1)[1], q.get("tab", "prep")))
             elif url.path.startswith("/job/"):
                 self._send(job_page(url.path.rsplit("/", 1)[1]))
             elif url.path.startswith("/report/"):
