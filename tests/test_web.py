@@ -90,6 +90,18 @@ def test_describe_plan():
     assert lines == ["You move 6s at 2:45", "You move 8s at 5:30 (can shift -5..+5s)", "Bloodlust at 0:00"]
 
 
+def test_server_is_quiet_on_connection_resets(capsys):
+    srv = web.Server(("127.0.0.1", 0), web.Handler)
+    try:
+        try:
+            raise ConnectionResetError(10054, "reset by peer")
+        except ConnectionResetError:
+            srv.handle_error(None, ("127.0.0.1", 1))
+        assert capsys.readouterr().err == ""
+    finally:
+        srv.server_close()
+
+
 def test_write_assigns_keeps_other_lines(tmp_path, monkeypatch):
     monkeypatch.setenv("PAF_HOME", str(tmp_path))
 

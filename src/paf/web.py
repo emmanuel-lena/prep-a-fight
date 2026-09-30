@@ -453,9 +453,19 @@ class Handler(BaseHTTPRequestHandler):
             self._send(page("Error", f"<h1>Error</h1><pre>{e(repr(ex))}</pre>"), 500)
 
 
+class Server(ThreadingHTTPServer):
+    daemon_threads = True
+
+    def handle_error(self, request, client_address) -> None:
+        """A browser closing or resetting a connection (tab closed, prefetch, reload...) is normal: no traceback."""
+        if isinstance(sys.exc_info()[1], (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)):
+            return
+        super().handle_error(request, client_address)
+
+
 def serve(port: int = 8765, open_browser: bool = True) -> None:
     load_dotenv()
-    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    server = Server(("127.0.0.1", port), Handler)
     url = f"http://127.0.0.1:{port}/"
     print(f"prep-a-fight is running on {url} (Ctrl+C to stop)")
     if open_browser:
