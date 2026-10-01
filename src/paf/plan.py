@@ -60,6 +60,7 @@ class Plan:
     no_lust: bool = False
     pi: list[float] | None = None
     assigns: list[str] = field(default_factory=list)  # boss mechanics the player handles (names)
+    raid: str = ""  # link to one of your raid's logs (composition and DPS: pad the adds or not)
 
     @property
     def empty(self) -> bool:
@@ -85,6 +86,8 @@ def parse_plan(text: str) -> Plan:
                     p.lust = parse_time(tok[1])
             elif tok[0] == "pi":
                 p.pi = [parse_time(x) for x in tok[1:]]
+            elif tok[0] == "raid" and len(tok) > 1:
+                p.raid = raw.split("#", 1)[0].strip()[len("raid"):].strip()
             elif tok[0] == "assign" and len(tok) > 1:
                 p.assigns.append(raw.split("#", 1)[0].strip()[len("assign"):].strip())
             elif len(tok) >= 3 and tok[1] == "move":
@@ -103,7 +106,7 @@ def parse_plan(text: str) -> Plan:
                 p.moves.append(m)
             else:
                 raise ValueError("expected '<time> move <seconds> [shift a..b] [distance y]', 'assign <mechanic>', "
-                                 "'lust', 'pi' or 'no boss-movement'")
+                                 "'raid <log link>', 'lust', 'pi' or 'no boss-movement'")
         except (ValueError, IndexError) as e:
             raise ValueError(f"line {n}: {e}") from None
     return p

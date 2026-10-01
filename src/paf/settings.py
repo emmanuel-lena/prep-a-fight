@@ -25,6 +25,9 @@ SETTINGS: dict[str, Setting] = {
     "spec": Setting("Elemental", "spec analyzed by default (Warcraft Logs name)"),
     "corpus_size": Setting(200, "number of kills collected per boss", kind=int),
     "cache_max_mb": Setting(2000, "disk cache cap in MB (sim results + Warcraft Logs responses)", kind=int),
+    "guild": Setting("", "your guild's name: its latest log gives your raid's composition (pad the adds or not)"),
+    "guild_server": Setting("", "your guild's server (e.g. Kazzak)"),
+    "guild_region": Setting("eu", "your guild's region", ("eu", "us", "kr", "tw", "cn")),
     "region": Setting("", "restrict rankings to a region (EU, US, KR, TW, CN); empty = all"),
 }
 

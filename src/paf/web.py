@@ -201,12 +201,21 @@ def home(error: str = "") -> bytes:
                  if encs else '<p class="muted">Connect to Warcraft Logs first (step 0).</p>' if not has_credentials()
                  else '<p class="muted">Warcraft Logs did not answer: check your connection, then reload.</p>')
     creds = credentials_block(error) if not has_credentials() or error else ""
+    g, gs, gr = settings.get("guild"), settings.get("guild_server"), settings.get("guild_region")
+    regions = "".join(f'<option{" selected" if r == gr else ""}>{r}</option>'
+                      for r in settings.SETTINGS["guild_region"].choices)
+    guild = f"""<h2>Your raid (optional)</h2><div class="card">
+<p class="small">Your guild's latest public log gives your raid's composition and DPS: the prep then tells you whether
+the others cover the adds (stay on the boss) or you should pad them. You can also paste a log link on a boss page.</p>
+<form method="post" action="/guild" class="row"><input name="guild" placeholder="Guild name" value="{e(g)}">
+<input name="server" placeholder="Server" value="{e(gs)}"><select name="region">{regions}</select>
+<button>Save</button></form></div>"""
     body = f"""<h1>Prepare a boss fight</h1>
 <p class="muted">Top players' logs, your character, SimulationCraft: the plan for this fight.</p>{prepared_block()}{creds}
 <h2>1. Your character</h2><div class="card"><p>{status}</p>
 <form method="post" action="/profile"><textarea name="simc" placeholder="In game: /simc, Ctrl+A, Ctrl+C, paste here"></textarea>
 <p><button>Load this character</button></p></form></div>
-<h2>2. The boss</h2><div class="card">{boss_form}</div>"""
+<h2>2. The boss</h2><div class="card">{boss_form}</div>{guild}"""
     return page("prep-a-fight", body)
 
 
@@ -251,6 +260,10 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
 <form method="post" action="/prep">
 <input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
 <h2>3. Your assignments</h2><div class="card">{assigns}</div>
+<h2>Your raid</h2><div class="card">
+<label>Link to one of your raid's logs <input name="raid" size="60" value="{e(current_raid(enc, difficulty))}"
+placeholder="https://www.warcraftlogs.com/reports/..."></label>
+<p class="small muted">{e(raid_hint())}</p></div>
 <h2>4. Options</h2><div class="card">
 <label><input type="checkbox" name="gear" checked> Top Gear with your bags and this boss's loot (slower)</label>
 <label><input type="checkbox" name="optimize" checked> Ideal cooldown plan per objective (slowest, 20-40 min)</label>
@@ -270,6 +283,43 @@ def _plan_path(enc, difficulty: str) -> Path:
     from paf.corpus.template import template_path
 
     return template_path(enc.name, difficulty).with_suffix(".plan.txt")
+
+
+def current_raid(enc, difficulty: str) -> str:
+    from paf.plan import parse_plan
+
+    p = _plan_path(enc, difficulty)
+    try:
+        return parse_plan(p.read_text(encoding="utf-8-sig")).raid if p.is_file() else ""
+    except ValueError:
+        return ""
+
+
+def raid_hint() -> str:
+    g = settings.get("guild")
+    if g:
+        return (f"Empty: the latest public log of {g} is used. Your raid's composition and DPS decide whether you pad "
+                f"the adds or stay on the boss.")
+    return ("Optional. Your raid's composition and DPS decide whether you pad the adds or stay on the boss. "
+            "Or set your guild once on the home page.")
+
+
+def write_raid(boss_id: int, difficulty: str, url: str) -> None:
+    """Keep the raid log link as the `raid` line of the boss plan file."""
+    from paf.corpus.template import template_path
+    from paf.encounters import raid_encounters
+    from paf.wcl import WCLClient
+
+    enc = next((x for x in raid_encounters(WCLClient()) if x.id == boss_id), None)
+    if enc is None:
+        return
+    p = template_path(enc.name, difficulty).with_suffix(".plan.txt")
+    p.parent.mkdir(parents=True, exist_ok=True)
+    lines = p.read_text(encoding="utf-8-sig").splitlines() if p.is_file() else []
+    lines = [line for line in lines if not line.strip().lower().startswith("raid ")]
+    if url.strip():
+        lines.append(f"raid {url.strip()}")
+    p.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def current_assigns(enc, difficulty: str) -> list[str]:
@@ -437,6 +487,11 @@ class Handler(BaseHTTPRequestHandler):
                 enc = next(x for x in raid_encounters(WCLClient()) if x.id == boss_id)
                 notes_path(template_path(enc.name, difficulty)).write_text(text, encoding="utf-8")
                 self._redirect(f"/boss?boss={boss_id}&difficulty={difficulty}")
+            elif self.path == "/guild":
+                settings.set_value("guild", (form.get("guild") or [""])[0])
+                settings.set_value("guild_server", (form.get("server") or [""])[0])
+                settings.set_value("guild_region", (form.get("region") or ["eu"])[0])
+                self._redirect("/")
             elif self.path == "/credentials":
                 from paf.config import save_credentials
                 from paf.wcl import WCLClient, WCLError
@@ -475,6 +530,17 @@ class Handler(BaseHTTPRequestHandler):
                 boss_id = int(form["boss"][0])
                 difficulty = form.get("difficulty", ["heroic"])[0]
                 write_assigns(boss_id, difficulty, form.get("assign", []))
+                raid = (form.get("raid") or [""])[0]
+                if raid.strip():
+                    from paf.raidneed import report_code
+
+                    try:
+                        report_code(raid)
+                    except ValueError as ex:
+                        self._send(page("Invalid log link", f"<p>{e(str(ex))}. "
+                                                            f"<a href='javascript:history.back()'>Back</a></p>"), 400)
+                        return
+                write_raid(boss_id, difficulty, raid)
                 enc = next(x for x in raid_encounters(WCLClient()) if x.id == boss_id)
                 args = ["prep", str(boss_id), "--difficulty", difficulty]
                 if "gear" not in form:

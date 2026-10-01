@@ -24,6 +24,21 @@ def _pct(v: float | None, digits: int = 2) -> str:
 
 
 @dataclass
+class RaidInfo:
+    """Your raid and the adds (paf.raidneed)."""
+    report: str
+    fight: str  # which pull the composition and DPS come from
+    players: int
+    you: tuple[str, float]  # spec, DPS
+    you_found: bool  # False: you are not in that log, a player of your spec at the raid's median DPS is used
+    verdicts: list = field(default_factory=list)  # paf.raidneed.AddVerdict
+    objective: str | None = None  # "boss" or "pad"
+    cleavers: list = field(default_factory=list)  # (name, spec, DPS on the main adds)
+    archetypes: dict = field(default_factory=dict)  # "AoE / funnel" / "flexible" / "single target" -> players
+    your_archetype: str = ""
+
+
+@dataclass
 class PrepData:
     boss: str
     difficulty: str
@@ -64,6 +79,7 @@ class PrepData:
     tops_players: int = 0
     links: dict[str, str] = field(default_factory=dict)  # spell / item name -> Wowhead reference
     cd_names: dict[str, str] = field(default_factory=dict)  # cooldown key (ascendance, trinket1) -> in-game name
+    raid: RaidInfo | None = None
 
 
 PALETTE = ["#e8590c", "#1c7ed6", "#2f9e44", "#ae3ec9", "#f59f00", "#d6336c", "#15aabf", "#5c7cfa", "#74b816"]
@@ -185,6 +201,10 @@ def headline(d: PrepData) -> list[str]:
     """The few things to remember, computed from the results, in the player's words (one string per point,
     '\\n' separates its lines)."""
     out = []
+    if d.raid and d.raid.verdicts:
+        v = d.raid.verdicts[0]
+        what = "stay on the boss" if d.raid.objective == "boss" else "pad the adds"
+        out.append(f"With your raid: {what}. {v.add.name}: {v.reason}.")
     if d.talents and d.talents.rows:
         fight = d.talents.fights[0]
         best = max(d.talents.rows, key=lambda r: r.per_fight.get(fight, (-1e9, None))[0])
@@ -259,6 +279,38 @@ td.n{text-align:right;white-space:nowrap} .pos{color:var(--pos);font-weight:600}
 """
 
 
+def raid_section(r: RaidInfo) -> str:
+    you = (f"you ({e(r.you[0])}, {r.you[1] / 1000:,.0f}k DPS)" if r.you_found else
+           f"a {e(r.you[0])} at your raid's median DPS ({r.you[1] / 1000:,.0f}k; you are not in that log)")
+    head = (f"<p class='small'>From your raid's log <a href='https://www.warcraftlogs.com/reports/{e(r.report)}' "
+            f"target='_blank' rel='noopener'>{e(r.report)}</a> ({e(r.fight)}, {r.players} players), with {you}.</p>")
+    if not r.verdicts:
+        return (f"<h2>Your raid and the adds</h2><div class='card'>{head}<p>No add takes a real share of the damage "
+                f"on this boss: nothing to decide, play for the boss.</p></div>")
+    rows = "".join(
+        f"<tr><td>{e(v.add.name)}</td><td class='n'>{v.without_you:.0%}</td><td class='n'>{v.with_you:.0%}</td>"
+        f"<td class='n'>{v.low:.0%}</td><td><b>{'boss' if v.verdict == 'boss' else 'pad'}</b>: "
+        f"{e(v.reason)}</td></tr>" for v in r.verdicts)
+    groups = "".join(f"<li><b>{e(k)}</b> ({len(ps)}): {e(', '.join(ps))}</li>" for k, ps in r.archetypes.items() if ps)
+    verdict = ("Stay on the boss: the cooldown plan and the gear below are the ones for boss damage." if r.objective
+               == "boss" else "Pad the adds: the cooldown plan and the gear below are the ones for total damage.")
+    mine = f" On this boss your spec is <b>{e(r.your_archetype)}</b>." if r.your_archetype else ""
+    return f"""<h2>Your raid and the adds</h2><div class="card">{head}
+<p><b>{verdict}</b>{mine}</p>
+<div class="scroll"><table><tr><th>Adds</th><th>Your raid without you</th><th>With you</th>
+<th>Top raids' weakest quarter</th><th>Verdict</th></tr>{rows}</table></div>
+<p class="small muted">Damage your raid puts on these adds, as a share of the top raids' (their median = 100%).</p>
+<p class="small">Your raid on this boss, by what each spec does with the adds:</p><ul class="small">{groups}</ul>
+<details><summary class="small">How it is computed</summary><p class="small muted">Measured: on this boss, each spec puts
+a share of its damage on these adds while they are up (from the ranked kills): well above the median of all players =
+AoE / funnel, well below = single target. Computed: your raid's damage on the adds = every player's DPS in your log x
+their spec's share; the same for every top raid gives the reference range. Rule (not a measurement): if your raid
+without you is within the top raids' range (above their weakest quarter), the others cover the adds and you stay on
+the boss; otherwise you pad. Not promised: how long the adds will live. In the top kills it depends on the mechanics
+and the strategy, not on the raid's DPS (checked: no correlation). Top players pad whatever their raid (they are
+ranked on their own DPS), so their logs alone cannot tell what your raid needs.</p></details></div>"""
+
+
 def render(d: PrepData) -> str:
     parts: list[str] = []
     parts.append(f"<h1>{e(d.boss)} ({e(d.difficulty)}): prep sheet</h1>")
@@ -292,6 +344,9 @@ def render(d: PrepData) -> str:
 <div class="scroll"><table><tr><th>Time</th><th>Adds</th><th>Alive</th><th>Types</th></tr>{waves}</table></div>
 {f'<p><a href="{e(d.timeline_file)}">Cooldown timelines of the top players</a></p>' if d.timeline_file else ''}
 </div>""")
+
+    if d.raid:
+        parts.append(raid_section(d.raid))
 
     # sim of the fight
     if d.sim_dps and d.patchwerk_dps:

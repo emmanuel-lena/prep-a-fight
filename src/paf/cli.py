@@ -739,6 +739,30 @@ def cmd_prep(args: argparse.Namespace) -> int:
         d.assigns = described or [f"from your plan {ppath.name}"]
     d.fight = fight
 
+    raid_url = args.raid or _plan_raid(enc, diff_name)
+    if raid_url or settings.get("guild"):
+        step("Your raid and the adds")
+        try:
+            if not raid_url:
+                from paf.raidneed import guild_report
+
+                raid_url = guild_report(client, settings.get("guild"), settings.get("guild_server"),
+                                        settings.get("guild_region"), enc.id, diff)
+            d.raid = _raid_verdict(client, con, enc, diff, raid_url, profile, spec)
+        except (ValueError, OSError, KeyError, TypeError) as ex:
+            print(f"  could not read your raid's log: {ex}")
+            d.notes.append(f"Your raid's log could not be read ({ex}).")
+        if d.raid and d.raid.verdicts:
+            for v in d.raid.verdicts:
+                print(f"  {v.add.name}: {v.verdict} - {v.reason}")
+            if args.objective is None:
+                args.objective = 1.0 if d.raid.objective == "boss" else 0.0
+                print(f"  -> cooldowns and gear for {'boss' if args.objective else 'total'} damage")
+        elif d.raid:
+            print("  no add type takes a real share of the damage on this boss: nothing to decide")
+    if args.objective is None:
+        args.objective = 0.0
+
     step("Simming your character on the fight")
     real = simc.run(simc.build_input(profile_text, fight.to_simc()), root / "fight", target_error=args.error)
     dummy = simc.run(simc.build_input(profile_text, ["fight_style=Patchwerk", f"max_time={simc.fmt(fight.duration)}",
@@ -861,6 +885,87 @@ def cmd_prep(args: argparse.Namespace) -> int:
     if args.open:
         webbrowser.open(out.as_uri())
     return 0
+
+
+def cmd_raid(args: argparse.Namespace) -> int:
+    from paf import settings
+    from paf.corpus import db
+    from paf.profile import parse_simc_export
+
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    con = db.connect()
+    if not con.execute("SELECT COUNT(*) FROM fight WHERE encounter_id=? AND difficulty=? AND status='done'",
+                       (enc.id, diff)).fetchone()[0]:
+        print(f"No kill of {enc.name} {diff_name} in the corpus yet: run `paf corpus \"{enc.name}\"` first.")
+        return 1
+    url = args.raid or _plan_raid(enc, diff_name)
+    if not url:
+        if not settings.get("guild"):
+            print("Give a log of your raid (--raid <link>) or set your guild once: `paf config guild \"<name>\"`, "
+                  "`paf config guild_server <server>`, `paf config guild_region eu`.")
+            return 1
+        from paf.raidneed import guild_report
+
+        url = guild_report(client, settings.get("guild"), settings.get("guild_server"), settings.get("guild_region"),
+                           enc.id, diff)
+    try:
+        profile = parse_simc_export(_load_profile(args.profile)[0])
+    except SystemExit:
+        from paf.profile import Profile
+
+        profile = Profile()
+    r = _raid_verdict(client, con, enc, diff, url, profile, settings.get("spec"))
+    print(f"{enc.name} ({diff_name}), your raid from log {r.report} ({r.fight}, {r.players} players)")
+    print(f"you: {r.you[0]}, {r.you[1] / 1000:,.0f}k DPS" + ("" if r.you_found else " (not in that log: raid median)"))
+    if not r.verdicts:
+        print("No add takes a real share of the damage on this boss: play for the boss.")
+        return 0
+    print("\nYour raid's damage on the adds, as a share of the top raids' (median = 100%):")
+    print(f"{'Adds':24} {'without you':>12} {'with you':>9} {'top raids, weakest quarter':>27}")
+    for v in r.verdicts:
+        print(f"{v.add.name:24} {v.without_you:11.0%} {v.with_you:9.0%} {v.low:27.0%}")
+        print(f"  -> {v.verdict}: {v.reason}")
+    for kind, players in r.archetypes.items():
+        if players:
+            print(f"\n{kind} on this boss ({len(players)}): " + ", ".join(players))
+    print(f"\n=> {'Stay on the boss' if r.objective == 'boss' else 'Pad the adds'}: "
+          f"`paf prep \"{enc.name}\"` will use the cooldown plan and gear for "
+          f"{'boss' if r.objective == 'boss' else 'total'} damage.")
+    return 0
+
+
+def _plan_raid(enc, diff_name: str) -> str:
+    """The `raid <log link>` line of the boss plan, if any."""
+    from paf.corpus.template import template_path
+    from paf.plan import parse_plan
+
+    p = template_path(enc.name, diff_name).with_suffix(".plan.txt")
+    try:
+        return parse_plan(p.read_text(encoding="utf-8-sig")).raid if p.is_file() else ""
+    except ValueError:
+        return ""
+
+
+def _raid_verdict(client, con, enc, diff: int, url: str, profile, spec: str):
+    """Pad the adds or stay on the boss, from your raid's composition and DPS (paf.raidneed)."""
+    import statistics as st
+
+    from paf import raidneed, settings
+    from paf.prep_report import RaidInfo
+
+    rc = raidneed.raid_from_report(client, url, enc.id, diff)
+    me = next((p for p in rc.players if profile.name and p[0].lower() == profile.name.lower()), None)
+    others = [(s, dps) for n, s, dps in rc.players if me is None or n != me[0]]
+    if me is not None:
+        you, found = (me[1], me[2]), True
+    else:  # not in that log: a damage dealer of your spec at the raid's median DPS among damage dealers
+        dealers = sorted(dps for _, _, dps in rc.players)[len(rc.players) // 2:]
+        you, found = (f"{spec} {settings.get('class')}", st.median(dealers) if dealers else 0.0), False
+    types = raidneed.add_types(con, enc.id, diff)
+    vs = raidneed.verdicts(types, others, you)
+    return RaidInfo(rc.report, rc.fight, len(rc.players), you, found, vs, raidneed.overall(vs),
+                    raidneed.best_cleavers(types, rc.players), raidneed.archetypes(types, rc.players),
+                    raidneed.archetype(types[0], you[0]) if types else "")
 
 
 def _fight_with_plan(enc, diff_name: str, described: list[str] | None = None):
@@ -1271,6 +1376,14 @@ def build_parser() -> argparse.ArgumentParser:
     asg.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
     asg.set_defaults(func=cmd_assigns)
 
+    rd = sub.add_parser("raid", help="pad the adds or stay on the boss, from your raid's composition and DPS")
+    rd.add_argument("boss")
+    rd.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    rd.add_argument("--raid", help="link to one of your raid's logs (default: your guild's latest log, "
+                                   "see `paf config guild`)")
+    rd.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
+    rd.set_defaults(func=cmd_raid)
+
     va = sub.add_parser("validate", help="sim the top players' own characters on the rebuilt fight and compare "
                                          "with their real DPS")
     va.add_argument("boss")
@@ -1296,7 +1409,10 @@ def build_parser() -> argparse.ArgumentParser:
     pr2 = sub.add_parser("prep", help="everything for one boss, as a one-page HTML prep sheet")
     pr2.add_argument("boss")
     pr2.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
-    pr2.add_argument("--objective", type=_objective, default=0.0, help="total (default), boss, or a boss weight")
+    pr2.add_argument("--objective", type=_objective, default=None,
+                     help="total, boss, or a boss weight (default: from your raid's log if given, else total)")
+    pr2.add_argument("--raid", help="link to one of your raid's logs: composition and DPS decide whether you pad "
+                                    "the adds (default: the `raid` line of the boss plan)")
     pr2.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
     pr2.add_argument("--error", type=float, default=0.2)
     pr2.add_argument("--ilvl", type=int, help="item level of the drops (default: median of your equipped items)")

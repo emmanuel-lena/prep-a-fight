@@ -24,6 +24,20 @@ def test_headline_speaks_the_players_language():
     assert "trinket1" not in text and "secondary" not in text and "hold vulnerable" not in text
 
 
+def test_raid_section_and_headline():
+    from paf.prep_report import RaidInfo
+    from paf.raidneed import AOE, AddType, verdicts
+
+    t = AddType("Amani", 100, 18.0, 0.15, {"Balance Druid": 0.44}, 0.25, tops_rate=1000.0, tops_low=900.0)
+    vs = verdicts([t], [("Balance Druid", 2500.0)], ("Elemental Shaman", 1000.0))
+    d = PrepData("Boss", "mythic", "Elemental", "Char")
+    d.raid = RaidInfo("ZJRNbP1DCqQ3grcV", "this boss, kill of 7:28", 20, ("Elemental Shaman", 190e3), False, vs,
+                      "boss", [], {AOE: ["Nizae (Balance Druid)"]}, "AoE / funnel")
+    assert headline(d)[0].startswith("With your raid: stay on the boss.")
+    page = render(d)
+    assert "Your raid and the adds" in page and "Nizae (Balance Druid)" in page and "you are not in that log" in page
+
+
 def test_render_prep_sheet_with_wowhead_links():
     d = PrepData("Boss <X>", "heroic", "Elemental", "Char", kills=10, duration=300)
     d.gear = [("shoulder: Hissing Mantle (321)", {"boss fight": 1.0}, 1.0)]
