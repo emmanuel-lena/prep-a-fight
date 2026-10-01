@@ -161,7 +161,30 @@ a.tab:hover{background:var(--line)}iframe{border:0;width:100%;height:calc(100vh 
             f"<title>{e(item['name'])}</title><style>{CSS}{css}</style></head><body>{body}</body></html>").encode()
 
 
-def home() -> bytes:
+def has_credentials() -> bool:
+    import os
+
+    return bool(os.environ.get("WCL_CLIENT_ID") and os.environ.get("WCL_CLIENT_SECRET"))
+
+
+def credentials_block(error: str = "") -> str:
+    err = f'<p style="color:#b3261e">{e(error)}</p>' if error else ""
+    return f"""<h2>0. Connect to Warcraft Logs (once)</h2><div class="card">
+<p>prep-a-fight reads the top players' logs with <b>your own</b> free Warcraft Logs API key (each player has an
+hourly quota, so the key is not shared).</p>
+<ol class="small">
+<li>Log in on <a href="https://www.warcraftlogs.com/api/clients" target="_blank" rel="noopener">warcraftlogs.com/api/clients</a>
+and click <b>Create Client</b>.</li>
+<li>Name: anything (e.g. <code>prep-a-fight</code>). Redirect URL: <code>http://localhost</code>. Leave "Public Client"
+unticked.</li>
+<li>Copy the <b>Client ID</b> and the <b>Client Secret</b> here.</li></ol>{err}
+<form method="post" action="/credentials"><label>Client ID <input name="id" size="44" required></label>
+<label>Client Secret <input name="secret" size="44" type="password" required></label>
+<p><button>Save and test</button></p></form>
+<p class="small muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p></div>"""
+
+
+def home(error: str = "") -> bytes:
     from paf.profile import parse_simc_export
 
     prof = _profile_path()
@@ -175,9 +198,11 @@ def home() -> bytes:
     diffs = "".join(f'<option{" selected" if d == diff else ""}>{d}</option>' for d in settings.DIFFICULTIES)
     boss_form = (f"""<form method="get" action="/boss" class="row">
 <select name="boss">{options}</select><select name="difficulty">{diffs}</select><button>Next</button></form>"""
-                 if encs else '<p class="muted">Warcraft Logs credentials missing: run <code>paf doctor</code>.</p>')
+                 if encs else '<p class="muted">Connect to Warcraft Logs first (step 0).</p>' if not has_credentials()
+                 else '<p class="muted">Warcraft Logs did not answer: check your connection, then reload.</p>')
+    creds = credentials_block(error) if not has_credentials() or error else ""
     body = f"""<h1>Prepare a boss fight</h1>
-<p class="muted">Top players' logs, your character, SimulationCraft: the plan for this fight.</p>{prepared_block()}
+<p class="muted">Top players' logs, your character, SimulationCraft: the plan for this fight.</p>{prepared_block()}{creds}
 <h2>1. Your character</h2><div class="card"><p>{status}</p>
 <form method="post" action="/profile"><textarea name="simc" placeholder="In game: /simc, Ctrl+A, Ctrl+C, paste here"></textarea>
 <p><button>Load this character</button></p></form></div>
@@ -412,6 +437,18 @@ class Handler(BaseHTTPRequestHandler):
                 enc = next(x for x in raid_encounters(WCLClient()) if x.id == boss_id)
                 notes_path(template_path(enc.name, difficulty)).write_text(text, encoding="utf-8")
                 self._redirect(f"/boss?boss={boss_id}&difficulty={difficulty}")
+            elif self.path == "/credentials":
+                from paf.config import save_credentials
+                from paf.wcl import WCLClient, WCLError
+
+                cid, secret = (form.get("id") or [""])[0].strip(), (form.get("secret") or [""])[0].strip()
+                try:
+                    WCLClient(cid, secret).rate_limit()
+                except (WCLError, OSError) as ex:
+                    self._send(home(f"Warcraft Logs refused these credentials: {ex}"), 400)
+                    return
+                save_credentials(cid, secret)
+                self._redirect("/")
             elif self.path == "/plan":
                 from paf.encounters import raid_encounters
                 from paf.plan import parse_plan

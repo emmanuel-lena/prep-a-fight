@@ -1,2 +1,8 @@
 * text=auto eol=lf
 *.ps1 text eol=crlf
+*.bat text eol=crlf
+tests/ export-ignore
+.github/ export-ignore
+CLAUDE.md export-ignore
+tools/ export-ignore
+docs/ export-ignore

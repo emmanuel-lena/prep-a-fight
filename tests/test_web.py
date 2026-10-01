@@ -90,6 +90,22 @@ def test_describe_plan():
     assert lines == ["You move 6s at 2:45", "You move 8s at 5:30 (can shift -5..+5s)", "Bloodlust at 0:00"]
 
 
+def test_credentials_saved_in_the_data_dir_and_loaded(tmp_path, monkeypatch):
+    from paf.config import load_dotenv, save_credentials
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path / "home"))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("WCL_CLIENT_ID", raising=False)
+    monkeypatch.delenv("WCL_CLIENT_SECRET", raising=False)
+    assert not web.has_credentials()
+    assert "Connect to Warcraft Logs" in web.credentials_block()
+    save_credentials(" abc ", "s3cret")
+    assert (tmp_path / "home" / ".env").read_text() == "WCL_CLIENT_ID=abc\nWCL_CLIENT_SECRET=s3cret\n"
+    monkeypatch.delenv("WCL_CLIENT_ID")
+    monkeypatch.delenv("WCL_CLIENT_SECRET")
+    assert load_dotenv()["WCL_CLIENT_ID"] == "abc" and web.has_credentials()
+
+
 def test_server_is_quiet_on_connection_resets(capsys):
     srv = web.Server(("127.0.0.1", 0), web.Handler)
     try:
