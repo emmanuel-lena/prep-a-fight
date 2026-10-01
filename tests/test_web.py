@@ -35,11 +35,11 @@ def server(tmp_path, monkeypatch):
 def test_home_and_profile_upload(server):
     url, home = server
     page = fetch(url + "/")
-    assert "Prepare a boss fight" in page and "No character loaded" in page
+    assert "Prepare a boss fight" in page and 'name="simc"' in page and "items in bags" not in page
     data = b'shaman="T"\nspec=elemental\nhead=,id=1\n'
     fetch(url + "/profile", b"simc=" + urllib.parse.quote(data).encode())
     assert (home / "profiles" / "current.simc").read_text().startswith('shaman="T"')
-    assert "Current character: <b>T</b>" in fetch(url + "/")
+    assert "<b>T</b>" in fetch(url + "/")
 
 
 def test_reports_are_served_and_other_files_are_not(server):

@@ -6,6 +6,7 @@ import html
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from paf import theme
 from paf.wowhead import SCRIPT as WH_SCRIPT
 from paf.wowhead import link, linkify
 
@@ -84,7 +85,7 @@ class PrepData:
     raid: RaidInfo | None = None
 
 
-PALETTE = ["#e8590c", "#1c7ed6", "#2f9e44", "#ae3ec9", "#f59f00", "#d6336c", "#15aabf", "#5c7cfa", "#74b816"]
+PALETTE = ["#c89933", "#8e6a9b", "#4f8a8b", "#d0705a", "#b8ad3c", "#b0577f", "#3f6fa0", "#6c9a5b", "#74526c"]
 
 
 def _key(label: str) -> str:
@@ -114,16 +115,16 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
     fight_row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">Fight</text>']
     for w in fight.add_waves:
         fight_row.append(f'<rect x="{x(w.time)}" y="{y}" width="{max(2, w.lifetime * px):.1f}" height="16" '
-                         f'fill="#2f9e44" opacity="0.35"><title>{_mmss(w.time)} adds x{w.count}</title></rect>')
+                         f'fill="#6c9a5b" opacity="0.4"><title>{_mmss(w.time)} adds x{w.count}</title></rect>')
     for v in fight.vulnerable:
         fight_row.append(f'<rect x="{x(v.start)}" y="{y}" width="{max(2, v.duration * px):.1f}" height="16" '
-                         f'fill="#e8590c" opacity="0.45"><title>{e(v.name)} x{v.multiplier:g}</title></rect>'
+                         f'fill="#c89933" opacity="0.5"><title>{e(v.name)} x{v.multiplier:g}</title></rect>'
                          f'<text x="{x(v.start) + 2}" y="{y + 12}" font-size="10" fill="var(--fg)">x{v.multiplier:g}</text>')
     for w in fight.invulnerable:
         fight_row.append(f'<rect x="{x(w.start)}" y="{y}" width="{w.duration * px:.1f}" height="16" fill="#868e96" '
                          f'opacity="0.4"><title>boss away</title></rect>')
     if fight.lust_time is not None:
-        fight_row.append(f'<rect x="{x(fight.lust_time)}" y="{y - 2}" width="{40 * px:.1f}" height="3" fill="#d6336c">'
+        fight_row.append(f'<rect x="{x(fight.lust_time)}" y="{y - 2}" width="{40 * px:.1f}" height="3" fill="#b0577f">'
                          f'<title>Bloodlust {_mmss(fight.lust_time)}</title></rect>')
     rows.append("".join(fight_row))
     y += 26
@@ -154,7 +155,7 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
         y += 22
     return (f'<div class="scroll"><svg width="{W}" height="{y + 4}" style="font-family:system-ui">{axis}'
             f'{"".join(rows)}</svg></div><p class="small muted">Dots: this plan (one simulated pull). Pale bars: '
-            f'when the top players cast the same cooldown. Green: add waves; orange: boss vulnerability windows '
+            f'when the top players cast the same cooldown. Green: add waves; gold: boss vulnerability windows '
             f'(x = damage taken); grey: boss away; pink line: Bloodlust.</p>')
 
 
@@ -266,19 +267,49 @@ def headline(d: PrepData) -> list[str]:
     return out
 
 
-CSS = """
-:root{--bg:#fbfaf7;--fg:#1d1d1f;--muted:#6b6b70;--line:#e6e3dc;--card:#fff;--pos:#1f7a3a;--neg:#b3261e;--acc:#1c64d6}
-@media (prefers-color-scheme:dark){:root{--bg:#16161a;--fg:#ececf0;--muted:#9a9aa3;--line:#2a2a31;--card:#1d1d22;
---pos:#5cc37a;--neg:#f07068;--acc:#6ea8ff}}
-body{background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,sans-serif;margin:0;padding:20px 16px}
-main{max-width:1000px;margin:auto}
-h1{font-size:24px;margin:0} h2{font-size:17px;margin:28px 0 8px} .muted{color:var(--muted)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:10px 0}
-.key li{margin:4px 0} table{border-collapse:collapse;width:100%} td,th{padding:5px 8px;border-bottom:1px solid var(--line);
-text-align:left;vertical-align:top} th{font-weight:600;color:var(--muted);font-size:12px}
-td.n{text-align:right;white-space:nowrap} .pos{color:var(--pos);font-weight:600} .neg{color:var(--neg)}
-.scroll{overflow-x:auto} a{color:var(--acc)} .small{font-size:12px}
+CSS = theme.CSS + """
+:root{--card:var(--surface)}
+.key ul{margin:0;padding-left:18px} .key li{margin:8px 0}
+.kpis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin:16px 0}
+.kpi.good .v{color:var(--pos)} .kpi.warn .v{color:var(--warn)}
+.sheet-head{margin:6px 0 4px}
 """
+
+
+def kpi_tiles(d: PrepData) -> str:
+    """The prep at a glance: model check, your raid's verdict, cooldowns, gear, talents."""
+    tiles = []
+
+    def tile(label: str, value: str, sub: str, cls: str = "") -> None:
+        tiles.append(f'<div class="tile kpi {cls}"><div class="l">{e(label)}</div><div class="v">{value}</div>'
+                     f'<div class="s">{e(sub)}</div></div>')
+
+    if d.validation:
+        lo, med, hi = d.validation
+        tile("Fight model", f"{med:.0%}", f"of the top players' real DPS when simmed (range {lo:.0%}-{hi:.0%})",
+             "good" if 0.9 <= med <= 1.1 else "warn")
+    if d.raid and d.raid.objective:
+        tile("Your raid", "Boss" if d.raid.objective == "boss" else "Pad",
+             "the others cover the adds" if d.raid.objective == "boss" else "the adds need your damage")
+    want = ("boss" if d.raid.objective == "boss" else "total") if d.raid and d.raid.objective else None
+    plans = [p for p in d.optimized if p.objective in ("boss", "total")]
+    best = next((p for p in plans if p.objective == want), None) or (max(plans, key=lambda p: p.gain) if plans else None)
+    if best is not None:
+        tile("Cooldown plan", f"{best.gain:+.1f}%", f"{objective_name(d, best.objective).lower()} vs SimC's default",
+             "good" if best.gain > 2 * best.error else "")
+    if d.gear:
+        w = d.gear[0][2]
+        tile("Gear", f"{w:+.2f}%" if w > 2 * d.gear_error else "Best",
+             "with a few swaps from your bags" if w > 2 * d.gear_error else "your equipped set is already the best",
+             "good" if w > 2 * d.gear_error else "")
+    if d.talents and d.talents.rows:
+        fight = d.talents.fights[0]
+        r = max(d.talents.rows, key=lambda r: r.per_fight.get(fight, (-1e9, None))[0])
+        g = r.per_fight.get(fight, (0.0, None))[0]
+        tile("Talents", f"{g:+.1f}%" if g > 2 * d.talents.error else "OK",
+             f"with {r.build.label}" if g > 2 * d.talents.error else "your build matches the top players'",
+             "good" if g > 2 * d.talents.error else "")
+    return f'<div class="kpis">{"".join(tiles)}</div>' if tiles else ""
 
 
 def raid_section(r: RaidInfo) -> str:
@@ -326,16 +357,17 @@ ranked on their own DPS), so their logs alone cannot tell what your raid needs.<
 
 def render(d: PrepData) -> str:
     parts: list[str] = []
-    parts.append(f"<h1>{e(d.boss)} ({e(d.difficulty)}): prep sheet</h1>")
-    parts.append(f'<p class="muted">{e(d.spec)}, character {e(d.character)}. Built from {d.kills} ranked kills '
-                 f'on Warcraft Logs and SimulationCraft, {datetime.now():%Y-%m-%d %H:%M}.</p>')
+    parts.append(f'<h1 class="sheet-head">{e(d.boss)} <span class="pill gold">{e(d.difficulty)}</span></h1>')
+    parts.append(f'<p class="muted small">{e(d.spec)}, {e(d.character)}. Built from {d.kills} ranked kills on Warcraft '
+                 f'Logs and SimulationCraft, {datetime.now():%d %b %Y %H:%M}.</p>')
+    parts.append(kpi_tiles(d))
 
     def lk(text: str) -> str:
         return linkify(text, d.links)
 
     key = headline(d)
     if key:
-        parts.append('<h2>What to remember</h2><div class="card key"><ul>'
+        parts.append('<div class="hero key"><h3>What to remember</h3><ul>'
                      + "".join("<li>" + "<br>".join(lk(line) for line in k.split("\n")) + "</li>" for k in key)
                      + "</ul></div>")
 
@@ -482,11 +514,12 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
 <table><tr><th>Item</th><th>Slot</th><th>In your best sets</th><th>Single swap</th></tr>{body}</table>
 <p class="small muted">At item level {d.loot_ilvl}; statistical error about +/-{d.loot_error:.2f}%.</p></div>""")
 
+    notes = list(d.notes)
     if d.validation:
         lo, med, hi = d.validation
-        d.notes.insert(0, f"Validation: the top players' own characters simmed on this rebuilt fight give {med:.0%} of "
-                          f"their real DPS (range {lo:.0%}-{hi:.0%}).")
-    notes = d.notes + [
+        notes.insert(0, f"Validation: the top players' own characters simmed on this rebuilt fight give {med:.0%} of "
+                        f"their real DPS (range {lo:.0%}-{hi:.0%}).")
+    notes += [
         "A rebuilt fight is an approximation: good to choose between builds, items and plans, not a prediction "
         "of your exact DPS.",
         "Corpus analyses are correlations (what the top players do); SimC checks them on your character.",
@@ -494,6 +527,5 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
     parts.append('<h2>Notes</h2><div class="card small muted"><ul>' + "".join(f"<li>{e(n)}</li>" for n in notes)
                  + "</ul></div>")
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
-            f"<title>{e(d.boss)} prep</title>{WH_SCRIPT}<style>{CSS}"
-            f"a.wh{{color:inherit;text-decoration:none;border-bottom:1px dotted currentColor}}</style></head><body><main>{''.join(parts)}"
+            f"<title>{e(d.boss)} prep</title>{WH_SCRIPT}<style>{CSS}</style></head><body><main>{''.join(parts)}"
             f'<p class="small muted">Generated by prep-a-fight. Player names are not shown.</p></main></body></html>')

@@ -16,33 +16,26 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from paf import settings
+from paf import settings, theme
 from paf.config import data_dir, load_dotenv
 
 e = html.escape
 
-CSS = """
-:root{--bg:#fbfaf7;--fg:#1d1d1f;--muted:#6b6b70;--line:#e6e3dc;--card:#fff;--acc:#1c64d6;--acc-fg:#fff}
-@media (prefers-color-scheme:dark){:root{--bg:#16161a;--fg:#ececf0;--muted:#9a9aa3;--line:#2a2a31;--card:#1d1d22;
---acc:#6ea8ff;--acc-fg:#0b1020}}
-body{background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif;margin:0;padding:20px 16px}
-main{max-width:860px;margin:auto} h1{font-size:24px;margin:0 0 4px} h2{font-size:17px;margin:24px 0 8px}
-.muted{color:var(--muted)} .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:10px 0}
-textarea{width:100%;min-height:180px;font:12px ui-monospace,monospace;box-sizing:border-box;background:var(--bg);color:var(--fg);
-border:1px solid var(--line);border-radius:6px;padding:8px}
-select,input,button{font:inherit} button,.btn{background:var(--acc);color:var(--acc-fg);border:0;border-radius:6px;padding:8px 14px;
-cursor:pointer;text-decoration:none;display:inline-block} label{display:block;margin:4px 0}
-table{border-collapse:collapse;width:100%} td,th{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
-th{font-size:12px;color:var(--muted)} pre{white-space:pre-wrap;font:12px ui-monospace,monospace;max-height:420px;overflow:auto}
-.small{font-size:12px} .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+CSS = theme.CSS + """
+pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius:8px;padding:10px 12px}
+.boss-tile .name{font-weight:700;font-size:16px;margin-bottom:6px}
+.boss-tile .when{font-size:12px;color:var(--muted);margin-top:8px}
+.cta{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:18px 0 6px}
+.lead{font-size:16px;color:var(--muted);margin-bottom:18px}
 """
 
 
-def page(title: str, body: str, refresh: int | None = None) -> bytes:
+def page(title: str, body: str, refresh: int | None = None, nav: str = "") -> bytes:
     meta = f'<meta http-equiv="refresh" content="{refresh}">' if refresh else ""
+    nav = nav or '<a href="/">Home</a>'
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
-            f"{meta}<title>{e(title)}</title><style>{CSS}</style></head><body><main>"
-            f'<p class="small"><a href="/">prep-a-fight</a></p>{body}</main></body></html>').encode()
+            f"{meta}<title>{e(title)}</title><style>{CSS}</style></head><body>{theme.topbar(nav)}"
+            f"<main>{body}</main></body></html>").encode()
 
 
 class Jobs:
@@ -122,12 +115,13 @@ def prepared_block() -> str:
     items = prepared()
     if not items:
         return ""
-    rows = "".join(
-        f'<tr><td><a href="/view/{e(x["key"])}"><b>{e(x["name"])}</b></a></td><td>{e(x["difficulty"])}</td>'
-        f'<td class="small muted">{"prep sheet + timelines" if len(x["files"]) == 2 else ", ".join(x["files"])}'
-        f'</td><td class="small muted">{time.strftime("%Y-%m-%d %H:%M", time.localtime(x["mtime"]))}</td></tr>'
+    tiles = "".join(
+        f'<a class="tile boss-tile" href="/view/{e(x["key"])}"><div class="name">{e(x["name"])}</div>'
+        f'<span class="pill gold">{e(x["difficulty"] or "?")}</span> '
+        f'<span class="pill">{"prep sheet + timelines" if len(x["files"]) == 2 else "prep sheet only" if "prep" in x["files"] else "timelines only"}</span>'
+        f'<div class="when">updated {time.strftime("%d %b %H:%M", time.localtime(x["mtime"]))}</div></a>'
         for x in items)
-    return f'<h2>Your prepared bosses</h2><div class="card"><table>{rows}</table></div>'
+    return f'<h2>Your prepared bosses</h2><div class="grid">{tiles}</div>'
 
 
 TABS = (("prep", "Prep sheet"), ("timeline", "Top players' timelines"))
@@ -142,23 +136,31 @@ def view_page(key: str, tab: str) -> bytes:
     if tab not in item["files"]:
         tab = next(iter(k for k, _ in TABS if k in item["files"]))
     tabs = "".join(
-        (f'<b class="tab on">{e(label)}</b>' if k == tab else
-         f'<a class="tab" href="/view/{e(key)}?tab={k}">{e(label)}</a>') if k in item["files"] else
-        f'<span class="tab muted">{e(label)}</span>'
-        for k, label in TABS)
+        f'<a class="{"on" if k == tab else ""}" href="/view/{e(key)}?tab={k}">{e(label)}</a>'
+        for k, label in TABS if k in item["files"])
     others = "".join(f'<option value="/view/{e(x["key"])}"{" selected" if x["key"] == key else ""}>'
                      f'{e(x["name"])} ({e(x["difficulty"])})</option>' for x in prepared())
     src = f'/report/{e(item["files"][tab])}'
-    body = f"""<div class="bar"><a href="/"><b>prep-a-fight</b></a>
-<select onchange="location=this.value">{others}</select>
-<nav>{tabs}</nav><a class="small" href="{src}" target="_blank">open alone</a></div>
-<iframe src="{src}" title="{e(item['name'])}"></iframe>"""
-    css = """body{padding:0;margin:0}.bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:8px 16px;
-border-bottom:1px solid var(--line);background:var(--card)}.bar a{color:inherit}nav{display:flex;gap:4px}
-.tab{padding:6px 12px;border-radius:6px;text-decoration:none}.tab.on{background:var(--acc);color:var(--acc-fg)}
-a.tab:hover{background:var(--line)}iframe{border:0;width:100%;height:calc(100vh - 52px);display:block}"""
+    boss_link = _boss_link(item)
+    nav = (f'<select onchange="location=this.value" aria-label="Boss">{others}</select>{tabs}'
+           + (f'<a href="{e(boss_link)}">Assignments &amp; options</a>' if boss_link else "")
+           + f'<a href="{src}" target="_blank">Open alone</a>')
+    css = "body{display:flex;flex-direction:column;height:100vh}iframe{border:0;width:100%;flex:1;display:block}"
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
-            f"<title>{e(item['name'])}</title><style>{CSS}{css}</style></head><body>{body}</body></html>").encode()
+            f"<title>{e(item['name'])}</title><style>{CSS}{css}</style></head><body>{theme.topbar(nav)}"
+            f'<iframe src="{src}" title="{e(item["name"])}"></iframe></body></html>').encode()
+
+
+def _boss_link(item: dict) -> str:
+    """The boss page of a prepared boss (assignments, raid, options), from its name."""
+    try:
+        from paf.corpus.template import _slug
+
+        encs = _encounters()
+    except Exception:  # noqa: BLE001 - the link is a convenience
+        return ""
+    enc = next((x for x in encs if item["key"] == f"{_slug(x.name)}-{item['difficulty']}"), None)
+    return f"/boss?boss={enc.id}&difficulty={item['difficulty']}" if enc else ""
 
 
 def has_credentials() -> bool:
@@ -168,54 +170,66 @@ def has_credentials() -> bool:
 
 
 def credentials_block(error: str = "") -> str:
-    err = f'<p style="color:#b3261e">{e(error)}</p>' if error else ""
-    return f"""<h2>0. Connect to Warcraft Logs (once)</h2><div class="card">
-<p>prep-a-fight reads the top players' logs with <b>your own</b> free Warcraft Logs API key (each player has an
-hourly quota, so the key is not shared).</p>
+    err = f'<p class="notice">{e(error)}</p>' if error else ""
+    return f"""<div class="card step"><div class="num">0</div><div class="body">
+<h3>Connect to Warcraft Logs <span class="pill">once</span></h3>
+<p class="small">prep-a-fight reads the top players' logs with <b>your own</b> free Warcraft Logs API key (each player
+has an hourly quota, so the key is not shared).</p>
 <ol class="small">
 <li>Log in on <a href="https://www.warcraftlogs.com/api/clients" target="_blank" rel="noopener">warcraftlogs.com/api/clients</a>
 and click <b>Create Client</b>.</li>
 <li>Name: anything (e.g. <code>prep-a-fight</code>). Redirect URL: <code>http://localhost</code>. Leave "Public Client"
 unticked.</li>
 <li>Copy the <b>Client ID</b> and the <b>Client Secret</b> here.</li></ol>{err}
-<form method="post" action="/credentials"><label>Client ID <input name="id" size="44" required></label>
-<label>Client Secret <input name="secret" size="44" type="password" required></label>
-<p><button>Save and test</button></p></form>
-<p class="small muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p></div>"""
+<form method="post" action="/credentials" class="row"><input name="id" size="38" placeholder="Client ID" required>
+<input name="secret" size="38" type="password" placeholder="Client Secret" required><button>Save and test</button></form>
+<p class="tiny muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p></div></div>"""
 
 
 def home(error: str = "") -> bytes:
     from paf.profile import parse_simc_export
 
     prof = _profile_path()
-    status = "No character loaded yet."
+    loaded = None
     if prof.is_file():
-        p = parse_simc_export(prof.read_text(encoding="utf-8-sig"))
-        status = f"Current character: <b>{e(p.name)}</b> ({e(p.spec)} {e(p.class_name)}), {len(p.candidates)} items in bags."
+        loaded = parse_simc_export(prof.read_text(encoding="utf-8-sig"))
+    paste = """<form method="post" action="/profile"><textarea name="simc"
+placeholder="In game: type /simc, then Ctrl+A, Ctrl+C, and paste here"></textarea>
+<p><button>Load this character</button></p></form>"""
+    if loaded is not None:
+        character = (f"""<p><b>{e(loaded.name)}</b> <span class="pill gold">{e(loaded.spec)} {e(loaded.class_name)}</span>
+<span class="pill">{len(loaded.candidates)} items in bags</span></p>
+<details><summary>Load another character or an updated export</summary>{paste}</details>""")
+    else:
+        character = paste
     encs = _encounters()
     options = "".join(f'<option value="{x.id}">{e(x.name)}</option>' for x in encs)
     diff = settings.get("difficulty")
     diffs = "".join(f'<option{" selected" if d == diff else ""}>{d}</option>' for d in settings.DIFFICULTIES)
     boss_form = (f"""<form method="get" action="/boss" class="row">
-<select name="boss">{options}</select><select name="difficulty">{diffs}</select><button>Next</button></form>"""
+<select name="boss" aria-label="Boss">{options}</select><select name="difficulty" aria-label="Difficulty">{diffs}</select>
+<button>Next</button></form>"""
                  if encs else '<p class="muted">Connect to Warcraft Logs first (step 0).</p>' if not has_credentials()
                  else '<p class="muted">Warcraft Logs did not answer: check your connection, then reload.</p>')
     creds = credentials_block(error) if not has_credentials() or error else ""
     g, gs, gr = settings.get("guild"), settings.get("guild_server"), settings.get("guild_region")
     regions = "".join(f'<option{" selected" if r == gr else ""}>{r}</option>'
                       for r in settings.SETTINGS["guild_region"].choices)
-    guild = f"""<h2>Your raid (optional)</h2><div class="card">
-<p class="small">Your guild's latest public log gives your raid's composition and DPS: the prep then tells you whether
-the others cover the adds (stay on the boss) or you should pad them. You can also paste a log link on a boss page.</p>
+    guild_state = f'<span class="pill gold">{e(g)}</span>' if g else '<span class="pill">optional</span>'
+    guild = f"""<div class="card step"><div class="num">3</div><div class="body">
+<h3>Your raid {guild_state}</h3>
+<p class="small muted">Your guild's latest public log gives your raid's composition and DPS: the prep then tells you
+whether the others cover the adds (stay on the boss) or you should pad them.</p>
 <form method="post" action="/guild" class="row"><input name="guild" placeholder="Guild name" value="{e(g)}">
-<input name="server" placeholder="Server" value="{e(gs)}"><select name="region">{regions}</select>
-<button>Save</button></form></div>"""
+<input name="server" placeholder="Server" value="{e(gs)}"><select name="region" aria-label="Region">{regions}</select>
+<button class="btn ghost">Save</button></form></div></div>"""
     body = f"""<h1>Prepare a boss fight</h1>
-<p class="muted">Top players' logs, your character, SimulationCraft: the plan for this fight.</p>{prepared_block()}{creds}
-<h2>1. Your character</h2><div class="card"><p>{status}</p>
-<form method="post" action="/profile"><textarea name="simc" placeholder="In game: /simc, Ctrl+A, Ctrl+C, paste here"></textarea>
-<p><button>Load this character</button></p></form></div>
-<h2>2. The boss</h2><div class="card">{boss_form}</div>{guild}"""
+<p class="lead">The top players' logs, your character and SimulationCraft: your plan for this fight.</p>
+{prepared_block()}
+<h2>New prep</h2>{creds}
+<div class="card step"><div class="num">1</div><div class="body"><h3>Your character</h3>{character}</div></div>
+<div class="card step"><div class="num">2</div><div class="body"><h3>The boss</h3>{boss_form}</div></div>
+{guild}"""
     return page("prep-a-fight", body)
 
 
@@ -241,33 +255,46 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
             mechs = []
     current = {a.lower() for a in current_assigns(enc, difficulty)}
     if mechs:
-        rows = ""
+        chips = ""
         for m in mechs:
-            when = ", ".join(f"{int(t // 60)}:{int(t % 60):02d}" for t in m.times[:6])
-            what = "kick" if m.kind == "interrupt" else f"{m.players_per_kill:.0f} players / kill"
+            when = ", ".join(f"{int(t // 60)}:{int(t % 60):02d}" for t in m.times[:4]) + ("…" if len(m.times) > 4 else "")
+            what = "kick" if m.kind == "interrupt" else f"{m.players_per_kill:.0f} per kill"
+            cost = f", {m.cost:g}s moving" if m.cost else ""
             checked = " checked" if m.name.lower() in current or m.key in current else ""
-            rows += (f'<tr><td><label><input type="checkbox" name="assign" value="{e(m.name)}"{checked}> {e(m.name)}</label></td>'
-                     f"<td>{what}</td><td>{m.cost:g}s moving</td><td class='small'>{when}</td></tr>")
-        assigns = f"""<table><tr><th>Mechanic</th><th>Who</th><th>Cost for {e(spec)}</th><th>When</th></tr>{rows}</table>"""
+            chips += (f'<label class="chip" title="{e(when)}"><input type="checkbox" name="assign" value="{e(m.name)}"'
+                      f'{checked}>{e(m.name)} <span class="meta">{what}{cost}</span></label>')
+        article = "an" if spec[:1].lower() in "aeiou" else "a"
+        assigns = (f'<p class="small muted">Tick what you handle on this fight. Timings and the movement it costs '
+                   f'{article} {e(spec)} come from the logs; hover a mechanic to see when it happens.</p>'
+                   f'<div class="chips">{chips}</div>')
     elif kills:
-        assigns = ('<p class="muted">Mechanics are not collected yet for this boss: they will be during the prep '
-                   '(about 2 quota points per kill).</p>')
+        assigns = ('<p class="muted small">The mechanics are collected during the first prep (about 2 quota points '
+                   'per kill); you can tick yours afterwards.</p>')
     else:
-        assigns = ('<p class="muted">No kill collected yet: the prep starts by collecting ~200 ranked kills from '
+        assigns = ('<p class="muted small">No kill collected yet: the first prep collects ~200 ranked kills from '
                    'Warcraft Logs (a few minutes to an hour depending on your API quota).</p>')
-    body = f"""<h1>{e(enc.name)} <span class="muted">({e(difficulty)})</span></h1>
-<p class="muted">{kills} kills in your corpus.{prepared_link(enc, difficulty)}</p>
+    last = prepared_link(enc, difficulty)
+    body = f"""<p class="small"><a href="/">&larr; Home</a></p>
+<h1>{e(enc.name)} <span class="pill gold">{e(difficulty)}</span></h1>
+<p class="lead">{kills} ranked kills in your corpus.{last}</p>
 <form method="post" action="/prep">
 <input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
-<h2>3. Your assignments</h2><div class="card">{assigns}</div>
-<h2>Your raid</h2><div class="card">
-<label>Link to one of your raid's logs <input name="raid" size="60" value="{e(current_raid(enc, difficulty))}"
-placeholder="https://www.warcraftlogs.com/reports/..."></label>
-<p class="small muted">{e(raid_hint())}</p></div>
-<h2>4. Options</h2><div class="card">
-<label><input type="checkbox" name="gear" checked> Top Gear with your bags and this boss's loot (slower)</label>
-<label><input type="checkbox" name="optimize" checked> Ideal cooldown plan per objective (slowest, 20-40 min)</label>
-</div><p><button>Prepare this fight</button></p></form>{plan_block(enc, difficulty)}{notes_block(enc, difficulty)}"""
+<div class="card step"><div class="num">4</div><div class="body"><h3>Your assignments</h3>{assigns}</div></div>
+<div class="card step"><div class="num">5</div><div class="body"><h3>Your raid on this boss</h3>
+<input name="raid" style="width:100%" value="{e(current_raid(enc, difficulty))}"
+placeholder="Link to one of your raid's logs: https://www.warcraftlogs.com/reports/..." aria-label="Raid log link">
+<p class="tiny muted" style="margin-top:6px">{e(raid_hint())}</p></div></div>
+<div class="card step"><div class="num">6</div><div class="body"><h3>What to sim</h3>
+<label><input type="checkbox" name="gear" checked> Best gear from your bags, and what this boss drops for you</label>
+<label><input type="checkbox" name="optimize" checked> Ideal cooldown plan per objective
+<span class="muted small">(the slowest part: 20 to 40 min)</span></label></div></div>
+<div class="cta"><button class="btn big">Prepare this fight</button>
+<span class="small muted">Runs on your computer; you can follow it live.</span></div></form>
+<h2>Advanced</h2>
+<details class="card"><summary>Your fight plan: your own movements, Bloodlust, Power Infusion</summary>
+{plan_block(enc, difficulty)}</details>
+<details class="card"><summary>What you know about this boss: damage amps, targets to ignore</summary>
+{notes_block(enc, difficulty)}</details>"""
     return page(enc.name, body)
 
 
@@ -275,7 +302,7 @@ def prepared_link(enc, difficulty: str) -> str:
     from paf.corpus.template import _slug
 
     key = f"{_slug(enc.name)}-{difficulty}"
-    return f' <a href="/view/{e(key)}">Open the last prep sheet</a>.' if any(
+    return f' <a href="/view/{e(key)}">Open the last prep sheet &rarr;</a>' if any(
         x["key"] == key for x in prepared()) else ""
 
 
@@ -346,16 +373,15 @@ def plan_block(enc, difficulty: str) -> str:
     elif template_path(enc.name, difficulty).is_file():
         text = plan_template(Fight.load(template_path(enc.name, difficulty)))
     else:
-        return ('<h2>Your fight plan</h2><div class="card muted">Available after the first prep: your own movements '
-                "(a soak at 2:45, a dodge...), Bloodlust and Power Infusion timings, on top of the rebuilt fight.</div>")
-    return f"""<h2>Your fight plan</h2><div class="card">
-<p class="small muted">What you do on this fight that the logs cannot guess, one line each: <code>2:45 move 6</code>
+        return ('<p class="muted small">Available after the first prep: your own movements (a soak at 2:45, a '
+                "dodge...), Bloodlust and Power Infusion timings, on top of the rebuilt fight.</p>")
+    return f"""<p class="small muted">What you do on this fight that the logs cannot guess, one line each: <code>2:45 move 6</code>
 (6 s of movement), <code>5:30 move 8 shift -5..+5</code> (the optimizer picks the best moment), <code>lust 0:00</code>,
 <code>pi 0:20 2:30</code>, <code>no boss-movement</code>. The mechanics ticked above are added as <code>assign</code> lines.
 Every sim of the prep (gear, talents, cooldowns) runs on this fight.</p>
 <form method="post" action="/plan"><input type="hidden" name="boss" value="{enc.id}">
 <input type="hidden" name="difficulty" value="{e(difficulty)}"><textarea name="plan">{e(text)}</textarea>
-<p><button>Save the plan</button></p></form></div>"""
+<p><button class="btn ghost">Save the plan</button></p></form>"""
 
 
 def notes_block(enc, difficulty: str) -> str:
@@ -365,15 +391,14 @@ def notes_block(enc, difficulty: str) -> str:
 
     p = notes_path(template_path(enc.name, difficulty))
     if not p.is_file():
-        return ('<h2>What you know about this boss</h2><div class="card muted">Available after the first prep: '
-                "the detected mechanics (units sharing the boss's health, damage amps...) with their evidence.</div>")
+        return ('<p class="muted small">Available after the first prep: the detected mechanics (units sharing the '
+                "boss's health, damage amps...) with their evidence.</p>")
     text = p.read_text(encoding="utf-8-sig")
-    return f"""<h2>What you know about this boss</h2><div class="card">
-<p class="small muted">Detected in the logs, with the evidence. Correct what the logs cannot tell (e.g. the real damage
-amp of a heart: <code>amp Venomous Heart 2.0</code>), save, then prepare the fight again.</p>
+    return f"""<p class="small muted">Detected in the logs, with the evidence. Correct what the logs cannot tell (e.g. the
+real damage amp of a heart: <code>amp Venomous Heart 2.0</code>), save, then prepare the fight again.</p>
 <form method="post" action="/notes"><input type="hidden" name="boss" value="{enc.id}">
 <input type="hidden" name="difficulty" value="{e(difficulty)}"><textarea name="notes">{e(text)}</textarea>
-<p><button>Save the notes</button></p></form></div>"""
+<p><button class="btn ghost">Save the notes</button></p></form>"""
 
 
 def write_assigns(boss_id: int, difficulty: str, chosen: list[str]) -> None:
@@ -401,13 +426,21 @@ def job_page(jid: str) -> bytes:
     elapsed = int(time.time() - job["started"])
     if job["status"] == "done" and job["result"] and job["result"].is_file():
         key = job["result"].stem.partition("-")[2]
-        return page("Done", f'<h1>Done</h1><p><a class="btn" href="/view/{e(key)}">Open the prep sheet</a>'
-                            f'</p><details><summary>Log</summary><pre>{e(log[-20000:])}</pre></details>')
+        return page("Done", f'<h1>Your prep is ready</h1><div class="cta"><a class="btn big" href="/view/{e(key)}">'
+                            f'Open the prep sheet</a></div>'
+                            f'<details class="card"><summary>What was done (log)</summary><pre class="log">'
+                            f'{e(log[-20000:])}</pre></details>')
     status = job["status"]
     refresh = 5 if status == "running" else None
-    return page("Working...", f"<h1>{'Working' if status == 'running' else e(status)}</h1>"
-                              f"<p class='muted'>{elapsed // 60} min {elapsed % 60:02d} s. This page refreshes itself.</p>"
-                              f"<div class='card'><pre>{e(log[-6000:])}</pre></div>", refresh)
+    steps = [line[3:] for line in log.splitlines() if line.startswith("== ")]
+    done = "".join(f"<li>{e(s)}</li>" for s in steps[:-1])
+    now = f"<li><b>{e(steps[-1])}</b> <span class='pill gold'>in progress</span></li>" if steps else ""
+    head = "Preparing the fight" if status == "running" else f"Stopped: {e(status)}"
+    return page("Working...", f"<h1>{head}</h1><p class='lead'>{elapsed // 60} min {elapsed % 60:02d} s. "
+                              f"This page refreshes itself; you can leave it open.</p>"
+                              f"<div class='card'><ol class='small'>{done}{now}</ol></div>"
+                              f"<details class='card'><summary>Details (log)</summary><pre class='log'>"
+                              f"{e(log[-6000:])}</pre></details>", refresh)
 
 
 class Handler(BaseHTTPRequestHandler):
