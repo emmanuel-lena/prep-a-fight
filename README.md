@@ -30,7 +30,24 @@ prep-a-fight is meant to sit **next to** the tools you already use, not replace 
 
 > Status: early development. First target: Elemental Shaman, one boss at a time. See [ROADMAP.md](ROADMAP.md).
 
-## Install
+## Install (players, Windows)
+
+1. Unzip `prep-a-fight-<version>.zip` anywhere and double-click **`install.bat`** (no admin rights needed).
+   It installs [uv](https://docs.astral.sh/uv/) (which brings its own Python), prep-a-fight,
+   SimulationCraft (~100 MB) and a **prep-a-fight** shortcut on your desktop. A few minutes.
+2. Double-click the shortcut: the app opens in your browser. Keep its black window open while you use it.
+3. First run: connect your free Warcraft Logs API key (the page shows how to create it, 2 minutes),
+   then paste your `/simc` export and pick a boss.
+
+To update, unzip the new version and run `install.bat` again. To uninstall: `uv tool uninstall prep-a-fight`,
+then delete the `.paf` folder in your user folder and the shortcut.
+
+A first prep collects ~200 ranked kills from Warcraft Logs (from a few minutes to an hour, depending on your
+API quota), then sims for 10 to 40 minutes on your CPU. Later preps of the same boss reuse everything.
+
+To share it: `tools/make-bundle.ps1` builds the zip from the last commit.
+
+## Install (developers)
 
 Requires Python 3.11+.
 
@@ -166,4 +183,8 @@ or Warcraft Logs.
 
 Outil gratuit, fait par un raider pour les raiders : préparer un boss sans passer 2 h dans les logs. Timelines des meilleurs logs de ta spec, sims
 sur le vrai combat reconstruit depuis les logs, et plan de CD selon tes assigns. Complémentaire de Raidbots et Warcraft Logs, pas un remplaçant.
-Installation ci-dessus, feuille de route dans [ROADMAP.md](ROADMAP.md).
+Feuille de route dans [ROADMAP.md](ROADMAP.md).
+
+**Installer (Windows)** : dézipper, double-cliquer `install.bat`, puis le raccourci **prep-a-fight** du bureau.
+Au premier lancement, la page explique comment créer sa clé API Warcraft Logs gratuite (2 minutes), puis on colle
+son `/simc` et on choisit un boss. Pour l'instant, seul le Chaman Élémentaire est pris en charge et testé.
