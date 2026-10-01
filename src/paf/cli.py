@@ -658,7 +658,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
     def step(msg: str) -> None:
         print(f"\n== {msg}", flush=True)
 
-    done = con.execute("SELECT COUNT(*) FROM fight WHERE encounter_id=? AND difficulty=? AND status='done'",
+    done = con.execute("SELECT COUNT(*) FROM fight WHERE encounter_id=? AND difficulty=? AND status='done' "
+                       "AND COALESCE(cohort, '') != 'focus'",
                        (enc.id, diff)).fetchone()[0]
     if done < 20 or args.refresh:
         step("Collecting the corpus from Warcraft Logs")
@@ -666,7 +667,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
                                       list_only=False, retry=False, refetch=False))
     mech_missing = con.execute(
         "SELECT COUNT(*) FROM fight f LEFT JOIN mech_status m USING(report, fight_id) "
-        "WHERE f.encounter_id=? AND f.difficulty=? AND f.status='done' AND m.report IS NULL",
+        "WHERE f.encounter_id=? AND f.difficulty=? AND f.status='done' AND m.report IS NULL "
+        "AND COALESCE(f.cohort, '') != 'focus'",
         (enc.id, diff)).fetchone()[0]
     if mech_missing:
         from paf.corpus.mechanics import fetch_mechanics
@@ -914,7 +916,7 @@ def cmd_raid(args: argparse.Namespace) -> int:
         from paf.profile import Profile
 
         profile = Profile()
-    r = _raid_verdict(client, con, enc, diff, url, profile, settings.get("spec"))
+    r = _raid_verdict(client, con, enc, diff, url, profile, settings.get("spec"), fill=args.fill)
     print(f"{enc.name} ({diff_name}), your raid from log {r.report} ({r.fight}, {r.players} players)")
     print(f"you: {r.you[0]}, {r.you[1] / 1000:,.0f}k DPS" + ("" if r.you_found else " (not in that log: raid median)"))
     if not r.verdicts:
@@ -928,6 +930,17 @@ def cmd_raid(args: argparse.Namespace) -> int:
     for kind, players in r.archetypes.items():
         if players:
             print(f"\n{kind} on this boss ({len(players)}): " + ", ".join(players))
+    if r.estimated:
+        print(f"\n(estimated from their rankings, too rare in the corpus: {', '.join(r.estimated)})")
+    if r.your_profile:
+        p = r.your_profile
+        print(f"\nYour spec's top 100: {p.dps / 1000:,.0f}k total DPS, {p.boss_dps / 1000:,.0f}k boss DPS "
+              f"({p.boss_share:.0%} on the boss), {p.same_players} players in both")
+        if p.pad_talents or p.boss_talents:
+            print(f"  pad build takes: {', '.join(p.pad_talents) or '-'}; boss build takes: "
+                  f"{', '.join(p.boss_talents) or '-'}")
+        else:
+            print("  same talents in both: no separate pad build")
     print(f"\n=> {'Stay on the boss' if r.objective == 'boss' else 'Pad the adds'}: "
           f"`paf prep \"{enc.name}\"` will use the cooldown plan and gear for "
           f"{'boss' if r.objective == 'boss' else 'total'} damage.")
@@ -946,12 +959,14 @@ def _plan_raid(enc, diff_name: str) -> str:
         return ""
 
 
-def _raid_verdict(client, con, enc, diff: int, url: str, profile, spec: str):
-    """Pad the adds or stay on the boss, from your raid's composition and DPS (paf.raidneed)."""
+def _raid_verdict(client, con, enc, diff: int, url: str, profile, spec: str, fill: bool = False):
+    """Pad the adds or stay on the boss, from your raid's composition and DPS (paf.raidneed). fill: fetch a few
+    ranked kills of the specs of your raid that are too rare in the corpus to be measured."""
     import statistics as st
 
     from paf import raidneed, settings
     from paf.prep_report import RaidInfo
+    from paf.wcl import WCLError
 
     rc = raidneed.raid_from_report(client, url, enc.id, diff)
     me = next((p for p in rc.players if profile.name and p[0].lower() == profile.name.lower()), None)
@@ -962,10 +977,29 @@ def _raid_verdict(client, con, enc, diff: int, url: str, profile, spec: str):
         dealers = sorted(dps for _, _, dps in rc.players)[len(rc.players) // 2:]
         you, found = (f"{spec} {settings.get('class')}", st.median(dealers) if dealers else 0.0), False
     types = raidneed.add_types(con, enc.id, diff)
+    missing = sorted({s for _, s, _ in rc.players if types and s not in types[0].focus and s not in raidneed.HEALERS})
+    if missing and fill:  # optional: measure the rare specs on real kills instead of estimating them
+        from paf.corpus.collect import add_focus_kills, collect
+
+        print(f"  not measured on this boss yet: {', '.join(missing)}; fetching ~20 ranked kills of each "
+              f"(about 10 quota points per kill)", flush=True)
+        for label in missing:
+            spec_name, _, cls = label.rpartition(" ")
+            try:
+                add_focus_kills(client, con, enc, diff, cls, spec_name)
+            except (WCLError, KeyError, TypeError) as ex:
+                print(f"  {label}: {ex}")
+        collect(client, con, enc, diff)
+        types = raidneed.add_types(con, enc.id, diff)
+    # every spec of the raid (and yours): total-DPS vs boss-DPS rankings, a few quota points per spec
+    print("  reading the total-DPS and boss-DPS rankings of your raid's specs...", flush=True)
+    profiles = raidneed.spec_profiles(client, enc.id, diff, [s for _, s, _ in rc.players] + [you[0]])
+    types = [raidneed.with_profiles(t, profiles) for t in types]
     vs = raidneed.verdicts(types, others, you)
     return RaidInfo(rc.report, rc.fight, len(rc.players), you, found, vs, raidneed.overall(vs),
                     raidneed.best_cleavers(types, rc.players), raidneed.archetypes(types, rc.players),
-                    raidneed.archetype(types[0], you[0]) if types else "")
+                    raidneed.archetype(types[0], you[0]) if types else "", profiles.get(you[0]),
+                    sorted(types[0].estimated) if types else [])
 
 
 def _fight_with_plan(enc, diff_name: str, described: list[str] | None = None):
@@ -1382,6 +1416,9 @@ def build_parser() -> argparse.ArgumentParser:
     rd.add_argument("--raid", help="link to one of your raid's logs (default: your guild's latest log, "
                                    "see `paf config guild`)")
     rd.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
+    rd.add_argument("--fill", action="store_true",
+                    help="measure the specs of your raid that are too rare in the corpus on ~20 of their ranked kills "
+                         "each (~10 quota points per kill) instead of estimating them from their rankings")
     rd.set_defaults(func=cmd_raid)
 
     va = sub.add_parser("validate", help="sim the top players' own characters on the rebuilt fight and compare "

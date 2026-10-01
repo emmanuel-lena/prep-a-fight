@@ -60,8 +60,14 @@ def main_boss(con: sqlite3.Connection, encounter_id: int, difficulty: int, defau
     return row[0] if row else default
 
 
-def kills_filter(encounter_id: int, difficulty: int) -> tuple[str, tuple]:
-    return ("f.encounter_id=? AND f.difficulty=? AND f.status='done'", (encounter_id, difficulty))
+FOCUS = "focus"  # cohort of the kills fetched only to measure rare specs (paf.raidneed): not the analyzed spec's
+
+
+def kills_filter(encounter_id: int, difficulty: int, include_focus: bool = False) -> tuple[str, tuple]:
+    if include_focus:
+        return ("f.encounter_id=? AND f.difficulty=? AND f.status='done'", (encounter_id, difficulty))
+    return ("f.encounter_id=? AND f.difficulty=? AND f.status='done' AND COALESCE(f.cohort, '') != 'focus'",
+            (encounter_id, difficulty))
 
 
 def fight_waves(spawns: list[tuple[float, float, str]]) -> list[tuple[float, int, float, list[str]]]:

@@ -38,6 +38,7 @@ class AddType:
     default_focus: float
     tops_rate: float  # median raid DPS on this add type in the top kills, from the composition
     tops_low: float = 0.0  # the top raids' weakest quarter (25th percentile of the same)
+    estimated: set[str] = field(default_factory=set)  # specs whose focus comes from the rankings, not the corpus
 
     def rate(self, comp: list[tuple[str, float]]) -> float:
         return sum(dps * self.focus.get(spec, self.default_focus) for spec, dps in comp)
@@ -57,7 +58,7 @@ def _union(ws: list[tuple[float, float]]) -> float:
 
 def add_types(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> list[AddType]:
     """The add types that matter on this boss, with each spec's focus on them (from the corpus)."""
-    where, params = kills_filter(encounter_id, difficulty)
+    where, params = kills_filter(encounter_id, difficulty, include_focus=True)
     durations = {(r[0], r[1]): r[2] for r in con.execute(
         f"SELECT report, fight_id, duration_s FROM fight f WHERE {where}", params)}
     damage = defaultdict(float)
@@ -235,12 +236,106 @@ def overall(vs: list[AddVerdict]) -> str | None:
     return vs[0].verdict if vs else None
 
 
+# --- what each spec does with the adds, from Warcraft Logs' two rankings --------------------------------
+# The top 100 of a spec by total DPS vs its top 100 by boss DPS: the gap is what padding adds at the top, for
+# every spec (even the ones too rare in the corpus), and their talents show whether a "pad build" exists.
+
+RANKING_QUERY = """query($id:Int!, $diff:Int!, $cls:String!, $spec:String!, $metric:CharacterRankingMetricType!) {
+  worldData { encounter(id:$id) { characterRankings(className:$cls, specName:$spec, difficulty:$diff,
+    metric:$metric, includeCombatantInfo:true) } } }"""
+TALENT_GAP = 0.15  # a talent taken this much more often in one top 100 than in the other
+
+
+@dataclass
+class SpecProfile:
+    spec: str  # "Spec Class"
+    dps: float  # median of the top 100 by total DPS
+    boss_dps: float  # median of the top 100 by boss DPS
+    same_players: int  # players in both top 100
+    pad_talents: list[str] = field(default_factory=list)  # taken more often by the total-DPS top
+    boss_talents: list[str] = field(default_factory=list)  # taken more often by the boss-DPS top
+
+    @property
+    def boss_share(self) -> float:
+        return self.boss_dps / self.dps if self.dps else 1.0
+
+
+def spec_profile(client, encounter_id: int, difficulty: int, label: str,
+                 talent_names: dict[int, str] | None = None) -> SpecProfile | None:
+    spec, _, cls = label.rpartition(" ")
+    lists = {}
+    for metric in ("dps", "bossdps"):
+        data = client.query(RANKING_QUERY, {"id": encounter_id, "diff": difficulty, "cls": cls, "spec": spec,
+                                            "metric": metric}, cache_ttl=6 * 3600)
+        cr = data["worldData"]["encounter"]["characterRankings"] or {}
+        lists[metric] = [r for r in (cr.get("rankings") or []) if r.get("amount")]
+    a, b = lists["dps"], lists["bossdps"]
+    if len(a) < 10 or len(b) < 10:
+        return None
+
+    def who(r):
+        return r.get("name"), (r.get("server") or {}).get("name")
+
+    def picks(rows):
+        c: dict[int, int] = defaultdict(int)
+        for r in rows:
+            for t in r.get("talents") or []:
+                c[t.get("talentID")] += 1
+        return c
+
+    pa, pb = picks(a), picks(b)
+    names = talent_names or {}
+    gaps = [(pa[t] / len(a) - pb[t] / len(b), t) for t in set(pa) | set(pb)]
+    p = SpecProfile(label, st.median(r["amount"] for r in a), st.median(r["amount"] for r in b),
+                    len({who(r) for r in a} & {who(r) for r in b}))
+    p.pad_talents = [names.get(t, f"talent {t}") for g, t in sorted(gaps, reverse=True) if g >= TALENT_GAP]
+    p.boss_talents = [names.get(t, f"talent {t}") for g, t in sorted(gaps) if g <= -TALENT_GAP]
+    return p
+
+
+def spec_profiles(client, encounter_id: int, difficulty: int, labels: list[str]) -> dict[str, SpecProfile]:
+    try:
+        from paf.gamedata import talent_entry_names
+
+        names = talent_entry_names()
+    except Exception:  # noqa: BLE001 - names are a nicety; the numbers do not need them
+        names = {}
+    out = {}
+    for label in sorted(set(labels)):
+        if label in HEALERS:
+            continue
+        p = spec_profile(client, encounter_id, difficulty, label, names)
+        if p:
+            out[label] = p
+    return out
+
+
+def with_profiles(t: AddType, profiles: dict[str, SpecProfile]) -> AddType:
+    """Fill the focus of the specs too rare in the corpus from their rankings' gap: a spec whose top padders
+    gain twice the median gap is assumed to put twice the median focus on the adds."""
+    measured = [p for s, p in profiles.items() if s in t.focus]
+    if not measured:
+        return t
+    ref_pad = st.median(1 - p.boss_share for p in measured)
+    ref_focus = st.median(t.focus[p.spec] for p in measured)
+    if ref_pad <= 0:
+        return t
+    focus = dict(t.focus)
+    for s, p in profiles.items():
+        if s not in focus:
+            focus[s] = min(1.0, ref_focus * (1 - p.boss_share) / ref_pad)
+    out = AddType(**{**t.__dict__, "focus": focus})
+    out.estimated = {s for s in focus if s not in t.focus}
+    return out
+
+
 AOE, FLEX, SINGLE = "AoE / funnel", "flexible", "single target"
 UNKNOWN = "not measured on this boss (too few in the logs; counted as average)"
 
 
 def archetype(t: AddType, spec: str) -> str:
-    """What a spec is on this boss, from its measured focus on the main adds vs the median of all players."""
+    """What a spec is on this boss, from its focus on the main adds (measured, or estimated from the rankings
+    for the rare specs) vs the median of all players."""
     if spec not in t.focus:
         return UNKNOWN
     f = t.focus[spec]

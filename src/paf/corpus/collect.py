@@ -345,7 +345,26 @@ def write_kill(con: sqlite3.Connection, report: str, fight_id: int, p: dict[str,
     con.commit()
 
 
-NPC_ACTORS_QUERY = """query($code:String!){ reportData { report(code:$code) {
+def add_focus_kills(client: WCLClient, con: sqlite3.Connection, enc: Encounter, difficulty: int, cls: str,
+                    spec: str, count: int = 20) -> int:
+    """Queue ranked kills of another spec, only to measure what that spec does on this boss (paf.raidneed).
+    They are kept apart (cohort 'focus'): the analyses of your spec never see them, and no ranked player is
+    stored, so fetching them skips the costly per-player events. Returns the number of new kills."""
+    from paf.corpus.analyze import FOCUS
+
+    new = 0
+    for k in enumerate_kills(client, enc, difficulty, cls, spec, count=count):
+        cur = con.execute("INSERT OR IGNORE INTO fight(report, fight_id, encounter_id, difficulty, size, duration_s,"
+                          " region, guild_id, cohort) VALUES(?,?,?,?,?,?,?,?,?)",
+                          (k.report, k.fight_id, enc.id, difficulty, k.row.get("size"),
+                           (k.row.get("duration") or 0) / 1000, (k.row.get("server") or {}).get("region"),
+                           (k.row.get("guild") or {}).get("id"), FOCUS))
+        new += cur.rowcount
+    con.commit()
+    return new
+
+
+NPC_ACTORS_QUERY ="""query($code:String!){ reportData { report(code:$code) {
   masterData { actors(type:"NPC") { id gameID } } } } }"""
 
 

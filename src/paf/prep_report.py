@@ -36,6 +36,8 @@ class RaidInfo:
     cleavers: list = field(default_factory=list)  # (name, spec, DPS on the main adds)
     archetypes: dict = field(default_factory=dict)  # "AoE / funnel" / "flexible" / "single target" -> players
     your_archetype: str = ""
+    your_profile: object | None = None  # paf.raidneed.SpecProfile of your spec (total vs boss DPS rankings)
+    estimated: list = field(default_factory=list)  # specs whose share on the adds is estimated from the rankings
 
 
 @dataclass
@@ -295,12 +297,23 @@ def raid_section(r: RaidInfo) -> str:
     verdict = ("Stay on the boss: the cooldown plan and the gear below are the ones for boss damage." if r.objective
                == "boss" else "Pad the adds: the cooldown plan and the gear below are the ones for total damage.")
     mine = f" On this boss your spec is <b>{e(r.your_archetype)}</b>." if r.your_archetype else ""
+    p = r.your_profile
+    build = ""
+    if p is not None:
+        build = (f"<p class='small'>Your spec's top 100 on this boss: {p.dps / 1000:,.0f}k total DPS vs "
+                 f"{p.boss_dps / 1000:,.0f}k for the top 100 by boss DPS ({p.boss_share:.0%}); {p.same_players} players "
+                 f"are in both. ")
+        build += (f"The pad build takes {e(', '.join(p.pad_talents) or '-')}; the boss build takes "
+                  f"{e(', '.join(p.boss_talents) or '-')}.</p>" if p.pad_talents or p.boss_talents else
+                  "Same talents in both: no separate pad build.</p>")
+    est = (f"<p class='small muted'>Estimated from their total-DPS vs boss-DPS rankings (too rare in the "
+           f"corpus): {e(', '.join(r.estimated))}.</p>" if r.estimated else "")
     return f"""<h2>Your raid and the adds</h2><div class="card">{head}
 <p><b>{verdict}</b>{mine}</p>
 <div class="scroll"><table><tr><th>Adds</th><th>Your raid without you</th><th>With you</th>
 <th>Top raids' weakest quarter</th><th>Verdict</th></tr>{rows}</table></div>
 <p class="small muted">Damage your raid puts on these adds, as a share of the top raids' (their median = 100%).</p>
-<p class="small">Your raid on this boss, by what each spec does with the adds:</p><ul class="small">{groups}</ul>
+<p class="small">Your raid on this boss, by what each spec does with the adds:</p><ul class="small">{groups}</ul>{est}{build}
 <details><summary class="small">How it is computed</summary><p class="small muted">Measured: on this boss, each spec puts
 a share of its damage on these adds while they are up (from the ranked kills): well above the median of all players =
 AoE / funnel, well below = single target. Computed: your raid's damage on the adds = every player's DPS in your log x
