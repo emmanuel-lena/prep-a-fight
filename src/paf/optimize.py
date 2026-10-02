@@ -443,12 +443,54 @@ def adjust_alignment(alignment: list[Alignment], default_timeline: list[tuple[fl
     return out
 
 
-def mrt_note(boss: str, plan: Plan, fight: Fight) -> str:
-    """A note for Method Raid Tools / NSRT: one line per cooldown cast, with its time."""
-    lines = [f"prep-a-fight {boss} ({plan.objective}: {plan.gain:+.1f}%)"]
-    for t, label in plan.timeline:
-        ctx = fight_context(fight, t)
-        lines.append(f"{{time:{int(t // 60)}:{int(t % 60):02d}}} {label.title()}" + (f" - {ctx}" if ctx else ""))
+MRT_FREQUENT = 8  # a cooldown cast more often than this in the pull is part of the rotation
+MRT_MERGE = 5.0  # seconds: casts of the same cooldown closer than this (charges) are one line
+HOLD_RULES = ("hold_", "add_waves", "secondary_targets", "vulnerable_windows", "lust_pi")
+GOALS = {"boss": "boss damage", "total": "total damage (pad)", "secondary": "burst", "adds": "damage to adds"}
+
+
+def _short_context(fight: Fight, t: float) -> str:
+    ctx = re.sub(r" \((after [^)]*|boss aura)\)", "", fight_context(fight, t))
+    return ", ".join(c for c in ctx.split(", ") if c and c != "move soon")
+
+
+def mrt_note(boss: str, plan: Plan, fight: Fight, names: dict[str, str] | None = None) -> str:
+    """A note for Method Raid Tools: the casts that matter, one line per moment ({time:m:ss} timers from the
+    pull). Rotational cooldowns are left out unless the plan holds them; charges cast together are one cast;
+    cooldowns cast at the same moment share a line."""
+    shown = {v.lower(): v for v in (names or {}).values()}
+
+    def name(label: str) -> str:
+        return shown.get(label.lower()) or " ".join(w if w in ("of", "the", "and") else w.capitalize()
+                                                    for w in label.split())
+
+    count: dict[str, int] = {}
+    for _, label in plan.timeline:
+        count[label] = count.get(label, 0) + 1
+    rules = {k.replace("use_item:", "").replace("_", " "): r.name for k, r in plan.choice.items()}
+
+    def keep(label: str, t: float) -> bool:
+        if count[label] <= MRT_FREQUENT:
+            return True
+        # a rotational cooldown the plan holds: only its casts on the moments it is held for
+        return rules.get(label, "default").startswith(HOLD_RULES) and bool(_short_context(fight, t))
+
+    moments: list[tuple[float, list[str]]] = []
+    last: dict[str, float] = {}
+    for t, label in sorted(plan.timeline):
+        if not keep(label, t) or t - last.get(label, -1e9) < MRT_MERGE:
+            continue
+        last[label] = t
+        if moments and t - moments[-1][0] < 2:
+            moments[-1][1].append(name(label))
+        else:
+            moments.append((t, [name(label)]))
+    lines = [f"prep-a-fight: {boss}, cooldowns for {GOALS.get(plan.objective, plan.objective)} "
+             f"({plan.gain:+.1f}%)"]
+    for t, labels in moments:
+        ctx = _short_context(fight, t)
+        lines.append(f"{{time:{int(t // 60)}:{int(t % 60):02d}}} {', '.join(dict.fromkeys(labels))}"
+                     + (f" - {ctx}" if ctx else ""))
     return "\n".join(lines)
 
 

@@ -819,8 +819,9 @@ def cmd_prep(args: argparse.Namespace) -> int:
         step("Ideal cooldown plan per objective, with sensitivity checks")
         d.optimized, _ = optimize_all(profile_text, fight, root / "optimize", target_error=args.error,
                                       alignment=d.alignment, validation=d.validation[1] if d.validation else None)
-        d.mrt = {p.objective: mrt_note(enc.name, p, fight) for p in d.optimized}
-        (reports / f"mrt-{_slug(enc.name)}-{diff_name}.txt").write_text("\n\n".join(d.mrt.values()) + "\n",
+        d.mrt = {p.objective: mrt_note(enc.name, p, fight, d.cd_names) for p in d.optimized}
+        raid_notes = [n for o, n in d.mrt.items() if o != "adds"]  # "damage to adds" is not a raid plan
+        (reports / f"mrt-{_slug(enc.name)}-{diff_name}.txt").write_text("\n\n".join(raid_notes) + "\n",
                                                                          encoding="utf-8")
 
     if not args.no_gear:

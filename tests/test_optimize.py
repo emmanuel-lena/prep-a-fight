@@ -112,3 +112,21 @@ def test_tops_alignment():
     a = tops_alignment(TL(), fight())[0]
     assert round(a.in_units, 2) == 0.67 and a.in_adds == 0.0
     assert 0 < a.units_cover < a.in_units
+
+
+def test_mrt_note_keeps_what_matters():
+    from paf.fight import Vulnerable
+    from paf.optimize import Plan, mrt_note
+
+    f = Fight("B", 600, vulnerable=[Vulnerable(120, 40, 2.0, "Venomous Heart (after Mother's Wrath)")],
+              movement=[Window(124, 5)], lust_time=120)
+    timeline = [(0.0, "stormkeeper"), (1.0, "stormkeeper"), (0.0, "ascendance"), (120.0, "ascendance"),
+                (120.5, "vile vial of volatile venom"), (121.0, "potion")]
+    timeline += [(10.0 + 30 * i, "ancestral swiftness") for i in range(15)]  # rotational: left out
+    plan = Plan("boss", {"ascendance": Rule("hold_vulnerable_60", "", lambda o: o)}, 10.0, 0.1, timeline=timeline)
+    note = mrt_note("Ula'tek", plan, f, {"use_item:trinket1": "Vile Vial of Volatile Venom"})
+    lines = note.splitlines()
+    assert lines[0] == "prep-a-fight: Ula'tek, cooldowns for boss damage (+10.0%)"
+    assert lines[1] == "{time:0:00} Ascendance, Stormkeeper"  # the second Stormkeeper charge is merged
+    assert lines[2] == "{time:2:00} Ascendance, Vile Vial of Volatile Venom, Potion - Venomous Heart x2, lust"
+    assert "Ancestral Swiftness" not in note and "move soon" not in note and "(after" not in note
