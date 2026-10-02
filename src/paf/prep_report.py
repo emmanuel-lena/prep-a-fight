@@ -88,6 +88,7 @@ class PrepData:
     guide_summary: str = ""  # html: the boss in 60 seconds (Encounter Journal, your role)
     guide_abilities: str = ""  # html: every ability phase by phase, with what the logs add
     role_bullets: list[str] = field(default_factory=list)  # what the journal tells your role to do
+    actions: list = field(default_factory=list)  # paf.actions.Action: what the top players do, from their logs
 
 
 PALETTE = ["#c89933", "#8e6a9b", "#4f8a8b", "#d0705a", "#b8ad3c", "#b0577f", "#3f6fa0", "#6c9a5b", "#74526c"]
@@ -568,8 +569,13 @@ def checklist_html(d: PrepData) -> str:
              " " + copy_button(d.mrt[plan.objective], "Copy the MRT note") if d.mrt.get(plan.objective) else "")
     if d.lust is not None:
         item(f"Bloodlust usually comes around {_mmss(d.lust)}")
-    for b in d.role_bullets[:4]:
-        item(e(b))
+    mine = [a for a in d.actions if a.kind in ("kill", "interrupt", "mechanic")
+            and not (a.kind == "interrupt" and not a.text.startswith("Interrupt"))]
+    for a in mine[:6]:
+        item(f"{icons.img(d.icons.get(a.name, ''), 'small')}{e(a.text)}")
+    if not mine:
+        for b in d.role_bullets[:4]:
+            item(e(b))
     for a in d.assigns:
         item("Your assignment: " + e(a))
     if not items:
@@ -628,6 +634,17 @@ def render(d: PrepData) -> str:
     if d.guide_summary or d.guide_abilities:
         tabs["boss"].append("<h2>The boss in 60 seconds</h2>" + d.guide_summary.replace(
             '<a href="#boss">Every ability, phase by phase &rarr;</a>', ""))
+        if d.actions:
+            groups = {"kill": "Adds to kill", "interrupt": "Interrupts", "assignment": "Assignments",
+                      "mechanic": "Mechanics you will get", "ignore": "Units the top raids leave alive"}
+            blocks = ""
+            for kind, title in groups.items():
+                rows = [a for a in d.actions if a.kind == kind]
+                if rows:
+                    blocks += (f"<h3>{e(title)}</h3><ul>" + "".join(
+                        f"<li>{icons.img(d.icons.get(a.name, ''), 'small')}{e(a.text)}</li>" for a in rows) + "</ul>")
+            tabs["boss"].append("<h2>What the top players do, from their logs</h2><div class='card guide'>"
+                                f"{blocks}</div>")
         tabs["boss"].append("<h2>Every ability, phase by phase</h2><p class='small muted'>From the in-game "
                             "Encounter Journal; timings and how many players are hit come from the ranked kills.</p>"
                             + d.guide_abilities)

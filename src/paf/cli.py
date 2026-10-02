@@ -881,7 +881,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
     from paf.icons import CLASS_ICON, icons_for
 
     d.class_name = profile.class_name
-    d.icons = icons_for(d.links)
+    d.icons = {**d.icons, **icons_for(d.links)}
     d.icons["__spec__"] = CLASS_ICON.format(cls=profile.class_name.lower())
     out = reports / f"prep-{_slug(enc.name)}-{diff_name}.html"
     out.write_text(render(d), encoding="utf-8")
@@ -969,18 +969,29 @@ def _boss_guide(d, con, enc, diff: int, diff_name: str, spec: str, tl, fight) ->
     from paf.icons import icons_for
 
     sections = bossguide.load(enc.id, diff_name)
-    if not sections:
-        return
     try:
         from paf.assigns import load_mechanics
 
         mechs = load_mechanics(con, enc.id, diff, spec)
     except Exception:  # noqa: BLE001 - the guide works without the assignment stats
         mechs = []
+    if not sections:
+        return
     burst = {v.name.split(" (")[0]: v.multiplier for v in fight.vulnerable}
     gicons = icons_for(bossguide.spell_refs(sections))
+    d.icons.update(gicons)
     d.guide_summary = bossguide.summary_html(sections, "damage", "#boss")
     d.role_bullets = bossguide.role_bullets(sections, "damage")
+    try:
+        from paf import raidneed, settings
+        from paf.actions import actions
+
+        label = f"{spec} {settings.get('class')}"
+        focus = {t.name: t.focus[label] for t in raidneed.add_types(con, enc.id, diff) if label in t.focus}
+        skip = {r[0] for r in con.execute("SELECT name FROM npc WHERE is_boss=1")}
+        d.actions = actions(con, enc.id, diff, spec, mechs, focus, skip)
+    except Exception as ex:  # noqa: BLE001 - the guide works without them
+        print(f"  actions from the logs skipped: {ex}")
     d.guide_abilities = bossguide.abilities_html(sections, timings=dict(tl.boss_casts), mechanics=mechs,
                                                  burst=burst, icon_map=gicons)
 

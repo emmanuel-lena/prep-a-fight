@@ -33,6 +33,8 @@ class Mechanic:
     cost: float  # extra seconds of movement for the player who handles it, each time
     samples: int  # kills where the analyzed spec handled it (basis of the cost)
     players_per_kill: float
+    per_kill: float = 0.0  # events per kill (e.g. kicks)
+    spec_share: float = 0.0  # share of the kills where the ranked player of your spec handled it
 
 
 def _cluster_times(per_kill: list[list[float]], support: float = 0.3) -> list[float]:
@@ -116,8 +118,11 @@ def mechanic_timings(con: sqlite3.Connection, encounter_id: int, difficulty: int
         else:
             cost = DEFAULT_COST
         players = st.median(len({a for _, a in v}) for v in by_kill.values())
+        mine_kills = [k for k in by_kill if k in ranked]
+        share = (sum(any(a == ranked[k] for _, a in by_kill[k]) for k in mine_kills) / len(mine_kills)
+                 if mine_kills else 0.0)
         out.append(Mechanic(key, name, kind, [round(t, 1) for t in times], round(min(cost, 10.0), 1),
-                            len(handled), players))
+                            len(handled), players, st.median(len(v) for v in by_kill.values()), round(share, 2)))
     out.sort(key=lambda m: (m.kind != "debuff", m.players_per_kill, m.name))
     return out
 
