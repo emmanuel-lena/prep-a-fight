@@ -51,3 +51,14 @@ def test_render_prep_sheet_with_wowhead_links():
     assert "Boss &lt;X&gt;" in page and "Best gear from your bags" in page
     assert 'data-wowhead="item=271481&amp;ilvl=321"' in page and 'href="https://www.wowhead.com/item=271092"' in page
     assert "wow.zamimg.com/js/tooltips.js" in page
+
+
+def test_checklist():
+    d = PrepData("Boss", "heroic", "Elemental", "Char")
+    d.lust = 120
+    d.role_bullets = ["Kill the Clutch.", "Burst the Heart."]
+    d.assigns = ["Malice: interrupt"]
+    page = render(d)
+    assert "Your raid checklist" in page and "Bloodlust usually comes around 2:00" in page
+    assert "Kill the Clutch." in page and "Your assignment: Malice: interrupt" in page
+    assert "ask your raid lead" in page

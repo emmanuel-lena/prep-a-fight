@@ -34,6 +34,10 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .boss-tile .top{font-size:13px;margin-top:10px;line-height:1.35}
 .cta{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:18px 0 6px}
 .lead{font-size:16px;color:var(--muted);margin-bottom:18px}
+ol.steps{list-style:none;margin:0;padding:0} .st{padding:7px 0;border-bottom:1px solid var(--line)}
+.st:last-child{border-bottom:0} .st span:first-child{display:inline-block;width:22px}
+.st.done{color:var(--muted)} .st.done span:first-child{color:var(--pos)} .st.now{font-weight:700}
+.st.now span:first-child{color:var(--accent)} .st.next{color:var(--muted)}
 """
 
 
@@ -57,15 +61,47 @@ class Jobs:
         job = {"args": args, "log": log, "result": result, "status": "running", "started": time.time()}
         with self.lock:
             self.jobs[jid] = job
+        self._save(jid, job)
 
         def run() -> None:
             with log.open("w", encoding="utf-8", errors="replace") as out:
                 proc = subprocess.run([sys.executable, "-m", "paf", *args], stdout=out, stderr=subprocess.STDOUT,
                                       env={**_env(), "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"})
             job["status"] = "done" if proc.returncode == 0 else f"failed (exit {proc.returncode})"
+            self._save(jid, job)
 
         threading.Thread(target=run, daemon=True).start()
         return jid
+
+    @staticmethod
+    def _save(jid: str, job: dict) -> None:
+        """Jobs are kept on disk: the progress page survives a restart of the app (the prep keeps running)."""
+        import json
+
+        meta = {"args": job["args"], "result": str(job["result"] or ""), "status": job["status"],
+                "started": job["started"]}
+        (data_dir() / "web" / f"job-{jid}.json").write_text(json.dumps(meta), encoding="utf-8")
+
+    def get(self, jid: str) -> dict | None:
+        import json
+        import re
+
+        if not re.fullmatch(r"[0-9a-f]{8}", jid):
+            return None
+        if jid in self.jobs:
+            return self.jobs[jid]
+        p = data_dir() / "web" / f"job-{jid}.json"
+        if not p.is_file():
+            return None
+        meta = json.loads(p.read_text(encoding="utf-8"))
+        log = data_dir() / "web" / f"job-{jid}.log"
+        text = log.read_text(encoding="utf-8", errors="replace") if log.is_file() else ""
+        status = meta["status"]
+        if status == "running":  # started by an earlier run of the app: read the outcome from the log
+            status = "done" if "Prep sheet:" in text else "failed" if "Traceback" in text else (
+                "running" if log.is_file() and time.time() - log.stat().st_mtime < 900 else "stopped")
+        return {"args": meta["args"], "log": log, "result": Path(meta["result"]) if meta["result"] else None,
+                "status": status, "started": meta["started"]}
 
 
 def _env() -> dict[str, str]:
@@ -445,29 +481,83 @@ def write_assigns(boss_id: int, difficulty: str, chosen: list[str]) -> None:
     ppath.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+# the steps of a prep, as `paf prep` prints them, with their typical duration in minutes on a first run
+PREP_STEPS = (
+    ("Collecting the corpus", "Download the top players' kills from Warcraft Logs", 20),
+    ("Collecting who handles", "Who handles each mechanic", 4),
+    ("Analyzing the corpus", "Rebuild the typical fight", 2),
+    ("Calibrating the fight", "Calibrate it on the logs", 1),
+    ("Validating the fight", "Check it against the top players' real DPS", 2),
+    ("Your raid and the adds", "Your raid and the adds", 1),
+    ("Simming your character", "Sim your character", 1),
+    ("Cooldown timelines", "Top players' cooldown timelines", 1),
+    ("Talent builds", "Sim the top players' talent builds", 3),
+    ("Ideal cooldown plan", "Find your best cooldown plan", 20),
+    ("Cooldown plans", "Compare cooldown plans", 5),
+    ("Top Gear", "Best gear from your bags", 5),
+    ("What this boss drops", "What this boss drops for you", 3),
+)
+
+
+def prep_progress(log: str) -> tuple[list[tuple[str, str]], float]:
+    """[(label, state)] with state done / now / next, and the typical minutes left. Steps that a prep
+    skips (the corpus already collected, no raid set...) are not listed."""
+    seen = [line[3:] for line in log.splitlines() if line.startswith("== ")]
+    finished = any(s.startswith("Done") for s in seen)
+    idx = {i for i, (prefix, _, _) in enumerate(PREP_STEPS) for s in seen if s.startswith(prefix)}
+    last = max(idx) if idx else -1
+    rows, left = [], 0.0
+    for i, (prefix, label, minutes) in enumerate(PREP_STEPS):
+        if i in idx:
+            rows.append((label, "done" if finished or i < last else "now"))
+        elif not finished and i > last and not prefix.startswith(("Collecting", "Your raid", "Cooldown plans")):
+            rows.append((label, "next"))
+            left += minutes
+    if last >= 0 and not finished:
+        left += PREP_STEPS[last][2] / 2
+    return rows, left
+
+
 def job_page(jid: str) -> bytes:
-    job = JOBS.jobs.get(jid)
+    job = JOBS.get(jid)
     if job is None:
-        return page("Unknown job", "<p>Unknown job.</p>")
+        return page("Unknown job", "<p>This prep is unknown (its files were removed?). <a href='/'>Home</a></p>")
     log = job["log"].read_text(encoding="utf-8", errors="replace") if job["log"].is_file() else ""
     elapsed = int(time.time() - job["started"])
     if job["status"] == "done" and job["result"] and job["result"].is_file():
         key = job["result"].stem.partition("-")[2]
-        return page("Done", f'<h1>Your prep is ready</h1><div class="cta"><a class="btn big" href="/view/{e(key)}">'
-                            f'Open the prep sheet</a></div>'
-                            f'<details class="card"><summary>What was done (log)</summary><pre class="log">'
-                            f'{e(log[-20000:])}</pre></details>')
+        go = f"/view/{e(key)}"
+        return (page("Done", f'<h1>Your prep is ready</h1><p class="lead">Opening the prep sheet&hellip;</p>'
+                             f'<div class="cta"><a class="btn big" href="{go}">Open the prep sheet</a></div>'
+                             f'<details class="card"><summary>What was done (log)</summary><pre class="log">'
+                             f'{e(log[-20000:])}</pre></details>')
+                .replace(b"<head>", f'<head><meta http-equiv="refresh" content="2;url={go}">'.encode(), 1))
     status = job["status"]
-    refresh = 5 if status == "running" else None
-    steps = [line[3:] for line in log.splitlines() if line.startswith("== ")]
-    done = "".join(f"<li>{e(s)}</li>" for s in steps[:-1])
-    now = f"<li><b>{e(steps[-1])}</b> <span class='pill gold'>in progress</span></li>" if steps else ""
-    head = "Preparing the fight" if status == "running" else f"Stopped: {e(status)}"
-    return page("Working...", f"<h1>{head}</h1><p class='lead'>{elapsed // 60} min {elapsed % 60:02d} s. "
-                              f"This page refreshes itself; you can leave it open.</p>"
-                              f"<div class='card'><ol class='small'>{done}{now}</ol></div>"
-                              f"<details class='card'><summary>Details (log)</summary><pre class='log'>"
-                              f"{e(log[-6000:])}</pre></details>", refresh)
+    if status == "done":
+        return page("Done", "<h1>The prep finished</h1><p class='lead'>Its sheet is listed on the "
+                            "<a href='/'>home page</a>.</p>")
+    rows, left = prep_progress(log)
+    icon = {"done": "&#10003;", "now": "&#9679;", "next": "&#9675;"}
+    items = "".join(f"<li class='st {state}'><span>{icon[state]}</span> {e(label)}"
+                    + (" <span class='pill gold'>in progress</span>" if state == "now" else "") + "</li>"
+                    for label, state in rows)
+    if status == "running":
+        head = "Preparing the fight"
+        eta = (f"about {max(1, round(left))} min left (typical first prep; much faster when the logs and sims "
+               f"are already cached)" if left else "almost done")
+        lead = (f"<span id='el' data-start='{job['started']:.0f}'>{elapsed // 60} min {elapsed % 60:02d} s</span>"
+                f" &middot; {eta}. You can leave this page open, it updates itself; the prep keeps running on your "
+                f"computer even if you close it.")
+    else:
+        head = "The prep stopped" if status == "stopped" else f"The prep failed ({e(status)})"
+        lead = "The log below says why. Go back to the boss page to try again."
+    js = """<script>(function(){var el=document.getElementById('el');if(!el)return;var s=+el.dataset.start;
+setInterval(function(){var t=Math.max(0,Math.floor(Date.now()/1000-s));el.textContent=Math.floor(t/60)+' min '+
+String(t%60).padStart(2,'0')+' s'},1000)})();</script>"""
+    body = (f"<h1>{head}</h1><p class='lead'>{lead}</p><div class='card'><ol class='steps'>{items}</ol></div>"
+            f"<details class='card'><summary>Details (log)</summary><pre class='log'>{e(log[-6000:])}</pre></details>"
+            + js)
+    return page("Preparing...", body, 10 if status == "running" else None)
 
 
 class Handler(BaseHTTPRequestHandler):

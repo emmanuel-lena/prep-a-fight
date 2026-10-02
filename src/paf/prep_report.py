@@ -87,6 +87,7 @@ class PrepData:
     class_name: str = ""  # e.g. "shaman" (class icon in the header)
     guide_summary: str = ""  # html: the boss in 60 seconds (Encounter Journal, your role)
     guide_abilities: str = ""  # html: every ability phase by phase, with what the logs add
+    role_bullets: list[str] = field(default_factory=list)  # what the journal tells your role to do
 
 
 PALETTE = ["#c89933", "#8e6a9b", "#4f8a8b", "#d0705a", "#b8ad3c", "#b0577f", "#3f6fa0", "#6c9a5b", "#74526c"]
@@ -307,6 +308,9 @@ CSS = theme.CSS + bossguide.CSS + """
 .info .sev{background:var(--lavender);color:#fff}
 .major{box-shadow:inset 3px 0 0 var(--bronze);padding-left:12px;margin-left:-15px}
 button.copy{padding:4px 10px;font-size:12.5px;margin:4px 6px 2px 0}
+.checklist ul{list-style:none;margin:0;padding:0} .checklist li{padding:8px 0;border-bottom:1px solid var(--line)}
+.checklist li:last-child{border-bottom:0} .checklist label{display:inline;margin:0;cursor:pointer}
+.checklist input:checked+span{text-decoration:line-through;color:var(--muted)}
 .plus{color:var(--pos);font-weight:700} .minus{color:var(--neg);font-weight:700}
 details.why summary{color:var(--warn);font-size:13px;margin:4px 0} details.why div{color:var(--warn);font-size:13px}
 .conf{margin:-2px 0 4px}
@@ -528,6 +532,51 @@ def suggestions(d: PrepData) -> list[Suggestion]:
                                       -(s.gain if s.gain is not None else -1)))
 
 
+def checklist_html(d: PrepData) -> str:
+    """One line per thing to do, in raid order: before the pull, then during the fight."""
+    items: list[str] = []
+
+    def item(what: str, extra: str = "") -> None:
+        items.append(f"<li><label><input type='checkbox'> <span>{what}</span></label>{extra}</li>")
+
+    best = best_build(d)
+    g = best.per_fight.get(d.talents.fights[0], (0.0, None))[0] if best else 0.0
+    if best is not None and g > 2 * d.talents.error:
+        item(f"Talents: import <b>{e(best.build.label)}</b> ({g:+.1f}%)",
+             " " + copy_button(best.build.code, "Copy") if best.build.code else "")
+    elif d.talents:
+        item("Talents: keep yours, they match the top players' on this fight")
+    if d.gear and d.gear[0][2] > 2 * d.gear_error:
+        changes, _, w = d.gear[0]
+        item(f"Gear ({w:+.2f}%): " + "; ".join(linkify(c, d.links) for c in changes.split("; ")))
+    elif d.gear:
+        item("Gear: keep what you wear")
+    want = ("boss" if d.raid.objective == "boss" else "total") if d.raid and d.raid.objective else "boss"
+    plan = next((p for p in d.optimized if p.objective == want and p.gain > 2 * p.error), None)
+    if d.raid and d.raid.objective:
+        item("Your role: <b>" + ("stay on the boss" if d.raid.objective == "boss" else "pad the adds") + "</b>")
+    else:
+        item("Your role: ask your raid lead whether you should pad the adds or focus the boss "
+             "<span class='muted'>(or set your guild in the app: the prep decides from your raid)</span>")
+    if plan is not None:
+        by_rule: dict[str, list[str]] = {}
+        for k, r in plan.choice.items():
+            if r.name != "default":
+                by_rule.setdefault(rule_phrase(d, r.name), []).append(cd_name(d, k))
+        rules = "; ".join(f"{', '.join(ks)}: {phrase}" for phrase, ks in by_rule.items())
+        item(f"Cooldowns ({_goal(plan.objective)} damage, {plan.gain:+.1f}%): {e(rules)}",
+             " " + copy_button(d.mrt[plan.objective], "Copy the MRT note") if d.mrt.get(plan.objective) else "")
+    if d.lust is not None:
+        item(f"Bloodlust usually comes around {_mmss(d.lust)}")
+    for b in d.role_bullets[:4]:
+        item(e(b))
+    for a in d.assigns:
+        item("Your assignment: " + e(a))
+    if not items:
+        return ""
+    return f'<div class="card checklist"><ul>{"".join(items)}</ul></div>'
+
+
 def suggestions_html(d: PrepData) -> str:
     rows = []
     for s in suggestions(d):
@@ -570,6 +619,9 @@ def render(d: PrepData) -> str:
             f'<p class="notice small"><b>Thin data:</b> only {d.kills} ranked kills of your spec on this boss and '
             f'difficulty. The timings of the fight and the habits of the top players are less reliable than usual; talent '
             f'builds played by fewer than {MIN_BUILD_PLAYERS} of them are listed but never recommended.</p>')
+    check = checklist_html(d)
+    if check:
+        tabs["overview"].append("<h2>Your raid checklist</h2>" + check)
     if d.guide_summary:
         tabs["overview"].append("<h2>The boss in 60 seconds</h2>" + d.guide_summary)
     tabs["overview"].append("<h2>What to change</h2>" + suggestions_html(d))

@@ -42,6 +42,13 @@ def spell_refs(sections: list[Section]) -> dict[str, str]:
     return {s.title: f"spell={s.spell_id}" for _, s in walk(sections) if s.spell_id and s.title}
 
 
+def role_bullets(sections: list[Section], role: str = "damage") -> list[str]:
+    """What the journal tells your role to do, as short points."""
+    over = next((s for s in sections if s.kind == "overview"), None)
+    mine = next((c for c in over.children if c.title == ROLE_TITLES.get(role)), None) if over else None
+    return bullets(mine.text) if mine and mine.text else []
+
+
 def summary_html(sections: list[Section], role: str = "damage", full_link: str = "") -> str:
     """The overview and what your role does, from the journal."""
     over = next((s for s in sections if s.kind == "overview"), None)

@@ -980,6 +980,7 @@ def _boss_guide(d, con, enc, diff: int, diff_name: str, spec: str, tl, fight) ->
     burst = {v.name.split(" (")[0]: v.multiplier for v in fight.vulnerable}
     gicons = icons_for(bossguide.spell_refs(sections))
     d.guide_summary = bossguide.summary_html(sections, "damage", "#boss")
+    d.role_bullets = bossguide.role_bullets(sections, "damage")
     d.guide_abilities = bossguide.abilities_html(sections, timings=dict(tl.boss_casts), mechanics=mechs,
                                                  burst=burst, icon_map=gicons)
 

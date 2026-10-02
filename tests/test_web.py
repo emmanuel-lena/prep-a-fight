@@ -131,3 +131,27 @@ def test_write_assigns_keeps_other_lines(tmp_path, monkeypatch):
     plan.write_text("2:00 move 5\nassign Old Mechanic\n")
     web.write_assigns(7, "heroic", ["Doomscale Shell"])
     assert plan.read_text() == "2:00 move 5\nassign Doomscale Shell\n"
+
+
+def test_prep_progress_and_job_from_disk(tmp_path, monkeypatch):
+    import json
+    import time
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    log = "\n== Analyzing the corpus\n  x\n== Calibrating the fight on the logs\n"
+    rows, left = web.prep_progress(log)
+    assert rows[0] == ("Rebuild the typical fight", "done") and rows[1] == ("Calibrate it on the logs", "now")
+    assert ("Find your best cooldown plan", "next") in rows and left > 20
+    assert not any(label.startswith("Download") for label, _ in rows)  # corpus already there: skipped
+    done_rows, done_left = web.prep_progress(log + "== Done\n")
+    assert all(state == "done" for _, state in done_rows) and done_left == 0
+    # a job started by an earlier run of the app: its outcome is read from the log
+    d = tmp_path / "web"
+    d.mkdir()
+    (d / "job-abcd1234.json").write_text(json.dumps({"args": [], "result": "", "status": "running",
+                                                     "started": time.time() - 60}))
+    (d / "job-abcd1234.log").write_text(log + "Prep sheet: x\n")
+    assert web.JOBS.get("abcd1234")["status"] == "done"
+    assert web.JOBS.get("../etc") is None
+    page = web.job_page("abcd1234").decode()
+    assert "The prep finished" in page and "failed" not in page
