@@ -21,7 +21,13 @@ from paf.config import data_dir, load_dotenv
 
 e = html.escape
 
-CSS = theme.CSS + """
+
+def bossguide_css() -> str:
+    from paf.bossguide import CSS as GUIDE_CSS
+
+    return GUIDE_CSS
+
+CSS = theme.CSS + bossguide_css() + """
 pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius:8px;padding:10px 12px}
 .boss-tile .name{font-weight:700;font-size:16px;margin-bottom:6px}
 .boss-tile .when{font-size:12px;color:var(--muted);margin-top:8px}
@@ -284,9 +290,20 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
         assigns = ('<p class="muted small">No kill collected yet: the first prep collects ~200 ranked kills from '
                    'Warcraft Logs (a few minutes to an hour depending on your API quota).</p>')
     last = prepared_link(enc, difficulty)
+    from paf import bossguide
+    from paf.icons import icons_for
+
+    sections = bossguide.load(enc.id, difficulty)
+    guide = ""
+    if sections:
+        gicons = icons_for(bossguide.spell_refs(sections))
+        guide = (f"<h2>The boss in 60 seconds</h2>{bossguide.summary_html(sections, 'damage')}"
+                 f"<details class='card'><summary>Every ability, phase by phase (Encounter Journal)</summary>"
+                 f"{bossguide.abilities_html(sections, mechanics=mechs, icon_map=gicons)}</details>"
+                 f"<h2>Prepare it</h2>")
     body = f"""<p class="small"><a href="/">&larr; Home</a></p>
 <h1>{e(enc.name)} <span class="pill gold">{e(difficulty)}</span></h1>
-<p class="lead">{kills} ranked kills in your corpus.{last}</p>
+<p class="lead">{kills} ranked kills in your corpus.{last}</p>{guide}
 <form method="post" action="/prep">
 <input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
 <div class="card step"><div class="num">1</div><div class="body"><h3>Your assignments</h3>{assigns}</div></div>

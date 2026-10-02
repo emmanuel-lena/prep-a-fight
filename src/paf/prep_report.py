@@ -6,7 +6,7 @@ import html
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from paf import icons, theme
+from paf import bossguide, icons, theme
 from paf.wowhead import SCRIPT as WH_SCRIPT
 from paf.wowhead import link, linkify
 
@@ -85,6 +85,8 @@ class PrepData:
     raid: RaidInfo | None = None
     icons: dict[str, str] = field(default_factory=dict)  # spell / item / cooldown key name -> game icon file
     class_name: str = ""  # e.g. "shaman" (class icon in the header)
+    guide_summary: str = ""  # html: the boss in 60 seconds (Encounter Journal, your role)
+    guide_abilities: str = ""  # html: every ability phase by phase, with what the logs add
 
 
 PALETTE = ["#c89933", "#8e6a9b", "#4f8a8b", "#d0705a", "#b8ad3c", "#b0577f", "#3f6fa0", "#6c9a5b", "#74526c"]
@@ -269,7 +271,7 @@ def headline(d: PrepData) -> list[str]:
     return out
 
 
-CSS = theme.CSS + """
+CSS = theme.CSS + bossguide.CSS + """
 :root{--card:var(--surface)}
 .key ul{margin:0;padding-left:18px} .key li{margin:8px 0}
 .kpis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin:18px 0 6px}
@@ -540,7 +542,7 @@ def suggestions_html(d: PrepData) -> str:
     return f'<div class="card suggs">{"".join(rows)}</div>'
 
 
-TABS = (("overview", "Overview"), ("cooldowns", "Cooldowns"), ("gear", "Gear & talents"), ("raid", "Your raid"),
+TABS = (("overview", "Overview"), ("boss", "The boss"), ("cooldowns", "Cooldowns"), ("gear", "Gear & talents"), ("raid", "Your raid"),
         ("fight", "The fight"))
 TAB_JS = """<script>
 (function(){var ids=[...document.querySelectorAll('.panel')].map(function(p){return p.id});
@@ -568,7 +570,15 @@ def render(d: PrepData) -> str:
             f'<p class="notice small"><b>Thin data:</b> only {d.kills} ranked kills of your spec on this boss and '
             f'difficulty. The timings of the fight and the habits of the top players are less reliable than usual; talent '
             f'builds played by fewer than {MIN_BUILD_PLAYERS} of them are listed but never recommended.</p>')
-    tabs["overview"].append("<h2>Suggestions</h2>" + suggestions_html(d))
+    if d.guide_summary:
+        tabs["overview"].append("<h2>The boss in 60 seconds</h2>" + d.guide_summary)
+    tabs["overview"].append("<h2>What to change</h2>" + suggestions_html(d))
+    if d.guide_summary or d.guide_abilities:
+        tabs["boss"].append("<h2>The boss in 60 seconds</h2>" + d.guide_summary.replace(
+            '<a href="#boss">Every ability, phase by phase &rarr;</a>', ""))
+        tabs["boss"].append("<h2>Every ability, phase by phase</h2><p class='small muted'>From the in-game "
+                            "Encounter Journal; timings and how many players are hit come from the ranked kills.</p>"
+                            + d.guide_abilities)
     if d.timeline_file:
         tabs["overview"].append(f'<p class="small"><a href="{e(d.timeline_file)}">See when the top players use each '
                                 f'cooldown (timelines) &rarr;</a></p>')

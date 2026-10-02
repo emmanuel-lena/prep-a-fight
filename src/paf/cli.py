@@ -809,6 +809,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
         if it and it.name in d.links:
             d.links[f"use_item:{slot}"] = d.links[it.name]
     d.alignment = tops_alignment_safe(tl_all, fight)
+    _boss_guide(d, con, enc, diff, diff_name, spec, tl_all, fight)
     if args.no_optimize:
         step("Cooldown plans")
         d.plans = compare_plans(profile_text, tl_all, fight, root / "cdplan", target_error=args.error / 2,
@@ -960,6 +961,27 @@ def cmd_raid(args: argparse.Namespace) -> int:
           f"`paf prep \"{enc.name}\"` will use the cooldown plan and gear for "
           f"{'boss' if r.objective == 'boss' else 'total'} damage.")
     return 0
+
+
+def _boss_guide(d, con, enc, diff: int, diff_name: str, spec: str, tl, fight) -> None:
+    """The boss in 60 seconds (Encounter Journal) with the logs' timings and assignment stats."""
+    from paf import bossguide
+    from paf.icons import icons_for
+
+    sections = bossguide.load(enc.id, diff_name)
+    if not sections:
+        return
+    try:
+        from paf.assigns import load_mechanics
+
+        mechs = load_mechanics(con, enc.id, diff, spec)
+    except Exception:  # noqa: BLE001 - the guide works without the assignment stats
+        mechs = []
+    burst = {v.name.split(" (")[0]: v.multiplier for v in fight.vulnerable}
+    gicons = icons_for(bossguide.spell_refs(sections))
+    d.guide_summary = bossguide.summary_html(sections, "damage", "#boss")
+    d.guide_abilities = bossguide.abilities_html(sections, timings=dict(tl.boss_casts), mechanics=mechs,
+                                                 burst=burst, icon_map=gicons)
 
 
 def _plan_raid(enc, diff_name: str) -> str:

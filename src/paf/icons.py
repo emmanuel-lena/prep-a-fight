@@ -66,5 +66,5 @@ def img(icon: str, size: str = "medium", cls: str = "", alt: str = "") -> str:
     cls = cls or ("ics" if size == "small" else "ic")
     if not icon:
         return '<span class="ics ph"></span>' if size == "small" else ""
-    return (f'<img class="{cls}" src="{CDN.format(size=size, icon=icon)}" alt="{alt}" loading="lazy" '
+    return (f'<img class="{cls}" src="{CDN.format(size=size, icon=icon)}" alt="{alt}" '
             f'onerror="this.style.visibility=\'hidden\'">')

@@ -23,6 +23,27 @@ def clean_text(text: str, mythic: bool = True) -> str:
         return ""
     # $[!16 ...$] = shown only on mythic (16 = difficulty id); $[16 ...$] variants
     text = re.sub(r"\$\[!?[\d,]+\s*(.*?)\$\]", (r"\1" if mythic else ""), text, flags=re.S)
+    text = re.sub(r"\$\[!?[\d,]+\s*", "", text)  # a conditional part cut before its end
+    if "$@" in text:  # references to other spells: their name, or their description (one level)
+        names = spell_names()
+        text = re.sub(r"\$@spellname(\d+)", lambda m: names.get(int(m.group(1)), "a spell"), text)
+
+        def desc(m: re.Match) -> str:
+            from paf.gamedata import spell_description
+
+            try:
+                inner = spell_description(int(m.group(1))) or ""
+            except Exception:  # noqa: BLE001 - a missing description is fine
+                inner = ""
+            return re.sub(r"\$@spelldesc\d+", "", inner)
+
+        text = re.sub(r"\$@spelldesc(\d+)", desc, text)
+        text = re.sub(r"\$@\w+", "", text)
+    text = re.sub(r"every \$\d*t\d+ sec", "periodically", text)
+    text = re.sub(r" for \$\d*d\d*", "", text)
+    text = re.sub(r"\$\d*d\d*\b", "a few seconds", text)
+    text = re.sub(r"\$\d*[sSmMoOaAhH]\d+%", "X%", text)
+    text = re.sub(r"\$\d*[sSmMoOaA]\d+", "X", text)
     text = re.sub(r"\|c[0-9A-Fa-f]{8}\|Hspell:\d+\|h\[([^\]]*)\]\|h\|r", r"\1", text)
     text = re.sub(r"\|c[0-9A-Fa-f]{8}|\|r|\|H[^|]*\|h|\|h", "", text)
     text = text.replace("$bullet;", "-")
