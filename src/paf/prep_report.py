@@ -189,7 +189,7 @@ def rule_phrase(d: PrepData, rule: str) -> str:
     m = re.fullmatch(r"hold_(adds|vulnerable)_(\d+)", rule)
     if m:
         what = "the next add wave" if m.group(1) == "adds" else (vuln or "the damage amp")
-        return f"keep for {what} if it comes within {m.group(2)} s"
+        return f"keep for {what} if it comes within {m.group(2)} s, otherwise use it"
     return {"default": "as SimC's default priority list", "on_cooldown": "on cooldown",
             "add_waves": "only on add waves", "secondary_targets": f"only on {units or 'the secondary targets'}",
             "vulnerable_windows": f"only during {vuln or 'the damage amp'}", "lust_pi": "with Bloodlust",
@@ -304,6 +304,7 @@ CSS = theme.CSS + """
   border:1px solid var(--accent)} .minor .sev{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
 .info .sev{background:var(--lavender);color:#fff}
 .major{box-shadow:inset 3px 0 0 var(--bronze);padding-left:12px;margin-left:-15px}
+button.copy{padding:4px 10px;font-size:12.5px;margin:4px 6px 2px 0}
 .plus{color:var(--pos);font-weight:700} .minus{color:var(--neg);font-weight:700}
 details.why summary{color:var(--warn);font-size:13px;margin:4px 0} details.why div{color:var(--warn);font-size:13px}
 .conf{margin:-2px 0 4px}
@@ -334,10 +335,9 @@ def kpi_tiles(d: PrepData) -> str:
     if best is not None:
         tile("Cooldown plan", f"{best.gain:+.1f}%", f"{_goal(best.objective)} damage, vs using them on cooldown",
              "good" if best.gain > 2 * best.error else "")
-    if d.talents and d.talents.rows:
-        fight = d.talents.fights[0]
-        r = max(d.talents.rows, key=lambda r: r.per_fight.get(fight, (-1e9, None))[0])
-        g = r.per_fight.get(fight, (0.0, None))[0]
+    r = best_build(d)
+    if r is not None:
+        g = r.per_fight.get(d.talents.fights[0], (0.0, None))[0]
         tile("Talents", f"{g:+.1f}%" if g > 2 * d.talents.error else "OK",
              f"{r.build.label}, vs your current talents" if g > 2 * d.talents.error
              else "your talents match the top players'", "good" if g > 2 * d.talents.error else "")
@@ -345,7 +345,7 @@ def kpi_tiles(d: PrepData) -> str:
         w = d.gear[0][2]
         tile("Gear", f"{w:+.2f}%" if w > 2 * d.gear_error else "Best",
              "swaps from your bags, vs your equipped gear" if w > 2 * d.gear_error
-             else "your equipped set is already the best", "good" if w > 2 * d.gear_error else "")
+             else "no swap from your bags beats it beyond the error", "good" if w > 2 * d.gear_error else "")
     conf = ""
     if d.validation:
         lo, med, hi = d.validation
@@ -412,6 +412,23 @@ class Suggestion:
     icon: str = ""  # game icon file name
 
 
+MIN_BUILD_PLAYERS = 3  # a build played by fewer top players is shown, never recommended
+THIN_CORPUS = 50  # fewer ranked kills than this: say the data is thin
+
+
+def best_build(d: PrepData):
+    """The best talent build played by at least MIN_BUILD_PLAYERS top players (None if none)."""
+    if not d.talents or not d.talents.rows:
+        return None
+    fight = d.talents.fights[0]
+    ok = [r for r in d.talents.rows if r.build.count >= MIN_BUILD_PLAYERS]
+    return max(ok, key=lambda r: r.per_fight.get(fight, (-1e9, None))[0]) if ok else None
+
+
+def copy_button(text: str, label: str) -> str:
+    return f'<button type="button" class="btn ghost copy" data-copy="{e(text)}">{e(label)}</button>'
+
+
 def _severity(gain: float | None) -> str:
     if gain is None:
         return "info"
@@ -433,10 +450,9 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         what = "stay on the boss" if d.raid.objective == "boss" else "pad the adds"
         out.append(Suggestion("info", f"With your raid, <b>{what}</b>", [e(v.reason)]))
     if d.talents and d.talents.rows:
-        fight = d.talents.fights[0]
-        best = max(d.talents.rows, key=lambda r: r.per_fight.get(fight, (-1e9, None))[0])
-        g = best.per_fight.get(fight, (0.0, None))[0]
-        if g > 2 * d.talents.error:
+        best = best_build(d)
+        g = best.per_fight.get(d.talents.fights[0], (0.0, None))[0] if best else 0.0
+        if best is not None and g > 2 * d.talents.error:
             both = set(best.add) & set(best.drop)  # same name on two nodes (e.g. a choice node): not a change
             add = [t for t in dict.fromkeys(best.add) if t not in both]
             drop = [t for t in dict.fromkeys(best.drop) if t not in both]
@@ -449,7 +465,10 @@ def suggestions(d: PrepData) -> list[Suggestion]:
                 lines.append("<span class='plus'>+</span> Take " + few(add))
             if drop:
                 lines.append("<span class='minus'>&minus;</span> <span class='muted'>Drop " + few(drop) + "</span>")
-            lines.append("<span class='muted small'>Every build compared in Gear &amp; talents.</span>")
+            if best.build.code:
+                lines.append(copy_button(best.build.code, "Copy the talent string") +
+                             " <span class='muted small'>then in game: Talents, Import loadout. "
+                             "Every build compared in Gear &amp; talents.</span>")
             out.append(Suggestion(_severity(g), f"Switch to the talents of <b>{e(best.build.label)}</b> "
                                   f"<span class='muted'>(played by {best.build.count} top players)</span>", lines, g,
                                   d.icons.get("__spec__", "")))
@@ -467,6 +486,9 @@ def suggestions(d: PrepData) -> list[Suggestion]:
                            if o not in (p.objective, "adds"))
         if others:
             lines.append(f"<span class='muted small'>Also: {e(others)}.</span>")
+        if d.mrt.get(p.objective):
+            lines.append(copy_button(d.mrt[p.objective], "Copy its MRT note")
+                         + " <span class='muted small'>timers from the pull, to paste in Method Raid Tools</span>")
         if p.flags:
             lines.append("<details class='why'><summary>&#9888; Why to double-check</summary>"
                          + "".join(f"<div>{e(f)}</div>" for f in p.flags) + "</details>")
@@ -525,7 +547,11 @@ TAB_JS = """<script>
 function show(id){if(ids.indexOf(id)<0)id=ids[0];document.querySelectorAll('.panel').forEach(function(p){
 p.hidden=p.id!==id});document.querySelectorAll('.tabs a').forEach(function(a){
 var on=a.getAttribute('href')==='#'+id;a.classList.toggle('on',on);a.setAttribute('aria-selected',on)});scrollTo(0,0)}
-addEventListener('hashchange',function(){show(location.hash.slice(1))});show(location.hash.slice(1));})();
+addEventListener('hashchange',function(){show(location.hash.slice(1))});show(location.hash.slice(1));
+document.addEventListener('click',function(ev){var b=ev.target.closest('[data-copy]');if(!b)return;
+var t=b.getAttribute('data-copy'),done=function(){var o=b.textContent;b.textContent='Copied';
+setTimeout(function(){b.textContent=o},1500)};if(navigator.clipboard&&navigator.clipboard.writeText){
+navigator.clipboard.writeText(t).then(done,function(){prompt('Copy:',t)})}else{prompt('Copy:',t)}});})();
 </script>"""
 
 
@@ -537,6 +563,11 @@ def render(d: PrepData) -> str:
 
     # overview
     tabs["overview"].append(kpi_tiles(d))
+    if d.kills and d.kills < THIN_CORPUS:
+        tabs["overview"].append(
+            f'<p class="notice small"><b>Thin data:</b> only {d.kills} ranked kills of your spec on this boss and '
+            f'difficulty. The timings of the fight and the habits of the top players are less reliable than usual; talent '
+            f'builds played by fewer than {MIN_BUILD_PLAYERS} of them are listed but never recommended.</p>')
     tabs["overview"].append("<h2>Suggestions</h2>" + suggestions_html(d))
     if d.timeline_file:
         tabs["overview"].append(f'<p class="small"><a href="{e(d.timeline_file)}">See when the top players use each '
@@ -654,7 +685,8 @@ for reference: a build can be worse there and much better on this fight. Error a
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
 <details><summary class="small">Play-by-play of one simulated pull</summary><div class="scroll"><table>
 <tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></details>
-<details><summary class="small">MRT note</summary><pre class="small" style="white-space:pre-wrap">{e(note)}</pre></details>
+<details><summary class="small">MRT note (to paste in Method Raid Tools)</summary>{copy_button(note, "Copy")}
+<pre class="small" style="white-space:pre-wrap">{e(note)}</pre></details>
 </div>""")
         tabs["cooldowns"].append("<h2>Ideal cooldown play-by-play, per objective</h2>" + "".join(blocks))
 
@@ -703,6 +735,7 @@ SimC does not know that a secondary target must die fast, so compare with the si
                        f"<td class='n'>{_pct(real) if real is not None else '-'}</td>"
                        f"<td class='n'>{_pct(v)}</td></tr>" for i, s, v, real in d.loot[:12])
         tabs["gear"].append(f"""<h2>What this boss drops, for you</h2><div class="card scroll">
+{'<p class="notice small">Nothing this boss drops is an upgrade for you at item level ' + str(d.loot_ilvl) + ': every value below is a loss vs what you already have.</p>' if all((real if real is not None else v) <= 0 for _, _, v, real in d.loot) else ''}
 <p class="small muted">"In your best sets": the item inserted in your best Top Gear sets, the rest of your gear
 rearranged around it (its real value). "Single swap": the classic droptimizer value, on your equipped set.</p>
 <table><tr><th>Item</th><th>Slot</th><th>In your best sets</th><th>Single swap</th></tr>{body}</table>

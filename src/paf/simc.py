@@ -7,8 +7,10 @@ input file holds the character (+ fight) and profilesets, and run options go on 
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
+import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -21,6 +23,12 @@ from paf.simc_install import find_simc
 
 class SimcError(RuntimeError):
     pass
+
+
+# simc uses every core: run it below normal priority so the app (and the rest of the PC) stays responsive;
+# it still gets the whole CPU when nothing else needs it
+LOW_PRIORITY: dict = ({"creationflags": 0x00004000} if sys.platform == "win32"  # BELOW_NORMAL_PRIORITY_CLASS
+                      else {"preexec_fn": lambda: os.nice(10)})
 
 
 def fmt(x: float) -> str:
@@ -195,7 +203,7 @@ def run(input_text: str, run_dir: Path, *, target_error: float = 0.2, iterations
     t0 = time.time()
     with (run_dir / "simc.log").open("w", encoding="utf-8", errors="replace") as log:
         proc = subprocess.run(args, stdout=log, stderr=subprocess.STDOUT, timeout=timeout,
-                              cwd=run_dir)
+                              cwd=run_dir, **LOW_PRIORITY)
     elapsed = time.time() - t0
     if proc.returncode != 0 or not json_path.is_file():
         tail = (run_dir / "simc.log").read_text(encoding="utf-8", errors="replace")[-1500:]

@@ -331,7 +331,7 @@ def play_by_play(profile_text: str, apl: OrderedDict[str, list[str]], plan: Plan
                                     fight.to_simc()), encoding="utf-8")
     log = run_dir / f"{plan.objective}-pull.log"
     subprocess.run([str(exe), str(inp), "iterations=1", "log=1", f"output={log}", f"seed={seed}", "threads=1"],
-                   capture_output=True, cwd=run_dir, timeout=600)
+                   capture_output=True, cwd=run_dir, timeout=600, **simc.LOW_PRIORITY)
     events: list[tuple[float, str]] = []
     seen: set[tuple[float, str]] = set()
     pat = re.compile(r"^(\d+\.\d+) Player '[^']+' (?:performs|schedules execute for) Action '([a-z0-9_]+)'")
