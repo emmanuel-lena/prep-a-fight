@@ -312,12 +312,15 @@ display:inline-block;margin-right:5px}}
 .topbar{{background:var(--header);color:#fff;position:relative;padding:12px 16px 15px}}
 .topbar::after{{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--stripe)}}
 .topbar b{{color:var(--sand)}}
+.hint{{display:none}}
+@media (max-width:640px){{.label{{width:104px;padding:0 6px;font-size:11px}} .hint{{display:block}}}}
 </style></head><body><div class="topbar"><strong>prep-a-<b>fight</b></strong></div><div class="page">
 <h1>{e(tl.boss)} ({e(tl.difficulty)}): {e(tl.spec)} cooldown timelines</h1>
 <p>{tl.kills} ranked kills, typical duration {_mmss(tl.duration)}. Cooldowns are detected automatically:
 abilities used by at least {MIN_USERS:.0%} of players and cast at most {MAX_CASTS_PER_MIN:g} times per minute.
 {lust_note}</p>
 <div>{legend}</div>
+<p class="hint">Swipe the timelines sideways to see the whole fight.</p>
 <h2>The fight</h2><div class="scroll">{"".join(parts)}</div>
 <h2>When the top players use each cooldown ({len(tl.players)} players, {BIN}s bins)</h2>
 <div class="scroll">{"".join(agg)}</div>

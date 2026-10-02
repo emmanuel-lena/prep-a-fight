@@ -25,6 +25,7 @@ CSS = theme.CSS + """
 pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius:8px;padding:10px 12px}
 .boss-tile .name{font-weight:700;font-size:16px;margin-bottom:6px}
 .boss-tile .when{font-size:12px;color:var(--muted);margin-top:8px}
+.boss-tile .top{font-size:13px;margin-top:10px;line-height:1.35}
 .cta{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:18px 0 6px}
 .lead{font-size:16px;color:var(--muted);margin-bottom:18px}
 """
@@ -102,6 +103,13 @@ def prepared() -> list[dict]:
         item = out.setdefault(key, {"key": key, "files": {}, "mtime": 0.0, "name": "", "difficulty": ""})
         item["files"][kind] = f.name
         item["mtime"] = max(item["mtime"], f.stat().st_mtime)
+        if kind == "prep" and f.with_suffix(".json").is_file():
+            import json
+
+            try:
+                item["headline"] = json.loads(f.with_suffix(".json").read_text(encoding="utf-8"))
+            except ValueError:
+                pass
         diff = next((d for d in DIFF_NAMES if key.endswith("-" + d)), "")
         item["difficulty"] = diff
         if not item["name"] or kind == "prep":
@@ -119,7 +127,9 @@ def prepared_block() -> str:
         f'<a class="tile boss-tile" href="/view/{e(x["key"])}"><div class="name">{e(x["name"])}</div>'
         f'<span class="pill gold">{e(x["difficulty"] or "?")}</span> '
         f'<span class="pill">{"prep sheet + timelines" if len(x["files"]) == 2 else "prep sheet only" if "prep" in x["files"] else "timelines only"}</span>'
-        f'<div class="when">updated {time.strftime("%d %b %H:%M", time.localtime(x["mtime"]))}</div></a>'
+        + (f'<div class="top"><b class="pos">{x["headline"]["gain"]:+.1f}%</b> {e(x["headline"]["what"])}</div>'
+           if x.get("headline", {}).get("gain") is not None else "")
+        + f'<div class="when">updated {time.strftime("%d %b %H:%M", time.localtime(x["mtime"]))}</div></a>'
         for x in items)
     return f'<h2>Your prepared bosses</h2><div class="grid">{tiles}</div>'
 
@@ -143,7 +153,7 @@ def view_page(key: str, tab: str) -> bytes:
     src = f'/report/{e(item["files"][tab])}'
     boss_link = _boss_link(item)
     nav = (f'<select onchange="location=this.value" aria-label="Boss">{others}</select>{tabs}'
-           + (f'<a href="{e(boss_link)}">Assignments &amp; options</a>' if boss_link else "")
+           + (f'<a href="{e(boss_link)}">Edit &amp; re-run</a>' if boss_link else "")
            + f'<a href="{src}" target="_blank">Open alone</a>')
     css = "body{display:flex;flex-direction:column;height:100vh}iframe{border:0;width:100%;flex:1;display:block}"
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
@@ -208,7 +218,7 @@ placeholder="In game: type /simc, then Ctrl+A, Ctrl+C, and paste here"></textare
     diffs = "".join(f'<option{" selected" if d == diff else ""}>{d}</option>' for d in settings.DIFFICULTIES)
     boss_form = (f"""<form method="get" action="/boss" class="row">
 <select name="boss" aria-label="Boss">{options}</select><select name="difficulty" aria-label="Difficulty">{diffs}</select>
-<button>Next</button></form>"""
+<button>Continue</button></form>"""
                  if encs else '<p class="muted">Connect to Warcraft Logs first (step 0).</p>' if not has_credentials()
                  else '<p class="muted">Warcraft Logs did not answer: check your connection, then reload.</p>')
     creds = credentials_block(error) if not has_credentials() or error else ""
@@ -258,8 +268,8 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
         chips = ""
         for m in mechs:
             when = ", ".join(f"{int(t // 60)}:{int(t % 60):02d}" for t in m.times[:4]) + ("…" if len(m.times) > 4 else "")
-            what = "kick" if m.kind == "interrupt" else f"{m.players_per_kill:.0f} per kill"
-            cost = f", {m.cost:g}s moving" if m.cost else ""
+            what = "interrupt" if m.kind == "interrupt" else f"{m.players_per_kill:.0f} players per kill"
+            cost = f", ~{m.cost:g} s of movement" if m.cost else ""
             checked = " checked" if m.name.lower() in current or m.key in current else ""
             chips += (f'<label class="chip" title="{e(when)}"><input type="checkbox" name="assign" value="{e(m.name)}"'
                       f'{checked}>{e(m.name)} <span class="meta">{what}{cost}</span></label>')
@@ -279,12 +289,12 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
 <p class="lead">{kills} ranked kills in your corpus.{last}</p>
 <form method="post" action="/prep">
 <input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
-<div class="card step"><div class="num">4</div><div class="body"><h3>Your assignments</h3>{assigns}</div></div>
-<div class="card step"><div class="num">5</div><div class="body"><h3>Your raid on this boss</h3>
+<div class="card step"><div class="num">1</div><div class="body"><h3>Your assignments</h3>{assigns}</div></div>
+<div class="card step"><div class="num">2</div><div class="body"><h3>Your raid on this boss</h3>
 <input name="raid" style="width:100%" value="{e(current_raid(enc, difficulty))}"
 placeholder="Link to one of your raid's logs: https://www.warcraftlogs.com/reports/..." aria-label="Raid log link">
 <p class="tiny muted" style="margin-top:6px">{e(raid_hint())}</p></div></div>
-<div class="card step"><div class="num">6</div><div class="body"><h3>What to sim</h3>
+<div class="card step"><div class="num">3</div><div class="body"><h3>What to sim</h3>
 <label><input type="checkbox" name="gear" checked> Best gear from your bags, and what this boss drops for you</label>
 <label><input type="checkbox" name="optimize" checked> Ideal cooldown plan per objective
 <span class="muted small">(the slowest part: 20 to 40 min)</span></label></div></div>

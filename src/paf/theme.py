@@ -61,6 +61,9 @@ button:hover,.btn:hover{filter:brightness(1.08);text-decoration:none}
 input,select,textarea{font:inherit;color:var(--fg);background:var(--surface-2);border:1px solid var(--line);
   border-radius:8px;padding:8px 10px}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+a:focus-visible,button:focus-visible,.btn:focus-visible,summary:focus-visible{outline:2px solid var(--accent);
+  outline-offset:2px;border-radius:6px}
+.chip:focus-within{outline:2px solid var(--accent);outline-offset:2px}
 input[type=checkbox],input[type=radio]{accent-color:var(--bronze);width:16px;height:16px;padding:0;vertical-align:-3px}
 textarea{width:100%;min-height:150px;font:12.5px/1.45 ui-monospace,Consolas,monospace}
 label{display:block;margin:6px 0}

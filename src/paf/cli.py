@@ -883,6 +883,15 @@ def cmd_prep(args: argparse.Namespace) -> int:
     d.icons["__spec__"] = CLASS_ICON.format(cls=profile.class_name.lower())
     out = reports / f"prep-{_slug(enc.name)}-{diff_name}.html"
     out.write_text(render(d), encoding="utf-8")
+    import json
+    import re
+
+    from paf.prep_report import suggestions
+
+    top = next((s for s in suggestions(d) if s.gain is not None), None)
+    what = re.sub(r"<[^>]+>", "", re.sub(r"<span class='pill[^']*'>.*?</span>", "", top.title)) if top else ""
+    summary = {"gain": round(top.gain, 1), "what": what.strip()} if top else {}
+    out.with_suffix(".json").write_text(json.dumps(summary), encoding="utf-8")  # headline for the app's home
     step("Done")
     from paf.prep_report import headline
 
