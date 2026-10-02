@@ -569,7 +569,7 @@ def checklist_html(d: PrepData) -> str:
              " " + copy_button(d.mrt[plan.objective], "Copy the MRT note") if d.mrt.get(plan.objective) else "")
     if d.lust is not None:
         item(f"Bloodlust usually comes around {_mmss(d.lust)}")
-    mine = [a for a in d.actions if a.kind in ("kill", "interrupt", "mechanic")
+    mine = [a for a in d.actions if a.kind in ("kill", "contact", "interrupt", "mechanic")
             and not (a.kind == "interrupt" and not a.text.startswith("Interrupt"))]
     for a in mine[:6]:
         item(f"{icons.img(d.icons.get(a.name, ''), 'small')}{e(a.text)}")
@@ -635,7 +635,7 @@ def render(d: PrepData) -> str:
         tabs["boss"].append("<h2>The boss in 60 seconds</h2>" + d.guide_summary.replace(
             '<a href="#boss">Every ability, phase by phase &rarr;</a>', ""))
         if d.actions:
-            groups = {"kill": "Adds to kill", "interrupt": "Interrupts", "assignment": "Assignments",
+            groups = {"kill": "Adds to kill", "contact": "Units handled by contact (soak)", "interrupt": "Interrupts", "assignment": "Assignments",
                       "mechanic": "Mechanics you will get", "ignore": "Units the top raids leave alive"}
             blocks = ""
             for kind, title in groups.items():

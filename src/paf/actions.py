@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from paf.corpus.analyze import kills_filter
 
 RANDOM_SHARE = 1 / 20  # one player of your spec in a 20-player raid
+UNIT_KINDS = ("kill", "contact", "ignore")
 KICK_SHARE = 0.3  # your spec handles it in at least this share of the kills: it is part of your job
 ASSIGN_PLAYERS = 4  # at most this many players hit per kill: an assignment, not raid damage
 
@@ -51,10 +52,34 @@ def _adds(con: sqlite3.Connection, encounter_id: int, difficulty: int, skip: set
     return sorted(out, key=lambda a: -a["share"])
 
 
+def contact_debuffs(con: sqlite3.Connection, encounter_id: int, difficulty: int,
+                    unit_abilities: dict[str, list[str]]) -> dict[str, list[tuple[str, float]]]:
+    """Unit -> [(debuff, applications per kill)] for the debuffs of that unit (its abilities in the Encounter
+    Journal) that players get: how a unit nobody kills is handled (soaked, broken by contact...)."""
+    where, params = kills_filter(encounter_id, difficulty)
+    names = dict(con.execute("SELECT id, name FROM ability").fetchall())
+    kills = con.execute(f"SELECT COUNT(*) FROM fight f JOIN mech_status m USING(report, fight_id) WHERE {where}",
+                        params).fetchone()[0]
+    if not kills:
+        return {}
+    counts: dict[str, int] = defaultdict(int)
+    for aid, n in con.execute(f"SELECT e.ability_id, COUNT(*) FROM mech_event e JOIN fight f USING(report, fight_id) "
+                              f"WHERE {where} AND e.kind='debuff' GROUP BY e.ability_id", params):
+        counts[(names.get(aid) or "").lower()] += n
+    out = {}
+    for unit, abilities in unit_abilities.items():
+        got = [(a, counts[a.lower()] / kills) for a in abilities if counts.get(a.lower(), 0) / kills >= 1]
+        if got:
+            out[unit] = sorted(got, key=lambda x: -x[1])
+    return out
+
+
 def actions(con: sqlite3.Connection, encounter_id: int, difficulty: int, spec: str, mechanics: list,
-            focus: dict[str, float] | None = None, skip: set[str] | None = None) -> list[Action]:
+            focus: dict[str, float] | None = None, skip: set[str] | None = None,
+            contact: dict[str, list[tuple[str, float]]] | None = None) -> list[Action]:
     """focus: add name -> share of your spec's damage on it while it is up (paf.raidneed);
-    skip: units that are not adds (the boss's own units, damage-amp windows)."""
+    skip: units that are not adds (the boss's own units, damage-amp windows);
+    contact: unit -> its debuffs that players get (contact_debuffs)."""
     who = f"top {spec} players"
     out: list[Action] = []
     for a in _adds(con, encounter_id, difficulty, skip or set()):
@@ -64,10 +89,18 @@ def actions(con: sqlite3.Connection, encounter_id: int, difficulty: int, spec: s
             extra = f"; {who} put {f:.0%} of their damage on them while they are up" if f else ""
             out.append(Action("kill", a["name"], f"Kill the {a['name']} ({many}): the top raids kill them in "
                                                  f"~{a['life']:.0f} s{extra}."))
-        elif a["died"] <= 0.1 and a["share"] < 0.01 and a["life"] > 60:
-            out.append(Action("ignore", a["name"], f"{a['name']}: the top raids do not kill it with damage (it "
-                                                   f"stays ~{a['life'] / 60:.0f} min); do not spend your damage on "
-                                                   f"it unless your raid's strategy says so."))
+        elif a["died"] <= 0.1 and a["life"] > 60 and (a["share"] < 0.01 or (contact or {}).get(a["name"])):
+            touched = (contact or {}).get(a["name"])
+            if touched:
+                how = ", ".join(f"{n} (~{k:.0f} per kill)" for n, k in touched[:3])
+                hit = "do not kill it" if a["share"] >= 0.01 else "do not damage it"
+                out.append(Action("contact", a["name"], f"{a['name']}: the top raids {hit}; players get "
+                                                        f"its debuffs instead: {how}. It is handled by contact "
+                                                        f"(soak / breaking it), not by damage."))
+            else:
+                out.append(Action("ignore", a["name"], f"{a['name']}: the top raids do not kill it with damage (it "
+                                                       f"stays ~{a['life'] / 60:.0f} min); do not spend your damage "
+                                                       f"on it unless your raid's strategy says so."))
     for m in mechanics:
         if m.kind == "interrupt":
             if m.spec_share >= KICK_SHARE:
@@ -86,13 +119,13 @@ def actions(con: sqlite3.Connection, encounter_id: int, difficulty: int, spec: s
         elif m.spec_share >= max(KICK_SHARE, 3 * RANDOM_SHARE):
             out.append(Action("mechanic", m.name, f"{m.name}: hits ~{m.players_per_kill:.0f} players per kill; "
                                                   f"{who} take it in {m.spec_share:.0%} of the kills: expect it."))
-    order = {"kill": 0, "interrupt": 1, "assignment": 2, "mechanic": 3, "ignore": 4}
+    order = {"kill": 0, "contact": 1, "interrupt": 2, "assignment": 3, "mechanic": 4, "ignore": 5}
     seen: set[str] = set()
     unique = []
     for a in sorted(out, key=lambda a: order[a.kind]):  # one line per mechanic (several spell ids share a name)
-        if (a.kind in ("kill", "ignore") and ("unit", a.name) in seen) or (a.kind not in ("kill", "ignore")
+        if (a.kind in UNIT_KINDS and ("unit", a.name) in seen) or (a.kind not in UNIT_KINDS
                                                                           and ("ability", a.name) in seen):
             continue
-        seen.add(("unit" if a.kind in ("kill", "ignore") else "ability", a.name))
+        seen.add(("unit" if a.kind in UNIT_KINDS else "ability", a.name))
         unique.append(a)
     return unique

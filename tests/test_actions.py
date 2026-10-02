@@ -36,3 +36,19 @@ def test_actions_from_the_logs():
     assert any(t.startswith("Malice is interrupted ~2 times per kill, mostly by other classes") for t in text)
     assert sum(t.startswith("Doomscale Shell: 1 player per kill") for t in text) == 1  # deduplicated, singular
     assert any(t.startswith("Clutch: the top raids do not kill it") for t in text)
+
+
+def test_contact_debuffs_explain_units_nobody_kills():
+    from paf.actions import contact_debuffs
+
+    con = corpus()
+    con.execute("INSERT INTO ability VALUES(77, 'Noxious Shell')")
+    for k in range(10):
+        con.execute("INSERT INTO mech_status VALUES(?, 1, 'x')", (f"r{k}",))
+        for _ in range(4):
+            con.execute("INSERT INTO mech_event VALUES(?, 1, 'debuff', 77, 5, 30)", (f"r{k}",))
+    contact = contact_debuffs(con, 9, 5, {"Clutch": ["Noxious Shell", "Rancid Yolk"]})
+    assert contact == {"Clutch": [("Noxious Shell", 4.0)]}
+    out = actions(con, 9, 5, "Elemental", [], {}, {"Boss"}, contact)
+    clutch = next(a for a in out if a.name == "Clutch")
+    assert clutch.kind == "contact" and "Noxious Shell (~4 per kill)" in clutch.text

@@ -989,7 +989,20 @@ def _boss_guide(d, con, enc, diff: int, diff_name: str, spec: str, tl, fight) ->
         label = f"{spec} {settings.get('class')}"
         focus = {t.name: t.focus[label] for t in raidneed.add_types(con, enc.id, diff) if label in t.focus}
         skip = {r[0] for r in con.execute("SELECT name FROM npc WHERE is_boss=1")}
-        d.actions = actions(con, enc.id, diff, spec, mechs, focus, skip)
+        from paf.actions import contact_debuffs
+        from paf.mechanics import walk
+
+        def own(section) -> list[str]:  # the unit's own abilities, not those of the units it contains
+            out = []
+            for c in section.children:
+                if c.kind == "ability":
+                    out.append(c.title)
+                    out += own(c)
+            return out
+
+        units = {s.title: own(s) for _, s in walk(sections) if s.kind == "creature"}
+        contact = contact_debuffs(con, enc.id, diff, units)
+        d.actions = actions(con, enc.id, diff, spec, mechs, focus, skip, contact)
     except Exception as ex:  # noqa: BLE001 - the guide works without them
         print(f"  actions from the logs skipped: {ex}")
     d.guide_abilities = bossguide.abilities_html(sections, timings=dict(tl.boss_casts), mechanics=mechs,
