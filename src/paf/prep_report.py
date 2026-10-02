@@ -6,7 +6,7 @@ import html
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from paf import theme
+from paf import icons, theme
 from paf.wowhead import SCRIPT as WH_SCRIPT
 from paf.wowhead import link, linkify
 
@@ -83,6 +83,8 @@ class PrepData:
     links: dict[str, str] = field(default_factory=dict)  # spell / item name -> Wowhead reference
     cd_names: dict[str, str] = field(default_factory=dict)  # cooldown key (ascendance, trinket1) -> in-game name
     raid: RaidInfo | None = None
+    icons: dict[str, str] = field(default_factory=dict)  # spell / item / cooldown key name -> game icon file
+    class_name: str = ""  # e.g. "shaman" (class icon in the header)
 
 
 PALETTE = ["#c89933", "#8e6a9b", "#4f8a8b", "#d0705a", "#b8ad3c", "#b0577f", "#3f6fa0", "#6c9a5b", "#74526c"]
@@ -270,9 +272,39 @@ def headline(d: PrepData) -> list[str]:
 CSS = theme.CSS + """
 :root{--card:var(--surface)}
 .key ul{margin:0;padding-left:18px} .key li{margin:8px 0}
-.kpis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin:16px 0}
+.kpis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin:18px 0 6px}
 .kpi.good .v{color:var(--pos)} .kpi.warn .v{color:var(--warn)}
-.sheet-head{margin:6px 0 4px}
+.warn{color:var(--warn)}
+/* header and tabs */
+.sheet-hero{background:var(--header);color:#fff;position:sticky;top:0;z-index:5}
+.sheet-hero .in{max-width:1040px;margin:0 auto;padding:16px 16px 10px;display:flex;gap:14px;align-items:center}
+.sheet-hero h1{color:#fff;margin:0 0 2px} .sheet-hero p{margin:0;color:#eadfe9;font-size:13px}
+.hero-ic{width:48px;height:48px;border-radius:10px;border:2px solid var(--sand);flex:none}
+.tabs{background:rgba(0,0,0,.18);border-bottom:3px solid transparent;border-image:var(--stripe) 1}
+.tabs .in{max-width:1040px;margin:0 auto;padding:0 10px;display:flex;gap:2px;overflow-x:auto}
+.tabs a{color:#eadfe9;padding:10px 14px;font-weight:600;font-size:14px;white-space:nowrap;border-bottom:3px solid transparent;
+  margin-bottom:-3px}
+.tabs a:hover{color:#fff;text-decoration:none} .tabs a.on{color:var(--sand);border-bottom-color:var(--sand)}
+/* suggestions */
+.suggs{padding:4px 18px}
+.sugg{display:grid;grid-template-columns:40px 1fr auto;gap:14px;align-items:start;padding:14px 0;
+  border-bottom:1px solid var(--line)}
+.sugg:last-child{border-bottom:0}
+.sugg .ic,.sugg .phm{width:36px;height:36px;border-radius:7px;display:block;border:1px solid var(--line)}
+.sugg .phm{background:var(--surface-2)}
+.sugg .t{font-size:15px;line-height:1.35} .sugg .d{font-size:13.5px;color:var(--fg);margin-top:4px}
+.sugg .d div{margin:3px 0}
+.ics{display:inline-block;width:18px;height:18px;border-radius:4px;vertical-align:-4px;margin-right:2px}
+.ics.ph{background:transparent}
+.panel{scroll-margin-top:120px}
+.sugg .gain{font-size:20px;font-weight:700;color:var(--pos);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sev{display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;
+  border-radius:5px;margin-right:6px;vertical-align:2px}
+.major .sev{background:var(--bronze);color:#1c1410} .moderate .sev{background:var(--accent-soft);color:var(--fg);
+  border:1px solid var(--accent)} .minor .sev{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.info .sev{background:var(--lavender);color:#fff}
+.major{box-shadow:inset 3px 0 0 var(--bronze);padding-left:12px;margin-left:-15px}
+@media (max-width:640px){.sugg{grid-template-columns:36px 1fr}.sugg .gain{grid-column:2;font-size:16px}}
 """
 
 
@@ -355,21 +387,135 @@ and the strategy, not on the raid's DPS (checked: no correlation). Top players p
 ranked on their own DPS), so their logs alone cannot tell what your raid needs.</p></details></div>"""
 
 
-def render(d: PrepData) -> str:
-    parts: list[str] = []
-    parts.append(f'<h1 class="sheet-head">{e(d.boss)} <span class="pill gold">{e(d.difficulty)}</span></h1>')
-    parts.append(f'<p class="muted small">{e(d.spec)}, {e(d.character)}. Built from {d.kills} ranked kills on Warcraft '
-                 f'Logs and SimulationCraft, {datetime.now():%d %b %Y %H:%M}.</p>')
-    parts.append(kpi_tiles(d))
+@dataclass
+class Suggestion:
+    severity: str  # "major" (>= 3%), "moderate" (>= 1%), "minor", "info"
+    title: str  # html
+    details: list[str] = field(default_factory=list)  # html lines
+    gain: float | None = None
+    icon: str = ""  # game icon file name
+
+
+def _severity(gain: float | None) -> str:
+    if gain is None:
+        return "info"
+    return "major" if gain >= 3 else "moderate" if gain >= 1 else "minor"
+
+
+def suggestions(d: PrepData) -> list[Suggestion]:
+    """What to change, most valuable first (WoWAnalyzer-style): each with its measured gain."""
 
     def lk(text: str) -> str:
         return linkify(text, d.links)
 
-    key = headline(d)
-    if key:
-        parts.append('<div class="hero key"><h3>What to remember</h3><ul>'
-                     + "".join("<li>" + "<br>".join(lk(line) for line in k.split("\n")) + "</li>" for k in key)
-                     + "</ul></div>")
+    def ic(name: str) -> str:
+        return d.icons.get(name, "")
+
+    out: list[Suggestion] = []
+    if d.raid and d.raid.verdicts:
+        v = d.raid.verdicts[0]
+        what = "stay on the boss" if d.raid.objective == "boss" else "pad the adds"
+        out.append(Suggestion("info", f"With your raid, <b>{what}</b>", [e(v.reason)]))
+    if d.talents and d.talents.rows:
+        fight = d.talents.fights[0]
+        best = max(d.talents.rows, key=lambda r: r.per_fight.get(fight, (-1e9, None))[0])
+        g = best.per_fight.get(fight, (0.0, None))[0]
+        if g > 2 * d.talents.error:
+            both = set(best.add) & set(best.drop)  # same name on two nodes (e.g. a choice node): not a change
+            add = [t for t in dict.fromkeys(best.add) if t not in both]
+            drop = [t for t in dict.fromkeys(best.drop) if t not in both]
+
+            def few(names: list[str]) -> str:
+                return e(", ".join(names[:6]) + (f" and {len(names) - 6} more" if len(names) > 6 else ""))
+
+            lines = []
+            if add:
+                lines.append("Take " + few(add))
+            if drop:
+                lines.append("<span class='muted'>Drop " + few(drop) + "</span>")
+            lines.append("<span class='muted small'>Full comparison in Gear &amp; talents.</span>")
+            out.append(Suggestion(_severity(g), f"Play the talent build <b>{e(best.build.label)}</b> "
+                                  f"<span class='muted'>({best.build.count} top players)</span>", lines, g,
+                                  d.icons.get("__spec__", "")))
+    want = ("boss" if d.raid.objective == "boss" else "total") if d.raid and d.raid.objective else None
+    for p in sorted(d.optimized, key=lambda p: (p.objective != want, -p.gain)):
+        if p.objective == "adds" or p.gain <= 2 * p.error:
+            continue
+        by_rule: dict[str, list[str]] = {}
+        for k, r in p.choice.items():
+            if r.name != "default":
+                by_rule.setdefault(rule_phrase(d, r.name), []).append(k)
+        lines = [", ".join(icons.img(d.icons.get(k, ""), "small") + link(cd_name(d, k), d.links.get(k))
+                           for k in ks) + f": {e(phrase)}" for phrase, ks in by_rule.items()]
+        if p.flags:
+            lines.append("<span class='warn'>&#9888; " + e("; ".join(p.flags)) + "</span>")
+        first = next(iter(p.choice), "")
+        others = ", ".join(f"{o if o != 'total' else 'pad'} {v:+.1f}%" for o, v in p.totals.items()
+                           if o not in (p.objective, "adds"))
+        out.append(Suggestion(_severity(p.gain), f"Cooldowns for <b>{e(objective_name(d, p.objective).lower())}</b>"
+                              + (f" <span class='muted'>({others})</span>" if others else ""), lines, p.gain,
+                              d.icons.get(first, "")))
+    if d.gear:
+        changes, _, w = d.gear[0]
+        if w > 2 * d.gear_error:
+            names = [n for n in d.links if n in changes and d.links[n].startswith("item=")]
+            out.append(Suggestion(_severity(w), "Equip from your bags", [lk(c) for c in changes.split("; ")], w,
+                                  ic(names[0]) if names else ""))
+    if d.loot:
+        item, slot, simple, real = d.loot[0]
+        delta = real if real is not None else simple
+        if delta > 2 * d.loot_error:
+            out.append(Suggestion(_severity(delta), f"Loot to hope for: {lk(item)}",
+                                  [f"{e(slot)}, at item level {d.loot_ilvl}"], delta, ic(item)))
+    held = [a for a in d.alignment if a.units_cover and a.in_units > a.units_cover * 1.5
+            and a.in_units - a.units_cover > 0.1]
+    if held:
+        vuln, units = burst_names(d)
+        out.append(Suggestion("info", "The top players keep " + ", ".join(lk(a.ability) for a in held) + " for "
+                              + e(" / ".join(x for x in (vuln, units) if x) or "the burst windows"), [],
+                              None, ic(held[0].ability)))
+    order = {"info": 0}
+    return sorted(out, key=lambda s: (order.get(s.severity, 1) if s.title.startswith("With your raid") else 1,
+                                      -(s.gain if s.gain is not None else -1)))
+
+
+def suggestions_html(d: PrepData) -> str:
+    rows = []
+    for s in suggestions(d):
+        label = {"major": "Major", "moderate": "Moderate", "minor": "Minor", "info": "Info"}[s.severity]
+        gain = f'<div class="gain">{s.gain:+.1f}%</div>' if s.gain is not None else '<div class="gain"></div>'
+        pic = icons.img(s.icon, "medium") or '<span class="phm"></span>'
+        details = "".join(f"<div>{x}</div>" for x in s.details)
+        rows.append(f'<div class="sugg {s.severity}">{pic}<div><div class="t"><span class="sev">{label}</span> '
+                    f'{s.title}</div><div class="d">{details}</div></div>{gain}</div>')
+    if not rows:
+        return '<p class="muted">Nothing to change: your character already plays this fight well.</p>'
+    return f'<div class="card suggs">{"".join(rows)}</div>'
+
+
+TABS = (("overview", "Overview"), ("cooldowns", "Cooldowns"), ("gear", "Gear & talents"), ("raid", "Your raid"),
+        ("fight", "The fight"))
+TAB_JS = """<script>
+(function(){var ids=[...document.querySelectorAll('.panel')].map(function(p){return p.id});
+function show(id){if(ids.indexOf(id)<0)id=ids[0];document.querySelectorAll('.panel').forEach(function(p){
+p.hidden=p.id!==id});document.querySelectorAll('.tabs a').forEach(function(a){
+a.classList.toggle('on',a.getAttribute('href')==='#'+id)});scrollTo(0,0)}
+addEventListener('hashchange',function(){show(location.hash.slice(1))});show(location.hash.slice(1));})();
+</script>"""
+
+
+def render(d: PrepData) -> str:
+    tabs: dict[str, list[str]] = {k: [] for k, _ in TABS}
+
+    def lk(text: str) -> str:
+        return linkify(text, d.links)
+
+    # overview
+    tabs["overview"].append(kpi_tiles(d))
+    tabs["overview"].append("<h2>Suggestions</h2>" + suggestions_html(d))
+    if d.timeline_file:
+        tabs["overview"].append(f'<p class="small"><a href="{e(d.timeline_file)}">See when the top players use each '
+                                f'cooldown (timelines) &rarr;</a></p>')
 
     # the fight
     rows = "".join(f"<tr><td>{_mmss(t)}</td><td>{e(n)}</td></tr>" for n, t in d.phases)
@@ -383,15 +529,24 @@ def render(d: PrepData) -> str:
     extra.append(f"top {e(d.spec)} players move {d.moving_share:.0%} of the fight")
     if d.add_share_spec is not None:
         extra.append(f"and do {d.add_share_spec:.0%} of their damage to adds")
-    parts.append(f"""<h2>The fight</h2><div class="card"><p>Typical duration {_mmss(d.duration)}; {"; ".join(extra)}.</p>
+    tabs["fight"].append(f"""<h2>The fight</h2><div class="card"><p>Typical duration {_mmss(d.duration)}; {"; ".join(extra)}.</p>
 <div class="scroll"><table><tr><th>Phase</th><th></th></tr>{rows}</table></div>
-<h3 class="small muted">Add waves (typical timeline across kills)</h3>
+<h3 class="small muted" style="margin-top:14px">Add waves (typical timeline across kills)</h3>
 <div class="scroll"><table><tr><th>Time</th><th>Adds</th><th>Alive</th><th>Types</th></tr>{waves}</table></div>
 {f'<p><a href="{e(d.timeline_file)}">Cooldown timelines of the top players</a></p>' if d.timeline_file else ''}
 </div>""")
+    if d.assigns:
+        tabs["fight"].append('<h2>Your assignments and plan</h2><div class="card small"><ul>'
+                             + "".join(f"<li>{e(a)}</li>" for a in d.assigns) + "</ul></div>")
 
+    # your raid
     if d.raid:
-        parts.append(raid_section(d.raid))
+        tabs["raid"].append(raid_section(d.raid))
+    else:
+        tabs["raid"].append("""<h2>Your raid and the adds</h2><div class="card"><p>Not set for this prep. Set your guild
+on the home page of the app (its latest public log is used), or paste one of your raid's logs on the boss page: the prep
+then tells you whether the others cover the adds (stay on the boss) or you should pad them, and picks the cooldown plan
+and the gear for that.</p></div>""")
 
     # sim of the fight
     if d.sim_dps and d.patchwerk_dps:
@@ -402,7 +557,7 @@ def render(d: PrepData) -> str:
         if d.boss_share_real is not None:
             cal = (f" The fight is calibrated so that your share of damage on the boss matches the top players' "
                    f"logs ({d.boss_share_real:.0%}); add counts scaled by {d.add_scale:g}.")
-        parts.append(f"""<h2>Your character on this fight</h2><div class="card">
+        tabs["fight"].append(f"""<h2>Your character on this fight</h2><div class="card">
 <p>{d.sim_dps:,.0f} DPS on the rebuilt fight{boss}, vs {d.patchwerk_dps:,.0f} on a Patchwerk of the same length
 ({(d.sim_dps / d.patchwerk_dps - 1):+.0%}).{cal}</p></div>""")
 
@@ -410,7 +565,7 @@ def render(d: PrepData) -> str:
     if d.talents:
         tc = d.talents
         head = "".join(f"<th>{e(f)}</th>" for f in tc.fights)
-        body = f"<tr><td>your build</td><td class='n'></td>{''.join('<td class=n>ref</td>' for _ in tc.fights)}<td></td></tr>"
+        body = f"<tr><td>your build</td>{''.join('<td class=n>ref</td>' for _ in tc.fights)}<td></td></tr>"
         for r in tc.rows:
             cells = ""
             for f in tc.fights:
@@ -420,9 +575,9 @@ def render(d: PrepData) -> str:
             if r.add or r.drop:
                 diff = f"take {e(', '.join(r.add) or '-')}<br><span class='muted'>drop {e(', '.join(r.drop) or '-')}</span>"
             body += (f"<tr><td>{e(r.build.label)}<br><span class='small muted'>{r.build.count} players, median rank "
-                     f"{r.build.median_rank:.0f}</span></td><td class='n'></td>{cells}<td class='small'>{diff}</td></tr>")
-        parts.append(f"""<h2>Talents of the top players, on your character</h2><div class="card scroll">
-<table><tr><th>Build</th><th></th>{head}<th>vs your build</th></tr>{body}</table>
+                     f"{r.build.median_rank:.0f}</span></td>{cells}<td class='small'>{diff}</td></tr>")
+        tabs["gear"].append(f"""<h2>Talents of the top players, on your character</h2><div class="card scroll">
+<table><tr><th>Build</th>{head}<th>vs your build</th></tr>{body}</table>
 <p class="small muted">Statistical error about +/-{tc.error:.2f}%.</p></div>""")
 
     # cooldown plans
@@ -432,7 +587,7 @@ def render(d: PrepData) -> str:
         body = "".join(f"<tr><td>{e(p.name.replace('_', ' '))}</td><td class='n'>{_pct(tot)}</td>"
                        f"<td class='n'>{_pct(boss)}</td><td class='small'>{e(p.description)}</td></tr>"
                        for p, tot, boss in pc.rows)
-        parts.append(f"""<h2>Cooldown plans</h2><div class="card scroll">
+        tabs["cooldowns"].append(f"""<h2>Cooldown plans</h2><div class="card scroll">
 <p class="small">When the top players use their cooldowns: {times}.</p>
 <table><tr><th>Plan</th><th>Total</th><th>Boss</th><th></th></tr>{body}</table>
 <p class="small muted">Statistical error about +/-{pc.error:.2f}%. SimC evaluates these plans; it does not invent new ones.</p>
@@ -443,7 +598,8 @@ def render(d: PrepData) -> str:
         blocks = []
         for p in d.optimized:
             changed = {k: r for k, r in p.choice.items() if r.name != "default"}
-            rules = "".join(f"<tr><td>{link(cd_name(d, k), d.links.get(k))}</td><td>{e(rule_phrase(d, r.name))}</td></tr>"
+            rules = "".join(f"<tr><td>{icons.img(d.icons.get(k, ''), 'small')} {link(cd_name(d, k), d.links.get(k))}</td>"
+                            f"<td>{e(rule_phrase(d, r.name))}</td></tr>"
                             for k, r in changed.items()) or "<tr><td colspan=2>the default priority list</td></tr>"
             others = ", ".join(f"{o} {_pct(v, 1)}" for o, v in p.totals.items() if o != p.objective)
             steps = ""
@@ -459,7 +615,7 @@ def render(d: PrepData) -> str:
                            + ", ".join(f"{e(v)} {_pct(g, 1)}" for v, g in p.sensitivity.items())
                            + (" &rarr; <b>robust</b>" if p.robust else " &rarr; <b>not robust</b>") + "</p>")
             if p.flags:
-                checks += "<ul class='small'>" + "".join(f"<li>&#9888; {e(f)}</li>" for f in p.flags) + "</ul>"
+                checks += "<ul class='small'>" + "".join(f"<li class='warn'>&#9888; {e(f)}</li>" for f in p.flags) + "</ul>"
             blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain)}
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span></h3>
 {checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names)}
@@ -468,7 +624,7 @@ def render(d: PrepData) -> str:
 <tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></details>
 <details><summary class="small">MRT note</summary><pre class="small" style="white-space:pre-wrap">{e(note)}</pre></details>
 </div>""")
-        parts.append("<h2>Ideal cooldown play-by-play, per objective</h2>" + "".join(blocks))
+        tabs["cooldowns"].append("<h2>Ideal cooldown play-by-play, per objective</h2>" + "".join(blocks))
 
     if d.alignment:
         a0 = d.alignment[0]
@@ -479,17 +635,14 @@ def render(d: PrepData) -> str:
                 held.append("held for adds")
             if a.units_cover and a.in_units > a.units_cover * 1.5 and a.in_units - a.units_cover > 0.1:
                 held.append("held for secondary targets")
-            rows += (f"<tr><td>{lk(a.ability)}</td><td class='n'>{a.in_adds:.0%}</td><td class='n'>{a.in_units:.0%}</td>"
+            rows += (f"<tr><td>{icons.img(d.icons.get(a.ability, ''), 'small')} {lk(a.ability)}</td>"
+                     f"<td class='n'>{a.in_adds:.0%}</td><td class='n'>{a.in_units:.0%}</td>"
                      f"<td>{e(' / '.join(held) or 'no clear hold')}</td></tr>")
-        parts.append(f"""<h2>What the top players do with their cooldowns</h2><div class="card scroll">
+        tabs["cooldowns"].append(f"""<h2>What the top players do with their cooldowns</h2><div class="card scroll">
 <p class="small">Share of their casts (after the opener) during add waves, which cover {a0.adds_cover:.0%} of the fight,
 and on the secondary targets, which cover {a0.units_cover:.0%}. Much more than the coverage means they hold the cooldown.
 SimC does not know that a secondary target must die fast, so compare with the simulated plans above.</p>
 <table><tr><th>Cooldown</th><th>During adds</th><th>Secondary targets</th><th></th></tr>{rows}</table></div>""")
-
-    if d.assigns:
-        parts.append('<h2>Your assignments</h2><div class="card small"><ul>'
-                     + "".join(f"<li>{e(a)}</li>" for a in d.assigns) + "</ul></div>")
 
     # gear
     if d.gear:
@@ -498,17 +651,18 @@ SimC does not know that a secondary target must die fast, so compare with the si
                        + "".join(f"<td class='n'>{_pct(per.get(f))}</td>" for f in d.gear_fights) + "</tr>"
                        for ch, per, w in d.gear[:8])
         mine = ("on the fight with your assignments and plan: " + "; ".join(d.assigns)) if d.assigns else \
-            "on the fight without personal assignments (tick yours in `paf serve` to see if they change your gear)"
-        parts.append(f"""<h2>Best gear from your bags, for this fight</h2><div class="card scroll">
+            "on the fight without personal assignments (tick yours in the app to see if they change your gear)"
+        tabs["gear"].insert(0, f"""<h2>Best gear from your bags, for this fight</h2><div class="card scroll">
 <p class="small">Simmed {e(d.gear_plan or 'with the default priority list')}, {e(mine)}.</p>
 <table><tr><th>Changes vs equipped</th><th>Weighted</th>{head}</tr>{body}</table>
 <p class="small muted">Statistical error about +/-{d.gear_error:.2f}%.</p></div>""")
 
     # loot
     if d.loot:
-        body = "".join(f"<tr><td>{lk(i)}</td><td>{e(s)}</td><td class='n'>{_pct(real) if real is not None else '-'}</td>"
+        body = "".join(f"<tr><td>{icons.img(d.icons.get(i, ''), 'small')} {lk(i)}</td><td>{e(s)}</td>"
+                       f"<td class='n'>{_pct(real) if real is not None else '-'}</td>"
                        f"<td class='n'>{_pct(v)}</td></tr>" for i, s, v, real in d.loot[:12])
-        parts.append(f"""<h2>What this boss drops, for you</h2><div class="card scroll">
+        tabs["gear"].append(f"""<h2>What this boss drops, for you</h2><div class="card scroll">
 <p class="small muted">"In your best sets": the item inserted in your best Top Gear sets, the rest of your gear
 rearranged around it (its real value). "Single swap": the classic droptimizer value, on your equipped set.</p>
 <table><tr><th>Item</th><th>Slot</th><th>In your best sets</th><th>Single swap</th></tr>{body}</table>
@@ -524,8 +678,17 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
         "of your exact DPS.",
         "Corpus analyses are correlations (what the top players do); SimC checks them on your character.",
     ]
-    parts.append('<h2>Notes</h2><div class="card small muted"><ul>' + "".join(f"<li>{e(n)}</li>" for n in notes)
-                 + "</ul></div>")
+    tabs["fight"].append('<h2>Notes</h2><div class="card small muted"><ul>' + "".join(f"<li>{e(n)}</li>" for n in notes)
+                         + "</ul></div>")
+
+    cls_icon = icons.img(icons.CLASS_ICON.format(cls=d.class_name.lower()), "large", "hero-ic") if d.class_name else ""
+    header = f"""<header class="sheet-hero"><div class="in">{cls_icon}<div class="txt">
+<h1>{e(d.boss)} <span class="pill gold">{e(d.difficulty)}</span></h1>
+<p>{e(d.character)} &middot; {e(d.spec)} &middot; {d.kills} ranked kills &middot; {datetime.now():%d %b %Y %H:%M}</p>
+</div></div><nav class="tabs"><div class="in">{''.join(f'<a href="#{k}">{e(label)}</a>' for k, label in TABS
+                                                         if tabs[k])}</div></nav></header>"""
+    panels = "".join(f'<section class="panel" id="{k}">{"".join(v)}</section>' for k, v in tabs.items() if v)
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
-            f"<title>{e(d.boss)} prep</title>{WH_SCRIPT}<style>{CSS}</style></head><body><main>{''.join(parts)}"
-            f'<p class="small muted">Generated by prep-a-fight. Player names are not shown.</p></main></body></html>')
+            f"<title>{e(d.boss)} prep</title>{WH_SCRIPT}<style>{CSS}</style></head><body>{header}<main>{panels}"
+            f'<p class="small muted">Generated by prep-a-fight. Player names are not shown.</p></main>{TAB_JS}'
+            f"</body></html>")

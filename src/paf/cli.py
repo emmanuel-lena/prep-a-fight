@@ -876,6 +876,11 @@ def cmd_prep(args: argparse.Namespace) -> int:
             d.loot_ilvl = ilvl
             d.loot_error = max((i.error for i in ranked_items[:12]), default=0.0)
 
+    from paf.icons import CLASS_ICON, icons_for
+
+    d.class_name = profile.class_name
+    d.icons = icons_for(d.links)
+    d.icons["__spec__"] = CLASS_ICON.format(cls=profile.class_name.lower())
     out = reports / f"prep-{_slug(enc.name)}-{diff_name}.html"
     out.write_text(render(d), encoding="utf-8")
     step("Done")
