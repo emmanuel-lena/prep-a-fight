@@ -141,6 +141,17 @@ def _encounters() -> list:
 DIFF_NAMES = tuple(settings.DIFFICULTIES)
 
 
+def split_key(key: str) -> tuple[str, str, str]:
+    """'nek-zali-mythic-assassination-rogue' -> ('nek-zali', 'mythic', 'Assassination Rogue'). Reports made
+    before the spec was part of the name have no spec."""
+    import re
+
+    m = re.match(rf"^(.+?)-({'|'.join(DIFF_NAMES)})(?:-(.+))?$", key)
+    if not m:
+        return key, "", ""
+    return m.group(1), m.group(2), (m.group(3) or "").replace("-", " ").title()
+
+
 def prepared() -> list[dict]:
     """Bosses with a prep sheet or a timeline in the reports folder, newest first."""
     import re
@@ -161,8 +172,8 @@ def prepared() -> list[dict]:
                 item["headline"] = json.loads(f.with_suffix(".json").read_text(encoding="utf-8"))
             except ValueError:
                 pass
-        diff = next((d for d in DIFF_NAMES if key.endswith("-" + d)), "")
-        item["difficulty"] = diff
+        boss, diff, spec = split_key(key)
+        item.update(boss=boss, difficulty=diff, spec=spec)
         if not item["name"] or kind == "prep":
             m = re.search(rb"<title>(.*?)</title>", f.read_bytes()[:4000], re.S)
             title = html.unescape(m.group(1).decode("utf-8", "replace")) if m else key
@@ -177,7 +188,8 @@ def prepared_block() -> str:
     tiles = "".join(
         f'<a class="tile boss-tile" href="/view/{e(x["key"])}"><div class="name">{e(x["name"])}</div>'
         f'<span class="pill gold">{e(x["difficulty"] or "?")}</span> '
-        f'<span class="pill">{"prep sheet + timelines" if len(x["files"]) == 2 else "prep sheet only" if "prep" in x["files"] else "timelines only"}</span>'
+        + (f'<span class="pill">{e(x["spec"])}</span> ' if x["spec"] else "")
+        + f'<span class="pill">{"prep sheet + timelines" if len(x["files"]) == 2 else "prep sheet only" if "prep" in x["files"] else "timelines only"}</span>'
         + (f'<div class="top"><b class="pos">{x["headline"]["gain"]:+.1f}%</b> {e(x["headline"]["what"])}</div>'
            if x.get("headline", {}).get("gain") is not None else "")
         + f'<div class="when">updated {time.strftime("%d %b %H:%M", time.localtime(x["mtime"]))}</div></a>'
@@ -200,7 +212,8 @@ def view_page(key: str, tab: str) -> bytes:
         f'<a class="{"on" if k == tab else ""}" href="/view/{e(key)}?tab={k}">{e(label)}</a>'
         for k, label in TABS if k in item["files"])
     others = "".join(f'<option value="/view/{e(x["key"])}"{" selected" if x["key"] == key else ""}>'
-                     f'{e(x["name"])} ({e(x["difficulty"])})</option>' for x in prepared())
+                     f'{e(x["name"])} ({e(" ".join(filter(None, (x["difficulty"], x["spec"]))))})</option>'
+                     for x in prepared())
     src = f'/report/{e(item["files"][tab])}'
     boss_link = _boss_link(item)
     nav = (f'<select onchange="location=this.value" aria-label="Boss">{others}</select>{tabs}'
@@ -220,7 +233,7 @@ def _boss_link(item: dict) -> str:
         encs = _encounters()
     except Exception:  # noqa: BLE001 - the link is a convenience
         return ""
-    enc = next((x for x in encs if item["key"] == f"{_slug(x.name)}-{item['difficulty']}"), None)
+    enc = next((x for x in encs if item["boss"] == _slug(x.name)), None)
     return f"/boss?boss={enc.id}&difficulty={item['difficulty']}" if enc else ""
 
 
@@ -396,9 +409,9 @@ wants you on the boss)</span></label>
 
 
 def prepared_link(enc, difficulty: str) -> str:
-    from paf.corpus.template import _slug
+    from paf.corpus.template import report_key
 
-    key = f"{_slug(enc.name)}-{difficulty}"
+    key = report_key(enc.name, difficulty)
     return f' <a href="/view/{e(key)}">Open the last prep sheet &rarr;</a>' if any(
         x["key"] == key for x in prepared()) else ""
 
@@ -758,7 +771,7 @@ class Handler(BaseHTTPRequestHandler):
                 p.write_text(text, encoding="utf-8")
                 self._redirect(f"/boss?boss={boss_id}&difficulty={difficulty}")
             elif self.path == "/prep":
-                from paf.corpus.template import _slug
+                from paf.corpus.template import report_key
                 from paf.encounters import raid_encounters
                 from paf.wcl import WCLClient
 
@@ -785,7 +798,7 @@ class Handler(BaseHTTPRequestHandler):
                 goal = (form.get("goal") or ["auto"])[0]
                 if goal in ("boss", "total"):
                     args += ["--objective", goal]
-                result = data_dir() / "reports" / f"prep-{_slug(enc.name)}-{difficulty}.html"
+                result = data_dir() / "reports" / f"prep-{report_key(enc.name, difficulty)}.html"
                 jid = JOBS.start(args, result)
                 self._redirect(f"/job/{jid}")
             else:

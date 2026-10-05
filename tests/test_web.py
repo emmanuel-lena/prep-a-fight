@@ -155,3 +155,10 @@ def test_prep_progress_and_job_from_disk(tmp_path, monkeypatch):
     assert web.JOBS.get("../etc") is None
     page = web.job_page("abcd1234").decode()
     assert "The prep finished" in page and "failed" not in page
+
+
+
+def test_report_keys_carry_the_spec():
+    assert web.split_key("nek-zali-the-soulcoiler-mythic-assassination-rogue") == (
+        "nek-zali-the-soulcoiler", "mythic", "Assassination Rogue")
+    assert web.split_key("ula-tek-heroic") == ("ula-tek", "heroic", "")  # reports from before the spec was in the name

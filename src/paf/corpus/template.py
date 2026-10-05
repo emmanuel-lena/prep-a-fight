@@ -38,6 +38,14 @@ def _slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
 
+def report_key(boss: str, difficulty: str) -> str:
+    """Name of a boss's reports (prep-<key>.html, timeline-<key>.html...): boss, difficulty and the analyzed
+    spec, so the preps of two characters never overwrite each other."""
+    from paf import settings
+
+    return f"{_slug(boss)}-{difficulty}-{_slug(settings.get('spec'))}-{_slug(settings.get('class'))}"
+
+
 def moving_seconds(points: list[tuple[float, float, float]], duration: float) -> list[bool]:
     """Per-second moving flags from (t, x, y) points of one player."""
     flags = [False] * (int(duration) + 1)

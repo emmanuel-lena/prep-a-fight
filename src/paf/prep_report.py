@@ -492,7 +492,12 @@ def suggestions(d: PrepData) -> list[Suggestion]:
                                   f"<span class='muted'>(played by {best.build.count} top players)</span>", lines, g,
                                   d.icons.get("__spec__", "")))
     want = wanted(d)
-    for p in sorted(d.optimized, key=lambda p: (p.objective != want, -p.gain)):
+
+    def costly(p) -> bool:
+        """A burst plan that loses boss or total damage: worth it only when the raid needs that target dead."""
+        return p.objective == "secondary" and any(v < -2 * p.error for o, v in p.totals.items() if o in ("boss", "total"))
+
+    for p in sorted(d.optimized, key=lambda p: (p.objective != want, costly(p), -p.gain)):
         if p.objective == "adds" or p.gain <= 2 * p.error:
             continue
         by_rule: dict[str, list[str]] = {}
@@ -520,7 +525,9 @@ def suggestions(d: PrepData) -> list[Suggestion]:
                    else " <span class='pill gold'>recommended for your raid</span>")
         elif want is None and p.objective in ("boss", "total"):
             tag = " <span class='pill'>pick one: see Your raid</span>"
-        out.append(Suggestion(_severity(p.gain), f"Cooldown plan <b>{e(goal)}</b>{tag}", lines, p.gain,
+        elif costly(p):
+            tag = " <span class='pill'>only if your raid needs it dead fast</span>"
+        out.append(Suggestion("info" if costly(p) else _severity(p.gain), f"Cooldown plan <b>{e(goal)}</b>{tag}", lines, p.gain,
                               d.icons.get(first, "")))
     if d.gear:
         changes, _, w = d.gear[0]

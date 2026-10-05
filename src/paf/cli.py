@@ -260,7 +260,7 @@ def cmd_timeline(args: argparse.Namespace) -> int:
     from paf.config import data_dir
     from paf.corpus import db
     from paf.corpus.collect import backfill_npc_actors
-    from paf.corpus.template import _slug
+    from paf.corpus.template import report_key
     from paf.corpus.timeline import build_timeline, render_html
 
     client, enc, diff_name, diff = _encounter_and_difficulty(args)
@@ -270,7 +270,7 @@ def cmd_timeline(args: argparse.Namespace) -> int:
     if tl.kills == 0:
         print(f"No kills in the corpus for {enc.name} {diff_name}: run `paf corpus \"{enc.name}\"` first.")
         return 1
-    out = data_dir() / "reports" / f"timeline-{_slug(enc.name)}-{diff_name}.html"
+    out = data_dir() / "reports" / f"timeline-{report_key(enc.name, diff_name)}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(render_html(tl), encoding="utf-8")
     print(f"{len(tl.players)} players, {len(tl.abilities)} cooldowns detected: "
@@ -644,7 +644,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
     from paf.config import data_dir
     from paf.corpus import db
     from paf.corpus.analyze import analyze
-    from paf.corpus.template import _slug, build_template, template_path
+    from paf.corpus.template import _slug, build_template, report_key, template_path
     from paf.corpus.timeline import build_timeline, render_html
     from paf.droptimizer import run_droptimizer, usable_loot
     from paf.gamedata import encounter_loot, item_classes, item_inventory_types, item_names, item_sets
@@ -792,7 +792,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
     tl = build_timeline(con, enc.id, diff, enc.name, diff_name, spec, top=25)
     reports = data_dir() / "reports"
     reports.mkdir(parents=True, exist_ok=True)
-    tl_file = reports / f"timeline-{_slug(enc.name)}-{diff_name}.html"
+    tl_file = reports / f"timeline-{report_key(enc.name, diff_name)}.html"
     tl_file.write_text(render_html(tl), encoding="utf-8")
     d.timeline_file = tl_file.name
 
@@ -835,7 +835,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
                                       alignment=d.alignment, validation=d.validation[1] if d.validation else None)
         d.mrt = {p.objective: mrt_note(enc.name, p, fight, d.cd_names) for p in d.optimized}
         raid_notes = [n for o, n in d.mrt.items() if o != "adds"]  # "damage to adds" is not a raid plan
-        (reports / f"mrt-{_slug(enc.name)}-{diff_name}.txt").write_text("\n\n".join(raid_notes) + "\n",
+        (reports / f"mrt-{report_key(enc.name, diff_name)}.txt").write_text("\n\n".join(raid_notes) + "\n",
                                                                          encoding="utf-8")
 
     if not args.no_gear:
@@ -896,14 +896,14 @@ def cmd_prep(args: argparse.Namespace) -> int:
     d.class_name = profile.class_name
     d.icons = {**d.icons, **icons_for(d.links)}
     d.icons["__spec__"] = CLASS_ICON.format(cls=profile.class_name.lower())
-    out = reports / f"prep-{_slug(enc.name)}-{diff_name}.html"
+    out = reports / f"prep-{report_key(enc.name, diff_name)}.html"
     out.write_text(render(d), encoding="utf-8")
     import json
     import re
 
     from paf.prep_report import suggestions
 
-    top = next((s for s in suggestions(d) if s.gain is not None), None)
+    top = next((s for s in suggestions(d) if s.gain is not None and s.severity != "info"), None)
     what = re.sub(r"<[^>]+>", "", re.sub(r"<span class='pill[^']*'>.*?</span>", "", top.title)) if top else ""
     summary = {"gain": round(top.gain, 1), "what": what.strip()} if top else {}
     out.with_suffix(".json").write_text(json.dumps(summary), encoding="utf-8")  # headline for the app's home
@@ -1257,7 +1257,7 @@ def print_alignment(enc, diff_name: str, diff: int, fight) -> None:
 def cmd_optimize(args: argparse.Namespace) -> int:
     from paf import simc
     from paf.config import data_dir
-    from paf.corpus.template import _slug
+    from paf.corpus.template import _slug, report_key
     from paf.optimize import OBJECTIVES, mrt_note, optimize_all
 
     profile_text, origin = _load_profile(args.profile)
@@ -1280,7 +1280,7 @@ def cmd_optimize(args: argparse.Namespace) -> int:
                             alignment=tops_alignment(tl, fight))
     print_optimized(plans, fight)
     print_alignment(enc, diff_name, diff, fight)
-    notes = data_dir() / "reports" / f"mrt-{_slug(enc.name)}-{diff_name}.txt"
+    notes = data_dir() / "reports" / f"mrt-{report_key(enc.name, diff_name)}.txt"
     notes.parent.mkdir(parents=True, exist_ok=True)
     notes.write_text("\n\n".join(mrt_note(enc.name, p, fight) for p in plans) + "\n", encoding="utf-8")
     print(f"\nMRT notes: {notes}\nRuns: {root}")
