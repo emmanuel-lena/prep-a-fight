@@ -567,6 +567,9 @@ def checklist_html(d: PrepData) -> str:
         rules = "; ".join(f"{', '.join(ks)}: {phrase}" for phrase, ks in by_rule.items())
         item(f"Cooldowns ({_goal(plan.objective)} damage, {plan.gain:+.1f}%): {e(rules)}",
              " " + copy_button(d.mrt[plan.objective], "Copy the MRT note") if d.mrt.get(plan.objective) else "")
+    elif any(p.objective == want for p in d.optimized):
+        item(f"Cooldowns ({_goal(want)} damage): use them as soon as they are ready; holding them for a moment of "
+             f"the fight gains nothing measurable here")
     if d.lust is not None:
         item(f"Bloodlust usually comes around {_mmss(d.lust)}")
     mine = [a for a in d.actions if a.kind in ("kill", "contact", "interrupt", "mechanic")
