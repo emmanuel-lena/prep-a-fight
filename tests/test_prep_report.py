@@ -62,3 +62,15 @@ def test_checklist():
     assert "Your raid checklist" in page and "Bloodlust usually comes around 2:00" in page
     assert "Kill the Clutch." in page and "Your assignment: Malice: interrupt" in page
     assert "ask your raid lead" in page
+
+
+def test_goal_chosen_by_the_player():
+    from paf.optimize import Plan, Rule
+
+    d = PrepData("Boss", "heroic", "Elemental", "Char")
+    d.goal = "boss"
+    p = Plan("boss", {"ascendance": Rule("hold_adds_20", "", lambda o: o)}, 5.0, 0.1)
+    p.totals = {"boss": 5.0}
+    d.optimized = [p]
+    page = render(d)
+    assert "Your role (your choice): <b>boss damage first</b>" in page and "your choice</span>" in page

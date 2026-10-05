@@ -83,6 +83,7 @@ class PrepData:
     links: dict[str, str] = field(default_factory=dict)  # spell / item name -> Wowhead reference
     cd_names: dict[str, str] = field(default_factory=dict)  # cooldown key (ascendance, trinket1) -> in-game name
     raid: RaidInfo | None = None
+    goal: str | None = None  # "boss" / "total" when the player chose it (else the raid's log decides)
     icons: dict[str, str] = field(default_factory=dict)  # spell / item / cooldown key name -> game icon file
     class_name: str = ""  # e.g. "shaman" (class icon in the header)
     guide_summary: str = ""  # html: the boss in 60 seconds (Encounter Journal, your role)
@@ -333,10 +334,12 @@ def kpi_tiles(d: PrepData) -> str:
         tiles.append(f'<div class="tile kpi {cls}"><div class="l">{e(label)}</div><div class="v">{value}</div>'
                      f'<div class="s">{e(sub)}</div></div>')
 
-    if d.raid and d.raid.objective:
+    if d.goal in ("boss", "total"):
+        tile("Your role", "Boss" if d.goal == "boss" else "Pad the adds", "your choice for this prep")
+    elif d.raid and d.raid.objective:
         tile("Your role", "Boss" if d.raid.objective == "boss" else "Pad the adds",
              "the others cover the adds" if d.raid.objective == "boss" else "your raid needs your damage on them")
-    want = ("boss" if d.raid.objective == "boss" else "total") if d.raid and d.raid.objective else None
+    want = wanted(d)
     plans = [p for p in d.optimized if p.objective in ("boss", "total")]
     best = next((p for p in plans if p.objective == want), None) or (max(plans, key=lambda p: p.gain) if plans else None)
     if best is not None:
@@ -361,6 +364,15 @@ def kpi_tiles(d: PrepData) -> str:
                 f'<span class="muted">the top players, simmed on this rebuilt fight with their own gear, get {med:.0%} of '
                 f'the DPS they really did (100% = the sim matches reality). Gains are % of your DPS.</span></p>')
     return (f'<div class="kpis">{"".join(tiles)}</div>' if tiles else "") + conf
+
+
+def wanted(d: PrepData) -> str | None:
+    """The objective to follow: the player's own choice, else the verdict from the raid's log, else none."""
+    if d.goal in ("boss", "total"):
+        return d.goal
+    if d.raid and d.raid.objective:
+        return "boss" if d.raid.objective == "boss" else "total"
+    return None
 
 
 def _goal(objective: str) -> str:
@@ -479,7 +491,7 @@ def suggestions(d: PrepData) -> list[Suggestion]:
             out.append(Suggestion(_severity(g), f"Switch to the talents of <b>{e(best.build.label)}</b> "
                                   f"<span class='muted'>(played by {best.build.count} top players)</span>", lines, g,
                                   d.icons.get("__spec__", "")))
-    want = ("boss" if d.raid.objective == "boss" else "total") if d.raid and d.raid.objective else None
+    want = wanted(d)
     for p in sorted(d.optimized, key=lambda p: (p.objective != want, -p.gain)):
         if p.objective == "adds" or p.gain <= 2 * p.error:
             continue
@@ -504,7 +516,8 @@ def suggestions(d: PrepData) -> list[Suggestion]:
                 "secondary": f"to burst {burst_names(d)[1] or 'the secondary targets'}"}.get(p.objective, p.objective)
         tag = ""
         if want is not None and p.objective == want:
-            tag = " <span class='pill gold'>recommended for your raid</span>"
+            tag = (" <span class='pill gold'>your choice</span>" if d.goal in ("boss", "total")
+                   else " <span class='pill gold'>recommended for your raid</span>")
         elif want is None and p.objective in ("boss", "total"):
             tag = " <span class='pill'>pick one: see Your raid</span>"
         out.append(Suggestion(_severity(p.gain), f"Cooldown plan <b>{e(goal)}</b>{tag}", lines, p.gain,
@@ -552,9 +565,11 @@ def checklist_html(d: PrepData) -> str:
         item(f"Gear ({w:+.2f}%): " + "; ".join(linkify(c, d.links) for c in changes.split("; ")))
     elif d.gear:
         item("Gear: keep what you wear")
-    want = ("boss" if d.raid.objective == "boss" else "total") if d.raid and d.raid.objective else "boss"
+    want = wanted(d) or "boss"
     plan = next((p for p in d.optimized if p.objective == want and p.gain > 2 * p.error), None)
-    if d.raid and d.raid.objective:
+    if d.goal in ("boss", "total"):
+        item("Your role (your choice): <b>" + ("boss damage first" if d.goal == "boss" else "pad the adds") + "</b>")
+    elif d.raid and d.raid.objective:
         item("Your role: <b>" + ("stay on the boss" if d.raid.objective == "boss" else "pad the adds") + "</b>")
     else:
         item("Your role: ask your raid lead whether you should pad the adds or focus the boss "

@@ -361,7 +361,14 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
 <input name="raid" style="width:100%" value="{e(current_raid(enc, difficulty))}"
 placeholder="Link to one of your raid's logs: https://www.warcraftlogs.com/reports/..." aria-label="Raid log link">
 <p class="tiny muted" style="margin-top:6px">{e(raid_hint())}</p></div></div>
-<div class="card step"><div class="num">3</div><div class="body"><h3>What to sim</h3>
+<div class="card step"><div class="num">3</div><div class="body"><h3>Your goal on this fight</h3>
+<label><input type="radio" name="goal" value="auto" checked> Let the app decide <span class="muted small">(from
+your raid's log; otherwise both plans are shown)</span></label>
+<label><input type="radio" name="goal" value="boss"> Boss damage first <span class="muted small">(your raid lead
+wants you on the boss)</span></label>
+<label><input type="radio" name="goal" value="total"> Total damage <span class="muted small">(pad the adds)</span>
+</label></div></div>
+<div class="card step"><div class="num">4</div><div class="body"><h3>What to sim</h3>
 <label><input type="checkbox" name="gear" checked> Best gear from your bags, and what this boss drops for you</label>
 <label><input type="checkbox" name="optimize" checked> Ideal cooldown plan per objective
 <span class="muted small">(the slowest part: 20 to 40 min)</span></label></div></div>
@@ -714,6 +721,9 @@ class Handler(BaseHTTPRequestHandler):
                     args.append("--no-gear")
                 if "optimize" not in form:
                     args.append("--no-optimize")
+                goal = (form.get("goal") or ["auto"])[0]
+                if goal in ("boss", "total"):
+                    args += ["--objective", goal]
                 result = data_dir() / "reports" / f"prep-{_slug(enc.name)}-{difficulty}.html"
                 jid = JOBS.start(args, result)
                 self._redirect(f"/job/{jid}")

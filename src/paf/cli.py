@@ -752,6 +752,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
         d.assigns = described or [f"from your plan {ppath.name}"]
     d.fight = fight
 
+    if args.objective is not None:  # the player's own choice wins over the raid's log
+        d.goal = "boss" if args.objective >= 0.5 else "total"
     raid_url = args.raid or _plan_raid(enc, diff_name)
     if raid_url or settings.get("guild"):
         step("Your raid and the adds")
@@ -1018,6 +1020,63 @@ def _boss_guide(d, con, enc, diff: int, diff_name: str, spec: str, tl, fight) ->
         print(f"  actions from the logs skipped: {ex}")
     d.guide_abilities = bossguide.abilities_html(sections, timings=dict(tl.boss_casts), mechanics=mechs,
                                                  burst=burst, icon_map=gicons)
+
+
+def cmd_raidplan(args: argparse.Namespace) -> int:
+    """The raid's comp: which spec each player brings and who pads, for the most boss damage with the adds
+    covered like in the top raids (paf.raidplan)."""
+    from paf import raidneed, raidplan, settings
+    from paf.config import data_dir
+    from paf.corpus import db
+    from paf.corpus.template import _slug
+
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    con = db.connect()
+    if not con.execute("SELECT COUNT(*) FROM fight WHERE encounter_id=? AND difficulty=? AND status='done'",
+                       (enc.id, diff)).fetchone()[0]:
+        print(f"No kill of {enc.name} {diff_name} in the corpus yet: run `paf corpus \"{enc.name}\"` first.")
+        return 1
+    url = args.raid or _plan_raid(enc, diff_name)
+    if not url and settings.get("guild"):
+        url = raidneed.guild_report(client, settings.get("guild"), settings.get("guild_server"),
+                                    settings.get("guild_region"), enc.id, diff)
+    if not url:
+        print("Give a log of your raid (--raid <link>) or set your guild (`paf config guild ...`).")
+        return 1
+    rc = raidneed.raid_from_report(client, url, enc.id, diff)
+    by_class = raidplan.class_specs(con, enc.id, diff)
+    extra: dict[str, list[str]] = {}
+    for part in (args.options or "").split(";"):
+        name, _, specs = part.partition(":")
+        if name.strip():
+            extra[name.strip().lower()] = [s.strip() for s in specs.split(",") if s.strip()]
+    members = []
+    for name, spec, dps in rc.players:
+        opts = [spec] + extra.get(name.lower(), [])
+        if args.swap_specs and spec not in raidneed.HEALERS and spec not in raidplan.TANKS:
+            opts += by_class.get(spec.rpartition(" ")[2], [])
+        members.append(raidplan.Member(name, spec, dps, list(dict.fromkeys(opts))))
+    print(f"{len(members)} players from log {rc.report} ({rc.fight}); reading the top 100 of "
+          f"{len({s for m in members for s in m.options})} specs...", flush=True)
+    profiles = raidneed.spec_profiles(client, enc.id, diff, [s for m in members for s in m.options])
+    shares = raidplan.add_shares(con, enc.id, diff)
+    _median, low = raidplan.required_adds(con, enc.id, diff)
+    p = raidplan.plan(members, profiles, shares, low)
+    print(f"\nBoss damage {p.boss / 1000:,.0f}k/s vs {p.current_boss / 1000:,.0f}k/s for the comp of the log "
+          f"({(p.boss / p.current_boss - 1) * 100 if p.current_boss else 0:+.1f}%); adds {p.adds / 1000:,.0f}k/s "
+          f"for {low / 1000:,.0f}k/s needed ({'covered' if p.covered else 'NOT covered'})")
+    for c in sorted(p.choices, key=lambda c: (c.member.role != "damage", not c.pad, -c.boss)):
+        role = c.member.role if c.member.role != "damage" else ("PAD" if c.pad else "boss")
+        swap = f"  (swap from {c.member.current})" if c.spec != c.member.current else ""
+        print(f"  {c.member.name:18} {c.spec:26} {role:6} boss {c.boss / 1000:6,.0f}k  "
+              f"adds {c.adds / 1000:5,.0f}k{swap}")
+    for n in p.notes:
+        print("  " + n)
+    out = data_dir() / "reports" / f"raidplan-{_slug(enc.name)}-{diff_name}.html"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(raidplan.render(p, enc.name, diff_name, rc.report, rc.fight), encoding="utf-8")
+    print(f"\nRaid plan: {out}")
+    return 0
 
 
 def _plan_raid(enc, diff_name: str) -> str:
@@ -1482,6 +1541,15 @@ def build_parser() -> argparse.ArgumentParser:
     asg.add_argument("boss")
     asg.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
     asg.set_defaults(func=cmd_assigns)
+
+    rp = sub.add_parser("raidplan", help="the raid's comp: which spec each player brings and who pads the adds")
+    rp.add_argument("boss")
+    rp.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    rp.add_argument("--raid", help="link to one of your raid's logs (default: the boss plan's or your guild's)")
+    rp.add_argument("--swap-specs", action="store_true",
+                    help="let every damage dealer switch to another damage spec of their class")
+    rp.add_argument("--options", help='other specs players can play: "Name: Fire Mage, Frost Mage; Name2: ..."')
+    rp.set_defaults(func=cmd_raidplan)
 
     rd = sub.add_parser("raid", help="pad the adds or stay on the boss, from your raid's composition and DPS")
     rd.add_argument("boss")
