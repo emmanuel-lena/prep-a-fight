@@ -43,7 +43,7 @@ ol.steps{list-style:none;margin:0;padding:0} .st{padding:7px 0;border-bottom:1px
 
 def page(title: str, body: str, refresh: int | None = None, nav: str = "") -> bytes:
     meta = f'<meta http-equiv="refresh" content="{refresh}">' if refresh else ""
-    nav = nav or '<a href="/">Home</a>'
+    nav = nav or '<a href="/">Home</a><a href="/tools">Tools</a><a href="/settings">Settings</a>'
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"{meta}<title>{e(title)}</title><style>{CSS}</style></head><body>{theme.topbar(nav)}"
             f"<main>{body}</main></body></html>").encode()
@@ -554,6 +554,21 @@ def job_page(jid: str) -> bytes:
                              f'{e(log[-20000:])}</pre></details>')
                 .replace(b"<head>", f'<head><meta http-equiv="refresh" content="2;url={go}">'.encode(), 1))
     status = job["status"]
+    if job["args"] and job["args"][0] != "prep":  # a tool: its output, then the reports it wrote
+        from paf.webtools import new_reports
+
+        name = job["args"][0]
+        if status == "running":
+            return page(name, f"<h1>Running: {e(name)}</h1><p class='lead'><span id='el' "
+                              f"data-start='{job['started']:.0f}'>{elapsed // 60} min {elapsed % 60:02d} s</span>. "
+                              f"This page updates itself.</p><div class='card'><pre class='log'>{e(log[-8000:])}"
+                              f"</pre></div>", 5)
+        links = "".join(f"<li><a href='/report/{e(r)}'>{e(r)}</a></li>" for r in new_reports(job["started"]))
+        head = "Finished" if status == "done" else f"Stopped ({e(status)})"
+        return page(name, f"<h1>{head}: {e(name)}</h1>"
+                          + (f"<h2>Reports written</h2><div class='card'><ul>{links}</ul></div>" if links else "")
+                          + f"<h2>Output</h2><div class='card'><pre class='log'>{e(log[-20000:])}</pre></div>"
+                          + f"<p><a class='btn ghost' href='/tool/{e(name)}'>Run it again</a></p>")
     if status == "done":
         return page("Done", "<h1>The prep finished</h1><p class='lead'>Its sheet is listed on the "
                             "<a href='/'>home page</a>.</p>")
@@ -605,6 +620,20 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(home())
             elif url.path == "/boss":
                 self._send(boss_page(q.get("boss", ""), q.get("difficulty", settings.get("difficulty"))))
+            elif url.path == "/tools":
+                from paf.webtools import tools_page
+
+                self._send(page("Tools", tools_page()))
+            elif url.path.startswith("/tool/"):
+                from paf.webtools import tool_page
+
+                body = tool_page(url.path.rsplit("/", 1)[1], _encounters())
+                self._send(page("Tool", body) if body else page("Not found", "<p>Unknown tool.</p>"),
+                           200 if body else 404)
+            elif url.path == "/settings":
+                from paf.webtools import settings_page
+
+                self._send(page("Settings", settings_page()))
             elif url.path.startswith("/view/"):
                 self._send(view_page(url.path.rsplit("/", 1)[1], q.get("tab", "prep")))
             elif url.path.startswith("/job/"):
@@ -661,6 +690,25 @@ class Handler(BaseHTTPRequestHandler):
                 enc = next(x for x in raid_encounters(WCLClient()) if x.id == boss_id)
                 notes_path(template_path(enc.name, difficulty)).write_text(text, encoding="utf-8")
                 self._redirect(f"/boss?boss={boss_id}&difficulty={difficulty}")
+            elif self.path.startswith("/tool/"):
+                from paf.webtools import tool_args
+
+                args = tool_args(self.path.rsplit("/", 1)[1], form)
+                if args is None or args[0] in ("serve", "profile", "config"):
+                    self._send(page("Not found", "<p>Unknown tool.</p>"), 404)
+                    return
+                self._redirect(f"/job/{JOBS.start(args, None)}")
+            elif self.path == "/settings":
+                from paf.webtools import settings_page
+
+                errors = []
+                for key in settings.SETTINGS:
+                    if key in form:
+                        try:
+                            settings.set_value(key, form[key][0])
+                        except (KeyError, ValueError) as ex:
+                            errors.append(f"{key}: {ex}")
+                self._send(page("Settings", settings_page("; ".join(errors) if errors else "Saved.")))
             elif self.path == "/guild":
                 settings.set_value("guild", (form.get("guild") or [""])[0])
                 settings.set_value("guild_server", (form.get("server") or [""])[0])
