@@ -65,8 +65,9 @@ class Jobs:
 
         def run() -> None:
             with log.open("w", encoding="utf-8", errors="replace") as out:
-                proc = subprocess.run([sys.executable, "-m", "paf", *args], stdout=out, stderr=subprocess.STDOUT,
-                                      env={**_env(), "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"})
+                flags = {"creationflags": 0x08000000} if sys.platform == "win32" else {}  # CREATE_NO_WINDOW
+                proc = subprocess.run([_python(), "-m", "paf", *args], stdout=out, stderr=subprocess.STDOUT,
+                                      env={**_env(), "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}, **flags)
             job["status"] = "done" if proc.returncode == 0 else f"failed (exit {proc.returncode})"
             self._save(jid, job)
 
@@ -102,6 +103,14 @@ class Jobs:
                 "running" if log.is_file() and time.time() - log.stat().st_mtime < 900 else "stopped")
         return {"args": meta["args"], "log": log, "result": Path(meta["result"]) if meta["result"] else None,
                 "status": status, "started": meta["started"]}
+
+
+def _python() -> str:
+    """The console Python next to the running one (the desktop app runs under pythonw.exe)."""
+    exe = Path(sys.executable)
+    if exe.name.lower() == "pythonw.exe" and (exe.parent / "python.exe").is_file():
+        return str(exe.parent / "python.exe")
+    return sys.executable
 
 
 def _env() -> dict[str, str]:

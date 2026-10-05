@@ -27,7 +27,7 @@ def dump_apl(profile_text: str, run_dir: Path, simc_path: str | None = None) -> 
     inp, out = run_dir / "apl_input.simc", run_dir / "apl.simc"
     inp.write_text(profile_text, encoding="utf-8")
     subprocess.run([str(exe), str(inp), "iterations=1", f"save_actions={out}"], capture_output=True,
-                   cwd=run_dir, timeout=300)
+                   cwd=run_dir, timeout=300, **simc.LOW_PRIORITY)
     if not out.is_file():
         raise simc.SimcError("simc did not write the action list")
     return out.read_text(encoding="utf-8")

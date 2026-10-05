@@ -21,6 +21,7 @@ if ($LASTEXITCODE -ne 0) { throw "prep-a-fight could not be installed" }
 & $uv.Source tool update-shell | Out-Null
 $bin = Join-Path $env:USERPROFILE ".local\bin"
 $paf = Join-Path $bin "paf.exe"
+$app = Join-Path $bin "prep-a-fight.exe"
 if (-not (Test-Path $paf)) { $paf = (Get-Command paf -ErrorAction Stop).Source }
 
 Step "SimulationCraft (about 100 MB)"
@@ -32,12 +33,11 @@ $desktop = [Environment]::GetFolderPath("Desktop")
 $link = Join-Path $desktop "prep-a-fight.lnk"
 $shell = New-Object -ComObject WScript.Shell
 $sc = $shell.CreateShortcut($link)
-$sc.TargetPath = $paf
-$sc.Arguments = "serve"
+$sc.TargetPath = $app
 $sc.WorkingDirectory = $env:USERPROFILE
 $sc.Description = "Prepare a boss fight (local web app)"
 $sc.Save()
 Write-Host "Shortcut: $link"
 
-Write-Host "`nDone. Double-click 'prep-a-fight' on your desktop: it opens in your browser." -ForegroundColor Green
-Write-Host "Keep its black window open while you use it; close it to stop."
+Write-Host "`nDone. Double-click 'prep-a-fight' on your desktop." -ForegroundColor Green
+Write-Host "It opens in its own window; close the window to stop it."

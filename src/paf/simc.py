@@ -27,8 +27,9 @@ class SimcError(RuntimeError):
 
 # simc uses every core: run it below normal priority so the app (and the rest of the PC) stays responsive;
 # it still gets the whole CPU when nothing else needs it
-LOW_PRIORITY: dict = ({"creationflags": 0x00004000} if sys.platform == "win32"  # BELOW_NORMAL_PRIORITY_CLASS
-                      else {"preexec_fn": lambda: os.nice(10)})
+# (no console window either: launched from the desktop app, Windows would open one per sim)
+LOW_PRIORITY: dict = ({"creationflags": 0x00004000 | 0x08000000}  # BELOW_NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW
+                      if sys.platform == "win32" else {"preexec_fn": lambda: os.nice(10)})
 
 
 def fmt(x: float) -> str:
