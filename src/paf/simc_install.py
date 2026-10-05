@@ -136,3 +136,41 @@ def install_nightly(force: bool = False) -> Path:
     if exe is None:
         raise RuntimeError(f"simc.exe not found after extracting {build.filename}")
     return exe
+
+
+_BACKGROUND: dict = {"thread": None, "error": ""}
+
+
+def ensure_simc() -> str:
+    """For the app: '' when simc is installed; otherwise starts the download once, in the background, and
+    returns 'downloading' or the error of the last attempt."""
+    import threading
+
+    if find_simc() is not None:
+        return ""
+    if sys.platform != "win32":
+        return "SimulationCraft is not installed: pass --simc or set PAF_SIMC (automatic install is Windows-only)."
+    t = _BACKGROUND["thread"]
+    if t is not None and t.is_alive():
+        return "downloading"
+    if t is not None and _BACKGROUND["error"]:
+        return _BACKGROUND["error"]
+
+    def run() -> None:
+        try:
+            install_nightly()
+        except Exception as exc:  # noqa: BLE001 - shown in the app, which offers a retry
+            _BACKGROUND["error"] = f"SimulationCraft could not be downloaded: {exc}"
+
+    _BACKGROUND["error"] = ""
+    _BACKGROUND["thread"] = threading.Thread(target=run, daemon=True)
+    _BACKGROUND["thread"].start()
+    return "downloading"
+
+
+def simc_status() -> str:
+    """ensure_simc() without starting anything: '' when there is nothing to say."""
+    t = _BACKGROUND["thread"]
+    if t is None or find_simc() is not None:
+        return ""
+    return "downloading" if t.is_alive() else _BACKGROUND["error"]

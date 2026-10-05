@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import sys
 import threading
+from pathlib import Path
 
 from paf.config import data_dir, load_dotenv
 
 TITLE = "prep-a-fight"
+ICON = Path(__file__).parent / "assets" / "prep-a-fight.ico"
 
 
 def _quiet_streams() -> None:
@@ -21,10 +23,25 @@ def _quiet_streams() -> None:
         sys.stderr = sys.stderr or log
 
 
+def _own_taskbar_icon() -> None:
+    """Run under pythonw.exe, the window would be grouped with Python and show its icon in the taskbar."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("prep-a-fight.app")
+        except (AttributeError, OSError):
+            pass
+
+
 def main() -> int:
     _quiet_streams()
     load_dotenv()
+    _own_taskbar_icon()
     from paf import web
+    from paf.simc_install import ensure_simc
+
+    ensure_simc()  # first launch of an installed copy: SimulationCraft downloads while the player sets up
 
     server = web.Server(("127.0.0.1", 0), web.Handler)  # a free port: several copies never collide
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -46,7 +63,7 @@ def main() -> int:
     except (AttributeError, TypeError):
         pass
     webview.create_window(TITLE, url, width=1320, height=920, min_size=(900, 600), background_color="#181219")
-    webview.start()
+    webview.start(icon=str(ICON) if ICON.is_file() else None)
     server.shutdown()
     server.server_close()
     try:

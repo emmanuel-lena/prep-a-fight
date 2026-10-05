@@ -1,0 +1,26 @@
+name: release
+# Pushing a tag v* builds the Windows installer and attaches it to a draft GitHub release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: choco install innosetup --no-progress -y
+      - run: ./tools/build-installer.ps1
+        shell: pwsh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: dist/prep-a-fight-setup-*.exe
+      - if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: dist/prep-a-fight-setup-*.exe

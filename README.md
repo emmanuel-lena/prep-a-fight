@@ -32,20 +32,22 @@ prep-a-fight is meant to sit **next to** the tools you already use, not replace 
 
 ## Install (players, Windows)
 
-1. Unzip `prep-a-fight-<version>.zip` anywhere and double-click **`install.bat`** (no admin rights needed).
-   It installs [uv](https://docs.astral.sh/uv/) (which brings its own Python), prep-a-fight,
-   SimulationCraft (~100 MB) and a **prep-a-fight** shortcut on your desktop. A few minutes.
-2. Double-click the shortcut: the app opens in its own window (close it to stop it).
-3. First run: connect your free Warcraft Logs API key (the page shows how to create it, 2 minutes),
-   then paste your `/simc` export and pick a boss.
+1. Download **`prep-a-fight-setup-<version>.exe`** and run it (no admin rights needed, ~13 MB). It installs the
+   app for your Windows user, with a Start menu entry, an optional desktop shortcut and an uninstaller.
+2. Open **prep-a-fight**: the app opens in its own window (close it to stop it). On first launch it downloads
+   SimulationCraft (~115 MB) in the background.
+3. Connect your free Warcraft Logs API key (the page shows how to create it, 2 minutes), then paste your
+   `/simc` export and pick a boss.
 
-To update, unzip the new version and run `install.bat` again. To uninstall: `uv tool uninstall prep-a-fight`,
-then delete the `.paf` folder in your user folder and the shortcut.
+Windows may show "Windows protected your PC" (SmartScreen) the first time: the installer is not signed with a
+paid code-signing certificate yet. Click **More info**, then **Run anyway**. The installer is built from this
+repository by `tools/build-installer.ps1` (Inno Setup and python.org's embeddable Python).
+
+To update, run the new installer over the old one. To uninstall: Windows Settings > Apps > prep-a-fight. Your
+preps, caches and SimulationCraft stay in the `.paf` folder of your user folder; delete it to remove everything.
 
 A first prep collects ~200 ranked kills from Warcraft Logs (from a few minutes to an hour, depending on your
 API quota), then sims for 10 to 40 minutes on your CPU. Later preps of the same boss reuse everything.
-
-To share it: `tools/make-bundle.ps1` builds the zip from the last commit.
 
 ## Install (developers)
 
@@ -185,6 +187,6 @@ Outil gratuit, fait par un raider pour les raiders : préparer un boss sans pass
 sur le vrai combat reconstruit depuis les logs, et plan de CD selon tes assigns. Complémentaire de Raidbots et Warcraft Logs, pas un remplaçant.
 Feuille de route dans [ROADMAP.md](ROADMAP.md).
 
-**Installer (Windows)** : dézipper, double-cliquer `install.bat`, puis le raccourci **prep-a-fight** du bureau (une fenêtre d'application s'ouvre).
+**Installer (Windows)** : lancer `prep-a-fight-setup-<version>.exe` (sans droits admin ; si SmartScreen bloque : « Informations complémentaires » puis « Exécuter quand même »), puis ouvrir **prep-a-fight** (une fenêtre d'application s'ouvre ; SimulationCraft se télécharge au premier lancement).
 Au premier lancement, la page explique comment créer sa clé API Warcraft Logs gratuite (2 minutes), puis on colle
-son `/simc` et on choisit un boss. Pour l'instant, seul le Chaman Élémentaire est pris en charge et testé.
+son `/simc` et on choisit un boss. Toutes les specs DPS sont prises en charge (le Chaman Élémentaire est la plus testée) ; pas encore les heals ni les tanks.

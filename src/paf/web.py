@@ -230,6 +230,19 @@ def has_credentials() -> bool:
     return bool(os.environ.get("WCL_CLIENT_ID") and os.environ.get("WCL_CLIENT_SECRET"))
 
 
+def simc_block() -> str:
+    """On first launch the app downloads SimulationCraft by itself: say so until it is there."""
+    from paf.simc_install import simc_status
+
+    state = simc_status()
+    if not state:
+        return ""
+    if state == "downloading":
+        return ('<p class="notice small"><b>First launch:</b> SimulationCraft (about 100 MB) is downloading in the '
+                'background. You can connect to Warcraft Logs meanwhile; reload this page in a minute.</p>')
+    return f'<p class="notice small">{e(state)} <a href="/tool/setup">Try again</a></p>'
+
+
 def credentials_block(error: str = "") -> str:
     err = f'<p class="notice">{e(error)}</p>' if error else ""
     return f"""<div class="card step"><div class="num">0</div><div class="body">
@@ -277,7 +290,7 @@ placeholder="In game: type /simc, then Ctrl+A, Ctrl+C, and paste here"></textare
 <button>Continue</button></form>"""
                  if encs else '<p class="muted">Connect to Warcraft Logs first (step 0).</p>' if not has_credentials()
                  else '<p class="muted">Warcraft Logs did not answer: check your connection, then reload.</p>')
-    creds = credentials_block(error) if not has_credentials() or error else ""
+    creds = simc_block() + (credentials_block(error) if not has_credentials() or error else "")
     g, gs, gr = settings.get("guild"), settings.get("guild_server"), settings.get("guild_region")
     regions = "".join(f'<option{" selected" if r == gr else ""}>{r}</option>'
                       for r in settings.SETTINGS["guild_region"].choices)
