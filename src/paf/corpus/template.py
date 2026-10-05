@@ -180,8 +180,13 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
         if r["t_spawn"] is None or r["name"] not in killable or r["is_boss"]:
             continue
         adds[(r["report"], r["fight_id"])].append((r["t_spawn"], r["t_death"] - r["t_spawn"], r["name"]))
-    add_waves = [AddWave(w.t, max(1, round(w.count)), w.lifetime, ", ".join(w.types))
-                 for w in canonical_waves([fight_waves(adds.get(k, [])) for k in keys])]
+    # one timeline per add type: types spawned together can live very differently (Vashnik: Shrouded Venom ~13 s,
+    # Burning Venom ~35 s, Malignant Totem ~41 s), and a mixed wave's median lifetime hid the long-lived ones
+    add_waves = []
+    for kind in sorted({s[2] for spawns in adds.values() for s in spawns}):
+        per_kill = [fight_waves([s for s in adds.get(k, []) if s[2] == kind]) for k in keys]
+        add_waves += [AddWave(w.t, max(1, round(w.count)), w.lifetime, kind) for w in canonical_waves(per_kill)]
+    add_waves.sort(key=lambda w: w.time)
     boss_waves = attack_windows(con, where, params, spec, keys)
 
     # intermissions -> the main boss is not attackable
