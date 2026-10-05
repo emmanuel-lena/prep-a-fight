@@ -35,7 +35,7 @@ prep-a-fight is meant to sit **next to** the tools you already use, not replace 
 1. Unzip `prep-a-fight-<version>.zip` anywhere and double-click **`install.bat`** (no admin rights needed).
    It installs [uv](https://docs.astral.sh/uv/) (which brings its own Python), prep-a-fight,
    SimulationCraft (~100 MB) and a **prep-a-fight** shortcut on your desktop. A few minutes.
-2. Double-click the shortcut: the app opens in your browser. Keep its black window open while you use it.
+2. Double-click the shortcut: the app opens in its own window (close it to stop it).
 3. First run: connect your free Warcraft Logs API key (the page shows how to create it, 2 minutes),
    then paste your `/simc` export and pick a boss.
 
@@ -185,6 +185,6 @@ Outil gratuit, fait par un raider pour les raiders : préparer un boss sans pass
 sur le vrai combat reconstruit depuis les logs, et plan de CD selon tes assigns. Complémentaire de Raidbots et Warcraft Logs, pas un remplaçant.
 Feuille de route dans [ROADMAP.md](ROADMAP.md).
 
-**Installer (Windows)** : dézipper, double-cliquer `install.bat`, puis le raccourci **prep-a-fight** du bureau.
+**Installer (Windows)** : dézipper, double-cliquer `install.bat`, puis le raccourci **prep-a-fight** du bureau (une fenêtre d'application s'ouvre).
 Au premier lancement, la page explique comment créer sa clé API Warcraft Logs gratuite (2 minutes), puis on colle
 son `/simc` et on choisit un boss. Pour l'instant, seul le Chaman Élémentaire est pris en charge et testé.
