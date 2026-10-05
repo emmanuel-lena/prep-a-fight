@@ -60,8 +60,18 @@ CREATE INDEX IF NOT EXISTS ix_pb ON player_buff(report, fight_id);
 """
 
 
-def db_path() -> Path:
-    return data_dir() / "corpus.sqlite"
+def db_path(cls: str | None = None, spec: str | None = None) -> Path:
+    """One corpus per spec (the ranked player of a kill is the analyzed spec's): corpus-<class>-<spec>.sqlite.
+    The first corpus (before specs were separated) was the Elemental Shaman's: it is renamed on first use."""
+    if cls is None or spec is None:
+        from paf import settings
+
+        cls, spec = cls or settings.get("class"), spec or settings.get("spec")
+    p = data_dir() / f"corpus-{cls.lower()}-{spec.lower()}.sqlite"
+    legacy = data_dir() / "corpus.sqlite"
+    if not p.exists() and legacy.exists() and (cls.lower(), spec.lower()) == ("shaman", "elemental"):
+        legacy.rename(p)
+    return p
 
 
 MIGRATIONS = [

@@ -136,6 +136,41 @@ def parse_simc_export(text: str) -> Profile:
     return p
 
 
+HEALER_SPECS = {"restoration", "holy", "discipline", "mistweaver", "preservation"}
+TANK_SPECS = {"blood", "brewmaster", "protection", "guardian", "vengeance"}
+
+
+def wcl_class_spec(p: Profile) -> tuple[str, str] | None:
+    """The character's class and spec as Warcraft Logs names them (deathknight -> DeathKnight,
+    beast_mastery -> BeastMastery)."""
+    if not p.class_name or not p.spec:
+        return None
+
+    def camel(s: str) -> str:
+        return "".join(w.capitalize() for w in s.split("_"))
+
+    cls = {"deathknight": "DeathKnight", "demonhunter": "DemonHunter"}.get(p.class_name.lower(), camel(p.class_name))
+    return cls, camel(p.spec)
+
+
+def role(p: Profile) -> str:
+    s = (p.spec or "").lower()
+    if s in HEALER_SPECS:
+        return "healer"
+    return "tank" if s in TANK_SPECS else "damage"
+
+
+def use_profile_spec(p: Profile) -> tuple[str, str] | None:
+    """Analyze the loaded character's own spec: the settings follow the profile (each spec has its corpus)."""
+    from paf import settings
+
+    names = wcl_class_spec(p)
+    if names and (settings.get("class"), settings.get("spec")) != names:
+        settings.set_value("class", names[0])
+        settings.set_value("spec", names[1])
+    return names
+
+
 def looks_like_export(text: str) -> bool:
     p = parse_simc_export(text)
     return bool(p.class_name and p.equipped)

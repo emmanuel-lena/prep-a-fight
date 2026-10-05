@@ -11,8 +11,9 @@ tighter error. Finally one simulated pull with the chosen rules gives the play-b
 from __future__ import annotations
 
 import re
+import statistics as st
 import subprocess
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -41,6 +42,13 @@ TRACKED = ("ascendance", "stormkeeper", "ancestral_swiftness", "potion", "blood_
 LONG_COOLDOWN = 100.0  # seconds; holds of up to 60 s only make sense for long cooldowns
 
 
+DISCOVERED: set[str] = set()  # the spec's own cooldowns, found by discover_cooldowns for the current character
+DISCOVER_MAX_CASTS = 6  # at most this many casts in the 5-minute probe...
+DISCOVER_MIN_GAP = 40.0  # ...at least this far apart (s): a cooldown, not a rotational spell
+NOT_COOLDOWNS = {"auto_attack", "snapshot_stats", "flask", "food", "augmentation", "bloodlust", "heroism",
+                 "invoke_external_buff", "wait", "pool_resource", "variable", "call_action_list", "run_action_list"}
+
+
 def cd_key(action: str) -> str | None:
     name = action_name(action)
     if name == "use_item":
@@ -49,7 +57,29 @@ def cd_key(action: str) -> str | None:
             return f"use_item:{m.group(1)}"
         m = re.search(r"name=([a-z0-9_]+)", action)
         return f"use_item:{m.group(1)}" if m else None
-    return name if name in TRACKED else None
+    return name if name in TRACKED or name in DISCOVERED else None
+
+
+def discover_cooldowns(profile_text: str, apl: OrderedDict[str, list[str]], run_dir: Path) -> set[str]:
+    """The spec's cooldowns: actions of its priority list cast rarely and far apart in a simulated 5-minute
+    pull on one target (Ascendance, Combustion, Avenging Wrath...), whatever the class."""
+    names = {action_name(a) for acts in apl.values() for a in acts} - NOT_COOLDOWNS - {"use_item", "use_items"}
+    events = play_by_play(profile_text, apl, Plan("discover", {}, 0, 0), Fight("probe", 300), run_dir,
+                          [Cooldown(n, n, True) for n in sorted(names) if n])
+    by: dict[str, list[float]] = defaultdict(list)
+    for t, label in sorted(events):
+        ts = by[label.replace(" ", "_")]
+        if not ts or t - ts[-1] > 3.0:  # the log has the cast start and its execution: one cast
+            ts.append(t)
+    precombat = {action_name(a) for a in apl.get("precombat", [])}
+    found = set()
+    for n, ts in by.items():
+        if n in precombat and len(ts) <= 1:  # a buff applied before the pull (weapon imbue, shield...)
+            continue
+        gaps = [b - a for a, b in zip(ts, ts[1:], strict=False)]
+        if len(ts) <= DISCOVER_MAX_CASTS and (not gaps or st.median(gaps) >= DISCOVER_MIN_GAP):
+            found.add(n)
+    return found
 
 
 def windows(times_lengths: list[tuple[float, float]], before: float = 2.0) -> str:
@@ -520,8 +550,10 @@ def optimize_all(profile_text: str, fight: Fight, run_dir: Path, *, objectives: 
     """alignment: what the top players do with their cooldowns (tops_alignment), to flag contradictions;
     validation: simulated / real DPS of the top players on this fight."""
     apl = parse_apl(dump_apl(profile_text, run_dir / "apl"))
+    DISCOVERED.clear()
+    DISCOVERED.update(discover_cooldowns(profile_text, apl, run_dir / "discover"))
     durations, used = cooldown_durations(profile_text, run_dir / "probe", apl)
-    used_items = any(u not in TRACKED for u in used)  # on-use items show up under their own name
+    used_items = any(u not in TRACKED and u not in DISCOVERED for u in used)  # on-use items: their own name
     # use_item keys are per slot in the APL but named by item in the log: long unless proven otherwise
     cds = [c for c in find_cooldowns(apl, fight, durations)
            if (c.key in used)

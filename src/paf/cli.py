@@ -95,6 +95,11 @@ def cmd_profile(args: argparse.Namespace) -> int:
     body = text.replace("\r\n", "\n")
     (dest / "current.simc").write_text(body, encoding="utf-8")
     print(f"Saved as the current profile: {dest / 'current.simc'}")
+    from paf.profile import use_profile_spec
+
+    names = use_profile_spec(parse_simc_export(body))
+    if names:
+        print(f"Analyzed spec: {names[1]} {names[0]} (its own corpus of top players)")
     return 0
 
 
@@ -650,6 +655,12 @@ def cmd_prep(args: argparse.Namespace) -> int:
 
     profile_text, origin = _load_profile(args.profile)
     profile = parse_simc_export(profile_text)
+    from paf.profile import role, use_profile_spec
+
+    if role(profile) != "damage":
+        print(f"{profile.spec.title()} is a {role(profile)} spec: prep-a-fight only prepares damage dealers for now.")
+        return 1
+    use_profile_spec(profile)  # the corpus, timelines and talents are the loaded character's spec's
     client, enc, diff_name, diff = _encounter_and_difficulty(args)
     spec = settings.get("spec")
     con = db.connect()

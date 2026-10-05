@@ -249,8 +249,13 @@ def home(error: str = "") -> bytes:
 placeholder="In game: type /simc, then Ctrl+A, Ctrl+C, and paste here"></textarea>
 <p><button>Load this character</button></p></form>"""
     if loaded is not None:
+        from paf.profile import role
+
+        warn = ("" if role(loaded) == "damage" else
+                f'<p class="notice small">{e(loaded.spec.title())} is a {role(loaded)} spec: prep-a-fight only '
+                f'prepares damage dealers for now (healers and tanks come later).</p>')
         character = (f"""<p><b>{e(loaded.name)}</b> <span class="pill gold">{e(loaded.spec)} {e(loaded.class_name)}</span>
-<span class="pill">{len(loaded.candidates)} items in bags</span></p>
+<span class="pill">{len(loaded.candidates)} items in bags</span></p>{warn}
 <details><summary>Load another character or an updated export</summary>{paste}</details>""")
     else:
         character = paste
@@ -619,6 +624,9 @@ class Handler(BaseHTTPRequestHandler):
                 p = _profile_path()
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text(text.replace("\r\n", "\n"), encoding="utf-8")
+                from paf.profile import parse_simc_export, use_profile_spec
+
+                use_profile_spec(parse_simc_export(text))
                 self._redirect("/")
             elif self.path == "/notes":
                 from paf.corpus.template import template_path
