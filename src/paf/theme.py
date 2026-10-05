@@ -17,31 +17,39 @@ TOKENS = """
   --shadow:0 1px 2px rgba(42,31,43,.06),0 4px 16px rgba(42,31,43,.06);
   --header:linear-gradient(90deg,#5c415d,#694966 55%,#74526c);
   --stripe:linear-gradient(90deg,#dbd053,#c89933);
-  --radius:12px;
+  --radius:10px;
+  --font-display:"Chakra Petch","Bahnschrift","Segoe UI",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans","Segoe UI",system-ui,-apple-system,sans-serif;
+  --font-data:"IBM Plex Mono",Consolas,ui-monospace,monospace;
+  --glow:radial-gradient(1100px 520px at 12% -8%,rgba(116,82,108,.16),transparent 70%),radial-gradient(900px 480px at 100% 0%,rgba(219,208,83,.08),transparent 70%);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#181219;--surface:#221a23;--surface-2:#2b212c;--line:#3b2e3c;--fg:#f2eaf1;--muted:#b6a3b3;
   --link:#dbd053;--primary:#c89933;--on-primary:#1c1410;--accent:#dbd053;--accent-soft:#3a3320;
   --pos:#8fd18b;--neg:#f08f84;--warn:#e7c35a;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25);
+  --glow:radial-gradient(1100px 560px at 12% -8%,rgba(116,82,108,.35),transparent 70%),radial-gradient(900px 480px at 100% 0%,rgba(200,153,51,.10),transparent 70%);color-scheme:dark;
 }}
 :root[data-theme="dark"]{
   --bg:#181219;--surface:#221a23;--surface-2:#2b212c;--line:#3b2e3c;--fg:#f2eaf1;--muted:#b6a3b3;
   --link:#dbd053;--primary:#c89933;--on-primary:#1c1410;--accent:#dbd053;--accent-soft:#3a3320;
   --pos:#8fd18b;--neg:#f08f84;--warn:#e7c35a;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25);
+  --glow:radial-gradient(1100px 560px at 12% -8%,rgba(116,82,108,.35),transparent 70%),radial-gradient(900px 480px at 100% 0%,rgba(200,153,51,.10),transparent 70%);color-scheme:dark;
 }
 """
 
 BASE = """
 *{box-sizing:border-box}
 html{color-scheme:light dark}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 "Segoe UI",system-ui,-apple-system,sans-serif}
+body{margin:0;background:var(--glow),var(--bg);background-attachment:fixed;color:var(--fg);font:15px/1.6 var(--font-body)}
+h1,h2,h3,.brand,.btn,button,.kpi .v,.kpi .l,.tabs a,.sev,.pill,th,.step .num{font-family:var(--font-display)}
+td.n,.gain,.kpi .v,code,pre{font-variant-numeric:tabular-nums}
 a{color:var(--link);text-decoration:none} a:hover{text-decoration:underline}
 main{max-width:1040px;margin:0 auto;padding:24px 16px 48px}
-h1{font-size:26px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
-h2{font-size:18px;margin:32px 0 10px;letter-spacing:-.005em}
-h3{font-size:15px;margin:0 0 8px}
+h1{font-size:30px;line-height:1.15;margin:0 0 6px;letter-spacing:.005em;font-weight:700;text-wrap:balance}
+h2{font-size:17px;margin:34px 0 12px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--muted);text-wrap:balance}
+h3{font-size:16px;margin:0 0 8px;font-weight:600;letter-spacing:.01em}
 p{margin:0 0 10px}
 .muted{color:var(--muted)} .small{font-size:13px} .tiny{font-size:12px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;
@@ -112,7 +120,28 @@ a.wh{color:inherit;text-decoration:none;border-bottom:1px dotted var(--muted)}
 @media (max-width:640px){h1{font-size:22px} .kpi .v{font-size:22px}}
 """
 
-CSS = TOKENS + BASE
+POLISH = """
+.kpi .v{font-size:32px;font-weight:700;letter-spacing:.01em}
+.kpi .l{font-weight:600;letter-spacing:.08em}
+.pill{font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:600}
+.btn,button{letter-spacing:.03em;transition:transform .12s ease,box-shadow .12s ease,filter .12s ease}
+.btn:hover,button:hover{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 30%,transparent)}
+.btn:active,button:active{transform:translateY(1px)}
+.tile{transition:border-color .15s ease,transform .15s ease}
+a.tile:hover{transform:translateY(-2px)}
+.card,.tile{background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(4px)}
+.lead{max-width:68ch}
+p,li{max-width:80ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+"""
+
+CSS = TOKENS + BASE + POLISH
+
+# Google Fonts (the faces fall back to system ones offline)
+HEAD = ('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" '
+        'href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?'
+        'family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600'
+        '&display=swap">')
 
 
 def topbar(right: str = "", home: str = "/") -> str:

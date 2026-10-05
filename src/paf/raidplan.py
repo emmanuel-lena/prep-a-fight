@@ -204,7 +204,7 @@ def render(p: Plan, boss: str, difficulty: str, report: str, fight: str) -> str:
 {rows}</table></div>
 <details class="card"><summary>How it is computed</summary><p class="small muted">{e(__doc__ or '')}</p></details>"""
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
-            f"<title>{e(boss)} raid plan</title><style>{theme.CSS}</style></head><body>{theme.topbar('')}"
+            f"<title>{e(boss)} raid plan</title>{theme.HEAD}<style>{theme.CSS}</style></head><body>{theme.topbar('')}"
             f"<main>{body}</main></body></html>")
 
 

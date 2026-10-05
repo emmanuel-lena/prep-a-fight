@@ -45,7 +45,7 @@ def page(title: str, body: str, refresh: int | None = None, nav: str = "") -> by
     meta = f'<meta http-equiv="refresh" content="{refresh}">' if refresh else ""
     nav = nav or '<a href="/">Home</a><a href="/tools">Tools</a><a href="/settings">Settings</a>'
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
-            f"{meta}<title>{e(title)}</title><style>{CSS}</style></head><body>{theme.topbar(nav)}"
+            f"{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}</style></head><body>{theme.topbar(nav)}"
             f"<main>{body}</main></body></html>").encode()
 
 
@@ -208,7 +208,7 @@ def view_page(key: str, tab: str) -> bytes:
            + f'<a href="{src}" target="_blank">Open alone</a>')
     css = "body{display:flex;flex-direction:column;height:100vh}iframe{border:0;width:100%;flex:1;display:block}"
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
-            f"<title>{e(item['name'])}</title><style>{CSS}{css}</style></head><body>{theme.topbar(nav)}"
+            f"<title>{e(item['name'])}</title>{theme.HEAD}<style>{CSS}{css}</style></head><body>{theme.topbar(nav)}"
             f'<iframe src="{src}" title="{e(item["name"])}"></iframe></body></html>').encode()
 
 

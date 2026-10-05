@@ -287,13 +287,14 @@ def render_html(tl: Timeline, px_per_s: float = 1.6) -> str:
     lust_note = ""
     return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>{e(tl.boss)} timelines</title>{WH_SCRIPT}
-<style>{theme.TOKENS}
+{theme.HEAD}<style>{theme.TOKENS}
 a.wh{{color:inherit;text-decoration:none;border-bottom:1px dotted var(--muted)}}
 :root{{--card:var(--surface);--grid:var(--line);--ph0:#efe6ee;--ph1:#e6dbe5;--inter:#f6efd2;--wave:#d9e6d0;
 --bc:#74526c}}
 @media (prefers-color-scheme:dark){{:root{{--ph0:#2b212c;--ph1:#342837;--inter:#3a3320;--wave:#26382a;
 --bc:#dbd053}}}}
-body{{background:var(--bg);color:var(--fg);font:13px/1.45 "Segoe UI",system-ui,sans-serif;margin:0;padding:0}}
+body{{background:var(--glow),var(--bg);background-attachment:fixed;color:var(--fg);font:13px/1.45 var(--font-body);margin:0;padding:0}}
+h1,h2,.topbar{{font-family:var(--font-display)}}
 .page{{padding:18px 16px 32px;max-width:1600px;margin:0 auto}}
 a{{color:var(--link)}}
 h1{{font-size:22px;margin:0 0 4px}} h2{{font-size:15px;margin:24px 0 8px}} p{{color:var(--muted);margin:0 0 10px}}
