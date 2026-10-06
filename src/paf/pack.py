@@ -19,6 +19,7 @@ from paf.actions import Action
 from paf.assigns import Mechanic
 from paf.config import data_dir
 from paf.corpus.timeline import Ability, Timeline
+from paf.defensives import DefensiveMoment, Defensives
 from paf.fight import Fight
 from paf.raidneed import AddType
 from paf.talent_sim import Build
@@ -49,6 +50,7 @@ class PackData:
     add_types: list[AddType] = field(default_factory=list)
     mechanics: list[Mechanic] = field(default_factory=list)
     actions: list[Action] = field(default_factory=list)
+    defensives: Defensives | None = None  # when the top players press their defensives
     version: int = VERSION
 
 
@@ -132,6 +134,12 @@ def from_json(text: str) -> PackData:
     d["add_types"] = [AddType(**{**t, "estimated": set(t.get("estimated", []))}) for t in d.get("add_types", [])]
     d["mechanics"] = [Mechanic(**m) for m in d.get("mechanics", [])]
     d["actions"] = [Action(**a) for a in d.get("actions", [])]
+    if d.get("defensives"):
+        df = d["defensives"]
+        d["defensives"] = Defensives(
+            [DefensiveMoment(m["time"], m["share"], [tuple(s) for s in m["spells"]], m["boss_ability"],
+                             m["boss_spell_id"]) for m in df.get("moments", [])],
+            [tuple(u) for u in df.get("usage", [])], df.get("kills", 0))
     return PackData(**d)
 
 

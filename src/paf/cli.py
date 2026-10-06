@@ -869,12 +869,20 @@ def cmd_prep(args: argparse.Namespace) -> int:
             d.links[f"use_item:{slot}"] = d.links[it.name]
     d.alignment = tops_alignment_safe(tl_all, fight)
     mechs = _boss_guide(d, con, enc, diff, diff_name, spec, tl_all, fight, pk)
+    from paf import defensives
+
+    d.defensives = pk.defensives if pk is not None else defensives.analyze(con, enc.id, diff, spec)
+    for m in d.defensives.moments if d.defensives else []:
+        for name, sid, _ in m.spells:
+            d.links.setdefault(name, spell_ref(sid))
+        if m.boss_ability and m.boss_spell_id:
+            d.links.setdefault(m.boss_ability, spell_ref(m.boss_spell_id))
     if pk is None:  # share what the logs gave, computed: the next prep of this spec and boss skips the corpus
         from paf import raidneed
 
         new = pack.PackData(enc.id, diff, cls, spec, pack.now_utc(), kills, boss, pack_fight, list(phases), add_share,
                             moving_share, target, d.validation, tl, tl_all, builds,
-                            raidneed.add_types(con, enc.id, diff), mechs, d.actions)
+                            raidneed.add_types(con, enc.id, diff), mechs, d.actions, d.defensives)
         print(f"  prep pack saved: {pack.save(new)}")
         if settings.get("share_packs") == "on" and new.validation:
             print(f"  prep pack {pack.publish(new)}")
@@ -889,6 +897,9 @@ def cmd_prep(args: argparse.Namespace) -> int:
         d.optimized, _ = optimize_all(profile_text, fight, root / "optimize", target_error=args.error,
                                       alignment=d.alignment, validation=d.validation[1] if d.validation else None)
         d.mrt = {p.objective: mrt_note(enc.name, p, fight, d.cd_names) for p in d.optimized}
+        if d.defensives and d.defensives.moments:  # the defensive moments go in every note
+            extra = defensives.mrt_lines(d.defensives)
+            d.mrt = {o: n + "\n" + "\n".join(extra) for o, n in d.mrt.items()}
         from paf.optimize import nsrt_note
 
         spell_ids = {n.lower(): int(r.split("=", 1)[1]) for n, r in d.links.items()
@@ -896,6 +907,9 @@ def cmd_prep(args: argparse.Namespace) -> int:
         player = profile.name or "everyone"
         d.nsrt = {p.objective: nsrt_note(enc.id, p, fight, d.phases, player, spell_ids, d.cd_names)
                   for p in d.optimized}
+        if d.defensives and d.defensives.moments:
+            extra = defensives.nsrt_lines(d.defensives, enc.id, d.phases, player)
+            d.nsrt = {o: n + ("\n" + "\n".join(extra) if extra else "") for o, n in d.nsrt.items()}
         raid_notes = [n for o, n in d.mrt.items() if o != "adds"]  # "damage to adds" is not a raid plan
         (reports / f"mrt-{report_key(enc.name, diff_name)}.txt").write_text("\n\n".join(raid_notes) + "\n",
                                                                          encoding="utf-8")

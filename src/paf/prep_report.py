@@ -75,6 +75,7 @@ class PrepData:
     optimized: list = field(default_factory=list)  # paf.optimize.Plan per objective
     mrt: dict[str, str] = field(default_factory=dict)  # objective -> MRT note
     nsrt: dict[str, str] = field(default_factory=dict)  # objective -> Northern Sky Raid Tools reminders
+    defensives: object | None = None  # paf.defensives.Defensives: when the top players press theirs
     alignment: list = field(default_factory=list)  # paf.optimize.Alignment
     fight: object | None = None  # paf.fight.Fight used by the sims
     assigns: list[str] = field(default_factory=list)  # notes of the player's assignments
@@ -628,6 +629,29 @@ lines: duration, add waves, immune and vulnerable windows, movement, Bloodlust, 
 the raid events).</p><p>{buttons}</p></div>'''
 
 
+def defensives_html(d: PrepData) -> str:
+    """When the top players of your spec press their defensives, and what hits them then."""
+    df = d.defensives
+    if not df or not (df.moments or df.usage):
+        return ""
+    rows = "".join(
+        f"<tr><td class='n'>{_mmss(m.time)}</td><td>{m.share:.0%}</td><td>"
+        + ", ".join(f"{icons.img(d.icons.get(n, ''), 'small')}{link(n, f'spell={sid}')} "
+                    f"<span class='muted small'>{s:.0%}</span>" for n, sid, s in m.spells)
+        + f"</td><td>{link(m.boss_ability, f'spell={m.boss_spell_id}') if m.boss_ability else '<span class=muted>-</span>'}"
+        + "</td></tr>" for m in df.moments)
+    table = (f"<div class='scroll'><table><tr><th>When</th><th>Top players</th><th>Defensive</th><th>Just before or "
+             f"after</th></tr>{rows}</table></div>") if df.moments else (
+        "<p class='small'>The top players do not press their defensives at one shared moment on this boss: use them "
+        "when you take damage.</p>")
+    usage = ", ".join(f"{link(n, f'spell={sid}')} {per:.1f} per kill ({share:.0%} of the kills)"
+                      for n, sid, per, share in df.usage[:6])
+    return (f"<h2>Defensives</h2><div class='card'><p class='small'>When the top players of your spec press a "
+            f"defensive on this boss ({df.kills} kills), and the boss ability cast just before or after. SimC does not "
+            f"simulate survival: this is advice, not a gain.</p>{table}"
+            + (f"<p class='small muted'>Used: {usage}.</p>" if usage else "") + "</div>")
+
+
 def nsrt_block(note: str) -> str:
     if not note:
         return ""
@@ -698,9 +722,12 @@ def render(d: PrepData) -> str:
                         f"<li>{icons.img(d.icons.get(a.name, ''), 'small')}{e(a.text)}</li>" for a in rows) + "</ul>")
             tabs["boss"].append("<h2>What the top players do, from their logs</h2><div class='card guide'>"
                                 f"{blocks}</div>")
+        tabs["boss"].append(defensives_html(d))
         tabs["boss"].append("<h2>Every ability, phase by phase</h2><p class='small muted'>From the in-game "
                             "Encounter Journal; timings and how many players are hit come from the ranked kills.</p>"
                             + d.guide_abilities)
+    else:
+        tabs["boss"].append(defensives_html(d))
     if d.timeline_file:
         tabs["overview"].append(f'<p class="small"><a href="{e(d.timeline_file)}">See when the top players use each '
                                 f'cooldown (timelines) &rarr;</a></p>')
