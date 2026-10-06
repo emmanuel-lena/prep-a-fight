@@ -23,7 +23,7 @@ export default {
     const res = await fetch(`https://api.github.com/repos/${env.REPO}/issues`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        Authorization: `Bearer ${String(env.GITHUB_TOKEN || "").trim()}`,
         Accept: "application/vnd.github+json",
         "User-Agent": "prep-a-fight-feedback-relay",
       },
