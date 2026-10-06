@@ -160,3 +160,58 @@ def load(encounter_id: int, difficulty: int, class_name: str, spec: str) -> Pack
         return from_json(path.read_text(encoding="utf-8"))
     except (ValueError, KeyError, TypeError):
         return None
+
+
+# --- shared packs (the relay, tools/feedback-worker) ---------------------------------------------
+
+def relay() -> str:
+    """The relay URL the installer was built with ('' without one: packs stay on this computer)."""
+    from paf.feedback import endpoint, is_discord
+
+    url = endpoint()
+    return "" if not url or is_discord(url) else url.rstrip("/")
+
+
+def _request(url: str, data: bytes | None = None, method: str = "GET"):
+    import urllib.request
+
+    from paf import __version__
+
+    req = urllib.request.Request(url, data=data, method=method, headers={
+        "User-Agent": f"prep-a-fight/{__version__}", "Content-Type": "application/json"})
+    return urllib.request.urlopen(req, timeout=30)
+
+
+def fetch_shared(encounter_id: int, difficulty: int, class_name: str, spec: str) -> PackData | None:
+    """The shared pack of this spec, boss and difficulty, if the relay has one (saved locally too)."""
+    import urllib.error
+
+    base = relay()
+    if not base:
+        return None
+    try:
+        with _request(f"{base}/packs/{key(encounter_id, difficulty, class_name, spec)}") as resp:
+            p = from_json(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError:
+        return None
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    save(p)
+    return p
+
+
+def publish(p: PackData) -> str:
+    """Share a pack made from the logs; returns what happened, in a few words."""
+    import urllib.error
+
+    base = relay()
+    if not base:
+        return "not shared (no relay in this build)"
+    try:
+        with _request(f"{base}/packs/{key(p.encounter_id, p.difficulty, p.class_name, p.spec)}",
+                      to_json(p).encode("utf-8"), "PUT"):
+            return "shared with the other players"
+    except urllib.error.HTTPError as ex:
+        return f"not shared: {ex.read().decode('utf-8', 'replace')[:120] or ex.code}"
+    except OSError as ex:
+        return f"not shared: {ex}"

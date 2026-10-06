@@ -673,6 +673,11 @@ def cmd_prep(args: argparse.Namespace) -> int:
 
     cls = settings.get("class")
     pk = None if args.refresh else pack.load(enc.id, diff, cls, spec)
+    if not args.refresh and (pk is None or pack.is_stale(pk.created)):
+        shared = pack.fetch_shared(enc.id, diff, cls, spec)  # another player of the app may have made a fresh one
+        if shared is not None and (pk is None or shared.created > pk.created):
+            pk = shared
+            print(f"Downloaded the shared prep pack of {spec} {cls} ({pk.created[:16].replace('T', ' ')} UTC).")
     if pk is not None and pack.is_stale(pk.created):
         print(f"Prep pack from {pk.created[:16].replace('T', ' ')} UTC: older than today's 04:00 (Paris) refresh, "
               f"rebuilding it from the logs.")
@@ -869,6 +874,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
                             moving_share, target, d.validation, tl, tl_all, builds,
                             raidneed.add_types(con, enc.id, diff), mechs, d.actions)
         print(f"  prep pack saved: {pack.save(new)}")
+        if settings.get("share_packs") == "on" and new.validation:
+            print(f"  prep pack {pack.publish(new)}")
     if args.no_optimize:
         step("Cooldown plans")
         d.plans = compare_plans(profile_text, tl_all, fight, root / "cdplan", target_error=args.error / 2,

@@ -29,7 +29,9 @@ SETTINGS: dict[str, Setting] = {
     "guild_server": Setting("", "your guild's server (e.g. Kazzak)"),
     "guild_region": Setting("eu", "your guild's region", ("eu", "us", "kr", "tw", "cn")),
     "region": Setting("", "restrict rankings to a region (EU, US, KR, TW, CN); empty = all"),
-    "check_updates": Setting("on", "look for a new version of the app once a day", ("on", "off")),
+    "check_updates": Setting("on", "look for a new version of the app every 10 minutes", ("on", "off")),
+    "share_packs": Setting("on", "share the prep packs you compute (fight data only, no names) so others skip the log "
+                                  "collection", ("on", "off")),
 }
 
 

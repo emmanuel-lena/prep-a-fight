@@ -4,3 +4,8 @@ compatibility_date = "2026-10-01"
 
 [vars]
 REPO = "emmanuel-lena/prep-a-fight"
+
+# prep packs (issue #6): the shared, computed fight data of each spec x boss x difficulty
+[[kv_namespaces]]
+binding = "PACKS"
+id = "2de202663ce3482aaa68838cda02ee42"

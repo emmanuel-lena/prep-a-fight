@@ -1,3 +1,4 @@
+import io
 from datetime import UTC, datetime
 
 from paf import pack
@@ -50,3 +51,46 @@ def test_pack_roundtrip_without_names_or_reports(tmp_path, monkeypatch):
     assert q.add_types[0].estimated == {"Fire Mage"} and q.add_types[0].rate([("Elemental Shaman", 100.0)]) == 40.0
     assert q.mechanics[0].per_kill == 2.0 and q.actions[0].text == "kick it" and q.validation == (0.98, 1.01, 1.03)
     assert pack.load(1, 5, "Shaman", "Elemental") is None
+
+
+class _Resp:
+    def __init__(self, body=b""):
+        self.body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def read(self):
+        return self.body
+
+
+def test_shared_packs_through_the_relay(tmp_path, monkeypatch):
+    import urllib.error
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    monkeypatch.setenv("PAF_FEEDBACK_URL", "https://relay.example.workers.dev")
+    store = {}
+
+    def fake(url, data=None, method="GET"):
+        k = url.split("/packs/", 1)[1]
+        if method == "PUT":
+            if k in store:
+                raise urllib.error.HTTPError(url, 409, "conflict", {}, io.BytesIO(b"not newer than the current pack"))
+            store[k] = data
+            return _Resp(b"{}")
+        if k not in store:
+            raise urllib.error.HTTPError(url, 404, "no pack", {}, io.BytesIO(b"no pack"))
+        return _Resp(store[k])
+
+    monkeypatch.setattr(pack, "_request", fake)
+    assert pack.fetch_shared(3470, 5, "Shaman", "Elemental") is None
+    assert pack.publish(_pack()) == "shared with the other players"
+    assert "not newer" in pack.publish(_pack())
+    assert list(store) == ["shaman-elemental/3470-5"]
+    got = pack.fetch_shared(3470, 5, "Shaman", "Elemental")
+    assert got.kills == 199 and pack.load(3470, 5, "Shaman", "Elemental") is not None  # kept locally too
+    monkeypatch.setenv("PAF_FEEDBACK_URL", "https://discord.com/api/webhooks/1/x")
+    assert pack.relay() == "" and "no relay" in pack.publish(_pack())
