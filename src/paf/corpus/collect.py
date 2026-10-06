@@ -198,7 +198,11 @@ def parse_kill(rep: dict[str, Any], fight_id: int, ranked_name: str | None,
     for p in rep.get("phases") or []:
         if p.get("encounterID") == f.get("encounterID"):
             names = {ph["id"]: (ph["name"], int(bool(ph.get("isIntermission")))) for ph in p["phases"]}
-    for tr in f.get("phaseTransitions") or []:
+    seen_phases: set[int] = set()
+    for tr in sorted(f.get("phaseTransitions") or [], key=lambda tr: tr["startTime"]):
+        if tr["id"] in seen_phases:  # a phase can come back (The Lost Explorers): its first start is kept
+            continue
+        seen_phases.add(tr["id"])
         nm, inter = names.get(tr["id"], (f"P{tr['id']}", 0))
         out["phases"].append((tr["id"], nm, inter, t(tr["startTime"])))
 
@@ -416,7 +420,8 @@ def collect(client: WCLClient, con: sqlite3.Connection, enc: Encounter, difficul
             adds = sum(1 for a in p["adds"] if a[5])
             log(f"  [{i}/{len(todo)}] {p['fight']['duration_s']:.0f}s, {len(p['players'])} players, "
                 f"{adds} adds killed")
-        except (WCLError, KeyError, TypeError, ValueError, OSError) as e:
+        except (WCLError, KeyError, TypeError, ValueError, OSError, sqlite3.Error) as e:
+            con.rollback()  # a kill half written is not kept
             stats["error"] += 1
             con.execute("UPDATE fight SET status='error', error=? WHERE report=? AND fight_id=?",
                         (str(e)[:500], row["report"], row["fight_id"]))

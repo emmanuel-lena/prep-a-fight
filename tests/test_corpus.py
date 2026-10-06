@@ -71,3 +71,17 @@ def test_write_kill(tmp_path):
     assert con.execute("SELECT t, x, y FROM player_cast").fetchone()[:] == (5.0, 12.34, -5.0)
     write_kill(con, "R", 7, p, pcasts, [])  # re-fetch replaces rows instead of duplicating them
     assert con.execute("SELECT COUNT(*) FROM player_cast").fetchone()[0] == 1
+
+
+def test_a_phase_that_comes_back_is_stored_once(tmp_path):
+    """The Lost Explorers: Warcraft Logs gives phase 1, 2, then 1 and 2 again (issue #8)."""
+    data = payload()
+    data["fights"][0]["phaseTransitions"] = [{"id": 1, "startTime": START}, {"id": 2, "startTime": START + 60_000},
+                                             {"id": 1, "startTime": START + 120_000},
+                                             {"id": 2, "startTime": START + 180_000}]
+    p = parse_kill(data, 7, "Someone")
+    assert p["phases"] == [(1, "P1", 0, 0.0), (2, "P2", 0, 60.0)]
+    con = db.connect(tmp_path / "c.sqlite")
+    con.execute("INSERT INTO fight(report, fight_id, encounter_id, difficulty) VALUES('R', 7, 99, 4)")
+    write_kill(con, "R", 7, p, [], [])
+    assert con.execute("SELECT COUNT(*) FROM phase").fetchone()[0] == 2

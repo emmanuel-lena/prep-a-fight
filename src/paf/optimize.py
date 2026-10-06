@@ -530,14 +530,15 @@ def plan_moments(plan: Plan, fight: Fight, names: dict[str, str] | None = None) 
 
 
 # Northern Sky Raid Tools numbers the phases of some bosses itself (its EncounterAlerts/<tier>/<Boss>.lua);
-# Warcraft Logs phase n (1-based, in order) -> NSRT phase. "order": n -> n. Bosses not listed: NSRT keeps phase 1
+# Warcraft Logs phase n (1-based, in order) -> NSRT phase. "order": n -> n; "first": only the first phase can be placed.
+# Bosses not listed: NSRT keeps phase 1
 # for the whole fight, so reminder times count from the pull. Nek'zali: NSRT splits the intermission (1.5, then
 # 1.75 when the second boss casts); reminders are given in 1.5, from the intermission start.
 NSRT_PHASES: dict[int, dict[int, float] | str] = {
     3470: {1: 1, 2: 1.5, 3: 2},  # Nek'zali the Soulcoiler
     3429: {1: 1, 2: 2, 3: 2.5, 4: 3},  # The Coiled Altar
     3445: "order",  # Entombed Sentinels
-    3497: "order",  # The Lost Explorers
+    3497: "first",  # The Lost Explorers: its phases come back (1, 2, 1, 2...) while NSRT counts 1, 2, 3, 4
 }
 # NSRT phases that end at a moment Warcraft Logs does not mark: (encounter, phase) -> seconds after which a reminder
 # would be cleared before firing (Nek'zali: 1.75 starts once the second boss casts, 25 s or more into 1.5)
@@ -551,6 +552,8 @@ def nsrt_phase(encounter_id: int, phases: list[tuple[str, float]], t: float) -> 
         return 1, t
     starts = sorted(s for _, s in phases)
     n = max(i for i, s in enumerate(starts, 1) if s <= t) if t >= starts[0] else 1
+    if table == "first":
+        return (1, t) if n == 1 else (0, t)  # phase 0: cannot be placed
     ph = n if table == "order" else table.get(n)
     if ph is None:  # more Warcraft Logs phases than NSRT knows: stay in its last one
         n = max(table)
@@ -568,7 +571,7 @@ def nsrt_note(encounter_id: int, plan: Plan, fight: Fight, phases: list[tuple[st
     for t, labels in plan_moments(plan, fight, names):
         ph, since = nsrt_phase(encounter_id, phases, t)
         limit = NSRT_UNSURE_AFTER.get((encounter_id, ph))
-        if limit is not None and since > limit:
+        if ph == 0 or (limit is not None and since > limit):
             skipped.append(f"{', '.join(dict.fromkeys(labels))} at {int(t // 60)}:{int(t % 60):02d}")
             continue
         for label in dict.fromkeys(labels):

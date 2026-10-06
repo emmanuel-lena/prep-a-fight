@@ -10,6 +10,7 @@ def test_nsrt_phases():
     assert nsrt_phase(3470, PHASES, 300) == (2, 39)
     assert nsrt_phase(3492, PHASES, 300) == (1, 300)  # a boss NSRT does not split: from the pull
     assert nsrt_phase(3445, PHASES, 300) == (3, 39)  # "order"
+    assert nsrt_phase(3497, PHASES, 100) == (1, 100) and nsrt_phase(3497, PHASES, 200)[0] == 0  # "first"
 
 
 def test_nsrt_note_lines():
