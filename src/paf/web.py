@@ -7,6 +7,7 @@ output is shown live; the result is the prep sheet page.
 from __future__ import annotations
 
 import html
+import os
 import subprocess
 import sys
 import threading
@@ -47,7 +48,45 @@ def page(title: str, body: str, refresh: int | None = None, nav: str = "") -> by
                   '<a href="/feedback">Feedback</a>')
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}</style></head><body>{theme.topbar(nav)}"
-            f"<main>{body}</main></body></html>").encode()
+            f"<main>{update_banner()}{body}</main></body></html>").encode()
+
+
+QUIT = {"hook": None}  # set by the desktop app: closes its window (an update is being installed)
+
+
+def update_banner() -> str:
+    from paf import update
+
+    rel = update.STATE.get("release")
+    if rel is None:
+        return ""
+    action = ("<form method='post' action='/update' style='display:inline'><button class='btn'>Update now</button>"
+              "</form>" if update.install_dir() else
+              f"<a class='btn' href='{e(rel.url)}' target='_blank' rel='noopener'>Download it</a>")
+    return (f"<div class='notice small row'><span><b>Version {e(rel.version)} is out</b> (you have "
+            f"{e(update.__version__)}). <a href='{e(rel.url)}' target='_blank' rel='noopener'>What's new</a>"
+            f"</span>{action}</div>")
+
+
+def run_update() -> str:
+    """Download the new installer, start it over this install and close the app (the installer reopens it)."""
+    from paf import update
+
+    rel, folder = update.STATE.get("release"), update.install_dir()
+    if rel is None or folder is None:
+        return "<h1>Nothing to update</h1><p><a href='/'>Back home</a></p>"
+    if any(j.get("status") == "running" for j in JOBS.jobs.values()):
+        return ("<h1>A prep is running</h1><p class='lead'>Updating would stop it. Update when it is done (the banner "
+                "stays).</p><p><a href='/'>Back home</a></p>")
+    try:
+        setup = update.download(rel)
+    except (OSError, ValueError) as ex:
+        return (f"<h1>The update failed</h1><p class='notice'>{e(str(ex))}</p><p>Download it by hand: "
+                f"<a href='{e(rel.url)}' target='_blank' rel='noopener'>{e(rel.url)}</a></p>")
+    update.run_installer(setup, folder)
+    threading.Timer(1.5, lambda: (QUIT["hook"] or (lambda: os._exit(0)))()).start()
+    return (f"<h1>Updating to {e(rel.version)}&hellip;</h1><p class='lead'>The app closes now and reopens by itself "
+            f"in a few seconds. Your preps and settings are kept.</p>")
 
 
 class Jobs:
@@ -702,6 +741,8 @@ class Handler(BaseHTTPRequestHandler):
                 from paf.webtools import settings_page
 
                 self._send(page("Settings", settings_page()))
+            elif url.path == "/feedback":
+                self._send(page("Feedback", feedback_page(q.get("job", ""))))
             elif url.path.startswith("/view/"):
                 self._send(view_page(url.path.rsplit("/", 1)[1], q.get("tab", "prep")))
             elif url.path.startswith("/job/"):
@@ -766,6 +807,10 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(page("Not found", "<p>Unknown tool.</p>"), 404)
                     return
                 self._redirect(f"/job/{JOBS.start(args, None)}")
+            elif self.path == "/feedback":
+                self._send(page("Feedback", send_feedback(form)))
+            elif self.path == "/update":
+                self._send(page("Update", run_update()))
             elif self.path == "/settings":
                 from paf.webtools import settings_page
 

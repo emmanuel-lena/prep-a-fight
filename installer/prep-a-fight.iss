@@ -59,12 +59,20 @@ Name: "{autodesktop}\prep-a-fight"; Filename: "{app}\python\pythonw.exe"; Parame
 [Run]
 Filename: "{app}\python\pythonw.exe"; Parameters: "-m paf.desktop"; WorkingDir: "{userdocs}"; \
   Description: "{cm:LaunchProgram,prep-a-fight}"; Flags: nowait postinstall skipifsilent
+; an update started from the app (/RELAUNCH=1) reopens it
+Filename: "{app}\python\pythonw.exe"; Parameters: "-m paf.desktop"; WorkingDir: "{userdocs}"; Flags: nowait; \
+  Check: RelaunchRequested
 
 [UninstallDelete]
 ; bytecode Python writes next to the libraries at run time
 Type: filesandordirs; Name: "{app}\python"
 
 [Code]
+function RelaunchRequested: Boolean;
+begin
+  Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   Data: String;

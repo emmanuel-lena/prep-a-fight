@@ -162,3 +162,16 @@ def test_report_keys_carry_the_spec():
     assert web.split_key("nek-zali-the-soulcoiler-mythic-assassination-rogue") == (
         "nek-zali-the-soulcoiler", "mythic", "Assassination Rogue")
     assert web.split_key("ula-tek-heroic") == ("ula-tek", "heroic", "")  # reports from before the spec was in the name
+
+
+def test_every_link_of_the_top_bar_and_feedback_routes(server, monkeypatch):
+    url, _ = server
+    monkeypatch.delenv("PAF_FEEDBACK_URL", raising=False)
+    from paf import feedback
+
+    monkeypatch.setattr(feedback, "WEBHOOK_FILE", feedback.WEBHOOK_FILE.with_name("absent.txt"))
+    for path in ("/", "/tools", "/settings", "/feedback"):
+        assert "Not found" not in fetch(url + path), path
+    done = fetch(url + "/feedback", urllib.parse.urlencode({"message": "It broke", "log": "on"}).encode())
+    assert "issues/new" in done
+    assert "Nothing to update" in fetch(url + "/update", b"")

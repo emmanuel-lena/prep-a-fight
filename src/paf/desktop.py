@@ -45,6 +45,9 @@ def main() -> int:
     from paf.simc_install import ensure_simc
 
     ensure_simc()  # first launch of an installed copy: SimulationCraft downloads while the player sets up
+    from paf.update import check_in_background
+
+    check_in_background()
 
     server = web.Server(("127.0.0.1", 0), web.Handler)  # a free port: several copies never collide
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -65,7 +68,9 @@ def main() -> int:
         webview.settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = True  # Wowhead / Warcraft Logs links
     except (AttributeError, TypeError):
         pass
-    webview.create_window(TITLE, url, width=1320, height=920, min_size=(900, 600), background_color="#181219")
+    window = webview.create_window(TITLE, url, width=1320, height=920, min_size=(900, 600),
+                                   background_color="#181219")
+    web.QUIT["hook"] = window.destroy  # an update is being installed: close, the installer reopens the app
     webview.start(icon=str(ICON) if ICON.is_file() else None)
     server.shutdown()
     server.server_close()
