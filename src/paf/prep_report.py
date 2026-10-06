@@ -360,9 +360,15 @@ def kpi_tiles(d: PrepData) -> str:
     if d.validation:
         lo, med, hi = d.validation
         level = "high" if abs(med - 1) <= 0.05 else "medium" if abs(med - 1) <= 0.12 else "low"
-        conf = (f'<p class="conf small"><span class="pill {"gold" if level == "high" else ""}">Confidence: {level}</span> '
-                f'<span class="muted">the top players, simmed on this rebuilt fight with their own gear, get {med:.0%} of '
-                f'the DPS they really did (100% = the sim matches reality). Gains are % of your DPS.</span></p>')
+        gap = abs(med - 1)
+        meaning = ("the sim matches reality: trust the gains below." if level == "high" else
+                   f"the sim is off by {gap:.0%}: trust which option wins more than the exact %." if level == "medium"
+                   else f"the sim is off by {gap:.0%}: this fight is badly rebuilt for your spec, use the gains as "
+                        f"hints only.")
+        conf = (f'<p class="conf small"><span class="pill {"gold" if level == "high" else ""}">Confidence: {level} '
+                f'&middot; sim {med:.0%} of real</span> <b>{e(meaning)}</b> <span class="muted">The top players, simmed '
+                f'on this rebuilt fight with their own gear, get {med:.0%} of the DPS they really did (100% = perfect). '
+                f'Gains are % of your DPS.</span></p>')
     return (f'<div class="kpis">{"".join(tiles)}</div>' if tiles else "") + conf
 
 
