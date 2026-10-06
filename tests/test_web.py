@@ -141,11 +141,12 @@ def test_prep_progress_and_job_from_disk(tmp_path, monkeypatch):
     monkeypatch.setenv("PAF_HOME", str(tmp_path))
     log = "\n== Analyzing the corpus\n  x\n== Calibrating the fight on the logs\n"
     rows, left = web.prep_progress(log)
-    assert rows[0] == ("Rebuild the typical fight", "done") and rows[1] == ("Calibrate it on the logs", "now")
-    assert ("Find your best cooldown plan", "next") in rows and left > 20
-    assert not any(label.startswith("Download") for label, _ in rows)  # corpus already there: skipped
+    states = [(label, state) for label, _, state in rows]
+    assert states[0] == ("Rebuild the typical fight", "done") and states[1] == ("Calibrate it on the logs", "now")
+    assert ("Find your best cooldown plan", "next") in states and left > 20
+    assert not any(label.startswith("Download") for label, _ in states)  # corpus already there: skipped
     done_rows, done_left = web.prep_progress(log + "== Done\n")
-    assert all(state == "done" for _, state in done_rows) and done_left == 0
+    assert all(state == "done" for *_, state in done_rows) and done_left == 0
     # a job started by an earlier run of the app: its outcome is read from the log
     d = tmp_path / "web"
     d.mkdir()
@@ -196,5 +197,30 @@ def test_check_for_updates_button(server, monkeypatch):
 def test_prep_progress_with_a_pack():
     log = "== Using the prep pack (199 top kills, 2026-10-06)\n== Calibrating the fight on the logs\n"
     rows, left = web.prep_progress(log)
-    labels = [label for label, _ in rows]
-    assert not any("corpus" in x.lower() or "real DPS" in x for x in labels) and rows[0][1] == "done"
+    labels = [label for label, *_ in rows]
+    assert not any("corpus" in x.lower() or "real DPS" in x for x in labels) and rows[0][2] == "done"
+
+
+def test_job_page_updates_itself(server):
+    import json
+    import time
+
+    url, home = server
+    (home / "web").mkdir(exist_ok=True)
+    (home / "web" / "job-abcd0f02.json").write_text(json.dumps(
+        {"args": ["prep", "3470", "--difficulty", "mythic"], "result": "", "status": "running",
+         "started": time.time() - 30}))
+    (home / "web" / "job-abcd0f02.log").write_text("== Simming your character on the fight  [+5s]\n")
+    from paf import web as w
+
+    w.JOBS.jobs.pop("abcd0f02", None)
+    job = w.JOBS.get("abcd0f02")
+    job["status"] = "running"
+    w.JOBS.jobs["abcd0f02"] = job
+    page = fetch(url + "/job/abcd0f02")
+    assert "id='live'" in page and "part=live" in page
+    part = fetch(url + "/job/abcd0f02?part=live")
+    assert "Sim your character" in part and "topbar" not in part
+    job["status"] = "done"
+    assert "data-reload" in fetch(url + "/job/abcd0f02?part=live")
+    w.JOBS.jobs.pop("abcd0f02", None)

@@ -666,8 +666,10 @@ def cmd_prep(args: argparse.Namespace) -> int:
     con = db.connect()
     root = simc.new_run_dir(label=f"prep-{_slug(enc.name)}")
 
-    def step(msg: str) -> None:
-        print(f"\n== {msg}", flush=True)
+    from paf.progress import Clock
+
+    clock = Clock()
+    step = clock.step  # prints the step with its time: the app predicts the time left from it
 
     from paf import pack
 
@@ -986,6 +988,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
     summary = {"gain": round(top.gain, 1), "what": what.strip()} if top else {}
     out.with_suffix(".json").write_text(json.dumps(summary), encoding="utf-8")  # headline for the app's home
     step("Done")
+    clock.save()
     from paf.prep_report import headline
 
     for line in headline(d):

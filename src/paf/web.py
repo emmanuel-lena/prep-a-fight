@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, urlparse
 
 from paf import settings, theme
 from paf.config import data_dir, load_dotenv
+from paf.progress import PREP_STEPS, prep_progress  # noqa: F401 - PREP_STEPS: re-exported
 
 e = html.escape
 
@@ -35,8 +36,8 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .boss-tile .top{font-size:13px;margin-top:10px;line-height:1.35}
 .cta{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:18px 0 6px}
 .lead{font-size:16px;color:var(--muted);margin-bottom:18px}
-ol.steps{list-style:none;margin:0;padding:0} .st{padding:7px 0;border-bottom:1px solid var(--line)}
-.st:last-child{border-bottom:0} .st span:first-child{display:inline-block;width:22px}
+ol.steps{list-style:none;margin:0;padding:0} .st{padding:7px 0;border-bottom:1px solid var(--line);display:flex;gap:4px}
+.st:last-child{border-bottom:0} .st>span:first-child{display:inline-block;width:22px;flex:none} .st .small{font-weight:400}
 .st.done{color:var(--muted)} .st.done span:first-child{color:var(--pos)} .st.now{font-weight:700}
 .st.now span:first-child{color:var(--accent)} .st.next{color:var(--muted)}
 """
@@ -568,47 +569,6 @@ def write_assigns(boss_id: int, difficulty: str, chosen: list[str]) -> None:
     ppath.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-# the steps of a prep, as `paf prep` prints them, with their typical duration in minutes on a first run
-PREP_STEPS = (
-    ("Using the prep pack", "Load what the top players' logs give, already computed (prep pack)", 0),
-    ("Collecting the corpus", "Download the top players' kills from Warcraft Logs", 20),
-    ("Collecting who handles", "Who handles each mechanic", 4),
-    ("Analyzing the corpus", "Rebuild the typical fight", 2),
-    ("Calibrating the fight", "Calibrate it on the logs", 1),
-    ("Validating the fight", "Check it against the top players' real DPS", 2),
-    ("Your raid and the adds", "Your raid and the adds", 1),
-    ("Simming your character", "Sim your character", 1),
-    ("Cooldown timelines", "Top players' cooldown timelines", 1),
-    ("Talent builds", "Sim the top players' talent builds", 3),
-    ("Ideal cooldown plan", "Find your best cooldown plan", 20),
-    ("Cooldown plans", "Compare cooldown plans", 5),
-    ("Top Gear", "Best gear from your bags", 5),
-    ("What this boss drops", "What this boss drops for you", 3),
-)
-
-
-def prep_progress(log: str) -> tuple[list[tuple[str, str]], float]:
-    """[(label, state)] with state done / now / next, and the typical minutes left. Steps that a prep
-    skips (the corpus already collected, no raid set...) are not listed."""
-    seen = [line[3:] for line in log.splitlines() if line.startswith("== ")]
-    finished = any(s.startswith("Done") for s in seen)
-    idx = {i for i, (prefix, _, _) in enumerate(PREP_STEPS) for s in seen if s.startswith(prefix)}
-    last = max(idx) if idx else -1
-    rows, left = [], 0.0
-    optional = ("Collecting", "Your raid", "Cooldown plans", "Using the prep pack")
-    if any(s.startswith("Using the prep pack") for s in seen):  # the pack replaces the corpus and the validation
-        optional += ("Analyzing", "Validating")
-    for i, (prefix, label, minutes) in enumerate(PREP_STEPS):
-        if i in idx:
-            rows.append((label, "done" if finished or i < last else "now"))
-        elif not finished and i > last and not prefix.startswith(optional):
-            rows.append((label, "next"))
-            left += minutes
-    if last >= 0 and not finished:
-        left += PREP_STEPS[last][2] / 2
-    return rows, left
-
-
 def feedback_page(jid: str = "", note: str = "") -> str:
     from paf import feedback
 
@@ -649,8 +609,10 @@ def send_feedback(form: dict) -> str:
             f"href='{e(feedback.issue_url(title, body))}'>Open the GitHub issue</a></div>")
 
 
-def job_page(jid: str) -> bytes:
+def job_page(jid: str, part: str = "") -> bytes:
     job = JOBS.get(jid)
+    if part == "live" and (job is None or job["status"] != "running"):  # finished: the page reloads itself
+        return b"<p data-reload>Done.</p>"
     if job is None:
         return page("Unknown job", "<p>This prep is unknown (its files were removed?). <a href='/'>Home</a></p>")
     log = job["log"].read_text(encoding="utf-8", errors="replace") if job["log"].is_file() else ""
@@ -682,29 +644,70 @@ def job_page(jid: str) -> bytes:
     if status == "done":
         return page("Done", "<h1>The prep finished</h1><p class='lead'>Its sheet is listed on the "
                             "<a href='/'>home page</a>.</p>")
-    rows, left = prep_progress(log)
+    live = prep_live(jid, job, log, elapsed)
+    if part == "live":
+        return live.encode()
+    js = f"""<script>(function(){{
+function tick(){{var el=document.getElementById('el');if(!el)return;var s=+el.dataset.start;
+var t=Math.max(0,Math.floor(Date.now()/1000-s));el.textContent=Math.floor(t/60)+' min '+String(t%60).padStart(2,'0')+' s'}}
+setInterval(tick,1000);
+var poll=setInterval(function(){{fetch('/job/{e(jid)}?part=live').then(function(r){{return r.text()}}).then(function(h){{
+if(h.indexOf('data-reload')>=0){{clearInterval(poll);location.reload();return}}
+var box=document.getElementById('live');var open=box.querySelector('details[open]');box.innerHTML=h;
+if(open){{var d=box.querySelector('details');if(d)d.open=true}}}}).catch(function(){{}})}},5000)}})();</script>"""
+    return page("Preparing...", f"<div id='live'>{live}</div>{guide_preview(job['args'])}{js}")
+
+
+def prep_live(jid: str, job: dict, log: str, elapsed: int) -> str:
+    """The part of the prep page that updates itself: steps, time left, what the prep found so far."""
+    from paf.progress import findings
+
+    status = job["status"]
+    if status == "done":  # the page reloads and opens the sheet
+        return "<p data-reload>Done.</p>"
+    rows, left = prep_progress(log, elapsed)
     icon = {"done": "&#10003;", "now": "&#9679;", "next": "&#9675;"}
-    items = "".join(f"<li class='st {state}'><span>{icon[state]}</span> {e(label)}"
-                    + (" <span class='pill gold'>in progress</span>" if state == "now" else "") + "</li>"
-                    for label, state in rows)
+    items = "".join(
+        f"<li class='st {state}'><span>{icon[state]}</span> <div><b>{e(label)}</b>"
+        + (" <span class='pill gold'>in progress</span>" if state == "now" else "")
+        + (f"<div class='small muted'>{e(why)}</div>" if state != "done" else "") + "</div></li>"
+        for label, why, state in rows)
     if status == "running":
         head = "Preparing the fight"
-        eta = (f"about {max(1, round(left))} min left (typical first prep; much faster when the logs and sims "
-               f"are already cached)" if left else "almost done")
+        if left < 1.5:
+            eta = "almost done"
+        else:
+            eta = f"about {max(1, round(left * 0.85))}-{round(left * 1.2) + 1} min left"
         lead = (f"<span id='el' data-start='{job['started']:.0f}'>{elapsed // 60} min {elapsed % 60:02d} s</span>"
-                f" &middot; {eta}. You can leave this page open, it updates itself; the prep keeps running on your "
-                f"computer even if you close it.")
+                f" &middot; <b>{eta}</b>")
+        calm = ("<p class='small muted'>Your computer stays usable: the simulations run at low priority. You can "
+                "close this window, the prep keeps running and its sheet appears on the home page.</p>")
     else:
         head = "The prep stopped" if status == "stopped" else f"The prep failed ({e(status)})"
         lead = ("The log below says why. Go back to the boss page to try again, or "
                 f"<a class='btn' href='/feedback?job={e(jid)}'>Send this report</a> (you see it before it goes).")
-    js = """<script>(function(){var el=document.getElementById('el');if(!el)return;var s=+el.dataset.start;
-setInterval(function(){var t=Math.max(0,Math.floor(Date.now()/1000-s));el.textContent=Math.floor(t/60)+' min '+
-String(t%60).padStart(2,'0')+' s'},1000)})();</script>"""
-    body = (f"<h1>{head}</h1><p class='lead'>{lead}</p><div class='card'><ol class='steps'>{items}</ol></div>"
-            f"<details class='card'><summary>Details (log)</summary><pre class='log'>{e(log[-6000:])}</pre></details>"
-            + js)
-    return page("Preparing...", body, 10 if status == "running" else None)
+        calm = ""
+    found = findings(log)
+    so_far = ("<h2>So far</h2><div class='card'><ul class='small'>" + "".join(f"<li>{e(x)}</li>" for x in found)
+              + "</ul></div>") if found else ""
+    return (f"<h1>{head}</h1><p class='lead'>{lead}</p>{calm}<div class='card'><ol class='steps'>{items}</ol></div>"
+            f"{so_far}<details class='card'><summary>Details (log)</summary><pre class='log'>{e(log[-6000:])}</pre>"
+            f"</details>")
+
+
+def guide_preview(args: list[str]) -> str:
+    """While the prep runs: the boss in 60 seconds (Encounter Journal), if it is on this computer."""
+    try:
+        from paf import bossguide
+
+        boss = int(args[1])
+        diff = args[args.index("--difficulty") + 1] if "--difficulty" in args else settings.get("difficulty")
+        sections = bossguide.load(boss, diff)
+        summary = bossguide.summary_html(sections, "damage", "#boss") if sections else ""
+    except Exception:  # noqa: BLE001 - only a reading while waiting
+        return ""
+    return (f"<h2>While you wait: the boss in 60 seconds</h2><div class='card'>{summary}</div>"
+            f"<style>{bossguide.CSS}</style>" if summary else "")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -750,7 +753,7 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path.startswith("/view/"):
                 self._send(view_page(url.path.rsplit("/", 1)[1], q.get("tab", "prep")))
             elif url.path.startswith("/job/"):
-                self._send(job_page(url.path.rsplit("/", 1)[1]))
+                self._send(job_page(url.path.rsplit("/", 1)[1], q.get("part", "")))
             elif url.path.startswith("/report/"):
                 name = Path(url.path).name
                 f = data_dir() / "reports" / name
