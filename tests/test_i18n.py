@@ -1,7 +1,8 @@
 from paf import i18n
 
 
-def test_french_page(monkeypatch):
+def test_french_page(monkeypatch, tmp_path):
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))  # no table of game names: only the app's catalog
     html = ("<h1>Your prepared bosses</h1><p>Time Warp</p><td>Time</td><p>Kill the Restless Amani (~36 per kill): "
             "the top raids kill them in ~19 s.</p><p>the top players&#x27; real DPS</p>"
             "<script>var x='Your prepared bosses'</script><input placeholder=\"Your message\">"

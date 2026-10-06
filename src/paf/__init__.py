@@ -1,3 +1,3 @@
 """prep-a-fight (paf): analyze top logs and adapt gear and cooldowns to a specific boss fight."""
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"

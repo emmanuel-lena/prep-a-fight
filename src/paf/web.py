@@ -36,6 +36,7 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .boss-tile .top{font-size:13px;margin-top:10px;line-height:1.35}
 .cta{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:18px 0 6px}
 .lead{font-size:16px;color:var(--muted);margin-bottom:18px}
+.ring{vertical-align:-3px;margin-left:4px} .ring circle{fill:none;stroke-width:3} .ring-bg{stroke:var(--line)} .ring-fg{stroke:var(--accent);stroke-dasharray:50.3;stroke-dashoffset:50.3;transform:rotate(-90deg);transform-origin:center;animation:ring linear forwards} @keyframes ring{to{stroke-dashoffset:0}} @media (prefers-reduced-motion:reduce){.ring-fg{animation:none;stroke-dashoffset:25}}
 ol.steps{list-style:none;margin:0;padding:0} .st{padding:7px 0;border-bottom:1px solid var(--line);display:flex;gap:4px}
 .st:last-child{border-bottom:0} .st>span:first-child{display:inline-block;width:22px;flex:none} .st .small{font-weight:400}
 .st.done{color:var(--muted)} .st.done span:first-child{color:var(--pos)} .st.now{font-weight:700}
@@ -48,8 +49,78 @@ def page(title: str, body: str, refresh: int | None = None, nav: str = "") -> by
     nav = nav or ('<a href="/">Home</a><a href="/tools">Tools</a><a href="/settings">Settings</a>'
                   '<a href="/feedback">Feedback</a>')
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
-            f"{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}</style></head><body>{theme.topbar(nav)}"
+            f"{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}</style></head><body>{theme.topbar(nav + lang_switch())}"
             f"<main>{update_banner()}{body}</main></body></html>").encode()
+
+
+def lang_switch() -> str:
+    """The language of the app, in the top bar: changing it reloads the page."""
+    from paf import i18n
+
+    cur = i18n.language()
+    options = "".join(f"<option value='{e(c)}'{' selected' if c == cur else ''}>{e(c.upper())}</option>"
+                      for c in i18n.available())
+    return (f"<form method='post' action='/language' class='lang' style='display:inline'>"
+            f"<select name='lang' aria-label='Language / Langue' onchange='pafLang(this)'>{options}</select>"
+            f"<noscript><button>OK</button></noscript></form>{LANG_JS}")
+
+
+# Switch the language in place: save it, fetch this page (and the sheet in its frame) again, already translated by
+# the server, and swap the content without reloading: no flash, scroll and open tab kept. Without JavaScript the
+# form posts and the page reloads.
+LANG_JS = """<script>
+async function pafFetch(url, opts){  // the whole response, body included, with a few tries: a local connection can drop
+  for (let i = 0; ; i++) {
+    const ctl = new AbortController(), timer = setTimeout(function(){ ctl.abort(); }, 5000);
+    try {
+      const r = await fetch(url, Object.assign({signal: ctl.signal}, opts));
+      if (!(r.ok || r.status === 204)) throw new Error(r.status);
+      const text = await r.text();
+      clearTimeout(timer);
+      return text;
+    } catch (e) { clearTimeout(timer); if (i >= 2) throw e; await new Promise(function(ok){ setTimeout(ok, 150); }); }
+  }
+}
+async function pafSwap(doc, url){
+  const html = await pafFetch(url, {cache: 'no-store'});
+  const fresh = new DOMParser().parseFromString(html, 'text/html');
+  const win = doc.defaultView, y = win.scrollY;
+  doc.title = fresh.title;
+  const body = doc.importNode(fresh.body, true);
+  body.querySelectorAll('script').forEach(function(old){
+    const s = doc.createElement('script');
+    for (const a of old.attributes) s.setAttribute(a.name, a.value);
+    s.textContent = old.textContent; old.replaceWith(s);
+  });
+  doc.body.replaceWith(body);
+  win.scrollTo(0, y);
+}
+async function pafLang(sel){
+  sel.disabled = true;
+  try {
+    await pafFetch('/language', {method: 'POST', headers: {'X-Paf-Inline': '1'},
+                                 body: new URLSearchParams({lang: sel.value})});
+    const frame = document.querySelector('iframe');
+    if (frame && frame.contentDocument) {  // a prep sheet in its frame: swap the top bar, then the sheet itself
+      const html = await pafFetch(location.href, {cache: 'no-store'});
+      const fresh = new DOMParser().parseFromString(html, 'text/html');
+      document.title = fresh.title;
+      const bar = fresh.querySelector('header.topbar');
+      const swapBar = function(){
+        const b = document.importNode(bar, true);
+        b.querySelectorAll('script').forEach(function(old){
+          const s = document.createElement('script'); s.textContent = old.textContent; old.replaceWith(s);
+        });
+        document.querySelector('header.topbar').replaceWith(b);
+      };
+      await pafSwap(frame.contentDocument, frame.contentWindow.location.href);
+      if (bar) swapBar();
+    } else {
+      await pafSwap(document, location.href);
+    }
+  } catch (e) { window.pafLastError = String(e && e.stack || e); sel.disabled = false; sel.form.submit(); }
+}
+</script>"""
 
 
 QUIT = {"hook": None}  # set by the desktop app: closes its window (an update is being installed)
@@ -262,7 +333,7 @@ def view_page(key: str, tab: str) -> bytes:
            + f'<a href="{src}" target="_blank">Open alone</a>')
     css = "body{display:flex;flex-direction:column;height:100vh}iframe{border:0;width:100%;flex:1;display:block}"
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
-            f"<title>{e(item['name'])}</title>{theme.HEAD}<style>{CSS}{css}</style></head><body>{theme.topbar(nav)}"
+            f"<title>{e(item['name'])}</title>{theme.HEAD}<style>{CSS}{css}</style></head><body>{theme.topbar(nav + lang_switch())}"
             f'<iframe src="{src}" title="{e(item["name"])}"></iframe></body></html>').encode()
 
 
@@ -654,8 +725,20 @@ setInterval(tick,1000);
 var poll=setInterval(function(){{fetch('/job/{e(jid)}?part=live').then(function(r){{return r.text()}}).then(function(h){{
 if(h.indexOf('data-reload')>=0){{clearInterval(poll);location.reload();return}}
 var box=document.getElementById('live');var open=box.querySelector('details[open]');box.innerHTML=h;
-if(open){{var d=box.querySelector('details');if(d)d.open=true}}}}).catch(function(){{}})}},5000)}})();</script>"""
+if(open){{var d=box.querySelector('details');if(d)d.open=true}}}}).catch(function(){{}})}},{POLL_S * 1000})}})();</script>"""
     return page("Preparing...", f"<div id='live'>{live}</div>{guide_preview(job['args'])}{js}")
+
+
+POLL_S = 5  # the prep page asks for its live part this often
+
+
+def refresh_ring(seconds: int) -> str:
+    """A small ring that fills until the next refresh of the live part (restarts with each refresh: the ring is
+    inside it). No number shown: hovering says it."""
+    return (f"<svg class='ring' viewBox='0 0 20 20' width='16' height='16' role='img' "
+            f"aria-label='Next update in {seconds} s'><title>Next update in {seconds} s</title>"
+            f"<circle cx='10' cy='10' r='8' class='ring-bg'/><circle cx='10' cy='10' r='8' class='ring-fg' "
+            f"style='animation-duration:{seconds}s'/></svg>")
 
 
 def prep_live(jid: str, job: dict, log: str, elapsed: int) -> str:
@@ -679,7 +762,7 @@ def prep_live(jid: str, job: dict, log: str, elapsed: int) -> str:
         else:
             eta = f"about {max(1, round(left * 0.85))}-{round(left * 1.2) + 1} min left"
         lead = (f"<span id='el' data-start='{job['started']:.0f}'>{elapsed // 60} min {elapsed % 60:02d} s</span>"
-                f" &middot; <b>{eta}</b>")
+                f" &middot; <b>{eta}</b> {refresh_ring(POLL_S)}")
         calm = ("<p class='small muted'>Your computer stays usable: the simulations run at low priority. You can "
                 "close this window, the prep keeps running and its sheet appears on the home page.</p>")
     else:
@@ -703,6 +786,12 @@ def guide_preview(args: list[str]) -> str:
         boss = int(args[1])
         diff = args[args.index("--difficulty") + 1] if "--difficulty" in args else settings.get("difficulty")
         sections = bossguide.load(boss, diff)
+        from paf import i18n
+
+        if sections and i18n.language() != "en":  # the journal in the player's language from the first prep
+            from paf import names
+
+            names.build(boss, diff, {}, i18n.wow_locale())
         summary = bossguide.summary_html(sections, "damage", "#boss") if sections else ""
     except Exception:  # noqa: BLE001 - only a reading while waiting
         return ""
@@ -818,6 +907,19 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(page("Not found", "<p>Unknown tool.</p>"), 404)
                     return
                 self._redirect(f"/job/{JOBS.start(args, None)}")
+            elif self.path == "/language":
+                from paf import i18n
+
+                lang = (form.get("lang") or [""])[0]
+                if lang in i18n.available():
+                    settings.set_value("language", lang)
+                if self.headers.get("X-Paf-Inline"):  # switched in place by the page itself
+                    self.send_response(204)
+                    self.end_headers()
+                    return
+                back = self.headers.get("Referer", "/")
+                self._redirect(urlparse(back).path + (f"?{urlparse(back).query}" if urlparse(back).query else "")
+                               if back.startswith(("http://127.0.0.1", "http://localhost")) else "/")
             elif self.path == "/feedback":
                 self._send(page("Feedback", send_feedback(form)))
             elif self.path == "/update":

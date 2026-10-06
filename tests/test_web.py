@@ -224,3 +224,15 @@ def test_job_page_updates_itself(server):
     job["status"] = "done"
     assert "data-reload" in fetch(url + "/job/abcd0f02?part=live")
     w.JOBS.jobs.pop("abcd0f02", None)
+
+
+def test_language_switch_in_the_top_bar(server, monkeypatch):
+    url, _ = server
+    page = fetch(url + "/settings")
+    assert "action='/language'" in page and "value='fr'" in page
+    fetch(url + "/language", urllib.parse.urlencode({"lang": "fr"}).encode())
+    from paf import settings
+
+    assert settings.get("language") == "fr"
+    monkeypatch.delenv("PAF_LANG")  # now the setting decides
+    assert "Réglages" in fetch(url + "/settings")

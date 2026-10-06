@@ -435,6 +435,8 @@ PATTERNS: list[tuple[str, str]] = [
     (r"about (\d+)-(\d+) min left", r"environ \1 à \2 min restantes"),
     (r"Version ([\d.]+) is out", r"La version \1 est sortie"), (r"\(you have ([\d.]+)\)", r"(tu as la \1)"),
     (r"Updating to ([\d.]+)", r"Mise à jour vers la \1"),
+    (r"Next update in (\d+) s", r"Prochaine mise à jour dans \1 s"),
+    (r"\bupdated (\d\d \w+ [\d:]+)", r"mis à jour le \1"),
     (r"Typical fight rebuilt from (\d+) kills: ([\d:]+), (\d+) add waves or targets\.",
      r"Combat type reconstruit à partir de \1 kills : \2, \3 vagues d'adds ou cibles."),
     (r"The top players put (\d+)% of their damage on the boss\.", r"Les tops mettent \1 % de leurs dégâts sur le boss."),
@@ -470,3 +472,23 @@ PATTERNS: list[tuple[str, str]] = [
     (r"(.+?) prep$", r"Prépa \1"),
     (r"(?<![\w])on (?=[A-Z])", r"sur "),
 ]
+
+# class and spec names ("Elemental Shaman", as Warcraft Logs writes them) in the game's French
+CLASSES = {"DeathKnight": "Chevalier de la mort", "DemonHunter": "Chasseur de démons", "Druid": "Druide",
+           "Evoker": "Évocateur", "Hunter": "Chasseur", "Mage": "Mage", "Monk": "Moine", "Paladin": "Paladin",
+           "Priest": "Prêtre", "Rogue": "Voleur", "Shaman": "Chaman", "Warlock": "Démoniste", "Warrior": "Guerrier"}
+SPECS = {"Blood": "Sang", "Frost": "Givre", "Unholy": "Impie", "Havoc": "Dévastation", "Vengeance": "Vengeance",
+         "Devourer": "Dévoreur", "Balance": "Équilibre", "Feral": "Farouche", "Guardian": "Gardien",
+         "Restoration": "Restauration", "Devastation": "Dévastation", "Preservation": "Préservation",
+         "Augmentation": "Augmentation", "BeastMastery": "Maîtrise des bêtes", "Beast Mastery": "Maîtrise des bêtes",
+         "Marksmanship": "Précision", "Survival": "Survie", "Arcane": "Arcanes", "Fire": "Feu",
+         "Brewmaster": "Maître brasseur", "Mistweaver": "Tisse-brume", "Windwalker": "Marche-vent", "Holy": "Sacré",
+         "Protection": "Protection", "Retribution": "Vindicte", "Discipline": "Discipline", "Shadow": "Ombre",
+         "Assassination": "Assassinat", "Outlaw": "Hors-la-loi", "Subtlety": "Finesse", "Elemental": "Élémentaire",
+         "Enhancement": "Amélioration", "Affliction": "Affliction", "Demonology": "Démonologie",
+         "Destruction": "Destruction", "Arms": "Armes", "Fury": "Fureur"}
+for _spec, _spec_fr in SPECS.items():
+    for _cls, _cls_fr in CLASSES.items():
+        for _cls_name in {_cls, {"DeathKnight": "Death Knight", "DemonHunter": "Demon Hunter"}.get(_cls, _cls)}:
+            PHRASES.setdefault(f"{_spec} {_cls_name}", f"{_cls_fr} {_spec_fr}")
+            PHRASES.setdefault(f"{_spec.lower()} {_cls_name.lower()}", f"{_cls_fr} {_spec_fr}")

@@ -15,14 +15,16 @@ WAGO_CSV = "https://wago.tools/db2/{table}/csv"
 MAX_AGE = 7 * 86400
 
 
-def _table_path(table: str) -> Path:
-    return data_dir() / "gamedata" / f"{table}.csv"
+def _table_path(table: str, locale: str = "") -> Path:
+    return data_dir() / "gamedata" / (f"{table}.{locale}.csv" if locale else f"{table}.csv")
 
 
-def table_rows(table: str, max_age: float = MAX_AGE) -> list[dict[str, str]]:
-    p = _table_path(table)
+def table_rows(table: str, max_age: float = MAX_AGE, locale: str = "") -> list[dict[str, str]]:
+    """A DB2 table; locale (frFR, deDE...): its texts in that language (default: English)."""
+    p = _table_path(table, locale)
     if not p.is_file() or time.time() - p.stat().st_mtime > max_age:
-        req = urllib.request.Request(WAGO_CSV.format(table=table), headers={"User-Agent": "prep-a-fight"})
+        url = WAGO_CSV.format(table=table) + (f"?locale={locale}" if locale else "")
+        req = urllib.request.Request(url, headers={"User-Agent": "prep-a-fight"})
         with urllib.request.urlopen(req, timeout=120) as resp:
             data = resp.read()
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -32,8 +34,8 @@ def table_rows(table: str, max_age: float = MAX_AGE) -> list[dict[str, str]]:
 
 
 @cache
-def spell_names() -> dict[int, str]:
-    return {int(r["ID"]): r["Name_lang"] for r in table_rows("SpellName") if r.get("ID", "").isdigit()}
+def spell_names(locale: str = "") -> dict[int, str]:
+    return {int(r["ID"]): r["Name_lang"] for r in table_rows("SpellName", locale=locale) if r.get("ID", "").isdigit()}
 
 
 @cache

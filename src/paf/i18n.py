@@ -78,25 +78,47 @@ class Catalog:
     patterns: list[tuple[re.Pattern, str]]
 
 
-@cache
-def catalog(lang: str) -> Catalog:
-    """A language's catalog, ready to match: each text also in its HTML-escaped form (' as &#x27;, & as &amp;)."""
-    if lang == "en":
-        return Catalog({}, {}, None, [])
-    mod = _module(lang)
+def _compile(pairs: dict[str, str], patterns: list[tuple[str, str]]) -> Catalog:
+    """Ready to match: each text also in its HTML-escaped form (' as &#x27;, & as &amp;)."""
     words, phrases = {}, {}
-    for en, tr in mod.PHRASES.items():
-        for a, b in {(en, tr), (html.escape(en), html.escape(tr))}:
+    for en, tr in pairs.items():
+        for a, b in ((en, tr), (html.escape(en), html.escape(tr))):  # the escaped form last: it wins, safe anywhere
             (words if " " not in a.strip() else phrases)[a] = b
     keys = sorted(phrases, key=len, reverse=True)
     rx = re.compile(r"(?<![\w])(" + "|".join(re.escape(k) for k in keys) + r")(?![\w])") if keys else None
     pats = []
-    for pat, tr in mod.PATTERNS:
+    for pat, tr in patterns:
         pats.append((re.compile(pat), tr))
         esc = pat.replace("'", "&#x27;")
         if esc != pat:
             pats.append((re.compile(esc), tr.replace("'", "&#x27;")))
     return Catalog(words, phrases, rx, pats)
+
+
+@cache
+def catalog(lang: str) -> Catalog:
+    """A language's catalog of the app's own texts."""
+    if lang == "en":
+        return Catalog({}, {}, None, [])
+    mod = _module(lang)
+    return _compile(mod.PHRASES, mod.PATTERNS)
+
+
+_NAMES: dict[str, tuple[float, Catalog]] = {}
+
+
+def game_names(lang: str) -> Catalog:
+    """The game's names and journal texts in `lang` (paf.names), reloaded when its table changes."""
+    from paf import names
+
+    locale = WOW_LOCALES.get(lang, "enUS")
+    path = names._path(locale)
+    mtime = path.stat().st_mtime if path.is_file() else 0.0
+    if lang == "en" or not mtime:
+        return Catalog({}, {}, None, [])
+    if _NAMES.get(locale, (None,))[0] != mtime:
+        _NAMES[locale] = (mtime, _compile(names.mapping(locale), []))
+    return _NAMES[locale][1]
 
 
 _SKIP = re.compile(r"(<script\b.*?</script>|<style\b.*?</style>|<pre\b.*?</pre>|<textarea\b.*?</textarea>|<[^>]+>)",
@@ -105,10 +127,7 @@ _VISIBLE_ATTR = re.compile(r'((?:placeholder|title|aria-label|alt)=)(["\'])(.*?)
 _RAW = ("<script", "<style", "<pre", "<textarea")
 
 
-def _text(s: str, lang: str) -> str:
-    if not s.strip():
-        return s
-    cat = catalog(lang)
+def _apply(s: str, cat: Catalog) -> str:
     core = s.strip()
     if core in cat.words:
         return s.replace(core, cat.words[core])
@@ -117,6 +136,14 @@ def _text(s: str, lang: str) -> str:
     for rx, tr in cat.patterns:
         s = rx.sub(tr, s)
     return s
+
+
+def _text(s: str, lang: str) -> str:
+    if not s.strip():
+        return s
+    if "\n" in s:  # a sentence written over several lines of HTML: one line, so that the catalog finds it
+        s = re.sub(r"\s+", " ", s)
+    return _apply(_apply(s, game_names(lang)), catalog(lang))  # game names first: sentences carry them
 
 
 def translate(html: str, lang: str | None = None) -> str:

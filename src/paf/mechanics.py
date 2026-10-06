@@ -17,16 +17,22 @@ SECTION_TYPES = {0: "stage", 1: "creature", 2: "ability", 3: "overview"}
 DIFFICULTY_BITS = {"lfr": 1 << 17, "normal": 1 << 14, "heroic": 1 << 15, "mythic": 1 << 16}
 
 
-def clean_text(text: str, mythic: bool = True) -> str:
+# words put in place of game variables, per language of the journal
+FILLERS = {"": ("periodically", "a few seconds", "a spell", r"every \$\d*t\d+ sec"),
+           "frFR": ("périodiquement", "quelques secondes", "un sort", r"toutes les \$\d*t\d+ s(?:ec)?\.?")}
+
+
+def clean_text(text: str, mythic: bool = True, locale: str = "") -> str:
     """Strip the journal markup: spell links, colors, bullets, difficulty-conditional parts."""
+    periodically, few_seconds, a_spell, every = FILLERS.get(locale, FILLERS[""])
     if not text:
         return ""
     # $[!16 ...$] = shown only on mythic (16 = difficulty id); $[16 ...$] variants
     text = re.sub(r"\$\[!?[\d,]+\s*(.*?)\$\]", (r"\1" if mythic else ""), text, flags=re.S)
     text = re.sub(r"\$\[!?[\d,]+\s*", "", text)  # a conditional part cut before its end
     if "$@" in text:  # references to other spells: their name, or their description (one level)
-        names = spell_names()
-        text = re.sub(r"\$@spellname(\d+)", lambda m: names.get(int(m.group(1)), "a spell"), text)
+        names = spell_names(locale)
+        text = re.sub(r"\$@spellname(\d+)", lambda m: names.get(int(m.group(1)), a_spell), text)
 
         def desc(m: re.Match) -> str:
             from paf.gamedata import spell_description
@@ -39,9 +45,9 @@ def clean_text(text: str, mythic: bool = True) -> str:
 
         text = re.sub(r"\$@spelldesc(\d+)", desc, text)
         text = re.sub(r"\$@\w+", "", text)
-    text = re.sub(r"every \$\d*t\d+ sec", "periodically", text)
+    text = re.sub(every, periodically, text)
     text = re.sub(r" for \$\d*d\d*", "", text)
-    text = re.sub(r"\$\d*d\d*\b", "a few seconds", text)
+    text = re.sub(r"\$\d*d\d*\b", few_seconds, text)
     text = re.sub(r"\$\d*[sSmMoOaAhH]\d+%", "X%", text)
     text = re.sub(r"\$\d*[sSmMoOaA]\d+", "X", text)
     text = re.sub(r"\|c[0-9A-Fa-f]{8}\|Hspell:\d+\|h\[([^\]]*)\]\|h\|r", r"\1", text)
@@ -74,8 +80,9 @@ class Section:
         return bool(self.difficulty_mask & DIFFICULTY_BITS.get(difficulty, 0))
 
 
-def encounter_sections(encounter_id: int) -> list[Section]:
-    """Top-level journal sections of a boss (Warcraft Logs / DungeonEncounter id), as a tree."""
+def encounter_sections(encounter_id: int, locale: str = "") -> list[Section]:
+    """Top-level journal sections of a boss (Warcraft Logs / DungeonEncounter id), as a tree. locale: the journal
+    in that language (frFR...), default English."""
     journal_id = None
     for r in table_rows("JournalEncounter"):
         if r.get("DungeonEncounterID") == str(encounter_id):
@@ -83,19 +90,19 @@ def encounter_sections(encounter_id: int) -> list[Section]:
             break
     if journal_id is None:
         return []
-    names = spell_names()
+    names = spell_names(locale)
     by_id: dict[int, Section] = {}
-    for r in table_rows("JournalEncounterSection"):
+    for r in table_rows("JournalEncounterSection", locale=locale):
         if r.get("JournalEncounterID") != journal_id:
             continue
         sid = int(r.get("SpellID") or 0)
         flags_v = int(r.get("IconFlags") or 0)
         title = r.get("Title_lang") or ""
-        if (not title or title.startswith("Section ")) and sid:
+        if (not title or re.match(r"Section\s*\d+$", title)) and sid:  # a placeholder (\s: a no-break space in French)
             title = names.get(sid, title)
         by_id[int(r["ID"])] = Section(
             int(r["ID"]), title, SECTION_TYPES.get(int(r.get("Type") or 0), "?"), sid,
-            [n for b, n in FLAGS.items() if flags_v & b], clean_text(r.get("BodyText_lang") or ""),
+            [n for b, n in FLAGS.items() if flags_v & b], clean_text(r.get("BodyText_lang") or "", locale=locale),
             int(r.get("ParentSectionID") or 0), int(r.get("OrderIndex") or 0), int(r.get("DifficultyMask") or -1))
     roots = []
     for s in sorted(by_id.values(), key=lambda s: s.order):

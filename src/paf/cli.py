@@ -989,6 +989,12 @@ def cmd_prep(args: argparse.Namespace) -> int:
 
     d.class_name = profile.class_name
     d.icons = {**d.icons, **icons_for(d.links)}
+    from paf import i18n
+
+    if i18n.language() != "en":  # the game's names and journal in the player's language (applied when shown)
+        from paf import names
+
+        names.build(enc.id, diff_name, d.links, i18n.wow_locale())
     d.icons["__spec__"] = CLASS_ICON.format(cls=profile.class_name.lower())
     out = reports / f"prep-{report_key(enc.name, diff_name)}.html"
     out.write_text(render(d), encoding="utf-8")
