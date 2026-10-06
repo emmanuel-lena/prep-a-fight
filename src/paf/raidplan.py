@@ -24,6 +24,12 @@ from dataclasses import dataclass, field
 from paf.corpus.analyze import kills_filter
 from paf.raidneed import HEALERS
 
+TAB_JS = """<script>(function(){var ids=[...document.querySelectorAll('.panel')].map(function(p){return p.id});
+function show(id){if(ids.indexOf(id)<0)id=ids[0];document.querySelectorAll('.panel').forEach(
+function(p){p.hidden=p.id!==id});
+document.querySelectorAll('.tabs a').forEach(function(a){a.classList.toggle('on',a.getAttribute('href')==='#'+id)})}
+addEventListener('hashchange',function(){show(location.hash.slice(1))});show(location.hash.slice(1));})();</script>"""
+
 TANKS = {"Blood DeathKnight", "Brewmaster Monk", "Protection Paladin", "Protection Warrior", "Guardian Druid",
          "Vengeance DemonHunter"}
 BOSS_MODE_ADDS = 1 / 3  # share of the pad add damage a player staying on the boss still does (cleave)
@@ -168,7 +174,45 @@ def plan(members: list[Member], profiles: dict, shares: dict[str, float], requir
                 sum(c.adds for c in current), adds >= required, notes)
 
 
-def render(p: Plan, boss: str, difficulty: str, report: str, fight: str) -> str:
+@dataclass
+class Played:
+    """What one player did in the raid's pull, from the log."""
+    name: str
+    spec: str
+    role: str
+    dps: float
+    boss: float  # DPS on the boss
+    adds: float  # DPS on everything else
+    tops_share: float | None  # median share on the adds of the top players of the spec on this boss
+
+    @property
+    def share(self) -> float:
+        return self.adds / self.dps if self.dps else 0.0
+
+    @property
+    def verdict(self) -> str:
+        if self.tops_share is None or self.role != "damage":
+            return ""
+        d = self.share - self.tops_share
+        return "padded more than the tops" if d > 0.1 else "stayed on the boss more than the tops" if d < -0.1 else \
+            "like the top players"
+
+
+def what_happened(rc, bosses: set[str], shares: dict[str, float]) -> list[Played]:
+    """Per player of the raid's log: DPS on the boss and on the adds, vs the habit of the top players of the
+    spec. Empty when the log has no pull of this boss."""
+    if not getattr(rc, "same_boss", False) or not rc.duration:
+        return []
+    out = []
+    for name, spec, dps in rc.players:
+        targets = rc.targets.get(name, {})
+        boss = sum(v for k, v in targets.items() if k in bosses) / rc.duration
+        role = "healer" if spec in HEALERS else "tank" if spec in TANKS else "damage"
+        out.append(Played(name, spec, role, dps, boss, max(0.0, dps - boss), shares.get(spec)))
+    return sorted(out, key=lambda x: (x.role != "damage", -x.adds))
+
+
+def render(p: Plan, boss: str, difficulty: str, report: str, fight: str, played: list[Played] | None = None) -> str:
     import html
 
     from paf import theme
@@ -191,8 +235,29 @@ def render(p: Plan, boss: str, difficulty: str, report: str, fight: str) -> str:
     cover = p.adds / p.required if p.required else 0.0
     notes = "".join(f"<p class='notice small'>{e(n)}</p>" for n in p.notes)
     padders = sum(c.pad for c in p.choices if c.member.role == "damage")
-    body = f"""<h1>{e(boss)} <span class="pill gold">{e(difficulty)}</span>: raid plan</h1>
-<p class="lead">From your raid's log {e(report)} ({e(fight)}): who plays what, and who pads the adds.</p>
+    happened = ""
+    if played:
+        add_total = sum(x.adds for x in played)
+        cover_note = (" (covered)" if add_total >= p.required else
+                      " (not covered: the adds lived longer than in the top raids)")
+        rows_h = "".join(
+            f"<tr><td>{e(x.name)}</td><td>{e(x.spec)}</td><td class='n'>{k(x.dps)}</td><td class='n'>{k(x.boss)}</td>"
+            f"<td class='n'>{k(x.adds)}</td><td class='n'>{x.share:.0%}</td>"
+            f"<td class='n'>{'' if x.tops_share is None else f'{x.tops_share:.0%}'}</td><td>{e(x.verdict)}</td></tr>"
+            for x in played)
+        happened = f"""<section class="panel" id="pull"><h2>What happened in this pull</h2>
+<p class="small">Read from the log: each player's damage on the boss and on the adds, next to what the top players of
+the same spec do on this boss. The raid did <b>{k(add_total)}</b> DPS on the adds; the top raids' weakest quarter does
+<b>{k(p.required)}</b>{cover_note}.</p>
+<div class="card scroll"><table><tr><th>Player</th><th>Spec</th><th>DPS</th><th>Boss</th><th>Adds</th><th>On adds</th>
+<th>Top players</th><th></th></tr>{rows_h}</table></div></section>"""
+    tabs = ("<nav class='tabs'><a href='#pull'>What happened</a><a href='#plan'>Best comp for this boss</a></nav>"
+            if happened else "")
+    body = f"""<h1>{e(boss)} <span class="pill gold">{e(difficulty)}</span>: your raid</h1>
+<p class="lead">From your raid's log {e(report)} ({e(fight)}).</p>{tabs}{happened}
+<section class="panel" id="plan"><h2>Best comp for this boss</h2>
+<p class="small">Who should play what, and who pads the adds, for the most boss damage while the adds still die as fast
+as in the top raids. Estimated from each player's DPS in the log and the top 100 of every spec on this boss.</p>
 <div class="kpis" style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
 <div class="tile kpi"><div class="l">Boss damage</div><div class="v">{gain:+.1f}%</div>
 <div class="s">vs your comp with everyone padding like the top players</div></div>
@@ -202,10 +267,14 @@ def render(p: Plan, boss: str, difficulty: str, report: str, fight: str) -> str:
 <div class="s">damage dealers on the adds</div></div></div>{notes}
 <div class="card scroll"><table><tr><th>Player</th><th>Spec</th><th>Role</th><th>Boss DPS</th><th>Add DPS</th></tr>
 {rows}</table></div>
-<details class="card"><summary>How it is computed</summary><p class="small muted">{e(__doc__ or '')}</p></details>"""
+<details class="card"><summary>How it is computed</summary><p class="small muted">{e(__doc__ or '')}</p></details>
+</section>"""
+    css = (".tabs{display:flex;gap:6px;margin:14px 0}.tabs a{padding:7px 14px;border-radius:8px;border:1px solid "
+           "var(--line)}.tabs a.on{background:var(--accent-soft);border-color:var(--accent)}")
+    js = TAB_JS if happened else ""
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
-            f"<title>{e(boss)} raid plan</title>{theme.HEAD}<style>{theme.CSS}</style></head><body>{theme.topbar('')}"
-            f"<main>{body}</main></body></html>")
+            f"<title>{e(boss)} raid plan</title>{theme.HEAD}<style>{theme.CSS}{css}</style></head><body>"
+            f"{theme.topbar('')}<main>{body}</main>{js}</body></html>")
 
 
 def class_specs(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> dict[str, list[str]]:

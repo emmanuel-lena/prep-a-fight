@@ -1090,9 +1090,17 @@ def cmd_raidplan(args: argparse.Namespace) -> int:
               f"adds {c.adds / 1000:5,.0f}k{swap}")
     for n in p.notes:
         print("  " + n)
+    bosses = {r[0] for r in con.execute("SELECT name FROM npc WHERE is_boss=1")}
+    played = raidplan.what_happened(rc, bosses, shares)
+    if played:
+        print("\nIn this pull (boss / adds DPS, share on adds vs the top players of the spec):")
+        for x in played:
+            tops = f"tops {x.tops_share:.0%}" if x.tops_share is not None else ""
+            print(f"  {x.name:18} {x.spec:26} boss {x.boss / 1000:6,.0f}k  adds {x.adds / 1000:5,.0f}k  "
+                  f"{x.share:4.0%} {tops:9} {x.verdict}")
     out = data_dir() / "reports" / f"raidplan-{_slug(enc.name)}-{diff_name}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(raidplan.render(p, enc.name, diff_name, rc.report, rc.fight), encoding="utf-8")
+    out.write_text(raidplan.render(p, enc.name, diff_name, rc.report, rc.fight, played), encoding="utf-8")
     print(f"\nRaid plan: {out}")
     return 0
 

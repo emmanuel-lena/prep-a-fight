@@ -134,6 +134,9 @@ class RaidComp:
     report: str
     fight: str  # which fight the DPS were read on
     players: list[tuple[str, str, float]] = field(default_factory=list)  # name, "Spec Class", DPS
+    targets: dict[str, dict[str, float]] = field(default_factory=dict)  # name -> target name -> damage
+    duration: float = 0.0
+    same_boss: bool = True  # False: the log has no pull of this boss, another one was read
 
 
 def report_code(url: str) -> str:
@@ -161,15 +164,19 @@ def raid_from_report(client, url: str, encounter_id: int, difficulty: int) -> Ra
     data = client.query(TABLE_QUERY, {"code": code, "f": [f["id"]]}, cache_ttl=3600)["reportData"]["report"]["table"]
     data = data.get("data", data) if isinstance(data, dict) else {}
     players = []
+    targets: dict[str, dict[str, float]] = {}
     for e in data.get("entries") or []:
         icon = e.get("icon") or ""
         if "-" not in icon or not dur:
             continue
         cls, spec = icon.split("-", 1)
         players.append((e.get("name", "?"), f"{spec} {cls}", (e.get("total") or 0) / dur))
-    what = "this boss" if f["encounterID"] == encounter_id else "another boss"
+        targets[e.get("name", "?")] = {tg.get("name", "?"): float(tg.get("total") or 0)
+                                         for tg in e.get("targets") or []}
+    same = f["encounterID"] == encounter_id
+    what = "this boss" if same else "another boss"
     return RaidComp(code, f"{what}, {'kill' if f['kill'] else 'pull'} of {int(dur // 60)}:{int(dur % 60):02d}",
-                    players)
+                    players, targets, dur, same)
 
 
 GUILD_REPORTS_QUERY = """query($name:String!,$server:String!,$region:String!){ reportData {
