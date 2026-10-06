@@ -74,6 +74,7 @@ class PrepData:
     notes: list[str] = field(default_factory=list)
     optimized: list = field(default_factory=list)  # paf.optimize.Plan per objective
     mrt: dict[str, str] = field(default_factory=dict)  # objective -> MRT note
+    nsrt: dict[str, str] = field(default_factory=dict)  # objective -> Northern Sky Raid Tools reminders
     alignment: list = field(default_factory=list)  # paf.optimize.Alignment
     fight: object | None = None  # paf.fight.Fight used by the sims
     assigns: list[str] = field(default_factory=list)  # notes of the player's assignments
@@ -519,7 +520,8 @@ def suggestions(d: PrepData) -> list[Suggestion]:
             lines.append(f"<span class='muted small'>Also: {e(others)}.</span>")
         if d.mrt.get(p.objective):
             lines.append(copy_button(d.mrt[p.objective], "Copy its MRT note")
-                         + " <span class='muted small'>timers from the pull, to paste in Method Raid Tools</span>")
+                         + (" " + copy_button(d.nsrt[p.objective], "Copy for NSRT") if d.nsrt.get(p.objective) else "")
+                         + " <span class='muted small'>to paste in Method Raid Tools or Northern Sky Raid Tools</span>")
         if p.flags:
             lines.append("<details class='why'><summary>&#9888; Why to double-check</summary>"
                          + "".join(f"<div>{e(f)}</div>" for f in p.flags) + "</details>")
@@ -624,6 +626,14 @@ lines: duration, add waves, immune and vulnerable windows, movement, Bloodlust, 
 <a href="https://www.raidbots.com/simbot/advanced" target="_blank" rel="noopener">Raidbots, Advanced</a>: paste your
 <code>/simc</code> export, then these lines under it, in the same box. Leave the fight style out (Patchwerk removes
 the raid events).</p><p>{buttons}</p></div>'''
+
+
+def nsrt_block(note: str) -> str:
+    if not note:
+        return ""
+    return (f'<details><summary class="small">Northern Sky Raid Tools reminders (personal reminders, times from each '
+            f'phase)</summary>{copy_button(note, "Copy")}<pre class="small" style="white-space:pre-wrap">{e(note)}</pre>'
+            f'</details>')
 
 
 def suggestions_html(d: PrepData) -> str:
@@ -811,6 +821,7 @@ for reference: a build can be worse there and much better on this fight. Error a
 <tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></details>
 <details><summary class="small">MRT note (to paste in Method Raid Tools)</summary>{copy_button(note, "Copy")}
 <pre class="small" style="white-space:pre-wrap">{e(note)}</pre></details>
+{nsrt_block(d.nsrt.get(p.objective, ""))}
 </div>""")
         tabs["cooldowns"].append("<h2>Ideal cooldown play-by-play, per objective</h2>" + "".join(blocks))
 

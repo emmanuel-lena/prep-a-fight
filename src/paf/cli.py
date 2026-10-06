@@ -887,6 +887,13 @@ def cmd_prep(args: argparse.Namespace) -> int:
         d.optimized, _ = optimize_all(profile_text, fight, root / "optimize", target_error=args.error,
                                       alignment=d.alignment, validation=d.validation[1] if d.validation else None)
         d.mrt = {p.objective: mrt_note(enc.name, p, fight, d.cd_names) for p in d.optimized}
+        from paf.optimize import nsrt_note
+
+        spell_ids = {n.lower(): int(r.split("=", 1)[1]) for n, r in d.links.items()
+                     if r.startswith("spell=") and r.split("=", 1)[1].isdigit()}
+        player = profile.name or "everyone"
+        d.nsrt = {p.objective: nsrt_note(enc.id, p, fight, d.phases, player, spell_ids, d.cd_names)
+                  for p in d.optimized}
         raid_notes = [n for o, n in d.mrt.items() if o != "adds"]  # "damage to adds" is not a raid plan
         (reports / f"mrt-{report_key(enc.name, diff_name)}.txt").write_text("\n\n".join(raid_notes) + "\n",
                                                                          encoding="utf-8")

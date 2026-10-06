@@ -488,6 +488,17 @@ def mrt_note(boss: str, plan: Plan, fight: Fight, names: dict[str, str] | None =
     """A note for Method Raid Tools: the casts that matter, one line per moment ({time:m:ss} timers from the
     pull). Rotational cooldowns are left out unless the plan holds them; charges cast together are one cast;
     cooldowns cast at the same moment share a line."""
+    lines = [f"prep-a-fight: {boss}, cooldowns for {GOALS.get(plan.objective, plan.objective)} "
+             f"({plan.gain:+.1f}%)"]
+    for t, labels in plan_moments(plan, fight, names):
+        ctx = _short_context(fight, t)
+        lines.append(f"{{time:{int(t // 60)}:{int(t % 60):02d}}} {', '.join(dict.fromkeys(labels))}"
+                     + (f" - {ctx}" if ctx else ""))
+    return "\n".join(lines)
+
+
+def plan_moments(plan: Plan, fight: Fight, names: dict[str, str] | None = None) -> list[tuple[float, list[str]]]:
+    """(time from the pull, cooldown names) of the casts worth a reminder (see mrt_note)."""
     shown = {v.lower(): v for v in (names or {}).values()}
 
     def name(label: str) -> str:
@@ -515,12 +526,58 @@ def mrt_note(boss: str, plan: Plan, fight: Fight, names: dict[str, str] | None =
             moments[-1][1].append(name(label))
         else:
             moments.append((t, [name(label)]))
-    lines = [f"prep-a-fight: {boss}, cooldowns for {GOALS.get(plan.objective, plan.objective)} "
-             f"({plan.gain:+.1f}%)"]
-    for t, labels in moments:
-        ctx = _short_context(fight, t)
-        lines.append(f"{{time:{int(t // 60)}:{int(t % 60):02d}}} {', '.join(dict.fromkeys(labels))}"
-                     + (f" - {ctx}" if ctx else ""))
+    return moments
+
+
+# Northern Sky Raid Tools numbers the phases of some bosses itself (its EncounterAlerts/<tier>/<Boss>.lua);
+# Warcraft Logs phase n (1-based, in order) -> NSRT phase. "order": n -> n. Bosses not listed: NSRT keeps phase 1
+# for the whole fight, so reminder times count from the pull. Nek'zali: NSRT splits the intermission (1.5, then
+# 1.75 when the second boss casts); reminders are given in 1.5, from the intermission start.
+NSRT_PHASES: dict[int, dict[int, float] | str] = {
+    3470: {1: 1, 2: 1.5, 3: 2},  # Nek'zali the Soulcoiler
+    3429: {1: 1, 2: 2, 3: 2.5, 4: 3},  # The Coiled Altar
+    3445: "order",  # Entombed Sentinels
+    3497: "order",  # The Lost Explorers
+}
+# NSRT phases that end at a moment Warcraft Logs does not mark: (encounter, phase) -> seconds after which a reminder
+# would be cleared before firing (Nek'zali: 1.75 starts once the second boss casts, 25 s or more into 1.5)
+NSRT_UNSURE_AFTER: dict[tuple[int, float], float] = {(3470, 1.5): 25.0}
+
+
+def nsrt_phase(encounter_id: int, phases: list[tuple[str, float]], t: float) -> tuple[float, float]:
+    """(NSRT phase, seconds since that phase started) of a time from the pull."""
+    table = NSRT_PHASES.get(encounter_id)
+    if not table or not phases:
+        return 1, t
+    starts = sorted(s for _, s in phases)
+    n = max(i for i, s in enumerate(starts, 1) if s <= t) if t >= starts[0] else 1
+    ph = n if table == "order" else table.get(n)
+    if ph is None:  # more Warcraft Logs phases than NSRT knows: stay in its last one
+        n = max(table)
+        ph = table[n]
+    return ph, t - starts[n - 1]
+
+
+def nsrt_note(encounter_id: int, plan: Plan, fight: Fight, phases: list[tuple[str, float]], player: str,
+              spell_ids: dict[str, int], names: dict[str, str] | None = None) -> str:
+    """Reminders for Northern Sky Raid Tools: one line per cooldown cast that matters (same choice as mrt_note),
+    `time:<s since the phase start>;ph:<phase>;tag:<player>;spellid:<id>;dur:5`; a cooldown without a spell id
+    (an item) is a text reminder."""
+    lines = [f"EncounterID:{encounter_id}"]
+    skipped = []
+    for t, labels in plan_moments(plan, fight, names):
+        ph, since = nsrt_phase(encounter_id, phases, t)
+        limit = NSRT_UNSURE_AFTER.get((encounter_id, ph))
+        if limit is not None and since > limit:
+            skipped.append(f"{', '.join(dict.fromkeys(labels))} at {int(t // 60)}:{int(t % 60):02d}")
+            continue
+        for label in dict.fromkeys(labels):
+            sid = spell_ids.get(label.lower())
+            what = f"spellid:{sid}" if sid else f"text:{label.replace(';', ',')}"
+            lines.append(f"time:{since:.1f};ph:{ph:g};tag:{player};{what};dur:5")
+    if skipped:  # no time: or tag: on this line, so NSRT does not read it as a reminder
+        lines.append("-- prep-a-fight: not placed (NSRT changes phase at a moment the logs do not give; see the MRT "
+                     "note): " + "; ".join(skipped))
     return "\n".join(lines)
 
 
