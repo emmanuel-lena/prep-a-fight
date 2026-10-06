@@ -7,7 +7,7 @@ import sys
 import threading
 from pathlib import Path
 
-from paf.config import data_dir, load_dotenv
+from paf.config import data_dir, load_dotenv, migrate_old_home
 
 TITLE = "prep-a-fight"
 ICON = Path(__file__).parent / "assets" / "prep-a-fight.ico"
@@ -35,7 +35,10 @@ def _own_taskbar_icon() -> None:
 
 
 def main() -> int:
+    moved = migrate_old_home()  # before anything opens a file in the data folder
     _quiet_streams()
+    if moved:
+        print(f"Moved from ~/.paf to {data_dir()}: {', '.join(moved)}")
     load_dotenv()
     _own_taskbar_icon()
     from paf import web

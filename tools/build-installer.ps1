@@ -31,6 +31,8 @@ $zipName = (Get-ChildItem $python -Filter "python3*.zip" | Select-Object -First 
     --target (Join-Path $python "Lib\site-packages") $root
 if ($LASTEXITCODE -ne 0) { throw "uv could not install the app" }
 Copy-Item (Join-Path $root "src\paf\assets\prep-a-fight.ico") $app
+# the app keeps its data (preps, caches, SimulationCraft) in <install folder>\data, see paf.config.installed_home
+[IO.File]::WriteAllText((Join-Path $app "paf-home.txt"), "data")
 
 $version = [regex]::Match((Get-Content (Join-Path $root "pyproject.toml") -Raw), '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
 & $iscc /Q "/DAppVersion=$version" (Join-Path $root "installer\prep-a-fight.iss")

@@ -89,8 +89,10 @@ def find_simc(explicit: str | None = None) -> Path | None:
     if env := os.environ.get("PAF_SIMC"):
         candidates.append(Path(env))
     root = simc_root()
-    if root.is_dir():
-        candidates.extend(sorted(root.glob("**/simc.exe")) + sorted(root.glob("**/simc")))
+    if root.is_dir():  # the newest install first (version folders do not sort by name: they end in a commit hash)
+        newest = sorted(root.iterdir(), key=lambda d: d.stat().st_mtime, reverse=True)
+        candidates.extend(exe for d in newest if d.is_dir() for name in ("simc.exe", "simc")
+                          for exe in sorted(d.glob(f"**/{name}")))
     if which := shutil.which("simc"):
         candidates.append(Path(which))
     for c in candidates:
@@ -135,7 +137,27 @@ def install_nightly(force: bool = False) -> Path:
     exe = next(target.glob("**/simc.exe"), None)
     if exe is None:
         raise RuntimeError(f"simc.exe not found after extracting {build.filename}")
+    target.touch()  # the newest install is the one find_simc() picks
+    remove_old_simc()
     return exe
+
+
+def remove_old_simc() -> int:
+    """Delete the SimulationCraft versions find_simc() no longer uses (about 540 MB each); returns how many."""
+    exe = find_simc()
+    root = simc_root()
+    if exe is None or not root.is_dir() or root not in exe.parents:
+        return 0
+    keep = next(d for d in [exe.parent, *exe.parents] if d.parent == root)
+    removed = 0
+    import time
+
+    for d in root.iterdir():
+        # a folder touched in the last hour may be a download in progress (no simc.exe yet)
+        if d.is_dir() and d != keep and time.time() - d.stat().st_mtime > 3600:
+            shutil.rmtree(d, ignore_errors=True)  # a version still running a sim stays until next time
+            removed += not d.exists()
+    return removed
 
 
 _BACKGROUND: dict = {"thread": None, "error": ""}

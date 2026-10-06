@@ -45,11 +45,32 @@ def prune(path: Path, limit: int) -> int:
     return freed
 
 
+KEEP_RUNS = 5  # sim folders of the last preps, for debugging; nothing reads them afterwards
+
+
+def prune_runs(root: Path, keep: int = KEEP_RUNS) -> int:
+    """Delete all but the newest ``keep`` run folders (each prep leaves ~30 MB of simc inputs and outputs)."""
+    if not root.is_dir():
+        return 0
+    runs = sorted((d for d in root.iterdir() if d.is_dir()), key=lambda d: d.stat().st_mtime, reverse=True)
+    freed = 0
+    for d in runs[keep:]:
+        freed += size(d)
+        shutil.rmtree(d, ignore_errors=True)
+    return freed
+
+
 def prune_all(limit: int | None = None) -> dict[str, int]:
-    """Cap each cache: sims get half of the budget, WCL responses the other half."""
+    """Cap each cache: sims get half of the budget, WCL responses the other half. Also drops old run folders
+    and SimulationCraft versions no longer used."""
+    from paf.simc import runs_root
+    from paf.simc_install import remove_old_simc
+
     limit = max_bytes() if limit is None else limit
     root = cache_root()
-    return {"sims": prune(root / "sims", limit // 2), "wcl": prune(root / "wcl", limit // 2)}
+    remove_old_simc()
+    return {"sims": prune(root / "sims", limit // 2), "wcl": prune(root / "wcl", limit // 2),
+            "runs": prune_runs(runs_root())}
 
 
 def clear(name: str | None = None) -> None:

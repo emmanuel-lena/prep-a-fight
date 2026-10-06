@@ -1,7 +1,8 @@
 ; Windows installer for prep-a-fight, built by tools/build-installer.ps1 (Inno Setup 6).
 ; It installs for the current user only (no admin rights): an embedded Python (python.org's own build) with the
-; app and its libraries, Start menu and desktop shortcuts, and an uninstaller. SimulationCraft and the player's
-; data stay in %USERPROFILE%\.paf: the app downloads simc on first launch, and uninstalling keeps the data.
+; app and its libraries, Start menu and desktop shortcuts, and an uninstaller. The player's data (preps, caches,
+; SimulationCraft, downloaded on first launch) goes to <install folder>\data (paf-home.txt); the uninstaller asks
+; whether to delete it.
 
 #ifndef AppVersion
   #define AppVersion "0.0.0"
@@ -62,3 +63,18 @@ Filename: "{app}\python\pythonw.exe"; Parameters: "-m paf.desktop"; WorkingDir: 
 [UninstallDelete]
 ; bytecode Python writes next to the libraries at run time
 Type: filesandordirs; Name: "{app}\python"
+
+[Code]
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Data: String;
+begin
+  Data := ExpandConstant('{app}\data');
+  if (CurUninstallStep = usPostUninstall) and DirExists(Data) then
+    if MsgBox('Also delete your preps, Warcraft Logs key, caches and SimulationCraft?' + #13#10 + Data,
+              mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
+    begin
+      DelTree(Data, True, True, True);
+      RemoveDir(ExpandConstant('{app}'));
+    end;
+end;

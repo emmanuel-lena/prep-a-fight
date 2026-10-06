@@ -131,11 +131,17 @@ def parse_json(path: Path) -> SimResult:
     return SimResult(baseline, results, path, raw=raw)
 
 
-def new_run_dir(root: Path | None = None, label: str = "") -> Path:
-    if root is None:  # a source checkout keeps its runs next to the code, an installed copy in the data dir
-        from paf.config import data_dir
+def runs_root() -> Path:
+    """A source checkout keeps its runs next to the code, an installed copy in the data dir."""
+    from paf.config import data_dir
 
-        root = Path.cwd() / "runs" if (Path.cwd() / "pyproject.toml").is_file() else data_dir() / "runs"
+    checkout = (Path.cwd() / "pyproject.toml").is_file() and not os.environ.get("PAF_HOME")
+    return Path.cwd() / "runs" if checkout else data_dir() / "runs"
+
+
+def new_run_dir(root: Path | None = None, label: str = "") -> Path:
+    if root is None:
+        root = runs_root()
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     d = root / (f"{stamp}-{label}" if label else stamp)
     d.mkdir(parents=True, exist_ok=True)

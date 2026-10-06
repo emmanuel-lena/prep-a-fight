@@ -46,8 +46,10 @@ repository by `tools/build-installer.ps1` (Inno Setup and python.org's embeddabl
 Beta testers: something broke or looks wrong? Open an issue with the **Beta report** form (it says which log to
 attach).
 
-To update, run the new installer over the old one. To uninstall: Windows Settings > Apps > prep-a-fight. Your
-preps, caches and SimulationCraft stay in the `.paf` folder of your user folder; delete it to remove everything.
+To update, run the new installer over the old one. Everything stays in the folder you chose: the app in it,
+your preps, caches and SimulationCraft in its `data` subfolder (about 1-2 GB with the caches, capped in Settings;
+old sim folders and SimulationCraft versions are removed automatically). To uninstall: Windows Settings > Apps >
+prep-a-fight; it asks whether to delete that data too.
 
 A first prep collects ~200 ranked kills from Warcraft Logs (from a few minutes to an hour, depending on your
 API quota), then sims for 10 to 40 minutes on your CPU. Later preps of the same boss reuse everything.
