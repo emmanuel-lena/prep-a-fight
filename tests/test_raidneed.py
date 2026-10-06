@@ -10,8 +10,8 @@ def add(focus=None):
 
 
 def test_report_code():
-    assert report_code("https://www.warcraftlogs.com/reports/ZJRNbP1DCqQ3grcV#fight=4") == "ZJRNbP1DCqQ3grcV"
-    assert report_code("ZJRNbP1DCqQ3grcV") == "ZJRNbP1DCqQ3grcV"
+    assert report_code("https://www.warcraftlogs.com/reports/AbCdEf1234567890#fight=4") == "AbCdEf1234567890"
+    assert report_code("AbCdEf1234567890") == "AbCdEf1234567890"
 
 
 def test_verdicts_boss_pad_and_lacking_cleave():

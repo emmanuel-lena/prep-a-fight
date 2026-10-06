@@ -31,7 +31,7 @@ def test_raid_section_and_headline():
     t = AddType("Amani", 100, 18.0, 0.15, {"Balance Druid": 0.44}, 0.25, tops_rate=1000.0, tops_low=900.0)
     vs = verdicts([t], [("Balance Druid", 2500.0)], ("Elemental Shaman", 1000.0))
     d = PrepData("Boss", "mythic", "Elemental", "Char")
-    d.raid = RaidInfo("ZJRNbP1DCqQ3grcV", "this boss, kill of 7:28", 20, ("Elemental Shaman", 190e3), False, vs,
+    d.raid = RaidInfo("AbCdEf1234567890", "this boss, kill of 7:28", 20, ("Elemental Shaman", 190e3), False, vs,
                       "boss", [], {AOE: ["Nizae (Balance Druid)"]}, "AoE / funnel")
     assert headline(d)[0].startswith("With your raid: stay on the boss.")
     page = render(d)
