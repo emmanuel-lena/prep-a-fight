@@ -1,3 +1,4 @@
+import json
 import threading
 import time
 import urllib.error
@@ -175,3 +176,18 @@ def test_every_link_of_the_top_bar_and_feedback_routes(server, monkeypatch):
     done = fetch(url + "/feedback", urllib.parse.urlencode({"message": "It broke", "log": "on"}).encode())
     assert "issues/new" in done
     assert "Nothing to update" in fetch(url + "/update", b"")
+
+
+def test_check_for_updates_button(server, monkeypatch):
+    url, _ = server
+    from paf import update
+
+    monkeypatch.setattr(update, "_get", lambda u: b"[]")
+    assert "Check for updates" in fetch(url + "/settings")
+    assert "You have the latest version" in fetch(url + "/update/check", b"")
+    monkeypatch.setattr(update, "_get", lambda u: json.dumps([{
+        "tag_name": "v99.0.0", "html_url": "https://github.com/x/y/releases/tag/v99.0.0", "body": "",
+        "assets": [{"name": "s.exe", "size": 1, "browser_download_url": "https://github.com/x/y/s.exe"}]}]).encode())
+    page = fetch(url + "/update/check", b"")
+    assert "Version 99.0.0 is out" in page
+    update.STATE["release"] = None

@@ -811,6 +811,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(page("Feedback", send_feedback(form)))
             elif self.path == "/update":
                 self._send(page("Update", run_update()))
+            elif self.path == "/update/check":
+                from paf import update
+
+                rel = update.check_now()
+                self._send(page("Updates", f"<h1>Updates</h1><p class='lead'>Version {e(rel.version)} is out: see the "
+                                           f"banner above.</p>" if rel else
+                                f"<h1>Updates</h1><p class='lead'>You have the latest version "
+                                f"({e(update.__version__)}).</p><p><a href='/settings'>Back to Settings</a></p>"))
             elif self.path == "/settings":
                 from paf.webtools import settings_page
 

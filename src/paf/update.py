@@ -1,6 +1,7 @@
 """Update from the app: is a newer release out on GitHub, and install it (installed copies only).
 
-The check reads the public releases of the repository (no account, no token), at most once a day. The update
+The check reads the public releases of the repository (no account, no token), every 10 minutes while the app is open,
+and on demand (Check now). The update
 downloads the release's installer over HTTPS, checks its size and SHA-256 against what GitHub publishes for the
 asset, then runs it silently over this install folder; the installer relaunches the app.
 """
@@ -20,7 +21,7 @@ from paf import __version__
 from paf.config import INSTALL_MARKER, data_dir
 
 RELEASES = "https://api.github.com/repos/emmanuel-lena/prep-a-fight/releases?per_page=10"
-CHECK_EVERY = 24 * 3600
+CHECK_EVERY = 10 * 60  # 6 calls an hour, well under GitHub's 60 an hour without an account
 
 
 @dataclass
@@ -119,16 +120,25 @@ def run_installer(setup: Path, folder: Path) -> None:
 STATE: dict = {"release": None}
 
 
+def check_now() -> Release | None:
+    """The Check now button: ask GitHub right away."""
+    STATE["release"] = available(force=True)
+    STATE["checked"] = time.time()
+    return STATE["release"]
+
+
 def check_in_background() -> None:
-    """At launch: look for a newer release without slowing the app down; the pages read STATE."""
+    """While the app is open: look for a newer release every CHECK_EVERY seconds, without slowing the app down;
+    the pages read STATE."""
     import threading
 
     from paf import settings
 
-    if settings.get("check_updates") != "on":
-        return
-
     def run() -> None:
-        STATE["release"] = available()
+        while True:
+            if settings.get("check_updates") == "on":
+                STATE["release"] = available()
+                STATE["checked"] = time.time()
+            time.sleep(CHECK_EVERY)
 
     threading.Thread(target=run, daemon=True).start()

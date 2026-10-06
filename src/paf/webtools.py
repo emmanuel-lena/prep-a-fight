@@ -8,7 +8,7 @@ import html
 import os
 import time
 
-from paf import settings
+from paf import __version__, settings
 from paf.config import data_dir
 
 e = html.escape
@@ -154,6 +154,9 @@ It is tested before it replaces the old one.</p>
 <tr><td>SimulationCraft</td><td class="small">{simc}
 <form method="post" action="/tool/setup" style="display:inline">
 <button class="btn ghost">Update</button></form></td></tr>
+<tr><td>prep-a-fight</td><td class="small">version {e(__version__)}
+<form method="post" action="/update/check" style="display:inline"><button class="btn ghost">Check for updates</button>
+</form></td></tr>
 <tr><td>Warcraft Logs</td><td class="small">{quota}</td></tr>
 <tr><td>Caches (sims, logs)</td><td class="small">{size(cache_root()) / 1e6:,.0f} MB
 (cap {settings.get('cache_max_mb')} MB)</td></tr>
