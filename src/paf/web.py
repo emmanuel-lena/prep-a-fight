@@ -43,7 +43,8 @@ ol.steps{list-style:none;margin:0;padding:0} .st{padding:7px 0;border-bottom:1px
 
 def page(title: str, body: str, refresh: int | None = None, nav: str = "") -> bytes:
     meta = f'<meta http-equiv="refresh" content="{refresh}">' if refresh else ""
-    nav = nav or '<a href="/">Home</a><a href="/tools">Tools</a><a href="/settings">Settings</a>'
+    nav = nav or ('<a href="/">Home</a><a href="/tools">Tools</a><a href="/settings">Settings</a>'
+                  '<a href="/feedback">Feedback</a>')
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}</style></head><body>{theme.topbar(nav)}"
             f"<main>{body}</main></body></html>").encode()
@@ -565,6 +566,46 @@ def prep_progress(log: str) -> tuple[list[tuple[str, str]], float]:
     return rows, left
 
 
+def feedback_page(jid: str = "", note: str = "") -> str:
+    from paf import feedback
+
+    what, log = feedback.job_log(jid) if jid else ("", feedback.app_log())
+    _, preview = feedback.report("(your message)", what, log)
+    dest = ("sent to the prep-a-fight team" if feedback.endpoint() else
+            "opened as a GitHub issue in your browser, for you to post (a free GitHub account is needed)")
+    return f'''<h1>Send feedback</h1>{note}<p class="lead">A bug, a wrong number, an idea: it is {dest}.</p>
+<form method="post" action="/feedback" class="card"><input type="hidden" name="job" value="{e(jid)}">
+<label>Your message <textarea name="message" required placeholder="What you did, what you expected, what you got.
+Your spec and the boss help."></textarea></label>
+<label class="chip"><input type="checkbox" name="log" checked> Attach the {"log of this prep" if jid else "app's log"}
+(below; your Warcraft Logs key, user folder and email addresses are removed)</label>
+<div class="cta"><button class="btn">Send</button></div></form>
+<details class="card"><summary>Exactly what is sent</summary><pre class="log">{e(preview[-20000:])}</pre></details>'''
+
+
+def send_feedback(form: dict) -> str:
+    from paf import feedback
+
+    jid = (form.get("job") or [""])[0]
+    message = (form.get("message") or [""])[0]
+    what, log = feedback.job_log(jid) if jid else ("", feedback.app_log())
+    title, body = feedback.report(message, what, log if form.get("log") else "")
+    url = feedback.endpoint()
+    if url:
+        try:
+            link = feedback.send(url, title, body)
+            track = (f" You can follow it here: <a href='{e(link)}' target='_blank' rel='noopener'>{e(link)}</a>."
+                     if link else "")
+            return f"<h1>Thanks!</h1><p class='lead'>Your feedback was sent.{track} <a href='/'>Back home</a></p>"
+        except (OSError, ValueError) as ex:
+            note = f"<p class='notice small'>Sending failed ({e(str(ex))}): post it on GitHub instead.</p>"
+    else:
+        note = ""
+    return (f"<h1>Almost done</h1>{note}<p class='lead'>Your report is ready on GitHub: open it, check it, and click "
+            f"<b>Create</b>.</p><div class='cta'><a class='btn big' target='_blank' rel='noopener' "
+            f"href='{e(feedback.issue_url(title, body))}'>Open the GitHub issue</a></div>")
+
+
 def job_page(jid: str) -> bytes:
     job = JOBS.get(jid)
     if job is None:
@@ -612,7 +653,8 @@ def job_page(jid: str) -> bytes:
                 f"computer even if you close it.")
     else:
         head = "The prep stopped" if status == "stopped" else f"The prep failed ({e(status)})"
-        lead = "The log below says why. Go back to the boss page to try again."
+        lead = ("The log below says why. Go back to the boss page to try again, or "
+                f"<a class='btn' href='/feedback?job={e(jid)}'>Send this report</a> (you see it before it goes).")
     js = """<script>(function(){var el=document.getElementById('el');if(!el)return;var s=+el.dataset.start;
 setInterval(function(){var t=Math.max(0,Math.floor(Date.now()/1000-s));el.textContent=Math.floor(t/60)+' min '+
 String(t%60).padStart(2,'0')+' s'},1000)})();</script>"""

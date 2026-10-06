@@ -1,0 +1,6 @@
+name = "prep-a-fight-feedback"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+REPO = "emmanuel-lena/prep-a-fight"

@@ -90,6 +90,7 @@ class PrepData:
     guide_abilities: str = ""  # html: every ability phase by phase, with what the logs add
     role_bullets: list[str] = field(default_factory=list)  # what the journal tells your role to do
     actions: list = field(default_factory=list)  # paf.actions.Action: what the top players do, from their logs
+    export: dict[str, str] = field(default_factory=dict)  # plan label ('' = fight only) -> simc lines (Raidbots)
 
 
 PALETTE = ["#c89933", "#8e6a9b", "#4f8a8b", "#d0705a", "#b8ad3c", "#b0577f", "#3f6fa0", "#6c9a5b", "#74526c"]
@@ -614,6 +615,17 @@ def checklist_html(d: PrepData) -> str:
     return f'<div class="card checklist"><ul>{"".join(items)}</ul></div>'
 
 
+def export_html(d: PrepData) -> str:
+    """The rebuilt fight as simc lines, to sim it on Raidbots or anywhere else."""
+    buttons = " ".join(copy_button(text, "Copy the fight" if not label else f"Copy the fight + plan for {label}")
+                       for label, text in d.export.items())
+    return f'''<h2>Sim this fight on Raidbots</h2><div class="card"><p class="small">The fight above as SimulationCraft
+lines: duration, add waves, immune and vulnerable windows, movement, Bloodlust, Power Infusion. On
+<a href="https://www.raidbots.com/simbot/advanced" target="_blank" rel="noopener">Raidbots, Advanced</a>: paste your
+<code>/simc</code> export, then these lines under it, in the same box. Leave the fight style out (Patchwerk removes
+the raid events).</p><p>{buttons}</p></div>'''
+
+
 def suggestions_html(d: PrepData) -> str:
     rows = []
     for s in suggestions(d):
@@ -701,6 +713,8 @@ def render(d: PrepData) -> str:
 <div class="scroll"><table><tr><th>Time</th><th>Adds</th><th>Alive</th><th>Types</th></tr>{waves}</table></div>
 {f'<p><a href="{e(d.timeline_file)}">Cooldown timelines of the top players</a></p>' if d.timeline_file else ''}
 </div>""")
+    if d.export:
+        tabs["fight"].append(export_html(d))
     if d.assigns:
         tabs["fight"].append('<h2>Your assignments and plan</h2><div class="card small"><ul>'
                              + "".join(f"<li>{e(a)}</li>" for a in d.assigns) + "</ul></div>")

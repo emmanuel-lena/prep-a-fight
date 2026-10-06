@@ -13,3 +13,4 @@ CLAUDE.local.md
 !tests/**/*.simc
 dist/
 build/
+src/paf/feedback_url.txt

@@ -838,6 +838,24 @@ def cmd_prep(args: argparse.Namespace) -> int:
         (reports / f"mrt-{report_key(enc.name, diff_name)}.txt").write_text("\n\n".join(raid_notes) + "\n",
                                                                          encoding="utf-8")
 
+    # the fight (and the cooldown plan to follow) as simc lines, to sim it on Raidbots
+    from paf.export import fight_lines
+    from paf.prep_report import wanted
+
+    title = f"{enc.name} {diff_name}"
+    d.export = {"": fight_lines(title, fight)}
+    goal = wanted(d) or ("boss" if args.objective is not None and args.objective >= 0.5 else "total")
+    plan = next((p for p in d.optimized if p.objective == goal and p.gain > 2 * p.error), None)
+    if plan is not None:
+        from paf.cdplan import dump_apl, parse_apl
+        from paf.optimize import apply_rules
+
+        apl = parse_apl(dump_apl(profile_text, root / "apl-export"))
+        label = "boss damage" if goal == "boss" else "total damage (pad)"
+        d.export[label] = fight_lines(title, fight, label, apply_rules(apl, plan.choice))
+    (reports / f"fight-{report_key(enc.name, diff_name)}.simc").write_text(
+        list(d.export.values())[-1], encoding="utf-8")
+
     if not args.no_gear:
         pool = GearPool(profile, item_inventory_types(), item_sets())
         gear_profile = profile_text
