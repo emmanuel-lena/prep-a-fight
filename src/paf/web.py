@@ -570,6 +570,7 @@ def write_assigns(boss_id: int, difficulty: str, chosen: list[str]) -> None:
 
 # the steps of a prep, as `paf prep` prints them, with their typical duration in minutes on a first run
 PREP_STEPS = (
+    ("Using the prep pack", "Load what the top players' logs give, already computed (prep pack)", 0),
     ("Collecting the corpus", "Download the top players' kills from Warcraft Logs", 20),
     ("Collecting who handles", "Who handles each mechanic", 4),
     ("Analyzing the corpus", "Rebuild the typical fight", 2),
@@ -594,10 +595,13 @@ def prep_progress(log: str) -> tuple[list[tuple[str, str]], float]:
     idx = {i for i, (prefix, _, _) in enumerate(PREP_STEPS) for s in seen if s.startswith(prefix)}
     last = max(idx) if idx else -1
     rows, left = [], 0.0
+    optional = ("Collecting", "Your raid", "Cooldown plans", "Using the prep pack")
+    if any(s.startswith("Using the prep pack") for s in seen):  # the pack replaces the corpus and the validation
+        optional += ("Analyzing", "Validating")
     for i, (prefix, label, minutes) in enumerate(PREP_STEPS):
         if i in idx:
             rows.append((label, "done" if finished or i < last else "now"))
-        elif not finished and i > last and not prefix.startswith(("Collecting", "Your raid", "Cooldown plans")):
+        elif not finished and i > last and not prefix.startswith(optional):
             rows.append((label, "next"))
             left += minutes
     if last >= 0 and not finished:

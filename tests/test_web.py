@@ -191,3 +191,10 @@ def test_check_for_updates_button(server, monkeypatch):
     page = fetch(url + "/update/check", b"")
     assert "Version 99.0.0 is out" in page
     update.STATE["release"] = None
+
+
+def test_prep_progress_with_a_pack():
+    log = "== Using the prep pack (199 top kills, 2026-10-06)\n== Calibrating the fight on the logs\n"
+    rows, left = web.prep_progress(log)
+    labels = [label for label, _ in rows]
+    assert not any("corpus" in x.lower() or "real DPS" in x for x in labels) and rows[0][1] == "done"

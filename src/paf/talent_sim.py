@@ -26,14 +26,16 @@ class Build:
     players: list[sqlite3.Row] = field(default_factory=list)
     code: str | None = None
     label: str = ""
+    n: int = 0  # number of top players, for a build read from a prep pack (no player rows)
+    rank: float = 0.0  # their median rank, same
 
     @property
     def count(self) -> int:
-        return len(self.players)
+        return len(self.players) or self.n
 
     @property
     def median_rank(self) -> float:
-        return st.median(p["rank_pos"] for p in self.players)
+        return st.median(p["rank_pos"] for p in self.players) if self.players else self.rank
 
 
 def top_builds(con: sqlite3.Connection, encounter_id: int, difficulty: int, spec: str, n: int = 6) -> list[Build]:
@@ -141,12 +143,20 @@ class TalentComparison:
 def compare_builds(profile_text: str, con: sqlite3.Connection, client: WCLClient, encounter_id: int,
                    difficulty: int, spec: str, fights: dict[str, list[str]], run_dir: Path, *, n: int = 6,
                    target_error: float = 0.2) -> TalentComparison | None:
-    from paf.gamedata import talent_entry_names
-
     builds = top_builds(con, encounter_id, difficulty, spec, n=n)
     if not builds:
         return None
     fetch_codes(client, con, builds)
+    return compare(profile_text, builds, fights, run_dir, target_error=target_error)
+
+
+def compare(profile_text: str, builds: list[Build], fights: dict[str, list[str]], run_dir: Path, *,
+            target_error: float = 0.2) -> TalentComparison | None:
+    """Sim the player's character with each build (from the corpus or a prep pack)."""
+    from paf.gamedata import talent_entry_names
+
+    if not builds:
+        return None
     names = talent_entry_names()
     mine = my_talent_entries(profile_text, sorted(builds[0].key))
     results = sim_builds(profile_text, builds, fights, run_dir, target_error=target_error)

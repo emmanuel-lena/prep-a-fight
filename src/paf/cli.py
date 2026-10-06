@@ -650,7 +650,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
     from paf.gamedata import encounter_loot, item_classes, item_inventory_types, item_names, item_sets
     from paf.prep_report import PrepData, render
     from paf.profile import parse_simc_export
-    from paf.talent_sim import compare_builds
+    from paf.talent_sim import compare as compare_builds
     from paf.topgear import FightProfile, GearPool, run_topgear
 
     profile_text, origin = _load_profile(args.profile)
@@ -669,44 +669,61 @@ def cmd_prep(args: argparse.Namespace) -> int:
     def step(msg: str) -> None:
         print(f"\n== {msg}", flush=True)
 
-    done = con.execute("SELECT COUNT(*) FROM fight WHERE encounter_id=? AND difficulty=? AND status='done' "
-                       "AND COALESCE(cohort, '') != 'focus'",
-                       (enc.id, diff)).fetchone()[0]
-    if done < 20 or args.refresh:
-        step("Collecting the corpus from Warcraft Logs")
-        cmd_corpus(argparse.Namespace(boss=args.boss, difficulty=args.difficulty, kills=None, ilvl=None,
-                                      list_only=False, retry=False, refetch=False))
-    mech_missing = con.execute(
-        "SELECT COUNT(*) FROM fight f LEFT JOIN mech_status m USING(report, fight_id) "
-        "WHERE f.encounter_id=? AND f.difficulty=? AND f.status='done' AND m.report IS NULL "
-        "AND COALESCE(f.cohort, '') != 'focus'",
-        (enc.id, diff)).fetchone()[0]
-    if mech_missing:
-        from paf.corpus.mechanics import fetch_mechanics
+    from paf import pack
 
-        step(f"Collecting who handles each mechanic ({mech_missing} kills)")
-        fetch_mechanics(client, con, enc.id, diff, [])
+    cls = settings.get("class")
+    pk = None if args.refresh else pack.load(enc.id, diff, cls, spec)
+    if pk is not None and pack.is_stale(pk.created):
+        print(f"Prep pack from {pk.created[:16].replace('T', ' ')} UTC: older than today's 04:00 (Paris) refresh, "
+              f"rebuilding it from the logs.")
+        pk = None
+    if pk is not None:  # what the logs give, already computed: no corpus, no validation sims
+        step(f"Using the prep pack ({pk.kills} top kills, {pk.created[:10]})")
+        boss = pk.boss
+        raw = pack.Fight.from_dict(pack.asdict(pk.fight))
+        raw.movement_scale = 1.0  # as from the corpus: the adds are calibrated first, the movement scale comes after
+        kills, phases, moving_share, add_share = pk.kills, pk.phases, pk.moving_share, pk.add_share_spec
+    else:
+        done = con.execute("SELECT COUNT(*) FROM fight WHERE encounter_id=? AND difficulty=? AND status='done' "
+                           "AND COALESCE(cohort, '') != 'focus'",
+                           (enc.id, diff)).fetchone()[0]
+        if done < 20 or args.refresh:
+            step("Collecting the corpus from Warcraft Logs")
+            cmd_corpus(argparse.Namespace(boss=args.boss, difficulty=args.difficulty, kills=None, ilvl=None,
+                                          list_only=False, retry=False, refetch=False))
+        mech_missing = con.execute(
+            "SELECT COUNT(*) FROM fight f LEFT JOIN mech_status m USING(report, fight_id) "
+            "WHERE f.encounter_id=? AND f.difficulty=? AND f.status='done' AND m.report IS NULL "
+            "AND COALESCE(f.cohort, '') != 'focus'",
+            (enc.id, diff)).fetchone()[0]
+        if mech_missing:
+            from paf.corpus.mechanics import fetch_mechanics
 
-    step("Analyzing the corpus")
-    boss = main_boss(con, enc.id, diff, enc.name)
-    rep = analyze(con, enc.id, diff, boss, spec)
-    from paf.corpus.units import fetch_boss_auras, fetch_unit_windows
+            step(f"Collecting who handles each mechanic ({mech_missing} kills)")
+            fetch_mechanics(client, con, enc.id, diff, [])
 
-    fetch_unit_windows(client, con, enc.id, diff, boss)
-    fetch_boss_auras(client, con, enc.id, diff, boss)
-    raw, info = build_template(con, enc.id, diff, boss, spec, diff_name, title=enc.name)
+        step("Analyzing the corpus")
+        boss = main_boss(con, enc.id, diff, enc.name)
+        rep = analyze(con, enc.id, diff, boss, spec)
+        from paf.corpus.units import fetch_boss_auras, fetch_unit_windows
+
+        fetch_unit_windows(client, con, enc.id, diff, boss)
+        fetch_boss_auras(client, con, enc.id, diff, boss)
+        raw, info = build_template(con, enc.id, diff, boss, spec, diff_name, title=enc.name)
+        kills, phases, moving_share = rep.kills, [(n, m) for n, _, m, _ in rep.phases], info.moving_share
+        add_share = rep.ranked_add_share[1]
     from paf.notes import refresh_notes, with_notes
 
     refresh_notes(template_path(enc.name, diff_name), raw)
     fight = with_notes(raw, template_path(enc.name, diff_name), verbose=True)
-    d = PrepData(enc.name, diff_name, spec, profile.name or origin, kills=rep.kills, duration=fight.duration)
-    d.phases = [(n, m) for n, _, m, _ in rep.phases]
-    d.lust, d.pi, d.moving_share = fight.lust_time, fight.power_infusion, info.moving_share
-    d.add_share_spec = rep.ranked_add_share[1]
-    print(f"  {rep.kills} kills, {len(fight.add_waves)} add waves / targets, duration {_mmss(fight.duration)}")
+    d = PrepData(enc.name, diff_name, spec, profile.name or origin, kills=kills, duration=fight.duration)
+    d.phases = list(phases)
+    d.lust, d.pi, d.moving_share = fight.lust_time, fight.power_infusion, moving_share
+    d.add_share_spec = add_share
+    print(f"  {kills} kills, {len(fight.add_waves)} add waves / targets, duration {_mmss(fight.duration)}")
 
     step("Calibrating the fight on the logs")
-    target = real_boss_share(con, enc.id, diff, boss, spec)
+    target = pk.boss_share if pk is not None else real_boss_share(con, enc.id, diff, boss, spec)
     if target is not None:
         cal = calibrate(profile_text, fight, target, root / "calibrate")
         fight.add_scale = cal.scale
@@ -719,7 +736,17 @@ def cmd_prep(args: argparse.Namespace) -> int:
                 f"SimC puts {got:.0%} of your damage on the boss vs {target:.0%} in the top players' logs, even "
                 f"with more adds: SimC keeps single-target spells on the boss while real players also spend them "
                 f"on adds and secondary targets. Boss-only numbers are optimistic, add damage pessimistic.")
-    if not args.no_validate:
+    if pk is not None:  # the pack's validation: the top players' characters were simmed when it was made
+        fight.movement_scale = pk.fight.movement_scale
+        d.validation = pk.validation
+        if d.validation:
+            print(f"  simulated / real DPS of the top players: {d.validation[1]:.2f} with movement "
+                  f"x{fight.movement_scale:g} (from the pack)")
+        if fight.movement_scale < 1:
+            d.notes.append(f"Movement inferred from the top players' trajectories is scaled by "
+                           f"{fight.movement_scale:g}: they keep casting while moving, which SimC's movement windows "
+                           f"do not model.")
+    elif not args.no_validate:
         from paf.validate import calibrate_movement, validate
 
         step("Validating the fight on the top players' own characters")
@@ -741,6 +768,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
                                f"keep casting while moving, which SimC's movement windows do not model.")
     raw.add_scale, raw.movement_scale = fight.add_scale, fight.movement_scale
     raw.save(template_path(enc.name, diff_name))
+    pack_fight = pack.Fight.from_dict(pack.asdict(raw))  # for a new pack: the add scale is each player's own
+    pack_fight.add_scale = 1.0
     d.waves = [(w.time, max(1, round(w.count * fight.add_scale)) if w.scalable else w.count, w.lifetime, w.name)
                for w in fight.add_waves]
     d.waves += [(v.start, 0, v.duration, f"{v.name}: boss takes x{v.multiplier:g} damage") for v in fight.vulnerable]
@@ -763,7 +792,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
 
                 raid_url = guild_report(client, settings.get("guild"), settings.get("guild_server"),
                                         settings.get("guild_region"), enc.id, diff)
-            d.raid = _raid_verdict(client, con, enc, diff, raid_url, profile, spec)
+            d.raid = _raid_verdict(client, con, enc, diff, raid_url, profile, spec,
+                                   types=pk.add_types if pk is not None else None)
         except (ValueError, OSError, KeyError, TypeError) as ex:
             print(f"  could not read your raid's log: {ex}")
             d.notes.append(f"Your raid's log could not be read ({ex}).")
@@ -786,10 +816,14 @@ def cmd_prep(args: argparse.Namespace) -> int:
     d.sim_boss_dps = real.baseline["prioritydps"].mean if "prioritydps" in real.baseline else None
 
     step("Cooldown timelines of the top players")
-    from paf.corpus.collect import backfill_npc_actors
+    if pk is not None:
+        tl, tl_all = pk.timeline, pk.timeline_all
+    else:
+        from paf.corpus.collect import backfill_npc_actors
 
-    backfill_npc_actors(client, con, enc.id, diff)
-    tl = build_timeline(con, enc.id, diff, enc.name, diff_name, spec, top=25)
+        backfill_npc_actors(client, con, enc.id, diff)
+        tl = build_timeline(con, enc.id, diff, enc.name, diff_name, spec, top=25)
+        tl_all = build_timeline(con, enc.id, diff, enc.name, diff_name, spec, top=10_000)
     reports = data_dir() / "reports"
     reports.mkdir(parents=True, exist_ok=True)
     tl_file = reports / f"timeline-{report_key(enc.name, diff_name)}.html"
@@ -799,9 +833,14 @@ def cmd_prep(args: argparse.Namespace) -> int:
     fights = {"boss fight": fight.to_simc(),
               "patchwerk": ["fight_style=Patchwerk", f"max_time={simc.fmt(fight.duration)}", "desired_targets=1"]}
     step("Talent builds of the top players")
-    d.talents = compare_builds(profile_text, con, client, enc.id, diff, spec, fights, root / "talents",
-                               target_error=args.error)
-    tl_all = build_timeline(con, enc.id, diff, enc.name, diff_name, spec, top=10_000)
+    if pk is not None:
+        builds = pk.builds
+    else:
+        from paf.talent_sim import fetch_codes, top_builds
+
+        builds = top_builds(con, enc.id, diff, spec)
+        fetch_codes(client, con, builds)
+    d.talents = compare_builds(profile_text, builds, fights, root / "talents", target_error=args.error)
     from paf.prep_report import _key as cd_key_of
 
     for ab in tl_all.abilities:  # when the top players cast each cooldown (for the plan timelines)
@@ -822,7 +861,14 @@ def cmd_prep(args: argparse.Namespace) -> int:
         if it and it.name in d.links:
             d.links[f"use_item:{slot}"] = d.links[it.name]
     d.alignment = tops_alignment_safe(tl_all, fight)
-    _boss_guide(d, con, enc, diff, diff_name, spec, tl_all, fight)
+    mechs = _boss_guide(d, con, enc, diff, diff_name, spec, tl_all, fight, pk)
+    if pk is None:  # share what the logs gave, computed: the next prep of this spec and boss skips the corpus
+        from paf import raidneed
+
+        new = pack.PackData(enc.id, diff, cls, spec, pack.now_utc(), kills, boss, pack_fight, list(phases), add_share,
+                            moving_share, target, d.validation, tl, tl_all, builds,
+                            raidneed.add_types(con, enc.id, diff), mechs, d.actions)
+        print(f"  prep pack saved: {pack.save(new)}")
     if args.no_optimize:
         step("Cooldown plans")
         d.plans = compare_plans(profile_text, tl_all, fight, root / "cdplan", target_error=args.error / 2,
@@ -994,25 +1040,40 @@ def cmd_raid(args: argparse.Namespace) -> int:
     return 0
 
 
-def _boss_guide(d, con, enc, diff: int, diff_name: str, spec: str, tl, fight) -> None:
-    """The boss in 60 seconds (Encounter Journal) with the logs' timings and assignment stats."""
+def _boss_guide(d, con, enc, diff: int, diff_name: str, spec: str, tl, fight, pk=None) -> list:
+    """The boss in 60 seconds (Encounter Journal) with the logs' timings and assignment stats. pk: a prep pack
+    (its mechanics and actions instead of the corpus). Returns the mechanics (for a new pack)."""
     from paf import bossguide
     from paf.icons import icons_for
 
     sections = bossguide.load(enc.id, diff_name)
-    try:
-        from paf.assigns import load_mechanics
+    if pk is not None:
+        mechs = pk.mechanics
+    else:
+        try:
+            from paf.assigns import load_mechanics
 
-        mechs = load_mechanics(con, enc.id, diff, spec)
-    except Exception:  # noqa: BLE001 - the guide works without the assignment stats
-        mechs = []
+            mechs = load_mechanics(con, enc.id, diff, spec)
+        except Exception:  # noqa: BLE001 - the guide works without the assignment stats
+            mechs = []
     if not sections:
-        return
+        return mechs
     burst = {v.name.split(" (")[0]: v.multiplier for v in fight.vulnerable}
     gicons = icons_for(bossguide.spell_refs(sections))
     d.icons.update(gicons)
     d.guide_summary = bossguide.summary_html(sections, "damage", "#boss")
     d.role_bullets = bossguide.role_bullets(sections, "damage")
+    if pk is not None:
+        d.actions = pk.actions
+    else:
+        _corpus_actions(d, con, enc, diff, spec, sections, mechs)
+    d.guide_abilities = bossguide.abilities_html(sections, timings=dict(tl.boss_casts), mechanics=mechs,
+                                                 burst=burst, icon_map=gicons)
+    return mechs
+
+
+def _corpus_actions(d, con, enc, diff: int, spec: str, sections, mechs) -> None:
+    """What the top players do on this boss (kill, kick, soak...), from the corpus."""
     try:
         from paf import raidneed, settings
         from paf.actions import actions
@@ -1036,8 +1097,6 @@ def _boss_guide(d, con, enc, diff: int, diff_name: str, spec: str, tl, fight) ->
         d.actions = actions(con, enc.id, diff, spec, mechs, focus, skip, contact)
     except Exception as ex:  # noqa: BLE001 - the guide works without them
         print(f"  actions from the logs skipped: {ex}")
-    d.guide_abilities = bossguide.abilities_html(sections, timings=dict(tl.boss_casts), mechanics=mechs,
-                                                 burst=burst, icon_map=gicons)
 
 
 def cmd_raidplan(args: argparse.Namespace) -> int:
@@ -1117,9 +1176,10 @@ def _plan_raid(enc, diff_name: str) -> str:
         return ""
 
 
-def _raid_verdict(client, con, enc, diff: int, url: str, profile, spec: str, fill: bool = False):
+def _raid_verdict(client, con, enc, diff: int, url: str, profile, spec: str, fill: bool = False, types=None):
     """Pad the adds or stay on the boss, from your raid's composition and DPS (paf.raidneed). fill: fetch a few
-    ranked kills of the specs of your raid that are too rare in the corpus to be measured."""
+    ranked kills of the specs of your raid that are too rare in the corpus to be measured. types: the add types
+    of a prep pack (else read from the corpus)."""
     import statistics as st
 
     from paf import raidneed, settings
@@ -1134,9 +1194,10 @@ def _raid_verdict(client, con, enc, diff: int, url: str, profile, spec: str, fil
     else:  # not in that log: a damage dealer of your spec at the raid's median DPS among damage dealers
         dealers = sorted(dps for _, _, dps in rc.players)[len(rc.players) // 2:]
         you, found = (f"{spec} {settings.get('class')}", st.median(dealers) if dealers else 0.0), False
-    types = raidneed.add_types(con, enc.id, diff)
+    if types is None:
+        types = raidneed.add_types(con, enc.id, diff)
     missing = sorted({s for _, s, _ in rc.players if types and s not in types[0].focus and s not in raidneed.HEALERS})
-    if missing and fill:  # optional: measure the rare specs on real kills instead of estimating them
+    if missing and fill and con is not None:  # optional: measure the rare specs on real kills, not estimates
         from paf.corpus.collect import add_focus_kills, collect
 
         print(f"  not measured on this boss yet: {', '.join(missing)}; fetching ~20 ranked kills of each "

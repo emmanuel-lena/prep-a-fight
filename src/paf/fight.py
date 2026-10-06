@@ -145,7 +145,11 @@ class Fight:
 
     @classmethod
     def load(cls, path: Path) -> Fight:
-        d = json.loads(path.read_text(encoding="utf-8"))
+        return cls.from_dict(json.loads(path.read_text(encoding="utf-8")))
+
+    @classmethod
+    def from_dict(cls, d: dict) -> Fight:
+        d = dict(d)
         d["add_waves"] = [AddWave(**w) for w in d.get("add_waves", [])]
         d["invulnerable"] = [Window(**w) for w in d.get("invulnerable", [])]
         d["movement"] = [Window(**w) for w in d.get("movement", [])]
