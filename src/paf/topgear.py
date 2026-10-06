@@ -271,8 +271,8 @@ def run_topgear(profile_text: str, pool: GearPool, fights: list[FightProfile], r
     pass1: dict[str, dict[str, float]] = {}
     for fp in fights:
         sets = {f"s{i}": opt.lines() for i, (_, opt) in enumerate(swaps)}
-        res = simc.run(simc.build_input(profile_text, fp.lines, sets), run_dir / f"pass1-{fp.name}",
-                       target_error=pass1_error)
+        res = simc.run_sets(profile_text, fp.lines, sets, run_dir / f"pass1-{fp.name}", log=log,
+                            target_error=pass1_error)
         by_name = {p.name: p for p in res.profilesets}
         for i, (g, _) in enumerate(swaps):
             ps = by_name.get(f"s{i}")
@@ -310,8 +310,8 @@ def run_topgear(profile_text: str, pool: GearPool, fights: list[FightProfile], r
         sets = {c.name: [line for o in c.options.values() for line in o.lines()] for c in combos}
         if not sets:
             break
-        res = simc.run(simc.build_input(profile_text, fp.lines, sets), run_dir / f"pass2-{fp.name}",
-                       target_error=pass2_error)
+        res = simc.run_sets(profile_text, fp.lines, sets, run_dir / f"pass2-{fp.name}", log=log,
+                            target_error=pass2_error)
         by_name = {p.name: p for p in res.profilesets}
         for c in combos:
             ps = by_name.get(c.name)

@@ -115,7 +115,7 @@ def run_droptimizer(profile_text: str, profile: Profile, items: list[LootItem], 
             owner[f"i{n}_{k}"] = it
     log(f"{len(items)} items ({len(sets)} placements) x {len(fights)} fight(s) at item level {ilvl}")
     for fp in fights:
-        res = simc.run(simc.build_input(profile_text, fp.lines, sets), run_dir / fp.name, target_error=target_error)
+        res = simc.run_sets(profile_text, fp.lines, sets, run_dir / fp.name, log=log, target_error=target_error)
         base = res.baseline["dps"].mean or 1
         for ps in res.profilesets:
             it = owner.get(ps.name)
@@ -145,7 +145,7 @@ def loot_in_best_sets(profile_text: str, profile: Profile, items: list[LootItem]
                 # the item replaces what the base set had in that slot; a 2H also empties the off-hand
                 kept = [line for line in lines if line.split("=", 1)[0] not in slots]
                 sets[f"b{b}_i{n}_{k}"] = kept + opt
-    res = simc.run(simc.build_input(profile_text, fight.lines, sets), run_dir, target_error=target_error)
+    res = simc.run_sets(profile_text, fight.lines, sets, run_dir, target_error=target_error)
     by = {ps.name: score_of(res, ps, objective) for ps in res.profilesets}
     best_without = max([0.0] + [by.get(f"b{b}", float("-inf")) for b in range(len(base_sets)) if base_sets[b]])
     out = {}

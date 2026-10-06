@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -214,3 +216,24 @@ def run(input_text: str, run_dir: Path, *, target_error: float = 0.2, iterations
     if key:
         sim_cache.sim_put(key, json_path)
     return res
+
+
+_BAD_PROFILESET = re.compile(r"Error: Profileset '([^']+)': (.+)")
+
+
+def run_sets(profile: str, fight_lines: list[str] | None, sets: dict[str, list[str]], run_dir: Path, *,
+             log: Callable[[str], None] = print, max_retries: int = 20, **kw) -> SimResult:
+    """run() with profilesets, where one simc rejects (an item the class cannot wear, an unknown bonus...) is
+    dropped with a message instead of failing the whole run. simc stops at the first bad profileset, so it
+    runs again without it."""
+    sets = dict(sets)
+    for _ in range(max_retries + 1):
+        try:
+            return run(build_input(profile, fight_lines, sets), run_dir, **kw)
+        except SimcError as exc:
+            m = _BAD_PROFILESET.search(str(exc))
+            if not m or m.group(1) not in sets:
+                raise
+            log(f"  skipped: {m.group(2).strip()}")
+            del sets[m.group(1)]
+    raise SimcError(f"simc rejected more than {max_retries} profilesets in {run_dir}")
