@@ -117,7 +117,13 @@ def settings_page(message: str = "") -> str:
     rows = ""
     for key, s in settings.SETTINGS.items():
         cur = settings.get(key)
-        if s.choices:
+        if key == "language":  # the languages the app has a catalog for
+            from paf.i18n import available
+
+            ctrl = f"<select name='{e(key)}'>" + "".join(
+                f"<option value='{e(c)}'{' selected' if c == cur else ''}>{e(n)}</option>"
+                for c, n in {"auto": "auto (Windows)", **available()}.items()) + "</select>"
+        elif s.choices:
             ctrl = f"<select name='{e(key)}'>" + "".join(
                 f"<option{' selected' if c == cur else ''}>{e(c)}</option>" for c in s.choices) + "</select>"
         else:

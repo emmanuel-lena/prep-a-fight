@@ -712,6 +712,10 @@ def guide_preview(args: list[str]) -> str:
 
 class Handler(BaseHTTPRequestHandler):
     def _send(self, body: bytes, status: int = 200, ctype: str = "text/html; charset=utf-8") -> None:
+        if ctype.startswith("text/html"):  # every page, prep sheets included, in the player's language
+            from paf.i18n import translate
+
+            body = translate(body.decode("utf-8")).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))

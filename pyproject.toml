@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "prep-a-fight"
-version = "0.1.15"
+version = "0.2.0"
 description = "Analyze top Warcraft Logs and adapt your gear and cooldowns to a specific boss fight, with a local SimulationCraft."
 readme = "README.md"
 license = "MIT"
@@ -51,3 +51,4 @@ select = ["E", "F", "W", "I", "UP", "B"]
 "src/paf/corpus/timeline.py" = ["E501"]
 "src/paf/web.py" = ["E501"]
 "src/paf/theme.py" = ["E501"]
+"src/paf/locale/*.py" = ["E501"]
