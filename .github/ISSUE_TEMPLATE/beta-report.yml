@@ -1,0 +1,54 @@
+name: Beta report
+description: Something broke, or a prep sheet looks wrong
+labels: ["beta"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing prep-a-fight! Do not paste your Warcraft Logs Client Secret or your `.env` file.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The number in the installer's name (prep-a-fight-setup-**0.1.2**.exe)
+      placeholder: 0.1.2
+    validations:
+      required: true
+  - type: input
+    id: spec
+    attributes:
+      label: Spec, boss and difficulty
+      placeholder: Demonology Warlock, Vashnik the Malignant, Mythic
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What happened?
+      options:
+        - The prep failed (an error in the progress page)
+        - The prep sheet looks wrong (advice, numbers)
+        - The app does not start or install
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: confidence
+    attributes:
+      label: Confidence line
+      description: At the top of the prep sheet, e.g. "Confidence: medium · sim 90% of real"
+  - type: textarea
+    id: what
+    attributes:
+      label: Details
+      description: What you did, what you expected, what you got. Screenshots welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: |
+        If the prep failed: the text of the progress page (or the file `%USERPROFILE%\.paf\web\job-<id>.log`, the newest one).
+        If the app misbehaves: `%USERPROFILE%\.paf\web\app.log`.
+      render: text

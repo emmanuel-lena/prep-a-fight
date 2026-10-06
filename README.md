@@ -43,6 +43,9 @@ Windows may show "Windows protected your PC" (SmartScreen) the first time: the i
 paid code-signing certificate yet. Click **More info**, then **Run anyway**. The installer is built from this
 repository by `tools/build-installer.ps1` (Inno Setup and python.org's embeddable Python).
 
+Beta testers: something broke or looks wrong? Open an issue with the **Beta report** form (it says which log to
+attach).
+
 To update, run the new installer over the old one. To uninstall: Windows Settings > Apps > prep-a-fight. Your
 preps, caches and SimulationCraft stay in the `.paf` folder of your user folder; delete it to remove everything.
 
