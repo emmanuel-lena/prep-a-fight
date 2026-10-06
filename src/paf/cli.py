@@ -998,6 +998,19 @@ def cmd_prep(args: argparse.Namespace) -> int:
     d.icons["__spec__"] = CLASS_ICON.format(cls=profile.class_name.lower())
     out = reports / f"prep-{report_key(enc.name, diff_name)}.html"
     out.write_text(render(d), encoding="utf-8")
+    try:  # the sheet's data, to render it again (design work) without a new prep; local only, never shared
+        import copy
+        import dataclasses
+        import pickle
+
+        from paf.optimize import Rule
+
+        saved = copy.copy(d)  # the plans' rules carry functions: only their names and descriptions are kept
+        saved.optimized = [dataclasses.replace(p, choice={k: Rule(r.name, r.description, None)
+                                                          for k, r in p.choice.items()}) for p in d.optimized]
+        (root / "prepdata.pickle").write_bytes(pickle.dumps(saved))
+    except Exception:  # noqa: BLE001 - only a convenience
+        pass
     import json
     import re
 

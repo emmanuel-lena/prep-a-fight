@@ -816,7 +816,6 @@ def guide_preview(args: list[str]) -> str:
     """While the prep runs: the boss in 60 seconds (Encounter Journal), if it is on this computer."""
     try:
         from paf import bossguide
-
         from paf.gamedata import _table_path
 
         if not _table_path("JournalEncounterSection").is_file():  # never wait for a download on this page

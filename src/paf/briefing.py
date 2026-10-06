@@ -1,0 +1,386 @@
+"""The overview of a prep sheet as a raid lead's briefing: a few lines that say what the fight is, the changes that
+matter for you in order (said plainly when a change barely matters), the fight drawn as an annotated timeline, and
+what to keep in mind once the pull starts (a list to tick, which fills the "ready" ring of the header).
+Written to read like a person's notes rather than a dashboard: serif headings, sentences, one accent colour.
+Everything is readable without JavaScript and without motion.
+"""
+
+from __future__ import annotations
+
+import html
+
+from paf import icons
+
+e = html.escape
+FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;'
+         '0,9..144,600;1,9..144,400&display=swap">')
+
+
+def _mmss(t: float) -> str:
+    return f"{int(t // 60)}:{int(t % 60):02d}"
+
+
+def _pct(t: float, dur: float) -> float:
+    return max(0.0, min(100.0, 100 * t / dur)) if dur else 0.0
+
+
+# --- the few lines on top --------------------------------------------------------------------------------------------
+
+def lede_html(d) -> str:
+    dur = d.duration or 0
+    waves = [w for w in d.waves if w[1]]
+    parts = [f"A {_mmss(dur)} fight" if dur else "This fight"]
+    if waves:
+        parts.append(f"with {len(waves)} waves of adds" if len(waves) > 1 else "with one wave of adds")
+    lust = ""
+    if d.lust is not None:
+        lust = "with Bloodlust at the pull" if d.lust < 15 else f"with Bloodlust around {_mmss(d.lust)}"
+    first = " ".join(parts) + (f", {lust}." if lust else ".")  # one sentence, so that a catalog can say it
+    second = ""
+    if d.add_share_spec is not None:
+        a = d.add_share_spec
+        second = (f" The best {e(d.spec)} players keep {1 - a:.0%} of their damage on the boss and put {a:.0%} on the adds."
+                  if a >= 0.05 else f" The best {e(d.spec)} players stay on the boss almost the whole time.")
+    return f"<p class='lede rv'>{first}{second}</p>"
+
+
+# --- what matters for you, in order ---------------------------------------------------------------------------------
+
+def _moves(d) -> list[tuple[float, str, str, str]]:
+    """(gain, the sentence, its detail, a button) of each change worth saying, biggest first."""
+    from paf.prep_report import _goal, best_build, cd_name, copy_button, linkify, rule_phrase, wanted
+
+    out = []
+    best = best_build(d)
+    if d.talents:
+        g = best.per_fight.get(d.talents.fights[0], (0.0, None))[0] if best else 0.0
+        if best is not None and g > 2 * d.talents.error:
+            add = ", ".join(dict.fromkeys(best.add[:6]))
+            out.append((g, f"Switch to <b>{e(best.build.label)}</b>, the talents of {best.build.count} top players.",
+                        f"It takes {e(add)}." if add else "",
+                        copy_button(best.build.code, "Copy the talent string") if best.build.code else ""))
+        else:
+            out.append((0.0, "Keep your talents: no build of the top players does better on this fight.", "", ""))
+    want = wanted(d) or "boss"
+    plans = [p for p in d.optimized if p.objective in ("boss", "total")]
+    plan = next((p for p in plans if p.objective == want and p.gain > 2 * p.error), None)
+    if plan is None and wanted(d) is None:
+        plan = max((p for p in plans if p.gain > 2 * p.error), key=lambda p: p.gain, default=None)
+    if plan is not None:
+        rules = [(cd_name(d, k), rule_phrase(d, r.name)) for k, r in plan.choice.items() if r.name != "default"]
+        say = "; ".join(f"{n}: {r}" for n, r in rules)
+        out.append((plan.gain, f"Play your cooldowns for {e(_goal(plan.objective))} damage.", e(say),
+                    copy_button(d.mrt[plan.objective], "Copy the MRT note") if d.mrt.get(plan.objective) else ""))
+    elif plans:
+        out.append((0.0, "Press your cooldowns as soon as they are ready: holding them gains nothing here.", "", ""))
+    if d.gear:
+        changes, _, w = d.gear[0]
+        if w > 2 * d.gear_error:
+            out.append((w, "Swap some gear from your bags.", "; ".join(linkify(c, d.links) for c in changes.split("; ")), ""))
+        else:
+            out.append((0.0, "Keep the gear you wear: nothing in your bags beats it here.", "", ""))
+    return sorted(out, key=lambda m: -m[0])
+
+
+def moves_html(d) -> str:
+    moves = _moves(d)
+    if not moves:
+        return ""
+    items = []
+    for i, (gain, say, more, button) in enumerate(moves, 1):
+        if gain >= 3:
+            tag = f"<span class='gain big'>{gain:+.1f}%</span>"
+        elif gain >= 1:
+            tag = f"<span class='gain'>{gain:+.1f}%</span>"
+        elif gain > 0:
+            tag = f"<span class='gain tiny' title='barely matters'>{gain:+.1f}%</span>"
+        else:
+            tag = "<span class='gain ok'>&#10003;</span>"
+        body = (f"<details><summary>{say}</summary><div class='why'>{more}{(' ' + button) if button else ''}</div>"
+                f"</details>" if (more or button) else f"<p class='say'>{say}</p>")
+        items.append(f"<li class='rv'><span class='n'>{i}</span><div class='mv'>{body}</div>{tag}</li>")
+    top = moves[0][0]
+    note = ("" if top >= 1 else "<p class='aside rv'>You are already close to what the best players do here: the changes "
+                                "below are small.</p>")
+    return f"<h2 class='rv'>What matters for you</h2>{note}<ol class='moves'>{''.join(items)}</ol>"
+
+
+# --- the fight, drawn ------------------------------------------------------------------------------------------------
+
+WIDTH_PX = 1000  # the timeline's width on a desktop (labels are placed for it, and wrap rows on phones)
+FLIP_AT = 72  # % of the fight after which a label opens to the left of its pin
+
+
+def _label_px(label: str, icon: bool) -> float:
+    return len(label) * 6.9 + (20 if icon else 0) + 18
+
+
+def _rows(events: list[tuple[float, str, bool]], dur: float) -> list[int]:
+    """A row for each label (in time order) so that labels never overlap; a label past FLIP_AT opens leftwards."""
+    spans: list[list[tuple[float, float]]] = []
+    rows = []
+    for t, label, icon in events:
+        x = _pct(t, dur)
+        w = _label_px(label, icon) / WIDTH_PX * 100
+        a, b = (x - w, x) if x > FLIP_AT else (x, x + w)
+        row = next((r for r, taken in enumerate(spans) if all(b < s - .4 or a > e + .4 for s, e in taken)), None)
+        if row is None:
+            spans.append([])
+            row = len(spans) - 1
+        spans[row].append((a, b))
+        rows.append(row)
+    return rows
+
+
+def _short(name: str) -> str:
+    return name.split(" (after")[0].split(" (boss aura)")[0].strip()
+
+
+def _note(t: float, dur: float, row: int, side: str, label: str, title: str, text: str, kind: str, icon: str = "") -> str:
+    pic = icons.img(icon, "small", "nt-ic") if icon else ""
+    flip = " flip" if _pct(t, dur) > FLIP_AT else ""
+    return (f"<button class='note {side} {kind}{flip}' style='left:{_pct(t, dur):.2f}%;--row:{row}' "
+            f"data-t='{_mmss(t)}' data-title='{e(title)}' data-text='{e(text)}' aria-label='{e(_mmss(t) + ' ' + title)}'>"
+            f"<span class='pin'></span><span class='lab'>{pic}{e(label)}</span></button>")
+
+
+def fight_map_html(d) -> str:
+    from paf.prep_report import _goal, wanted
+
+    dur = d.duration or (d.fight.duration if d.fight else 0)
+    if not dur:
+        return ""
+    phases = sorted(d.phases, key=lambda p: p[1])
+    brackets = ""
+    for i, (name, start) in enumerate(phases):
+        end = phases[i + 1][1] if i + 1 < len(phases) else dur
+        short = name  # the full name: the game's table translates it
+        brackets += (f"<div class='ph' style='left:{_pct(start, dur):.2f}%;width:{_pct(end - start, dur):.2f}%' "
+                     f"title='{e(name)}'><span>{e(short)}</span></div>")
+    above: list[tuple[float, str, str, str, str, str]] = []  # t, label, title, text, kind, icon
+    shade = ""
+    for t, count, life, name in d.waves:
+        if count == 0:
+            shade += (f"<div class='burst' style='left:{_pct(t, dur):.2f}%;width:{max(_pct(life, dur), .6):.2f}%'></div>")
+            above.append((t, "burst", name, f"The boss takes more damage for {life:.0f} s: your big cooldowns hit "
+                                             f"harder here.", "k-burst", ""))
+        else:
+            shade += (f"<div class='adds' style='left:{_pct(t, dur):.2f}%;width:{max(_pct(life, dur), .6):.2f}%'></div>")
+            what = f"{count} × {_short(name)}" if count > 1 and name else (_short(name) if name else f"{count} adds")
+            above.append((t, f"{count} adds" if count > 1 else _short(name or "add"), what,
+                          f"Alive about {life:.0f} s.", "k-adds", ""))
+    if d.lust is not None:
+        above.append((d.lust, "Bloodlust", "Bloodlust", "Bloodlust usually goes out here: line your cooldowns up.",
+                      "k-lust", ""))
+    below: list[tuple[float, str, str, str, str, str]] = []
+    want = wanted(d) or "boss"
+    plan = next((p for p in d.optimized if p.objective == want), None) or next(iter(d.optimized), None)
+    if plan is not None and d.fight is not None:
+        from paf.optimize import plan_moments
+
+        seen: set[str] = set()
+        for t, labels in plan_moments(plan, d.fight, d.cd_names):
+            names = list(dict.fromkeys(labels))
+            ic = next((d.icons.get(n) for n in names if d.icons.get(n)), "")
+            label = " + ".join(names) if not (ic and set(names) <= seen) else ""  # a cooldown seen before: its icon
+            seen.update(names)
+            below.append((t, label, ", ".join(names),
+                          f"Press {', '.join(names)} (cooldown plan for {_goal(plan.objective)} damage).", "k-you", ic))
+    if d.defensives:
+        for m in d.defensives.moments:
+            name = m.spells[0][0] if m.spells else "a defensive"
+            why = f" for {m.boss_ability}" if m.boss_ability else ""
+            below.append((m.time, name, f"{name}{why}", f"{m.share:.0%} of the top players press {name}{why} here.",
+                          "k-def", d.icons.get(name, "")))
+    if not (above or below):
+        return ""
+    above.sort()
+    below.sort()
+    ra = _rows([(t, lab, bool(ic)) for t, lab, _, _, _, ic in above], dur)
+    rb = _rows([(t, lab, bool(ic)) for t, lab, _, _, _, ic in below], dur)
+    notes = "".join(_note(t, dur, r, "up", lab, ti, tx, k, ic) for (t, lab, ti, tx, k, ic), r in zip(above, ra, strict=True))
+    notes += "".join(_note(t, dur, r, "down", lab, ti, tx, k, ic) for (t, lab, ti, tx, k, ic), r in zip(below, rb, strict=True))
+    ticks = "".join(f"<span style='left:{_pct(t, dur):.2f}%'>{_mmss(t)}</span>"
+                    for t in range(0, int(dur) + 1, 60 if dur <= 480 else 120))
+    up, down = (max(ra) + 1 if ra else 0), (max(rb) + 1 if rb else 0)
+    return f"""<h2 class='rv'>How the fight goes</h2>
+<div class='tl-scroll rv'><div class='tl' style='--up:{up};--down:{down}' data-dur='{dur:.0f}'>
+<div class='tl-phases'>{brackets}</div><div class='tl-zone up'></div>
+<div class='tl-axis'>{shade}<div class='tl-ticks'>{ticks}</div></div><div class='tl-zone down'></div>
+{notes}<div class='tl-legend small muted'><span class='lg k-adds'>adds</span><span class='lg k-burst'>burst window</span>
+<span class='lg k-you'>your cooldowns</span><span class='lg k-def'>defensives</span></div></div></div>
+<p class='margin rv' aria-live='polite'><b class='m-t'></b> <span class='m-title'>Point at a note on the timeline</span>
+<span class='m-text'>: what comes then, and what you do.</span></p>"""
+
+
+# --- once the pull starts --------------------------------------------------------------------------------------------
+
+def _fight_items(d) -> list[tuple[str, str]]:
+    from paf.prep_report import checklist_items
+
+    skip = ("Talents:", "Gear", "Cooldowns (", "Talents :")
+    return [(w, x) for w, x in checklist_items(d) if not w.startswith(skip)]
+
+
+def checklist_html(d) -> str:
+    items = _fight_items(d)
+    if not items:
+        return ""
+    lines = "".join(f"<li class='rv'><label><input type='checkbox'><span class='box' aria-hidden='true'></span>"
+                    f"<span class='t'>{what}</span></label>{extra}</li>" for what, extra in items)
+    return f"<h2 class='rv'>Once the pull starts</h2><ul class='checks'>{lines}</ul>"
+
+
+def ready_count(d) -> int:
+    return len(_fight_items(d))
+
+
+def ready_ring(n: int) -> str:
+    if not n:
+        return ""
+    return (f"<div class='ready' title='Ready for the pull'><svg viewBox='0 0 44 44' aria-hidden='true'>"
+            f"<circle cx='22' cy='22' r='19' class='r-bg'/><circle cx='22' cy='22' r='19' class='r-fg'/></svg>"
+            f"<div class='r-txt'><b class='r-n'>0/{n}</b><span>ready</span></div></div>")
+
+
+def confidence_pill(d) -> str:
+    if not d.validation:
+        return ""
+    med = d.validation[1]
+    gap = abs(med - 1)
+    level = "high" if gap <= 0.05 else "medium" if gap <= 0.12 else "low"
+    say = {"high": "the sim matches what the best players really did: trust the numbers.",
+           "medium": f"the sim is {gap:.0%} off what the best players really did: trust which option wins more than "
+                     f"the exact %.",
+           "low": f"the sim is {gap:.0%} off what the best players really did: read the numbers as hints."}[level]
+    return f"<p class='trust {level} rv'><span>How much to trust this:</span> {e(say)}</p>"
+
+
+CSS = """
+/* the briefing */
+.js .rv{opacity:0;transform:translateY(8px)}
+.rv{transition:opacity .6s ease,transform .6s ease}
+.js .rv.in{opacity:1;transform:none}
+#overview>*:not(.tl-scroll){max-width:760px}
+.tl-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:thin} .tl{min-width:900px}
+#overview h2{font:600 26px/1.2 'Fraunces',Georgia,serif;letter-spacing:0;text-transform:none;color:var(--fg);
+  margin:44px 0 14px}
+.lede{font:400 22px/1.5 'Fraunces',Georgia,serif;margin:8px 0 6px;color:var(--fg)}
+.trust{font-size:13.5px;color:var(--muted);margin:10px 0 0;padding-left:12px;border-left:2px solid var(--line)}
+.trust span{font-style:italic} .trust.high{border-color:var(--pos)} .trust.low{border-color:var(--neg)}
+.aside{font:italic 400 16px 'Fraunces',Georgia,serif;color:var(--muted);margin:-4px 0 10px}
+/* what matters */
+.moves{list-style:none;margin:0;padding:0;counter-reset:m}
+.moves li{display:grid;grid-template-columns:44px 1fr auto;gap:14px;align-items:baseline;padding:16px 0;
+  border-top:1px solid var(--line)} .moves li:last-child{border-bottom:1px solid var(--line)}
+.moves .n{font:400 40px/1 'Fraunces',Georgia,serif;color:var(--accent)}
+.moves summary,.moves .say{font-size:17px;line-height:1.45;cursor:pointer;margin:0;list-style:none}
+.moves summary::-webkit-details-marker{display:none}
+.moves summary::after{content:" \\203A";color:var(--muted);display:inline-block;transition:transform .2s}
+.moves details[open] summary::after{transform:rotate(90deg)}
+.moves .why{margin:8px 0 0;font-size:14px;color:var(--muted);line-height:1.55}
+.moves .why button{margin-left:6px}
+.gain{font:600 18px var(--font-data);white-space:nowrap;color:var(--fg)}
+.gain.big{font-size:24px;color:var(--pos)} .gain.tiny{color:var(--muted);font-weight:500;font-size:15px}
+.gain.ok{color:var(--pos);font-size:20px}
+/* the timeline: phases on top, then the notes above the axis, the axis, the notes below it */
+.tl{position:relative;--lh:28px;--axis:calc(34px + var(--up) * var(--lh) + 14px);
+  height:calc(var(--axis) + 30px + var(--down) * var(--lh) + 34px);margin-top:6px}
+.tl-phases{position:absolute;left:0;right:0;top:0;height:30px}
+.ph{position:absolute;top:16px;height:12px;border-top:1.5px solid var(--muted);border-left:1.5px solid var(--muted);
+  border-right:1.5px solid var(--muted);border-radius:6px 6px 0 0;opacity:.8}
+.ph span{position:absolute;top:-17px;left:6px;font:italic 400 13px 'Fraunces',Georgia,serif;color:var(--muted);
+  white-space:nowrap;max-width:calc(100% - 8px);overflow:hidden;text-overflow:ellipsis}
+.tl-zone{display:none}
+.tl-axis{position:absolute;left:0;right:0;top:var(--axis);height:0;border-top:2px solid var(--fg)}
+.tl-axis .adds,.tl-axis .burst{position:absolute;top:-6px;height:10px;border-radius:5px}
+.tl-axis .adds{background:color-mix(in srgb,var(--pos) 55%,transparent)}
+.tl-axis .burst{background:repeating-linear-gradient(135deg,var(--sand) 0 3px,transparent 3px 6px)}
+.tl-ticks span{position:absolute;top:8px;transform:translateX(-50%);font:500 11px var(--font-data);color:var(--muted);
+  background:var(--bg);padding:0 3px;z-index:1}
+.tl-ticks span:first-child{transform:none} .tl-ticks span:first-child::before{left:0}
+.tl-ticks span::before{content:"";position:absolute;left:50%;top:-12px;height:6px;border-left:1.5px solid var(--fg)}
+.note{position:absolute;padding:0;background:none;border:0;color:var(--fg);cursor:pointer;font:inherit;z-index:2}
+.note .pin{position:absolute;left:0;width:1.5px;background:currentColor;opacity:.35;pointer-events:none}
+.note .lab{position:relative;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-size:12.5px;
+  height:22px;padding:0 7px 0 6px;border-radius:4px;background:var(--bg);border:1px solid transparent;
+  transition:border-color .15s,background .15s}
+.note:hover,.note.on,.note:focus-visible{z-index:3} .note:focus-visible{outline:none}
+.note:hover .lab,.note.on .lab,.note:focus-visible .lab{border-color:currentColor;background:var(--surface)}
+.note:hover .pin,.note.on .pin{opacity:.9}
+.note.up{top:calc(34px + (var(--up) - 1 - var(--row)) * var(--lh) + 4px)}
+.note.up .pin{top:22px;height:calc((var(--row) + 1) * var(--lh) - 12px)}
+.note.down{top:calc(var(--axis) + 30px + var(--row) * var(--lh))}
+.note.down .pin{bottom:22px;height:calc(30px + var(--row) * var(--lh) - 22px + 22px)}
+.note.down .pin{top:calc(-30px - var(--row) * var(--lh));height:calc(30px + var(--row) * var(--lh))}
+.note.flip{transform:translateX(calc(-100% + 1px))} .note.flip .pin{left:auto;right:0}
+.k-adds{color:var(--pos)} .k-burst{color:var(--warn)} .k-lust{color:var(--neg)} .k-you{color:var(--accent)} .k-def{color:#4f8fd0}
+.note .nt-ic{width:16px;height:16px;border-radius:3px;margin:0;vertical-align:0}
+.tl-legend{position:absolute;right:0;bottom:0;display:flex;gap:14px}
+.lg::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:5px}
+.margin{min-height:48px;margin:10px 0 0;padding:10px 14px;border-left:3px solid var(--accent);background:var(--surface-2);
+  border-radius:0 8px 8px 0;font-size:15px} .margin .m-t{font:600 15px var(--font-data);color:var(--accent)}
+.margin .m-text{color:var(--muted)}
+/* once the pull starts */
+.checks{list-style:none;margin:0;padding:0}
+.checks li{padding:10px 0;border-bottom:1px dotted var(--line)} .checks li:last-child{border:0}
+.checks label{display:flex;gap:12px;align-items:flex-start;margin:0;cursor:pointer;font-size:15.5px;line-height:1.5}
+.checks input{position:absolute;opacity:0;pointer-events:none}
+.checks .box{flex:none;width:20px;height:20px;margin-top:2px;border:1.5px solid var(--muted);border-radius:4px;position:relative}
+.checks .box::after{content:"";position:absolute;left:5px;top:0;width:6px;height:12px;border:solid var(--pos);
+  border-width:0 2.5px 2.5px 0;transform:rotate(45deg) scale(0);transition:transform .2s cubic-bezier(.3,1.6,.5,1)}
+.checks input:checked+.box::after{transform:rotate(45deg) scale(1)}
+.checks input:checked~.t{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.checks input:focus-visible+.box{outline:2px solid var(--accent);outline-offset:2px}
+.ready{margin-left:auto;display:flex;align-items:center;gap:8px;color:#fff}
+.ready svg{width:44px;height:44px;transform:rotate(-90deg)}
+.ready circle{fill:none;stroke-width:3.5} .ready .r-bg{stroke:rgba(255,255,255,.2)}
+.ready .r-fg{stroke:var(--sand);stroke-linecap:round;stroke-dasharray:119.4;stroke-dashoffset:119.4;
+  transition:stroke-dashoffset .6s ease}
+.ready .r-txt{display:flex;flex-direction:column;line-height:1.1}
+.ready .r-n{font:600 17px var(--font-data)} .ready span{font-size:11px;opacity:.8}
+.ready.done .r-fg{stroke:var(--pos)}
+.ready.pop{animation:pop .45s} @keyframes pop{40%{transform:scale(1.12)}}
+#overview .guide{border:0;background:none;box-shadow:none;padding:0}
+details.more{margin-top:40px;border-top:1px solid var(--line);padding-top:10px}
+details.more>summary{font:italic 400 17px 'Fraunces',Georgia,serif;color:var(--muted);padding:6px 0}
+@media (max-width:640px){.lede{font-size:19px}.moves li{grid-template-columns:30px 1fr auto;gap:10px}
+  .moves .n{font-size:30px}}
+@media (prefers-reduced-motion:reduce){.js .rv{opacity:1;transform:none}.ready .r-fg{transition:none}}
+"""
+
+JS = """<script>
+(function(){
+var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+var io = 'IntersectionObserver' in window ? new IntersectionObserver(function(es){
+  es.forEach(function(en){ if(!en.isIntersecting) return; var el = en.target;
+    var sibs = [].slice.call(el.parentNode.children).filter(function(x){ return x.classList.contains('rv'); });
+    el.style.transitionDelay = reduce ? '0s' : (Math.max(0, sibs.indexOf(el)) * 60) + 'ms';
+    el.classList.add('in'); io.unobserve(el); });
+}, {threshold: .1}) : null;
+document.querySelectorAll('.rv').forEach(function(el){ io ? io.observe(el) : el.classList.add('in'); });
+// the timeline: a note tells its story in the margin below
+document.querySelectorAll('.tl').forEach(function(tl){
+  var m = tl.closest('section').querySelector('.margin');
+  function show(n){ tl.querySelectorAll('.note.on').forEach(function(o){ o.classList.remove('on'); });
+    n.classList.add('on'); m.querySelector('.m-t').textContent = n.dataset.t;
+    m.querySelector('.m-title').textContent = n.dataset.title;
+    m.querySelector('.m-text').textContent = ' \\u2014 ' + n.dataset.text; }
+  tl.querySelectorAll('.note').forEach(function(n){ n.addEventListener('click', function(){ show(n); });
+    n.addEventListener('mouseenter', function(){ show(n); }); n.addEventListener('focus', function(){ show(n); }); });
+});
+// once the pull starts: ticks fill the ring of the header, remembered on this computer
+var boxes = [].slice.call(document.querySelectorAll('.checks input')), ring = document.querySelector('.ready');
+var key = 'paf-ready:' + document.title;
+try { var saved = JSON.parse(localStorage.getItem(key) || '[]'); boxes.forEach(function(b, i){ b.checked = !!saved[i]; }); } catch (e) {}
+function update(bump){ if (!ring) return; var n = boxes.filter(function(b){ return b.checked; }).length;
+  ring.querySelector('.r-n').textContent = n + '/' + boxes.length;
+  ring.querySelector('.r-fg').style.strokeDashoffset = 119.4 * (1 - n / Math.max(1, boxes.length));
+  ring.classList.toggle('done', n === boxes.length && n > 0);
+  if (bump && !reduce){ ring.classList.remove('pop'); void ring.offsetWidth; ring.classList.add('pop'); } }
+boxes.forEach(function(b){ b.addEventListener('change', function(){
+  try { localStorage.setItem(key, JSON.stringify(boxes.map(function(x){ return x.checked; }))); } catch (e) {}
+  update(true); }); });
+update(false);
+})();
+</script>"""

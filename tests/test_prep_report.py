@@ -59,7 +59,7 @@ def test_checklist():
     d.role_bullets = ["Kill the Clutch.", "Burst the Heart."]
     d.assigns = ["Malice: interrupt"]
     page = render(d)
-    assert "Your raid checklist" in page and "Bloodlust usually comes around 2:00" in page
+    assert "Once the pull starts" in page and "Bloodlust usually comes around 2:00" in page
     assert "Kill the Clutch." in page and "Your assignment: Malice: interrupt" in page
     assert "ask your raid lead" in page
 

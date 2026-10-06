@@ -123,7 +123,7 @@ def game_names(lang: str) -> Catalog:
 
 _SKIP = re.compile(r"(<script\b.*?</script>|<style\b.*?</style>|<pre\b.*?</pre>|<textarea\b.*?</textarea>|<[^>]+>)",
                    re.S | re.I)
-_VISIBLE_ATTR = re.compile(r'((?:placeholder|title|aria-label|alt)=)(["\'])(.*?)\2')
+_VISIBLE_ATTR = re.compile(r'((?:placeholder|title|aria-label|alt|data-title|data-text)=)(["\'])(.*?)\2')
 _RAW = ("<script", "<style", "<pre", "<textarea")
 
 
