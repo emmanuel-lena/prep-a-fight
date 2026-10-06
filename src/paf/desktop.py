@@ -34,6 +34,88 @@ def _own_taskbar_icon() -> None:
             pass
 
 
+LOADING = ("<!doctype html><html><body style='background:#181219;color:#b6a3b3;font:15px system-ui;display:grid;"
+           "place-items:center;height:100vh;margin:0'>prep-a-fight&hellip;</body></html>")
+
+
+def _serve_in_process(window) -> bool:
+    """Have WebView2 ask the app itself for http://paf.local/... (paf.inproc): no network connection at all.
+    False when the engine cannot be reached (the window then uses the local server). WebView2 objects are only
+    touched on the window's own thread (from another thread they block)."""
+    if not window.events.loaded.wait(20):  # the loading page is shown: the engine is ready
+        return False
+    form = window.native
+    if form is None:
+        return False
+    from Microsoft.Web.WebView2.Core import CoreWebView2WebResourceContext
+    from System import Action, Array, Byte
+    from System.IO import MemoryStream
+
+    from paf import inproc
+
+    def on_request(sender, args) -> None:
+        uri = str(args.Request.Uri)
+        if not uri.startswith(inproc.BASE + "/"):
+            return
+        path = uri[len(inproc.BASE):] or "/"
+        method = str(args.Request.Method)
+        headers = {str(h.Key): str(h.Value) for h in args.Request.Headers.GetEnumerator()}
+        body = b""
+        if args.Request.Content is not None:
+            ms = MemoryStream()
+            args.Request.Content.CopyTo(ms)
+            body = bytes(ms.ToArray())
+        deferral = args.GetDeferral()
+        env = sender.Environment
+
+        def work() -> None:
+            try:
+                status, reason, head, data = inproc.serve(method, path, headers, body)
+                status, head, data = inproc.as_page(status, head, data)
+            except Exception as ex:  # noqa: BLE001 - shown in the window rather than a blank page
+                status, reason, data = 500, "Error", str(ex).encode()
+                head = [("Content-Type", "text/plain; charset=utf-8")]
+
+            def reply() -> None:
+                lines = "\r\n".join(f"{k}: {v}" for k, v in head if k.lower() not in ("content-length", "connection"))
+                args.Response = env.CreateWebResourceResponse(MemoryStream(Array[Byte](data)), status,
+                                                              reason or "OK", lines)
+                deferral.Complete()
+
+            form.Invoke(Action(reply))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    done, ok = threading.Event(), [False]
+
+    def install() -> None:
+        try:
+            core = form.browser.webview.CoreWebView2  # on the window's thread
+            core.AddWebResourceRequestedFilter(f"{inproc.BASE}/*", CoreWebView2WebResourceContext.All)
+            core.WebResourceRequested += on_request
+            ok[0] = True
+        finally:
+            done.set()
+
+    form.Invoke(Action(install))
+    done.wait(5)
+    return ok[0]
+
+
+def _open(window, server_url: str) -> None:
+    """Show the app: through paf.local when possible, else through the local server."""
+    from paf import inproc, web
+
+    try:
+        inside = _serve_in_process(window)
+    except Exception as ex:  # noqa: BLE001 - the local server always works as a fallback
+        print(f"in-process pages unavailable ({ex}): using the local server")
+        inside = False
+    print(f"pages {'in process (paf.local)' if inside else 'through the local server'}", flush=True)
+    web.PUBLIC_BASE = server_url.rstrip("/")  # links that open in the browser need a real address
+    window.load_url(f"{inproc.BASE}/" if inside else server_url)
+
+
 def main() -> int:
     moved = migrate_old_home()  # before anything opens a file in the data folder
     _quiet_streams()
@@ -68,10 +150,10 @@ def main() -> int:
         webview.settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = True  # Wowhead / Warcraft Logs links
     except (AttributeError, TypeError):
         pass
-    window = webview.create_window(TITLE, url, width=1320, height=920, min_size=(900, 600),
+    window = webview.create_window(TITLE, html=LOADING, width=1320, height=920, min_size=(900, 600),
                                    background_color="#181219")
     web.QUIT["hook"] = window.destroy  # an update is being installed: close, the installer reopens the app
-    webview.start(icon=str(ICON) if ICON.is_file() else None)
+    webview.start(_open, (window, url), icon=str(ICON) if ICON.is_file() else None)
     server.shutdown()
     server.server_close()
     try:

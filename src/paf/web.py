@@ -156,7 +156,8 @@ async function pafLang(sel){
 </script>"""
 
 
-QUIT = {"hook": None}  # set by the desktop app: closes its window (an update is being installed)
+QUIT = {"hook": None}
+PUBLIC_BASE = ""  # the local server's address, when the desktop window shows pages without it (paf.inproc)  # set by the desktop app: closes its window (an update is being installed)
 
 
 def update_banner() -> str:
@@ -364,7 +365,7 @@ def view_page(key: str, tab: str) -> bytes:
     nav = (f'<select onchange="location=this.value" aria-label="Boss">{others}</select>{tabs}'
            + (f'<a href="{e(boss_link)}">Edit &amp; re-run</a>' if boss_link else "")
            + (f'<a href="/share/{e(key)}">Share</a>' if "prep" in item["files"] else "")
-           + f'<a href="{src}" target="_blank">Open alone</a>')
+           + f'<a href="{PUBLIC_BASE}{src}" target="_blank">Open alone</a>')
     css = "body{display:flex;flex-direction:column;height:100vh}iframe{border:0;width:100%;flex:1;display:block}"
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"<title>{e(item['name'])}</title>{theme.HEAD}<style>{CSS}{css}</style></head><body>{theme.topbar(nav + lang_switch())}"
@@ -970,7 +971,7 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 back = self.headers.get("Referer", "/")
                 self._redirect(urlparse(back).path + (f"?{urlparse(back).query}" if urlparse(back).query else "")
-                               if back.startswith(("http://127.0.0.1", "http://localhost")) else "/")
+                               if back.startswith(("http://127.0.0.1", "http://localhost", "http://paf.local")) else "/")
             elif self.path == "/feedback":
                 self._send(page("Feedback", send_feedback(form)))
             elif self.path == "/update":
