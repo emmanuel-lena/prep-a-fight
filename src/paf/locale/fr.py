@@ -330,6 +330,17 @@ PHRASES: dict[str, str] = {
     "export, then these lines under it, in the same box. Leave the fight style out (Patchwerk removes the raid events).": "export, puis ces lignes en dessous, dans la même boîte. Ne mets pas de fight style (Patchwerk efface les raid events).",
     ": paste your": " : colle ton",
     "The fight above as SimulationCraft lines: duration, add waves, immune and vulnerable windows, movement, Bloodlust, Power Infusion. On": "Le combat ci-dessus en lignes SimulationCraft : durée, vagues d'adds, fenêtres d'immunité et de vulnérabilité, déplacements, Furie sanguinaire, Infusion de puissance. Sur",
+    # sharing
+    "Share": "Partager", "Share this prep": "Partager cette prépa", "Share it": "Partager",
+    "Shared.": "Partagée.", "Copy the link": "Copier le lien", "Open": "Ouvrir", "Stop sharing": "Arrêter le partage",
+    "Back to the prep sheet": "Retour à la fiche",
+    "Anyone with this link sees the prep sheet in their browser, without the app:": "Toute personne qui a ce lien voit la fiche dans son navigateur, sans l'appli :",
+    "To publish a newer version after a new prep, stop sharing and share again.": "Pour publier une version plus récente après une nouvelle prépa, arrête le partage et partage à nouveau.",
+    "Get a link to this prep sheet for your raid (Discord, guild forum...): it opens in any browser, nobody needs the app.": "Obtiens un lien vers cette fiche pour ton raid (Discord, forum de guilde...) : il s'ouvre dans n'importe quel navigateur, personne n'a besoin de l'appli.",
+    "The sheet shows your character's name and gear: anyone with the link can see them. It stays online 30 days, and you can stop sharing it at any time.": "La fiche montre le nom et le stuff de ton personnage : toute personne qui a le lien peut les voir. Elle reste en ligne 30 jours, et tu peux arrêter le partage à tout moment.",
+    "Prepared with": "Préparé avec", "free and open source.": "gratuit et open source.",
+    "Sharing failed:": "Le partage a échoué :", "Prep sheet": "Fiche", "Top players' timelines": "Timelines des tops",
+    "Open alone": "Ouvrir seule", "Edit & re-run": "Modifier et relancer",
 }
 
 PATTERNS: list[tuple[str, str]] = [
@@ -435,6 +446,7 @@ PATTERNS: list[tuple[str, str]] = [
     (r"about (\d+)-(\d+) min left", r"environ \1 à \2 min restantes"),
     (r"Version ([\d.]+) is out", r"La version \1 est sortie"), (r"\(you have ([\d.]+)\)", r"(tu as la \1)"),
     (r"Updating to ([\d.]+)", r"Mise à jour vers la \1"),
+    (r"It stays online (\d+) days, then disappears\.", r"Elle reste en ligne \1 jours, puis disparaît."),
     (r"Next update in (\d+) s", r"Prochaine mise à jour dans \1 s"),
     (r"\bupdated (\d\d \w+ [\d:]+)", r"mis à jour le \1"),
     (r"Typical fight rebuilt from (\d+) kills: ([\d:]+), (\d+) add waves or targets\.",

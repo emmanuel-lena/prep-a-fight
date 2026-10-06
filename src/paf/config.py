@@ -35,8 +35,8 @@ def data_dir() -> Path:
     return installed_home() or Path.home() / ".paf"
 
 
-# what moves from ~/.paf to the install folder (simc, caches and run folders are rebuilt or not needed)
-MIGRATED = (".env", "settings.json", "profiles", "reports", "fights", "web", "gamedata", "cache")
+# left behind when ~/.paf moves to the install folder: old sim folders, nothing reads them
+NOT_MIGRATED = ("runs",)
 
 
 def migrate_old_home() -> list[str]:
@@ -49,7 +49,7 @@ def migrate_old_home() -> list[str]:
         return []
     moved = []
     for item in sorted(old.iterdir()):
-        if item.name in MIGRATED or (item.name.startswith("corpus") and item.suffix == ".sqlite"):
+        if item.name not in NOT_MIGRATED:
             if not (new / item.name).exists():
                 shutil.move(str(item), str(new / item.name))
                 moved.append(item.name)

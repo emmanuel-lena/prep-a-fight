@@ -94,10 +94,59 @@ async function packs(request, env, key) {
   return Response.json({ stored: key, created: pack.created });
 }
 
+// Shared prep sheets: a raid lead publishes a sheet, the guild opens the link in a browser. The page may only run
+// its own inline scripts and Wowhead's tooltips, load fonts and images, and never post anything anywhere.
+const MAX_SHEET = 3_000_000;
+const SHARE_DAYS = 30;
+const SHEET_CSP = [
+  "default-src 'none'", "script-src 'unsafe-inline' https://wow.zamimg.com https://nether.wowhead.com",
+  "style-src 'unsafe-inline' https://fonts.googleapis.com https://wow.zamimg.com", "font-src https://fonts.gstatic.com",
+  "img-src https: data:", "connect-src https://nether.wowhead.com", "form-action 'none'", "base-uri 'none'",
+  "frame-ancestors 'none'",
+].join("; ");
+
+function newId(n) {
+  const abc = "abcdefghijkmnpqrstuvwxyz23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(n));
+  return Array.from(bytes, (b) => abc[b % abc.length]).join("");
+}
+
+async function share(request, env, url) {
+  const id = url.pathname.slice("/s/".length);
+  if (request.method === "GET") {
+    if (!/^[a-z0-9]{10}$/.test(id)) return new Response("not found", { status: 404 });
+    const html = await env.PACKS.get(`share:${id}`);
+    if (!html) return new Response("This prep sheet is no longer shared.", { status: 404 });
+    return new Response(html, {
+      headers: { "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": SHEET_CSP,
+                 "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer",
+                 "Cache-Control": "public, max-age=300" },
+    });
+  }
+  if (!fromApp(request)) return new Response("forbidden", { status: 403 });
+  if (request.method === "POST" && url.pathname === "/s") {
+    const html = await request.text();
+    if (!html || html.length > MAX_SHEET || !html.includes("prep-a-fight")) return new Response("not a prep sheet", { status: 400 });
+    const sid = newId(10), token = newId(24);
+    await env.PACKS.put(`share:${sid}`, html, { expirationTtl: SHARE_DAYS * 86400 });
+    await env.PACKS.put(`share-token:${sid}`, token, { expirationTtl: SHARE_DAYS * 86400 });
+    return Response.json({ id: sid, url: `${url.origin}/s/${sid}`, token, days: SHARE_DAYS });
+  }
+  if (request.method === "DELETE") {
+    const token = await env.PACKS.get(`share-token:${id}`);
+    if (!token || token !== request.headers.get("X-Share-Token")) return new Response("forbidden", { status: 403 });
+    await env.PACKS.delete(`share:${id}`);
+    await env.PACKS.delete(`share-token:${id}`);
+    return new Response(null, { status: 204 });
+  }
+  return new Response("method", { status: 405 });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/") return new Response("prep-a-fight relay");
+    if (url.pathname === "/s" || url.pathname.startsWith("/s/")) return share(request, env, url);
     if (!fromApp(request)) return new Response("forbidden", { status: 403 });
     if (url.pathname.startsWith("/packs/")) return packs(request, env, url.pathname.slice("/packs/".length));
     if (request.method === "POST" && url.pathname === "/") return feedback(request, env);

@@ -66,13 +66,16 @@ def test_installed_copy_keeps_its_data_in_its_folder(tmp_path, monkeypatch):
     (old / ".env").write_text("WCL_CLIENT_ID=x\n")
     (old / "corpus-shaman-elemental.sqlite").write_bytes(b"db")
     (old / "simc" / "v1").mkdir(parents=True)
+    (old / "packs" / "shaman-elemental").mkdir(parents=True)
+    (old / "runs" / "r1").mkdir(parents=True)
     monkeypatch.delenv("PAF_HOME", raising=False)
     monkeypatch.setattr(config.sys, "prefix", str(app / "python"))
     monkeypatch.setattr(config.Path, "home", lambda: tmp_path / "home")
     config.installed_home.cache_clear()
     try:
         assert config.data_dir() == app / "data"
-        assert set(config.migrate_old_home()) == {".env", "reports", "corpus-shaman-elemental.sqlite"}
+        assert set(config.migrate_old_home()) == {".env", "reports", "corpus-shaman-elemental.sqlite", "simc", "packs"}
+        assert not (app / "data" / "runs").exists()
         assert (app / "data" / ".env").is_file() and not old.exists()
     finally:
         config.installed_home.cache_clear()

@@ -53,6 +53,39 @@ def page(title: str, body: str, refresh: int | None = None, nav: str = "") -> by
             f"<main>{update_banner()}{body}</main></body></html>").encode()
 
 
+def share_page(key: str, error: str = "") -> str:
+    """Share a prep sheet with the raid: a link that opens in any browser."""
+    from paf import share
+
+    item = next((x for x in prepared() if x["key"] == key and "prep" in x["files"]), None)
+    if item is None:
+        return "<h1>Not found</h1><p>Nothing prepared for this boss yet.</p>"
+    info = share.current(key)
+    head = (f"<h1>Share this prep</h1><p class='lead'>{e(item['name'])} &middot; {e(item['difficulty'])}"
+            + (f" &middot; {e(item['spec'])}" if item.get("spec") else "") + "</p>")
+    err = f"<p class='notice'>{e(error)}</p>" if error else ""
+    if info:
+        return (head + err + f"""<div class='card'><p><b>Shared.</b> Anyone with this link sees the prep sheet in their
+browser, without the app:</p><p class='row'><input readonly value='{e(info["url"])}' style='flex:1;min-width:260px'
+onclick='this.select()'><button type='button' data-copy='{e(info["url"])}'>Copy the link</button>
+<a class='btn ghost' href='{e(info["url"])}' target='_blank' rel='noopener'>Open</a></p>
+<p class='small muted'>It stays online {info.get("days", 30)} days, then disappears. To publish a newer version after
+a new prep, stop sharing and share again.</p>
+<form method='post' action='/unshare/{e(key)}'><button class='btn ghost'>Stop sharing</button></form></div>
+<p><a href='/view/{e(key)}'>Back to the prep sheet</a></p>{COPY_JS}""")
+    return (head + err + f"""<div class='card'><p>Get a link to this prep sheet for your raid (Discord, guild
+forum...): it opens in any browser, nobody needs the app.</p>
+<p class='small muted'>The sheet shows your character's name and gear: anyone with the link can see them. It stays
+online 30 days, and you can stop sharing it at any time.</p>
+<form method='post' action='/share/{e(key)}'><button class='btn'>Share it</button></form></div>
+<p><a href='/view/{e(key)}'>Back to the prep sheet</a></p>""")
+
+
+COPY_JS = """<script>document.addEventListener('click',function(ev){var b=ev.target.closest('[data-copy]');if(!b)return;
+var t=b.getAttribute('data-copy'),o=b.textContent;function done(){b.textContent='Copied';setTimeout(function(){
+b.textContent=o},1500)}if(navigator.clipboard){navigator.clipboard.writeText(t).then(done,function(){})}});</script>"""
+
+
 def lang_switch() -> str:
     """The language of the app, in the top bar: changing it reloads the page."""
     from paf import i18n
@@ -330,6 +363,7 @@ def view_page(key: str, tab: str) -> bytes:
     boss_link = _boss_link(item)
     nav = (f'<select onchange="location=this.value" aria-label="Boss">{others}</select>{tabs}'
            + (f'<a href="{e(boss_link)}">Edit &amp; re-run</a>' if boss_link else "")
+           + (f'<a href="/share/{e(key)}">Share</a>' if "prep" in item["files"] else "")
            + f'<a href="{src}" target="_blank">Open alone</a>')
     css = "body{display:flex;flex-direction:column;height:100vh}iframe{border:0;width:100%;flex:1;display:block}"
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
@@ -783,6 +817,10 @@ def guide_preview(args: list[str]) -> str:
     try:
         from paf import bossguide
 
+        from paf.gamedata import _table_path
+
+        if not _table_path("JournalEncounterSection").is_file():  # never wait for a download on this page
+            return ""
         boss = int(args[1])
         diff = args[args.index("--difficulty") + 1] if "--difficulty" in args else settings.get("difficulty")
         sections = bossguide.load(boss, diff)
@@ -843,6 +881,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(page("Settings", settings_page()))
             elif url.path == "/feedback":
                 self._send(page("Feedback", feedback_page(q.get("job", ""))))
+            elif url.path.startswith("/share/"):
+                self._send(page("Share", share_page(url.path.rsplit("/", 1)[1])))
             elif url.path.startswith("/view/"):
                 self._send(view_page(url.path.rsplit("/", 1)[1], q.get("tab", "prep")))
             elif url.path.startswith("/job/"):
@@ -907,6 +947,18 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(page("Not found", "<p>Unknown tool.</p>"), 404)
                     return
                 self._redirect(f"/job/{JOBS.start(args, None)}")
+            elif self.path.startswith(("/share/", "/unshare/")):
+                from paf import share
+
+                key = self.path.rsplit("/", 1)[1]
+                try:
+                    if self.path.startswith("/share/"):
+                        share.publish(key)
+                    else:
+                        share.stop(key)
+                    self._redirect(f"/share/{key}")
+                except (OSError, RuntimeError, ValueError) as ex:
+                    self._send(page("Share", share_page(key, f"Sharing failed: {ex}")), 502)
             elif self.path == "/language":
                 from paf import i18n
 
