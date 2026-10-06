@@ -743,15 +743,21 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/credentials":
                 from paf.config import save_credentials
                 from paf.wcl import WCLClient, WCLError
+                from paf.webtools import settings_page
 
                 cid, secret = (form.get("id") or [""])[0].strip(), (form.get("secret") or [""])[0].strip()
+                from_settings = (form.get("back") or [""])[0] == "settings"
                 try:
                     WCLClient(cid, secret).rate_limit()
                 except (WCLError, OSError) as ex:
-                    self._send(home(f"Warcraft Logs refused these credentials: {ex}"), 400)
+                    error = f"Warcraft Logs refused these credentials (the old key is kept): {ex}"
+                    self._send(page("Settings", settings_page(error)) if from_settings else home(error), 400)
                     return
                 save_credentials(cid, secret)
-                self._redirect("/")
+                if from_settings:
+                    self._send(page("Settings", settings_page("New Warcraft Logs key saved and tested.")))
+                else:
+                    self._redirect("/")
             elif self.path == "/plan":
                 from paf.encounters import raid_encounters
                 from paf.plan import parse_plan

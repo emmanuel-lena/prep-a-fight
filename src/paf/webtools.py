@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import os
 import time
 
 from paf import settings
@@ -134,9 +135,21 @@ def settings_page(message: str = "") -> str:
     except Exception as ex:  # noqa: BLE001 - shown as is
         quota = f"<span class='neg'>{e(str(ex)[:160])}</span>"
     msg = f"<p class='notice small'>{e(message)}</p>" if message else ""
+    cid = os.environ.get("WCL_CLIENT_ID", "")
+    current = (f"Current key: client <code>{e(cid[:8])}…</code>" if cid else
+               "<span class='neg'>No key yet.</span>")
     return f"""<h1>Settings</h1>{msg}
 <form method="post" action="/settings" class="card"><table>{rows}</table>
 <div class="cta"><button class="btn">Save</button></div></form>
+<h2>Warcraft Logs key</h2><div class="card"><p class="small">{current} To use another one (a new client, or a
+regenerated secret): create or open it on <a href="https://www.warcraftlogs.com/api/clients" target="_blank"
+rel="noopener">warcraftlogs.com/api/clients</a>, then paste both values.
+It is tested before it replaces the old one.</p>
+<form method="post" action="/credentials" class="row"><input type="hidden" name="back" value="settings">
+<input name="id" size="38" placeholder="Client ID" required>
+<input name="secret" size="38" type="password" placeholder="Client Secret" required autocomplete="off">
+<button>Save and test</button></form>
+<p class="tiny muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p></div>
 <h2>Status</h2><div class="card"><table>
 <tr><td>SimulationCraft</td><td class="small">{simc}
 <form method="post" action="/tool/setup" style="display:inline">

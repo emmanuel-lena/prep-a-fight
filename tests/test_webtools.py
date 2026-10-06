@@ -25,3 +25,11 @@ def test_settings_page(tmp_path, monkeypatch):
     monkeypatch.delenv("WCL_CLIENT_ID", raising=False)
     page = webtools.settings_page("Saved.")
     assert "cache_max_mb" in page and "SimulationCraft" in page and "Saved." in page
+
+
+def test_settings_page_changes_the_warcraft_logs_key(tmp_path, monkeypatch):
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    monkeypatch.setenv("WCL_CLIENT_ID", "9a1b2c3d-long-client-id")
+    page = webtools.settings_page()
+    assert "9a1b2c3d…" in page and "long-client-id" not in page
+    assert 'action="/credentials"' in page and 'name="back" value="settings"' in page
