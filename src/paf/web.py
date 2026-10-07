@@ -32,6 +32,33 @@ def bossguide_css() -> str:
 CSS = theme.CSS + bossguide_css() + """
 pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius:8px;padding:10px 12px}
 .boss-tile .name{font-weight:700;font-size:16px;margin-bottom:6px}
+/* the home page once set up (simple_home) */
+.home-hero{display:grid;gap:18px;margin:6px 0 30px;padding:24px;border-radius:16px;background:var(--surface);
+  border:1px solid var(--line)}
+.home-hero .me{display:flex;gap:14px;align-items:center}
+.home-hero .me-ic{width:56px;height:56px;border-radius:10px;margin:0}
+.home-hero .me b{display:block;font-size:20px} .home-hero .me span{color:var(--muted)}
+.start{display:grid;gap:14px;max-width:560px}
+.start h1{margin:4px 0 0;font:600 30px/1.15 'Fraunces',Georgia,serif}
+.start select.big{font-size:18px;padding:12px 14px;border-radius:10px}
+.segs{display:flex;gap:8px;flex-wrap:wrap}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg span{display:inline-block;padding:10px 18px;border-radius:999px;border:1.5px solid var(--line);cursor:pointer;
+  font-weight:600;font-size:16px}
+.seg input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.seg input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.btn.go{justify-self:start;font-size:18px;padding:12px 26px;border-radius:12px}
+.h-mine{margin-top:0}
+.bcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.bcard{display:flex;gap:12px;align-items:center;padding:14px 16px;border-radius:12px;border:1px solid var(--line);
+  background:var(--surface);color:var(--fg);text-decoration:none;transition:border-color .15s,transform .15s}
+.bcard:hover{border-color:var(--accent);transform:translateY(-1px)}
+.bcard .bc-ic{width:40px;height:40px;border-radius:8px;margin:0;flex:none}
+.bc-txt{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.bc-txt b{font-size:16px} .bc-meta{font-size:13px;color:var(--muted)}
+.bc-when{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.bc-more,.home-more{margin-top:18px} .bc-more>summary,.home-more>summary{cursor:pointer;color:var(--muted)}
+.home-more[open]>summary{margin-bottom:12px}
 .boss-tile .when{font-size:12px;color:var(--muted);margin-top:8px}
 .boss-tile .top{font-size:13px;margin-top:10px;line-height:1.35}
 .cta{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:18px 0 6px}
@@ -343,6 +370,40 @@ def prepared_block() -> str:
     return f'<h2>Your prepared bosses</h2><div class="grid">{tiles}</div>'
 
 
+def ago(mtime: float, now: float | None = None) -> str:
+    """When a prep was made, in words."""
+    s = max(0.0, (now or time.time()) - mtime)
+    if s < 120:
+        return "just now"
+    if s < 3600:
+        return f"{int(s // 60)} min ago"
+    if s < 86400:
+        return f"{int(s // 3600)} h ago"
+    if s < 2 * 86400:
+        return "yesterday"
+    return time.strftime("%d %b", time.localtime(mtime))
+
+
+DIFF_LABELS = {"lfr": "LFR", "normal": "Normal", "heroic": "Heroic", "mythic": "Mythic"}
+
+
+def boss_cards(items: list[dict], limit: int = 6) -> str:
+    """The prepared bosses as plain cards: the boss, the difficulty, when; the numbers stay in the sheet."""
+    from paf import icons
+
+    def card(x: dict) -> str:
+        cls = (x.get("spec") or "").split(" ")[-1].lower()
+        ic = icons.img(icons.CLASS_ICON.format(cls=cls), "medium", "bc-ic") if cls else ""
+        return (f'<a class="bcard" href="/view/{e(x["key"])}">{ic}<span class="bc-txt"><b>{e(x["name"])}</b>'
+                f'<span class="bc-meta"><span class="pill gold">{e(DIFF_LABELS.get(x["difficulty"], x["difficulty"] or "?"))}</span>'
+                f' {e(x["spec"] or "")}</span></span><span class="bc-when">{ago(x["mtime"])}</span></a>')
+    head = "".join(card(x) for x in items[:limit])
+    rest = items[limit:]
+    more = (f'<details class="bc-more"><summary>{len(rest)} more</summary><div class="bcards">'
+            + "".join(card(x) for x in rest) + "</div></details>") if rest else ""
+    return f'<div class="bcards">{head}</div>{more}'
+
+
 TABS = (("prep", "Prep sheet"), ("timeline", "Top players' timelines"))
 
 
@@ -462,6 +523,8 @@ whether the others cover the adds (stay on the boss) or you should pad them.</p>
 <form method="post" action="/guild" class="row"><input name="guild" placeholder="Guild name" value="{e(g)}">
 <input name="server" placeholder="Server" value="{e(gs)}"><select name="region" aria-label="Region">{regions}</select>
 <button class="btn ghost">Save</button></form></div></div>"""
+    if loaded is not None and encs and has_credentials() and not error:  # ready: one big thing to do
+        return page("prep-a-fight", simple_home(loaded, encs, character, guild, creds))
     body = f"""<h1>Prepare a boss fight</h1>
 <p class="lead">The top players' logs, your character and SimulationCraft: your plan for this fight.</p>
 {prepared_block()}
@@ -470,6 +533,30 @@ whether the others cover the adds (stay on the boss) or you should pad them.</p>
 <div class="card step"><div class="num">2</div><div class="body"><h3>The boss</h3>{boss_form}</div></div>
 {guild}"""
     return page("prep-a-fight", body)
+
+
+def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
+    """The home page once the app is set up (issue #13): your character, one big "prepare a boss", your bosses."""
+    from paf import icons
+
+    diff = settings.get("difficulty")
+    options = "".join(f'<option value="{x.id}">{e(x.name)}</option>' for x in encs)
+    diffs = "".join(f'<label class="seg"><input type="radio" name="difficulty" value="{d}"{" checked" if d == diff else ""}>'
+                    f'<span>{e(DIFF_LABELS.get(d, d))}</span></label>' for d in settings.DIFFICULTIES if d != "lfr")
+    ic = icons.img(icons.CLASS_ICON.format(cls=loaded.class_name.lower()), "large", "me-ic")
+    items = prepared()
+    mine = (f'<h2 class="h-mine">Your bosses</h2>{boss_cards(items)}' if items else "")
+    g = settings.get("guild")
+    return f"""<section class="home-hero"><div class="me">{ic}<div><b>{e(loaded.name)}</b>
+<span>{e(loaded.spec.title())} {e(loaded.class_name.title())}{(" &middot; " + e(g)) if g else ""}</span></div></div>
+<form method="get" action="/boss" class="start"><h1>Prepare a boss</h1>
+<select name="boss" aria-label="Boss" class="big">{options}</select>
+<div class="segs" role="radiogroup" aria-label="Difficulty">{diffs}</div>
+<button class="btn go">Let's go &rarr;</button></form></section>
+{mine}
+<details class="home-more"><summary>Change your character, your raid or your Warcraft Logs key</summary>
+<div class="card step"><div class="num">1</div><div class="body"><h3>Your character</h3>{character}</div></div>
+{guild}{creds}</details>"""
 
 
 def boss_page(boss_id: str, difficulty: str) -> bytes:

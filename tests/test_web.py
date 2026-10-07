@@ -236,3 +236,28 @@ def test_language_switch_in_the_top_bar(server, monkeypatch):
     assert settings.get("language") == "fr"
     monkeypatch.delenv("PAF_LANG")  # now the setting decides
     assert "Réglages" in fetch(url + "/settings")
+
+
+def test_simple_home_once_set_up(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    monkeypatch.setenv("WCL_CLIENT_ID", "id")
+    monkeypatch.setenv("WCL_CLIENT_SECRET", "secret")
+    monkeypatch.setattr(web, "_encounters", lambda: [SimpleNamespace(id=3470, name="Nek'zali the Soulcoiler")])
+    (tmp_path / "profiles").mkdir(parents=True)
+    (tmp_path / "profiles" / "current.simc").write_text('shaman="Ixuu"\nspec=elemental\nhead=,id=1\n')
+    rep = tmp_path / "reports"
+    rep.mkdir()
+    (rep / "prep-the-altar-heroic-elemental-shaman.html").write_text("<title>The Altar prep</title>")
+    page = web.home().decode()
+    assert "Prepare a boss</h1>" in page and "Let's go" in page and 'name="difficulty" value="mythic"' in page
+    assert "Your bosses" in page and "The Altar" in page and "just now" in page
+    assert "Change your character" in page and 'name="simc"' in page  # the rest, folded
+    assert "%" not in page.split("Your bosses", 1)[1].split("<details", 1)[0]  # no numbers on the cards
+
+
+def test_ago():
+    now = 1_000_000.0
+    assert web.ago(now - 30, now) == "just now" and web.ago(now - 600, now) == "10 min ago"
+    assert web.ago(now - 7200, now) == "2 h ago" and web.ago(now - 100_000, now) == "yesterday"

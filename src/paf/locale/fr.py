@@ -375,6 +375,10 @@ PHRASES: dict[str, str] = {
     "NSRT reminders": "Rappels NSRT", "Method Raid Tools: paste it in your note": "Method Raid Tools : colle-la dans ta note",
     "Northern Sky Raid Tools: your personal reminders": "Northern Sky Raid Tools : tes rappels perso",
     "Moving or standing still": "Bouger ou rester planté", "Move: it is the strategy": "Bouge : c'est la strat",
+    # the home page once set up (paf.web.simple_home)
+    "Let's go &rarr;": "C'est parti &rarr;", "Your bosses": "Tes boss",
+    "Difficulty": "Difficulté", "Normal": "Normal", "Heroic": "Héroïque", "Mythic": "Mythique", "just now": "à l'instant", "yesterday": "hier",
+    "Change your character, your raid or your Warcraft Logs key": "Changer de personnage, de raid ou de clé Warcraft Logs",
     "Your last pull": "Ton dernier pull", "Casting": "Temps à caster", "Moving": "Temps en mouvement",
     "Your longest pauses without casting:": "Tes plus longues pauses sans caster :",
     "Before the pull:": "Avant le pull :", "You": "Toi","Kill them": "Tue-les", "Interrupt": "Interromps", "Soak it": "Soak",
@@ -560,6 +564,7 @@ PATTERNS: list[tuple[str, str]] = [
     (r"^Careful with (.+)$", r"Attention à \1"), (r"^Hit (.+)$", r"Tape \1"),
     (r"^Defensive: (.+)$", r"Défensif : \1"), (r"^precast$", r"avant le pull"),
     (r"^Everyone moves \((\d+) s\)$", r"Tout le monde bouge (\1 s)"),
+    (r"^(\d+) h ago$", r"il y a \1 h"), (r"^(\d+) min ago$", r"il y a \1 min"), (r"^(\d+) more$", r"\1 de plus"),
     # your last pull (paf.review); "top players" may already read "tops" (a phrase of its own)
     (r"^(kill|pull) of (\d+:\d\d), from your raid's log\.$", r"\1 de \2, d'après le log de ton raid."),
     (r"^You (\d+)%$", r"Toi \1 %"), (r"^(?:Top players|Tops) (\d+)%$", r"Tops \1 %"),
