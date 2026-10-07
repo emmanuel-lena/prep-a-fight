@@ -30,3 +30,16 @@ def test_an_imported_character_is_marked(tmp_path, monkeypatch):
     monkeypatch.setenv("PAF_HOME", str(tmp_path))
     c = characters.save(SHAMAN, imported=True)
     assert c.imported and characters.is_imported((tmp_path / "profiles" / "current.simc").read_text(encoding="utf-8"))
+
+
+def test_characters_page_and_the_add_button(tmp_path, monkeypatch):
+    from paf import web
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    characters.save(SHAMAN)
+    characters.save(ROGUE)
+    page = web.characters_page()
+    assert page.count("class=\"ccard") == 2 and "Play this character" in page and "id='add'" in page
+    assert 'action="/profile"' in page and 'action="/character/remove"' in page
+    assert 'href="/characters#add"' in web.characters_strip()
+    assert 'href="/characters"' in web.page("X", "").decode()  # in the top bar

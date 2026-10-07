@@ -54,8 +54,16 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
   border:1px solid var(--line);background:none;color:var(--fg);font:inherit;font-weight:600}
 .chars .ch button:hover{border-color:var(--accent)}
 .chars .ch-ic{width:26px;height:26px;border-radius:50%;margin:0}
-.ch-add{flex:1 1 100%} .ch-add>summary{display:inline-block;cursor:pointer;color:var(--accent);font-weight:600;padding:6px 2px}
-.ch-add textarea{width:100%;min-height:120px;box-sizing:border-box}
+.ch-new{display:inline-flex;align-items:center;padding:6px 14px;border-radius:999px;border:1.5px dashed var(--accent);
+  color:var(--accent);font-weight:600;text-decoration:none} .ch-new:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.ccards{display:grid;gap:12px;margin-bottom:24px}
+.ccard{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:14px 16px;border-radius:14px;border:1px solid var(--line);
+  background:var(--surface)} .ccard.on{border-color:var(--accent)}
+.ccard .cc-ic{width:48px;height:48px;border-radius:10px;margin:0}
+.cc-txt{display:flex;flex-direction:column;gap:4px;flex:1;min-width:180px} .cc-txt b{font-size:18px}
+.cc-act{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .cc-act form{margin:0}
+.btn.danger{color:var(--neg)}
+.add-form textarea{width:100%;min-height:160px;box-sizing:border-box}
 .bcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
 .bcard{display:flex;gap:12px;align-items:center;padding:14px 16px;border-radius:12px;border:1px solid var(--line);
   background:var(--surface);color:var(--fg);text-decoration:none;transition:border-color .15s,transform .15s}
@@ -87,8 +95,8 @@ def page(title: str, body: str, refresh: int | None = None, nav: str = "", job: 
         running = loading.banners(skip=job)
     except Exception:  # noqa: BLE001 - a banner never breaks a page
         running = ""
-    nav = nav or ('<a href="/">Home</a><a href="/tools">Tools</a><a href="/settings">Settings</a>'
-                  '<a href="/feedback">Feedback</a>')
+    nav = nav or ('<a href="/">Home</a><a href="/characters">Characters</a><a href="/tools">Tools</a>'
+                  '<a href="/settings">Settings</a><a href="/feedback">Feedback</a>')
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}{loading.CSS}</style></head><body>"
             f"{theme.topbar(nav + lang_switch())}{loading.LOADER}"
@@ -560,12 +568,38 @@ def characters_strip() -> str:
         f'<button title="{e(c.spec.title())} {e(c.class_name.title())}">'
         f'{icons.img(icons.CLASS_ICON.format(cls=c.class_name.lower()), "medium", "ch-ic")}<span>{e(c.name)}</span>'
         f'</button></form>' for c in others)
-    add = ('<details class="ch-add"><summary>+ Add a character</summary><form method="post" action="/profile">'
-           '<p class="small muted">In game, on that character: type <code>/simc</code>, then Ctrl+A, Ctrl+C, and paste '
-           'here. Paste it again after a gear change to update it.</p>'
-           '<textarea name="simc" required placeholder="Paste the /simc export here"></textarea>'
-           '<p><button class="btn">Add this character</button></p></form></details>')
+    add = '<a class="ch-new" href="/characters#add">+ Add a character</a>'
     return f'<div class="chars">{chips}{add}</div>'
+
+
+ADD_FORM = ('<form method="post" action="/profile" class="add-form"><p class="small muted">In game, on that character: '
+            'type <code>/simc</code>, then Ctrl+A, Ctrl+C, and paste here. Paste it again after a gear change to '
+            'update it.</p><textarea name="simc" required placeholder="Paste the /simc export here"></textarea>'
+            '<p><button class="btn go">Add this character</button></p></form>')
+
+
+def characters_page() -> str:
+    """All your characters: play one, update its export, remove it; and add a new one."""
+    from paf import characters, icons
+
+    cards = ""
+    for c in characters.all_characters():
+        ic = icons.img(icons.CLASS_ICON.format(cls=c.class_name.lower()), "large", "cc-ic")
+        badge = ('<span class="pill">from a log: no bags</span>' if c.imported else
+                 f'<span class="pill">{c.bags} items in bags</span>')
+        play = ('<span class="pill gold">active</span>' if c.current else
+                f'<form method="post" action="/character/select"><input type="hidden" name="slug" value="{e(c.slug)}">'
+                f'<button class="btn go">Play this character</button></form>')
+        cards += (f'<div class="ccard{" on" if c.current else ""}">{ic}<div class="cc-txt"><b>{e(c.name)}</b>'
+                  f'<span>{e(c.spec.title())} {e(c.class_name.title())}</span><span>{badge} '
+                  f'<span class="muted small">updated <span>{ago(c.mtime)}</span></span></span></div><div class="cc-act">{play}'
+                  f'<a class="btn ghost" href="#add">Update</a>'
+                  f'<form method="post" action="/character/remove"><input type="hidden" name="slug" value="{e(c.slug)}">'
+                  f'<button class="btn ghost danger" title="Remove">Remove</button></form></div></div>')
+    empty = "" if cards else "<p class='muted'>No character yet: add your first one below.</p>"
+    return (f"<h1>Your characters</h1><p class='lead'>One /simc export per character: switch in one click, paste "
+            f"again after a gear change.</p><div class='ccards'>{cards}</div>{empty}"
+            f"<h2 id='add'>+ Add a character</h2><div class='card'>{ADD_FORM}</div>")
 
 
 def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
@@ -1108,6 +1142,8 @@ class Handler(BaseHTTPRequestHandler):
                 body = tool_page(url.path.rsplit("/", 1)[1], _encounters())
                 self._send(page("Tool", body) if body else page("Not found", "<p>Unknown tool.</p>"),
                            200 if body else 404)
+            elif url.path == "/characters":
+                self._send(page("Characters", characters_page()))
             elif url.path == "/settings":
                 from paf.webtools import settings_page
 

@@ -403,6 +403,12 @@ PHRASES: dict[str, str] = {
     # your characters (paf.characters)
     "Paste /simc (recommended)": "Coller /simc (recommandé)", "Quick: from Warcraft Logs": "Rapide : depuis Warcraft Logs",
     "+ Add a character": "+ Ajouter un perso", "Add this character": "Ajouter ce perso",
+    "Characters": "Persos", "Your characters": "Tes persos",
+    "One /simc export per character: switch in one click, paste again after a gear change.":
+        "Un export /simc par perso : change d'un clic, recolle-le après un changement de stuff.",
+    "Play this character": "Jouer ce perso", "Remove": "Supprimer", "active": "actif",
+    "from a log: no bags": "depuis un log : sans sacs", "updated": "mis à jour",
+    "No character yet: add your first one below.": "Aucun perso pour l'instant : ajoute le premier ci-dessous.",
     "In game, on that character: type": "En jeu, sur ce perso : tape",
     ", then Ctrl+A, Ctrl+C, and paste here. Paste it again after a gear change to update it.":
         ", puis Ctrl+A, Ctrl+C, et colle ici. Recolle-le après un changement de stuff pour le mettre à jour.",
