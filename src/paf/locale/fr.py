@@ -359,6 +359,17 @@ PHRASES: dict[str, str] = {
     "Prepared with": "Préparé avec", "free and open source.": "gratuit et open source.",
     "Sharing failed:": "Le partage a échoué :", "Prep sheet": "Fiche", "Top players' timelines": "Timelines des tops",
     "Open alone": "Ouvrir seule", "Edit & re-run": "Modifier et relancer",
+    # the simple view (paf.simple)
+    "Before the pull": "Avant le pull", "Change your talents": "Change tes talents", "a big gain": "gros gain",
+    "a small gain": "petit gain", "Copy the talents": "Copier les talents",
+    "Swap some gear": "Change quelques pièces de stuff", "Nothing to change": "Rien à changer",
+    "Your talents and gear are already right for this boss.": "Tes talents et ton stuff sont déjà bons pour ce boss.",
+    "Your cooldowns": "Tes CD", "Press them as soon as they are ready.": "Lance-les dès qu'ils sont prêts.",
+    "Hold them for these moments.": "Garde-les pour ces moments.", "Watch out": "Attention",
+    "The fight, start to finish": "Le combat, du début à la fin",
+    "On top: what you press. Below: what the boss does. Touch an icon.":
+        "En haut : ce que tu lances. En bas : ce que fait le boss. Touche une icône.",
+    "See all the details &rarr;": "Voir tout le détail &rarr;", "&larr; Simple view": "&larr; Vue simple",
 }
 
 PATTERNS: list[tuple[str, str]] = [
@@ -534,6 +545,13 @@ PATTERNS: list[tuple[str, str]] = [
     (r"(.+?) \((heroic|mythic|normal)\): (\w+) cooldown timelines", r"\1 (\2) : timelines des CD \3"),
     (r"(.+?) prep$", r"Prépa \1"),
     (r"(?<![\w])on (?=[A-Z])", r"sur "),
+    # last: the specific sentences above (e.g. "Kill the X (~36 per kill)...") win over these
+    # the simple view (paf.simple): short sentences around a game name
+    (r"^Kill the (.+)$", r"Tue : \1"), (r"^Interrupt (.+)$", r"Interromps \1"), (r"^Soak (.+)$", r"Soak \1"),
+    (r"^Careful with (.+)$", r"Attention à \1"), (r"^press (.+)$", r"lance \1"), (r"^hit (.+)$", r"tape \1"),
+    (r"^Defensive: (.+)$", r"Défensif : \1"),
+    # the sheet picker of /view: "Boss (mythic Elemental)"
+    (r"\(mythic\b", r"(mythique"), (r"\(heroic\b", r"(héroïque"), (r"\(normal\b", r"(normal"), (r"\(lfr\b", r"(LFR"),
 ]
 
 # class and spec names ("Elemental Shaman", as Warcraft Logs writes them) in the game's French
