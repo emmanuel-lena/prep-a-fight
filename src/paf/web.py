@@ -609,31 +609,53 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
         gicons = icons_for(bossguide.spell_refs(sections))
         guide = (f"<h2>The boss in 60 seconds</h2>{bossguide.summary_html(sections, 'damage')}"
                  f"<details class='card'><summary>Every ability, phase by phase (Encounter Journal)</summary>"
-                 f"{bossguide.abilities_html(sections, mechanics=mechs, icon_map=gicons)}</details>"
-                 f"<h2>Prepare it</h2>")
+                 f"{bossguide.abilities_html(sections, mechanics=mechs, icon_map=gicons)}</details>")
+    raid_now = current_raid(enc, difficulty)
+    g = settings.get("guild")
+    raid_said = f"the latest public log of {g}" if g else ""
+    nxt = "<button type='button' class='btn go next'>Next &rarr;</button>"
+    back = "<button type='button' class='btn ghost prev'>&larr; Back</button>"
     body = f"""<p class="small"><a href="/">&larr; Home</a></p>
-<h1>{e(enc.name)} <span class="pill gold">{e(difficulty)}</span></h1>
-<p class="lead">{kills} ranked kills in your corpus.{last}</p>{guide}
-<form method="post" action="/prep">
+<h1>{e(enc.name)} <span class="pill gold">{e(DIFF_LABELS.get(difficulty, difficulty))}</span></h1>
+<p class="lead">{kills} ranked kills in your corpus.{last}</p>
+<form method="post" action="/prep" class="ob story" data-boss="{enc.id}-{e(difficulty)}">
 <input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
-<div class="card step"><div class="num">1</div><div class="body"><h3>Your assignments</h3>{assigns}</div></div>
-<div class="card step"><div class="num">2</div><div class="body"><h3>Your raid on this boss</h3>
-<input name="raid" style="width:100%" value="{e(current_raid(enc, difficulty))}"
+<ol class="ob-dots" aria-hidden="true"><li></li><li></li><li></li><li></li></ol>
+<section class="ob-step" data-step="goal"><h2>What do you want from this boss?</h2>
+<div class="goals">
+<label class="goal"><input type="radio" name="goal" value="boss"><span><b>Boss damage</b>
+<small>Progress: your raid lead wants everyone on the boss. Cooldowns and gear aim at the boss.</small></span></label>
+<label class="goal"><input type="radio" name="goal" value="total"><span><b>Pad the adds</b>
+<small>Your job is the adds, or you farm for parses: cooldowns and gear for total damage.</small></span></label>
+<label class="goal"><input type="radio" name="goal" value="auto" checked><span><b>Let my raid decide</b>
+<small>The prep reads your raid's log: if the others already cover the adds, you stay on the boss.</small></span></label>
+</div><div class="ob-actions">{nxt}</div></section>
+<section class="ob-step" data-step="assigns"><h2>Are you assigned to something?</h2>{assigns}
+<p class="small muted">Each assignment is simulated: its moves and its downtime change your cooldown plan and your gear.</p>
+<div class="ob-actions">{back}{nxt}</div></section>
+<section class="ob-step" data-step="raid"><h2>Your raid</h2>
+<input name="raid" style="width:100%" value="{e(raid_now)}"
 placeholder="Link to one of your raid's logs: https://www.warcraftlogs.com/reports/..." aria-label="Raid log link">
-<p class="tiny muted" style="margin-top:6px">{e(raid_hint())}</p></div></div>
-<div class="card step"><div class="num">3</div><div class="body"><h3>Your goal on this fight</h3>
-<label><input type="radio" name="goal" value="auto" checked> Let the app decide <span class="muted small">(from
-your raid's log; otherwise both plans are shown)</span></label>
-<label><input type="radio" name="goal" value="boss"> Boss damage first <span class="muted small">(your raid lead
-wants you on the boss)</span></label>
-<label><input type="radio" name="goal" value="total"> Total damage <span class="muted small">(pad the adds)</span>
-</label></div></div>
-<div class="card step"><div class="num">4</div><div class="body"><h3>What to sim</h3>
+<p class="small muted" style="margin-top:6px">{e(raid_hint())}</p>
+<div class="ob-actions">{back}{nxt}</div></section>
+<section class="ob-step" data-step="go"><h2>Ready to prepare</h2>
+<ul class="recap">
+<li data-if="goal=boss">For <b>boss damage</b>.</li><li data-if="goal=total">For <b>total damage</b> (pad the adds).</li>
+<li data-if="goal=auto">Your raid's log decides between boss damage and padding.</li>
+<li data-if="assigns"><span>With your assignments:</span> <b class="recap-assigns"></b></li>
+<li data-if="no-assigns">No assignment.</li>
+<li data-if="raid">Your raid: <b class="recap-raid"></b></li>
+<li data-if="no-raid">Your raid: <b>{e(raid_said) if raid_said else "none (the prep shows both plans)"}</b></li>
+</ul>
+<details class="what-sim"><summary>What to sim</summary>
 <label><input type="checkbox" name="gear" checked> Best gear from your bags, and what this boss drops for you</label>
 <label><input type="checkbox" name="optimize" checked> Ideal cooldown plan per objective
-<span class="muted small">(the slowest part: 20 to 40 min)</span></label></div></div>
-<div class="cta"><button class="btn big">Prepare this fight</button>
-<span class="small muted">Runs on your computer; you can follow it live.</span></div></form>
+<span class="muted small">(the slowest part: 20 to 40 min)</span></label></details>
+<div class="ob-actions">{back}<button class="btn go">Prepare this fight &rarr;</button></div>
+<p class="small muted">Runs on your computer; you can follow it live.</p></section>
+</form>
+{(f"<details class='card'><summary>The boss in 60 seconds</summary>{guide}</details>") if guide else ""}
+{_story_css()}{STORY_JS}
 <h2>Advanced</h2>
 <details class="card"><summary>Your fight plan: your own movements, Bloodlust, Power Infusion</summary>
 {plan_block(enc, difficulty)}</details>
@@ -641,6 +663,61 @@ wants you on the boss)</span></label>
 {notes_block(enc, difficulty)}</details>"""
     return page(enc.name, body)
 
+
+def _story_css() -> str:
+    from paf.onboarding import CSS as ONBOARDING_CSS
+
+    return "<style>" + ONBOARDING_CSS + """
+.story{margin:10px 0 30px;max-width:640px}
+.story h2{font:600 26px/1.2 'Fraunces',Georgia,serif;margin:0 0 16px;text-transform:none;letter-spacing:0;color:var(--fg)}
+.goals{display:grid;gap:10px}
+.goal{display:block;cursor:pointer}
+.goal input{position:absolute;opacity:0;pointer-events:none}
+.goal>span{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border:1.5px solid var(--line);border-radius:12px;
+  transition:border-color .15s,background .15s}
+.goal b{font-size:17px} .goal small{color:var(--muted);font-size:14.5px;line-height:1.45}
+.goal input:checked+span{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.goal input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.recap{list-style:none;padding:0;margin:0 0 14px;display:grid;gap:8px;font-size:17px}
+.recap li::before{content:"\\2713";color:var(--pos);font-weight:700;margin-right:10px}
+.recap li[hidden]{display:none}
+.what-sim{margin:6px 0 0} .what-sim label{display:block;margin:6px 0}
+</style>"""
+
+
+STORY_JS = """<script>
+(function(){
+var f = document.querySelector('form.story'); if (!f) return;
+var steps = [].slice.call(f.querySelectorAll('.ob-step')), dots = [].slice.call(f.querySelectorAll('.ob-dots li'));
+var key = 'paf-goal:' + f.dataset.boss, at = 0;
+try { var g = localStorage.getItem(key); var r = g && f.querySelector('input[name=goal][value=' + g + ']'); if (r) r.checked = true; } catch (e) {}
+function recap(){
+  var goal = (f.querySelector('input[name=goal]:checked') || {}).value || 'auto';
+  var picked = [].slice.call(f.querySelectorAll('input[name=assign]:checked')).map(function(i){
+    var t = i.parentNode.cloneNode(true); var m = t.querySelector('.meta'); if (m) m.remove(); return t.textContent.trim(); });
+  var raid = (f.querySelector('input[name=raid]') || {}).value || '';
+  f.querySelector('.recap-assigns').textContent = picked.join(', ');
+  f.querySelector('.recap-raid').textContent = raid;
+  f.querySelectorAll('.recap [data-if]').forEach(function(li){
+    var c = li.dataset.if;
+    li.hidden = !(c === 'goal=' + goal || (c === 'assigns' && picked.length) || (c === 'no-assigns' && !picked.length)
+                  || (c === 'raid' && raid) || (c === 'no-raid' && !raid)); });
+}
+function show(i, back){
+  at = Math.max(0, Math.min(steps.length - 1, i));
+  steps.forEach(function(s, j){ s.classList.toggle('on', j === at); s.classList.toggle('back', !!back); });
+  dots.forEach(function(d, j){ d.classList.toggle('on', j <= at); });
+  if (steps[at].dataset.step === 'go') recap();
+}
+f.querySelectorAll('.next').forEach(function(b){ b.addEventListener('click', function(){ show(at + 1); }); });
+f.querySelectorAll('.prev').forEach(function(b){ b.addEventListener('click', function(){ show(at - 1, true); }); });
+f.querySelectorAll('input[name=goal]').forEach(function(r){ r.addEventListener('change', function(){
+  try { localStorage.setItem(key, r.value); } catch (e) {} setTimeout(function(){ show(at + 1); }, 200); }); });
+f.addEventListener('submit', function(){ var r = f.querySelector('input[name=goal]:checked');
+  try { if (r) localStorage.setItem(key, r.value); } catch (e) {} });
+show(0);
+})();
+</script>"""
 
 def prepared_link(enc, difficulty: str) -> str:
     from paf.corpus.template import report_key

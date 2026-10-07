@@ -400,6 +400,35 @@ PHRASES: dict[str, str] = {
         "Ajoute d'abord ta clé Warcraft Logs (l'étape d'avant), ou colle ton export /simc.",
     "Ready": "C'est prêt", "You can set the rest later in Settings.": "Tu pourras régler le reste plus tard dans les Réglages.",
     "your raid is saved": "ton raid est enregistré",
+    # the boss page: a short story before the prep (issue #12)
+    "What do you want from this boss?": "Qu'est-ce que tu veux sur ce boss ?",
+    "Progress: your raid lead wants everyone on the boss. Cooldowns and gear aim at the boss.":
+        "Prog : ton RL veut tout le monde sur le boss. CD et stuff visent le boss.",
+    "Your job is the adds, or you farm for parses: cooldowns and gear for total damage.":
+        "Ton rôle, c'est les adds, ou tu farm pour le parse : CD et stuff pour les dégâts totaux.",
+    "Let my raid decide": "Mon raid décide",
+    "The prep reads your raid's log: if the others already cover the adds, you stay on the boss.":
+        "La prépa lit le log de ton raid : si les autres couvrent déjà les adds, tu restes sur le boss.",
+    "Next &rarr;": "Suivant &rarr;", "&larr; Back": "&larr; Retour",
+    "Are you assigned to something?": "Tu as un assign ?",
+    "Each assignment is simulated: its moves and its downtime change your cooldown plan and your gear.":
+        "Chaque assign est simulé : ses déplacements et son temps mort changent ton plan de CD et ton stuff.",
+    "Link to one of your raid's logs: https://www.warcraftlogs.com/reports/...":
+        "Lien vers un log de ton raid : https://www.warcraftlogs.com/reports/...",
+    "Raid log link": "Lien du log du raid", "Ready to prepare": "Prêt à préparer",
+    "boss damage": "dégâts boss", "total damage": "dégâts totaux",
+    "Your raid's log decides between boss damage and padding.": "Le log de ton raid choisit entre dégâts boss et pad.",
+    "With your assignments:": "Avec tes assigns :", "No assignment.": "Aucun assign.", "Your raid:": "Ton raid :",
+    "What to sim": "Quoi simuler", "Ideal cooldown plan per objective": "Plan de CD idéal par objectif",
+    "(the slowest part: 20 to 40 min)": "(le plus long : 20 à 40 min)",
+    "Prepare this fight &rarr;": "Préparer ce combat &rarr;",
+    "Runs on your computer; you can follow it live.": "Tourne sur ton ordinateur ; tu peux suivre en direct.",
+    "Advanced": "Avancé", "For": "Pour les", "&larr; Home": "&larr; Accueil",
+    "Your fight plan: your own movements, Bloodlust, Power Infusion":
+        "Ton plan de combat : tes propres déplacements, Furie sanguinaire, Infusion de puissance",
+    "What you know about this boss: damage amps, targets to ignore":
+        "Ce que tu sais de ce boss : amplis de dégâts, cibles à ignorer",
+    "Tick what you handle on this fight.": "Coche ce que tu gères sur ce combat.",
     # the home page once set up (paf.web.simple_home)
     "Let's go &rarr;": "C'est parti &rarr;", "Your bosses": "Tes boss",
     "Difficulty": "Difficulté", "Normal": "Normal", "Heroic": "Héroïque", "Mythic": "Mythique", "just now": "à l'instant", "yesterday": "hier",
@@ -597,7 +626,14 @@ PATTERNS: list[tuple[str, str]] = [
      r"aucun combat de boss récent de \1 dans un log public : colle plutôt ton export /simc"),
     (r"^Warcraft Logs refused this key: (.*)$", r"Warcraft Logs a refusé cette clé : \1"),
     (r"^That does not look like a /simc export\.$", r"Ça ne ressemble pas à un export /simc."),
-    (r"^(\d+) h ago$", r"il y a \1 h"), (r"^(\d+) min ago$", r"il y a \1 min"), (r"^(\d+) more$", r"\1 de plus"),
+    (r"^(\d+) h ago$", r"il y a \1 h"),
+    (r"(\d+) kills classés in your corpus\.", r"\1 kills classés dans ton corpus."),
+    (r"(\d+) players (?:par|per) kill", r"\1 joueurs par kill"), (r", ~(\d+) s of movement", r", ~\1 s de déplacement"),
+    (r"^(?:Your raid|Ton raid)'s log decides between boss damage and padding\.$", r"Le log de ton raid choisit entre dégâts boss et pad."),
+    (r"^the latest public log of (.+)$", r"le dernier log public de \1"),
+    (r"^none \(the prep shows both plans\)$", r"aucun (la prépa montre les deux plans)"),
+    (r"Timings (?:and|et le) (?:the )?movement it costs an? (\w+) come from the logs; hover a mechanic to see when it happens\.",
+     r"Les timings et le déplacement que ça coûte à un \1 viennent des logs ; survole une méca pour voir quand elle arrive."), (r"^(\d+) min ago$", r"il y a \1 min"), (r"^(\d+) more$", r"\1 de plus"),
     # your last pull (paf.review); "top players" may already read "tops" (a phrase of its own)
     (r"^(kill|pull) of (\d+:\d\d), from your raid's log\.$", r"\1 de \2, d'après le log de ton raid."),
     (r"^You (\d+)%$", r"Toi \1 %"), (r"^(?:Top players|Tops) (\d+)%$", r"Tops \1 %"),
