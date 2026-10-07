@@ -366,9 +366,10 @@ PHRASES: dict[str, str] = {
     "Your talents and gear are already right for this boss.": "Tes talents et ton stuff sont déjà bons pour ce boss.",
     "Your cooldowns": "Tes CD", "Press them as soon as they are ready.": "Lance-les dès qu'ils sont prêts.",
     "Hold them for these moments.": "Garde-les pour ces moments.", "Watch out": "Attention",
-    "The fight, start to finish": "Le combat, du début à la fin",
-    "On top: what you press. Below: what the boss does. Touch an icon.":
-        "En haut : ce que tu lances. En bas : ce que fait le boss. Touche une icône.",
+    "The fight, step by step": "Le combat, pas à pas",
+    "Left: what the boss does. Right: what you do. Open a phase to see it.":
+        "À gauche : ce que fait le boss. À droite : ce que tu fais. Ouvre une phase pour la voir.",
+    "You": "Toi", "Kill them": "Tue-les", "Interrupt": "Interromps", "Soak it": "Soak",
     "See all the details &rarr;": "Voir tout le détail &rarr;", "&larr; Simple view": "&larr; Vue simple",
 }
 
@@ -548,7 +549,7 @@ PATTERNS: list[tuple[str, str]] = [
     # last: the specific sentences above (e.g. "Kill the X (~36 per kill)...") win over these
     # the simple view (paf.simple): short sentences around a game name
     (r"^Kill the (.+)$", r"Tue : \1"), (r"^Interrupt (.+)$", r"Interromps \1"), (r"^Soak (.+)$", r"Soak \1"),
-    (r"^Careful with (.+)$", r"Attention à \1"), (r"^press (.+)$", r"lance \1"), (r"^hit (.+)$", r"tape \1"),
+    (r"^Careful with (.+)$", r"Attention à \1"), (r"^Hit (.+)$", r"Tape \1"),
     (r"^Defensive: (.+)$", r"Défensif : \1"),
     # the sheet picker of /view: "Boss (mythic Elemental)"
     (r"\(mythic\b", r"(mythique"), (r"\(heroic\b", r"(héroïque"), (r"\(normal\b", r"(normal"), (r"\(lfr\b", r"(LFR"),

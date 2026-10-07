@@ -1020,8 +1020,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
         saved.optimized = [dataclasses.replace(p, choice={k: Rule(r.name, r.description, None)
                                                           for k, r in p.choice.items()}) for p in d.optimized]
         (root / "prepdata.pickle").write_bytes(pickle.dumps(saved))
-    except Exception:  # noqa: BLE001 - only a convenience
-        pass
+    except Exception as exc:  # noqa: BLE001 - only a convenience
+        print(f"  (the sheet's data was not saved for a later render: {str(exc)[:120]})")
     import json
     import re
 
@@ -1117,6 +1117,10 @@ def _boss_guide(d, con, enc, diff: int, diff_name: str, spec: str, tl, fight, pk
             mechs = load_mechanics(con, enc.id, diff, spec)
         except Exception:  # noqa: BLE001 - the guide works without the assignment stats
             mechs = []
+    # the boss's spells and when (the simple view's vertical timeline): the Encounter Journal's, else the rare ones
+    journal = set(bossguide.spell_refs(sections)) if sections else set()
+    d.boss_casts = [(n, ts) for n, ts in (tl.boss_casts if tl is not None else [])
+                    if (n in journal if journal else len(ts) <= 12)]
     if not sections:
         return mechs
     burst = {v.name.split(" (")[0]: v.multiplier for v in fight.vulnerable}

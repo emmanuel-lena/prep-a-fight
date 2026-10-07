@@ -28,14 +28,27 @@ def test_simple_view_comes_first_with_three_questions(monkeypatch):
     assert "Your cooldowns" in view and "Hold them for these moments." in view
     assert re.search(r"<b>Ascendance</b><span class='times'><time>0:20</time><time>3:20</time>", view)
     assert "Nothing to change" in view  # no talents nor gear worth it
-    assert view.count("class='mk up'") == 3 and "See all the details" in view
+    assert "See all the details" in view
     assert "&larr; Simple view" in page  # the way back from the details
     assert "{" not in view
 
 
-def test_markers_never_overlap():
-    rows = simple._rows([0, 1, 2, 100, 101], 300)
-    assert rows[:3] == [0, 1, 2] and rows[3] == 0 and rows[4] == 1
+def test_vertical_fight_boss_left_you_right(monkeypatch):
+    from paf.actions import Action
+
+    d = sheet()
+    d.boss_casts = [("Soul Transfer", [21.0, 160.0])]
+    d.waves = [(50.0, 4, 20.0, "Amani")]
+    d.actions = [Action("kill", "Amani", "Kill the Amani (~4 per kill)")]
+    monkeypatch.setattr("paf.optimize.plan_moments", lambda plan, fight, names: [(20, ["Ascendance"])])
+    view = simple.fight_html(d)
+    phases = view.split("<details")[1:]
+    assert len(phases) == 2 and " open>" in phases[0] and " open>" not in phases[1]  # the first phase is open
+    first = phases[0]
+    # one row at 0:20: the boss's spell on the left, your cooldown on the right
+    assert re.search(r"<div class='l'>.*Soul Transfer.*</div><time>0:20</time><div class='r'>.*Ascendance", first)
+    assert "4 × Amani" in first and "Kill them" in first and "inv_misc_groupneedmore" in first
+    assert "<time>2:40</time>" in phases[1]
 
 
 def test_simple_view_in_french(monkeypatch):
@@ -46,4 +59,4 @@ def test_simple_view_in_french(monkeypatch):
     monkeypatch.setenv("PAF_LANG", "fr")
     page = translate(simple.simple_html(d))
     assert "Tes CD" in page and "Garde-les pour ces moments." in page and "Rien à changer" in page
-    assert "data-text='lance Ascendance'" in page or 'data-text="lance Ascendance"' in page
+    assert "Le combat, pas à pas" in page and "À gauche : ce que fait le boss." in page
