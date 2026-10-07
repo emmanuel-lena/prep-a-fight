@@ -48,6 +48,7 @@ Le prototype PowerShell (`Invoke-LocalTopGear.ps1`, Top Gear 3 passes) a été r
 - **Mouvement déduit des trajectoires** : trop pénalisant tel quel (les tops castent en bougeant). `paf validate --calibrate` le met à l'échelle ; sur Ula'tek HM, facteur 0 → 0,97 du DPS réel des tops. Les déplacements perso et les assigns (`personal_movement`) ne sont jamais mis à l'échelle.
 - **Calibrage des adds** : jamais au-dessus de ×1 (les nombres viennent des logs) ; l'écart de part boss restant vient de la priorité de cible de SimC.
 - `gear_crit_rating=` / `gear_haste_rating=` / … **remplacent** le total du stuff : sert à imposer les vraies stats des tops (les logs n'ont pas les stats des objets craftés).
+- **Council** (The Lost Explorers : 3 boss à ~1/3 des dégâts chacun) : `desired_targets=2` **sans** fight_style garde les raid_events et ajoute une 2e cible permanente ; `prioritydps` ne compte alors que la 1re → `paf.simc.parse_json` l'ignore quand `desired_targets>1`. Les tops Élém y font 32 % de Chain Lightning (2 boss touchés par cast dans 97 % des cas) : 1 cible = validation 0,69, 2 cibles = 0,93.
 - Trinkets on-use : catégorie partagée 1141, **verrou de 20 s** (données 12.1.0.69933), bien modélisé par simc.
 
 ## Prépa : ce que les données permettent (vérifié sur Ula'tek HM)

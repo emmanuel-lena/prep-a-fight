@@ -112,6 +112,11 @@ def parse_json(path: Path) -> SimResult:
         if m:
             baseline["dps"] = m
 
+    # several permanent targets (a council, paf.fight.Fight.targets) are all bosses, but simc's priority damage
+    # counts the first one only: without it, the boss objective falls back to all damage
+    several = int((sim.get("options") or {}).get("desired_targets") or 1) > 1
+    if several:
+        baseline.pop("prioritydps", None)
     results: list[ProfilesetResult] = []
     ps_block = sim.get("profilesets") or {}
     metric_name = metric_key(ps_block.get("metric", "dps")) if isinstance(ps_block, dict) else "dps"
@@ -125,6 +130,8 @@ def parse_json(path: Path) -> SimResult:
             m = _metric(extra)
             if m and extra.get("metric"):
                 pr.metrics[metric_key(extra["metric"])] = m
+        if several:
+            pr.metrics.pop("prioritydps", None)
         if "dps" not in pr.metrics and metric_name != "dps":
             pr.metrics.setdefault("dps", pr.metrics[metric_name])
         results.append(pr)

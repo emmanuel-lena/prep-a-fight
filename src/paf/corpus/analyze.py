@@ -60,6 +60,26 @@ def main_boss(con: sqlite3.Connection, encounter_id: int, difficulty: int, defau
     return row[0] if row else default
 
 
+COUNCIL_MIN_SHARE = 0.15  # a council member takes at least this share of the damage done to boss units
+COUNCIL_MAIN_MAX = 0.5  # ... and no boss unit takes more than this share (else: a boss and its helpers)
+
+
+def council(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> list[str]:
+    """The members of a council (The Lost Explorers: Trader Gebbo, Scrollsage Iku, First Mate Nama), most damaged
+    first: several bosses with their own health, none taking most of the damage. Empty for any other fight (Ula'tek
+    and her heart, The Coiled Altar's two bosses: the main one takes most of it)."""
+    where, params = kills_filter(encounter_id, difficulty)
+    rows = con.execute(
+        f"SELECT d.target, SUM(d.amount) AS s FROM damage_by_target d JOIN fight f USING(report, fight_id) "
+        f"JOIN npc n ON n.name = d.target WHERE {where} AND n.is_boss = 1 GROUP BY d.target ORDER BY s DESC",
+        params).fetchall()
+    total = sum(r[1] or 0 for r in rows)
+    if not total or (rows[0][1] or 0) / total > COUNCIL_MAIN_MAX:
+        return []
+    members = [r[0] for r in rows if (r[1] or 0) / total >= COUNCIL_MIN_SHARE]
+    return members if len(members) >= 2 else []
+
+
 FOCUS = "focus"  # cohort of the kills fetched only to measure rare specs (paf.raidneed): not the analyzed spec's
 
 

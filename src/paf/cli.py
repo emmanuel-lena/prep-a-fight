@@ -213,10 +213,13 @@ def cmd_template(args: argparse.Namespace) -> int:
 
     client, enc, diff_name, diff = _encounter_and_difficulty(args)
     con = db.connect()
-    from paf.corpus.units import fetch_boss_auras, fetch_unit_windows
+    from paf.corpus.analyze import council
+    from paf.corpus.units import fetch_boss_auras, fetch_council_stack, fetch_unit_windows
 
     boss = main_boss(con, enc.id, diff, enc.name)
     fetch_unit_windows(client, con, enc.id, diff, boss)  # secondary units' real windows (cheap, cached)
+    if members := council(con, enc.id, diff):  # how many council members are stacked
+        fetch_council_stack(client, con, enc.id, diff, members)
     fetch_boss_auras(client, con, enc.id, diff, boss)  # auras on the boss: possible damage amps
     fight, info = build_template(con, enc.id, diff, boss, settings.get("spec"), diff_name, title=enc.name)
     if info.kills == 0:
@@ -237,6 +240,11 @@ def cmd_template(args: argparse.Namespace) -> int:
     for v in fight.vulnerable:
         print(f"  {_mmss(v.start)}-{_mmss(v.start + v.duration)}  {v.name}: shares the boss's health, "
               f"boss takes x{v.multiplier:g} damage ({v.source or 'measured in the logs'})")
+    if fight.focus:
+        print(f"  a council: {', '.join(dict.fromkeys(f.name for f in fight.focus))}, {fight.targets} of them "
+              f"stacked (simulated as {fight.targets} bosses the whole fight); the top players mostly hit:")
+        for f in fight.focus:
+            print(f"    {_mmss(f.start):>5}-{_mmss(f.start + f.duration)}  {f.name} ({f.support:.0%} of the kills)")
     print("  targets besides the boss:")
     for w in fight.add_waves:
         print(f"    {_mmss(w.time):>5}  x{w.count:<3} alive {w.lifetime:3.0f}s  {w.name}")
@@ -712,9 +720,12 @@ def cmd_prep(args: argparse.Namespace) -> int:
         step("Analyzing the corpus")
         boss = main_boss(con, enc.id, diff, enc.name)
         rep = analyze(con, enc.id, diff, boss, spec)
-        from paf.corpus.units import fetch_boss_auras, fetch_unit_windows
+        from paf.corpus.analyze import council
+        from paf.corpus.units import fetch_boss_auras, fetch_council_stack, fetch_unit_windows
 
         fetch_unit_windows(client, con, enc.id, diff, boss)
+        if members := council(con, enc.id, diff):
+            fetch_council_stack(client, con, enc.id, diff, members)
         fetch_boss_auras(client, con, enc.id, diff, boss)
         raw, info = build_template(con, enc.id, diff, boss, spec, diff_name, title=enc.name)
         kills, phases, moving_share = rep.kills, [(n, m) for n, _, m, _ in rep.phases], info.moving_share

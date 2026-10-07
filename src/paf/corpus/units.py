@@ -86,6 +86,57 @@ def fetch_unit_windows(client: WCLClient, con: sqlite3.Connection, encounter_id:
     return len(todo)
 
 
+STACK_STEP = 3.0  # seconds; the council members a player hits within this slice are stacked
+
+
+def stacked_targets(events: list[dict], members: set[int], start: float) -> float | None:
+    """Median number of council members (actor ids) hit by direct damage per slice of STACK_STEP s, over the
+    slices where the player hits at least one. Damage over time is left out: a dot ticks on a distant boss."""
+    slices: dict[int, set[int]] = {}
+    for ev in events:
+        if ev.get("type") == "damage" and not ev.get("tick") and ev.get("targetID") in members:
+            slices.setdefault(int((ev["timestamp"] - start) / 1000 // STACK_STEP), set()).add(ev["targetID"])
+    return st.median(len(v) for v in slices.values()) if slices else None
+
+
+def fetch_council_stack(client: WCLClient, con: sqlite3.Connection, encounter_id: int, difficulty: int,
+                        members: list[str], kills: int = 4,
+                        log: Callable[[str], None] = lambda s: print(s, flush=True)) -> int:
+    """For a council (paf.corpus.analyze.council): how many members the ranked players hit at once (The Lost
+    Explorers: two of the three are stacked, Chain Lightning hits both). A few kills, ~1 page of events each."""
+    where, params = kills_filter(encounter_id, difficulty)
+    have = con.execute(f"SELECT COUNT(*) FROM council_stack c JOIN fight f USING(report, fight_id) WHERE {where}",
+                       params).fetchone()[0]
+    todo = con.execute(
+        f"SELECT f.report, f.fight_id, r.actor_id FROM fight f JOIN ranked r USING(report, fight_id) "
+        f"LEFT JOIN council_stack c USING(report, fight_id) WHERE {where} AND c.report IS NULL "
+        f"AND r.actor_id IS NOT NULL ORDER BY f.report LIMIT ?", (*params, max(0, kills - have))).fetchall()
+    for r in todo:
+        ids = {a for (a,) in con.execute(
+            f"SELECT a.actor_id FROM npc_actor a JOIN npc n USING(game_id) WHERE a.report=? "
+            f"AND n.name IN ({','.join('?' * len(members))})", (r[0], *members))}
+        try:
+            fr = client.query(FIGHT_QUERY, {"code": r[0], "f": [r[1]]},
+                              cache_ttl=0)["reportData"]["report"]["fights"][0]
+            events = list(client.events(r[0], r[1], fr["startTime"], fr["endTime"], data_type="DamageDone",
+                                        source_id=r[2], cache=False))
+        except (WCLError, KeyError, TypeError, IndexError, OSError) as e:
+            log(f"  council damage skipped: {str(e)[:100]}")
+            continue
+        n = stacked_targets(events, ids, fr["startTime"])
+        con.execute("INSERT OR REPLACE INTO council_stack VALUES(?,?,?)", (r[0], r[1], n))
+        con.commit()
+    return len(todo)
+
+
+def council_stack(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> int:
+    """Council members hit at once by the ranked players (median over the measured kills), 1 when unknown."""
+    where, params = kills_filter(encounter_id, difficulty)
+    vals = [v for (v,) in con.execute(f"SELECT c.targets FROM council_stack c JOIN fight f USING(report, fight_id) "
+                                      f"WHERE {where}", params) if v]
+    return max(1, round(st.median(vals))) if vals else 1
+
+
 AURA_QUERY = """query($code:String!,$f:[Int]!,$s:Float,$e:Float){ reportData { report(code:$code) {
   masterData { actors(type:"NPC") { id name subType } }
   debuffs: events(fightIDs:$f, startTime:$s, endTime:$e, dataType:Debuffs, hostilityType:Enemies, limit:10000) {

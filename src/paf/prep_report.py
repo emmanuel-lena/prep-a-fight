@@ -754,11 +754,22 @@ def render(d: PrepData) -> str:
     extra.append(f"top {e(d.spec)} players move {d.moving_share:.0%} of the fight")
     if d.add_share_spec is not None:
         extra.append(f"and do {d.add_share_spec:.0%} of their damage to adds")
+    focus = ""
+    if d.fight is not None and d.fight.focus:
+        n = d.fight.targets
+        focus = ("<h3 class='small muted' style='margin-top:14px'>"
+                 + (f"A council: who the top players mostly hit ({n} bosses are stacked, the sims count {n} targets "
+                    f"the whole fight)" if n > 1 else "A council: who the top players hit (the bosses are never "
+                    "stacked, the sims count one target at a time)")
+                 + "</h3><div class='scroll'><table><tr><th>Time</th>"
+                 "<th>Boss</th><th>Kills</th></tr>"
+                 + "".join(f"<tr><td>{_mmss(f.start)}-{_mmss(f.start + f.duration)}</td><td>{e(f.name)}</td>"
+                           f"<td class='n'>{f.support:.0%}</td></tr>" for f in d.fight.focus) + "</table></div>")
     tabs["fight"].append(f"""<h2>The fight</h2><div class="card"><p>Typical duration {_mmss(d.duration)}; {"; ".join(extra)}.</p>
 <div class="scroll"><table><tr><th>Phase</th><th></th></tr>{rows}</table></div>
 <h3 class="small muted" style="margin-top:14px">Add waves (typical timeline across kills)</h3>
 <div class="scroll"><table><tr><th>Time</th><th>Adds</th><th>Alive</th><th>Types</th></tr>{waves}</table></div>
-{f'<p><a href="{e(d.timeline_file)}">Cooldown timelines of the top players</a></p>' if d.timeline_file else ''}
+{focus}{f'<p><a href="{e(d.timeline_file)}">Cooldown timelines of the top players</a></p>' if d.timeline_file else ''}
 </div>""")
     if d.export:
         tabs["fight"].append(export_html(d))

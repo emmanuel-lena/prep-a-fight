@@ -9,8 +9,8 @@ import statistics as st
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from paf.corpus.analyze import KILLABLE_DEATH_RATE, _q, canonical_waves, fight_waves, kills_filter
-from paf.fight import AddWave, Fight, Vulnerable, Window
+from paf.corpus.analyze import KILLABLE_DEATH_RATE, _q, canonical_waves, council, fight_waves, kills_filter
+from paf.fight import AddWave, Fight, Focus, Vulnerable, Window
 
 LUST_NAMES = {"bloodlust", "heroism", "time warp", "primal rage", "fury of the aspects", "ancient hysteria",
               "netherwinds", "drums of fury", "drums of the mountain", "drums of the maelstrom",
@@ -24,6 +24,9 @@ MIN_MOVE = 3.0  # seconds; shorter movement windows are ignored
 MERGE_GAP = 3  # seconds; movement windows closer than this are merged
 BOSS_UNIT_MIN_SHARE = 0.02  # secondary boss units taking less raid damage than this are mechanics, not targets
 ATTACK_GAP = 10.0  # seconds without a cast on a unit that end an attack window
+FOCUS_STEP = 10  # seconds; a council's focus is read per slice of this length
+FOCUS_DOMINANT = 0.6  # a player hits one council member in a slice when it gets this share of their casts
+FOCUS_MIN = 20.0  # seconds; shorter focus segments are merged into their neighbours
 
 
 @dataclass
@@ -80,7 +83,7 @@ def movement_windows(per_kill: list[list[bool]], share: float = MOVE_SHARE) -> l
 
 
 def attack_windows(con: sqlite3.Connection, where: str, params: tuple, spec: str,
-                   keys: list[tuple[str, int]]) -> list[AddWave]:
+                   keys: list[tuple[str, int]], exclude: set[str] = frozenset()) -> list[AddWave]:
     """Windows when secondary boss units (e.g. a heart) are attacked, from the ranked players' casts.
 
     Only units taking a real share of the raid's damage count; the others are mechanics.
@@ -90,7 +93,7 @@ def attack_windows(con: sqlite3.Connection, where: str, params: tuple, spec: str
         f"WHERE {where} GROUP BY d.target", params).fetchall())
     total = sum(v or 0 for v in shares.values()) or 1
     units = {r[0] for r in con.execute("SELECT name FROM npc WHERE is_boss=1")
-             if (shares.get(r[0]) or 0) / total >= BOSS_UNIT_MIN_SHARE}
+             if (shares.get(r[0]) or 0) / total >= BOSS_UNIT_MIN_SHARE} - set(exclude)
     if not units:
         return []
     casts = con.execute(
@@ -117,6 +120,59 @@ def attack_windows(con: sqlite3.Connection, where: str, params: tuple, spec: str
                     prev = tt
     waves = canonical_waves([[(s, 1, d, [nm]) for s, d, nm in segments.get(k, [])] for k in keys])
     return [AddWave(w.t, 1, w.lifetime, ", ".join(w.types), scalable=False) for w in waves if w.lifetime >= 5]
+
+
+def council_focus(con: sqlite3.Connection, where: str, params: tuple, spec: str, members: list[str],
+                  duration: float) -> list[Focus]:
+    """Which council member the ranked players hit along the fight: per slice of FOCUS_STEP s, the member most
+    kills hit (support = share of the kills), consecutive slices merged."""
+    casts = con.execute(
+        f"SELECT c.report, c.fight_id, c.t, n.name FROM player_cast c JOIN fight f USING(report, fight_id) "
+        f"JOIN ranked r USING(report, fight_id) JOIN npc_actor a ON a.report=c.report AND a.actor_id=c.target_id "
+        f"JOIN npc n ON n.game_id=a.game_id WHERE {where} AND c.actor_id=r.actor_id AND r.spec=? AND c.type='cast' "
+        f"AND n.name IN ({','.join('?' * len(members))})", (*params, spec, *members)).fetchall()
+    per: dict[tuple[str, int], dict[int, dict[str, int]]] = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+    for c in casts:
+        per[(c["report"], c["fight_id"])][int(c["t"] // FOCUS_STEP)][c["name"]] += 1
+    slices = []
+    for i in range(int(duration // FOCUS_STEP) + 1):
+        votes: dict[str, int] = defaultdict(int)
+        seen = 0
+        for kill in per.values():
+            hits = kill.get(i)
+            if not hits:
+                continue
+            seen += 1
+            name, n = max(hits.items(), key=lambda kv: kv[1])
+            if n / sum(hits.values()) >= FOCUS_DOMINANT:
+                votes[name] += 1
+        if seen and votes:
+            name, n = max(votes.items(), key=lambda kv: kv[1])
+            slices.append([i * FOCUS_STEP, FOCUS_STEP, name, [n / seen]])
+
+    def joined(segs: list[list]) -> list[list]:  # consecutive segments on the same member become one
+        out: list[list] = []
+        for s in segs:
+            if out and out[-1][2] == s[2]:
+                out[-1] = [out[-1][0], s[0] + s[1] - out[-1][0], s[2], out[-1][3] + s[3]]
+            else:
+                out.append(list(s))
+        return out
+
+    merged = joined(slices)
+    while len(merged) > 1 and min(m[1] for m in merged) < FOCUS_MIN:  # a short segment goes to its longer neighbour
+        i = min(range(len(merged)), key=lambda j: merged[j][1])
+        near = [j for j in (i - 1, i + 1) if 0 <= j < len(merged)]
+        j = max(near, key=lambda j: merged[j][1])
+        a, b = sorted((i, j))
+        merged[a:b + 1] = [[merged[a][0], merged[b][0] + merged[b][1] - merged[a][0], merged[j][2], merged[j][3]]]
+        merged = joined(merged)
+    end = min(duration, merged[-1][0] + merged[-1][1]) if merged else 0
+    out = []
+    for k, (start, length, name, sup) in enumerate(merged):
+        length = (end if k == len(merged) - 1 else start + length) - start
+        out.append(Focus(round(start, 1), round(length, 1), name, round(st.median(sup), 2)))
+    return out
 
 
 def game_amp(encounter_id: int, unit_name: str, difficulty: str) -> tuple[float | None, str]:
@@ -195,7 +251,10 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
         per_kill = [fight_waves([s for s in adds.get(k, []) if s[2] == kind]) for k in keys]
         add_waves += [AddWave(w.t, max(1, round(w.count)), w.lifetime, kind) for w in canonical_waves(per_kill)]
     add_waves.sort(key=lambda w: w.time)
-    boss_waves = attack_windows(con, where, params, spec, keys)
+    # a council (several bosses with their own health): the simulated bosses are the members the player hits at once
+    # (Fight.targets), so the members are neither adds nor vulnerability windows; their order is information
+    members = set(council(con, encounter_id, difficulty))
+    boss_waves = attack_windows(con, where, params, spec, keys, exclude=members)
 
     # intermissions -> the main boss is not attackable
     phases = defaultdict(list)
@@ -210,6 +269,8 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
         # a phase is "boss away" when the graphs show (almost) no damage on the boss; without measurements,
         # intermissions are assumed to be
         away = attackable[pid] < 0.2 if pid in attackable else bool(inter)
+        if members:  # measured on one member only: another one is attackable while it is away
+            away = False
         if away:
             end = ordered[i + 1][1] if i + 1 < len(ordered) else duration
             invulnerable.append(Window(round(start, 1), round(end - start, 1)))
@@ -252,9 +313,11 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
 
     # secondary boss units (e.g. a heart) share the boss's health: their windows become boss vulnerability
     # windows, with the damage amplification measured in the logs
-    from paf.corpus.units import trigger_casts, unit_windows
+    from paf.corpus.units import council_stack, trigger_casts, unit_windows
 
     measured, ratios = unit_windows(con, encounter_id, difficulty)
+    measured = {k: [w for w in ws if w[2] not in members] for k, ws in measured.items()}
+    measured = {k: ws for k, ws in measured.items() if ws}
     if measured:  # damage-taken graphs of a few kills: real windows and damage rate ratio of each unit
         waves = canonical_waves([[(s, 1, d, [nm]) for s, d, nm in kill] for kill in measured.values()])
         vulnerable = []
@@ -312,6 +375,8 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
         lust_time=round(st.median(lust_times), 1) if lust_times else 0.0,
         power_infusion=[round(t, 1) for t in pi_times],
         source=f"median of {len(keys)} ranked kills (paf corpus)",
+        focus=council_focus(con, where, params, spec, sorted(members), duration) if members else [],
+        targets=council_stack(con, encounter_id, difficulty) if members else 1,
     )
     return fight, TemplateInfo(len(keys), moving_share, by_phase, boss_waves)
 

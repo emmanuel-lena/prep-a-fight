@@ -37,9 +37,17 @@ def lede_html(d) -> str:
         lust = "with Bloodlust at the pull" if d.lust < 15 else f"with Bloodlust around {_mmss(d.lust)}"
     first = " ".join(parts) + (f", {lust}." if lust else ".")  # one sentence, so that a catalog can say it
     second = ""
-    if d.add_share_spec is not None:
+    focus = d.fight.focus if d.fight is not None else []
+    if focus:
+        members = list(dict.fromkeys(f.name for f in focus))
+        stacked = d.fight.targets
+        second += (f" A council of {len(members)} bosses, {stacked} of them stacked: the top players cleave them and "
+                   f"start on {e(focus[0].name)}." if stacked > 1 else
+                   f" A council of {len(members)} bosses, never stacked: the top players hit one at a time and start "
+                   f"on {e(focus[0].name)}.")
+    if d.add_share_spec is not None and not (focus and d.add_share_spec < 0.05):  # a council: said above
         a = d.add_share_spec
-        second = (f" The best {e(d.spec)} players keep {1 - a:.0%} of their damage on the boss and put {a:.0%} on the adds."
+        second += (f" The best {e(d.spec)} players keep {1 - a:.0%} of their damage on the boss and put {a:.0%} on the adds."
                   if a >= 0.05 else f" The best {e(d.spec)} players stay on the boss almost the whole time.")
     return f"<p class='lede rv'>{first}{second}</p>"
 
@@ -169,6 +177,9 @@ def fight_map_html(d) -> str:
             what = f"{count} × {_short(name)}" if count > 1 and name else (_short(name) if name else f"{count} adds")
             above.append((t, f"{count} adds" if count > 1 else _short(name or "add"), what,
                           f"Alive about {life:.0f} s.", "k-adds", ""))
+    for f in (d.fight.focus if d.fight is not None else []):
+        above.append((f.start, f.name, f"Focus {f.name}", f"{f.support:.0%} of the top players' kills hit {f.name} here.",
+                      "k-focus", ""))
     if d.lust is not None:
         above.append((d.lust, "Bloodlust", "Bloodlust", "Bloodlust usually goes out here: line your cooldowns up.",
                       "k-lust", ""))
@@ -203,11 +214,12 @@ def fight_map_html(d) -> str:
     ticks = "".join(f"<span style='left:{_pct(t, dur):.2f}%'>{_mmss(t)}</span>"
                     for t in range(0, int(dur) + 1, 60 if dur <= 480 else 120))
     up, down = (max(ra) + 1 if ra else 0), (max(rb) + 1 if rb else 0)
+    focus_legend = "<span class='lg k-focus'>focus</span>" if d.fight is not None and d.fight.focus else ""
     return f"""<h2 class='rv'>How the fight goes</h2>
 <div class='tl-scroll rv'><div class='tl' style='--up:{up};--down:{down}' data-dur='{dur:.0f}'>
 <div class='tl-phases'>{brackets}</div><div class='tl-zone up'></div>
 <div class='tl-axis'>{shade}<div class='tl-ticks'>{ticks}</div></div><div class='tl-zone down'></div>
-{notes}<div class='tl-legend small muted'><span class='lg k-adds'>adds</span><span class='lg k-burst'>burst window</span>
+{notes}<div class='tl-legend small muted'><span class='lg k-adds'>adds</span><span class='lg k-burst'>burst window</span>{focus_legend}
 <span class='lg k-you'>your cooldowns</span><span class='lg k-def'>defensives</span></div></div></div>
 <p class='margin rv' aria-live='polite'><b class='m-t'></b> <span class='m-title'>Point at a note on the timeline</span>
 <span class='m-text'>: what comes then, and what you do.</span></p>"""
@@ -314,7 +326,7 @@ CSS = """
 .note.down .pin{bottom:22px;height:calc(30px + var(--row) * var(--lh) - 22px + 22px)}
 .note.down .pin{top:calc(-30px - var(--row) * var(--lh));height:calc(30px + var(--row) * var(--lh))}
 .note.flip{transform:translateX(calc(-100% + 1px))} .note.flip .pin{left:auto;right:0}
-.k-adds{color:var(--pos)} .k-burst{color:var(--warn)} .k-lust{color:var(--neg)} .k-you{color:var(--accent)} .k-def{color:#4f8fd0}
+.k-adds{color:var(--pos)} .k-burst{color:var(--warn)} .k-lust{color:var(--neg)} .k-you{color:var(--accent)} .k-def{color:#4f8fd0} .k-focus{color:#9a6fc4}
 .note .nt-ic{width:16px;height:16px;border-radius:3px;margin:0;vertical-align:0}
 .tl-legend{position:absolute;right:0;bottom:0;display:flex;gap:14px}
 .lg::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:5px}

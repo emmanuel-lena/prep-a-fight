@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS boss_aura(        -- buffs/debuffs applied to the bos
 CREATE TABLE IF NOT EXISTS aura_status(report TEXT, fight_id INT, PRIMARY KEY(report, fight_id));
 CREATE TABLE IF NOT EXISTS phase_rate(       -- boss damage-taken rate during a phase vs the rest of the fight
   report TEXT, fight_id INT, phase_id INT, rate_ratio REAL, PRIMARY KEY(report, fight_id, phase_id));
+CREATE TABLE IF NOT EXISTS council_stack(    -- a council: how many members the ranked player hits at once
+  report TEXT, fight_id INT, targets REAL, PRIMARY KEY(report, fight_id));
 CREATE TABLE IF NOT EXISTS npc_actor(         -- enemy actor ids of a report -> game NPC (bosses included)
   report TEXT, actor_id INT, game_id INT, PRIMARY KEY(report, actor_id));
 CREATE INDEX IF NOT EXISTS ix_pc ON player_cast(report, fight_id);

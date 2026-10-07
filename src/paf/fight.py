@@ -43,6 +43,16 @@ class Vulnerable:
     source: str = ""  # where the multiplier comes from: "game data (spell N)", "measured in the logs", "notes"
 
 
+@dataclass
+class Focus:
+    """Which council member the top players mostly hit (information only: the simulated bosses are the stacked
+    members, see Fight.targets)."""
+    start: float
+    duration: float
+    name: str
+    support: float  # share of the kills where they hit that boss then
+
+
 def merged_movement(windows: list[Window]) -> list[Window]:
     """Union of overlapping movement windows. In SimC a movement event that starts during another one
     replaces it (it can shorten it), so overlaps must be merged before being sent."""
@@ -74,6 +84,8 @@ class Fight:
     vulnerable: list[Vulnerable] = field(default_factory=list)  # boss damage amplification windows
     # possible amps detected in the logs (auras on the boss): not simulated until confirmed in the boss notes
     candidate_vulnerable: list[Vulnerable] = field(default_factory=list)
+    focus: list[Focus] = field(default_factory=list)  # a council: who the top players hit, when
+    targets: int = 1  # bosses hit at once the whole fight (a council's stacked members): desired_targets
 
     def _spawns(self) -> list[tuple[float, float, AddWave]]:
         """(spawn, lifetime, wave) as simulated. SimC never goes back to the boss if an add is still alive when
@@ -128,6 +140,8 @@ class Fight:
             "vary_combat_length=0",
             f"max_time={fmt(round(self.duration, 1))}",
         ]
+        if self.targets > 1:  # every target is a boss: simc's priority damage would count the first one only
+            lines.append(f"desired_targets={self.targets}")
         if self.lust_time is None:
             lines.append("override.bloodlust=0")
         else:
@@ -156,6 +170,7 @@ class Fight:
         d["personal_movement"] = [Window(**w) for w in d.get("personal_movement", [])]
         d["vulnerable"] = [Vulnerable(**w) for w in d.get("vulnerable", [])]
         d["candidate_vulnerable"] = [Vulnerable(**w) for w in d.get("candidate_vulnerable", [])]
+        d["focus"] = [Focus(**w) for w in d.get("focus", [])]
         return cls(**d)
 
 
