@@ -34,10 +34,6 @@ def _own_taskbar_icon() -> None:
             pass
 
 
-LOADING = ("<!doctype html><html><body style='background:#181219;color:#b6a3b3;font:15px system-ui;display:grid;"
-           "place-items:center;height:100vh;margin:0'>prep-a-fight&hellip;</body></html>")
-
-
 def _serve_in_process(window) -> bool:
     """Have WebView2 ask the app itself for http://paf.local/... (paf.inproc): no network connection at all.
     False when the engine cannot be reached (the window then uses the local server). WebView2 objects are only
@@ -150,7 +146,9 @@ def main() -> int:
         webview.settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = True  # Wowhead / Warcraft Logs links
     except (AttributeError, TypeError):
         pass
-    window = webview.create_window(TITLE, html=LOADING, width=1320, height=920, min_size=(900, 600),
+    from paf.loading import startup_page
+
+    window = webview.create_window(TITLE, html=startup_page(), width=1320, height=920, min_size=(900, 600),
                                    background_color="#181219")
     web.QUIT["hook"] = window.destroy  # an update is being installed: close, the installer reopens the app
     webview.start(_open, (window, url), icon=str(ICON) if ICON.is_file() else None)

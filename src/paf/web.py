@@ -71,13 +71,21 @@ ol.steps{list-style:none;margin:0;padding:0} .st{padding:7px 0;border-bottom:1px
 """
 
 
-def page(title: str, body: str, refresh: int | None = None, nav: str = "") -> bytes:
+def page(title: str, body: str, refresh: int | None = None, nav: str = "", job: str = "") -> bytes:
+    """job: the prep whose own page this is (its banner is not repeated on top)."""
+    from paf import loading
+
     meta = f'<meta http-equiv="refresh" content="{refresh}">' if refresh else ""
+    try:
+        running = loading.banners(skip=job)
+    except Exception:  # noqa: BLE001 - a banner never breaks a page
+        running = ""
     nav = nav or ('<a href="/">Home</a><a href="/tools">Tools</a><a href="/settings">Settings</a>'
                   '<a href="/feedback">Feedback</a>')
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
-            f"{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}</style></head><body>{theme.topbar(nav + lang_switch())}"
-            f"<main>{update_banner()}{body}</main></body></html>").encode()
+            f"{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}{loading.CSS}</style></head><body>"
+            f"{theme.topbar(nav + lang_switch())}{loading.LOADER}"
+            f"<main>{update_banner()}{running}{body}</main>{loading.JS}</body></html>").encode()
 
 
 def share_page(key: str, error: str = "") -> str:
@@ -893,6 +901,10 @@ def send_feedback(form: dict) -> str:
 
 def job_page(jid: str, part: str = "") -> bytes:
     job = JOBS.get(jid)
+    if part == "banner":  # the banner of the other pages, refreshed by them
+        from paf import loading
+
+        return loading.banner(jid, job).encode() if job and job["status"] == "running" else b""
     if part == "live" and (job is None or job["status"] != "running"):  # finished: the page reloads itself
         return b"<p data-reload>Done.</p>"
     if job is None:
@@ -937,7 +949,7 @@ var poll=setInterval(function(){{fetch('/job/{e(jid)}?part=live').then(function(
 if(h.indexOf('data-reload')>=0){{clearInterval(poll);location.reload();return}}
 var box=document.getElementById('live');var open=box.querySelector('details[open]');box.innerHTML=h;
 if(open){{var d=box.querySelector('details');if(d)d.open=true}}}}).catch(function(){{}})}},{POLL_S * 1000})}})();</script>"""
-    return page("Preparing...", f"<div id='live'>{live}</div>{guide_preview(job['args'])}{js}")
+    return page("Preparing...", f"<div id='live'>{live}</div>{guide_preview(job['args'])}{js}", job=jid)
 
 
 POLL_S = 5  # the prep page asks for its live part this often
@@ -972,10 +984,15 @@ def prep_live(jid: str, job: dict, log: str, elapsed: int) -> str:
             eta = "almost done"
         else:
             eta = f"about {max(1, round(left * 0.85))}-{round(left * 1.2) + 1} min left"
+        from paf.loading import percent
+
+        pct, _left = percent(log, elapsed)
         lead = (f"<span id='el' data-start='{job['started']:.0f}'>{elapsed // 60} min {elapsed % 60:02d} s</span>"
-                f" &middot; <b>{eta}</b> {refresh_ring(POLL_S)}")
-        calm = ("<p class='small muted'>Your computer stays usable: the simulations run at low priority. You can "
-                "close this window, the prep keeps running and its sheet appears on the home page.</p>")
+                f" &middot; <b>{pct}%</b> &middot; <b>{eta}</b> {refresh_ring(POLL_S)}"
+                f"<span class='jb-bar big'><span style='width:{pct}%'></span></span>")
+        calm = ("<div class='leave'><b>You can leave this page.</b> The prep keeps running: a banner on top of every "
+                "page shows how far it is, and its sheet appears on the home page. You can even close the app.</div>"
+                "<p class='small muted'>Your computer stays usable: the simulations run at low priority.</p>")
     else:
         head = "The prep stopped" if status == "stopped" else f"The prep failed ({e(status)})"
         lead = ("The log below says why. Go back to the boss page to try again, or "

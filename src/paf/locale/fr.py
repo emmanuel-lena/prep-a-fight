@@ -400,6 +400,19 @@ PHRASES: dict[str, str] = {
         "Ajoute d'abord ta clé Warcraft Logs (l'étape d'avant), ou colle ton export /simc.",
     "Ready": "C'est prêt", "You can set the rest later in Settings.": "Tu pourras régler le reste plus tard dans les Réglages.",
     "your raid is saved": "ton raid est enregistré",
+    # loading and running preps (paf.loading)
+    "Loading&hellip;": "Chargement&hellip;",
+    "The first time, the app downloads the game data and the logs: it can take a moment.":
+        "La première fois, l'appli télécharge les données du jeu et les logs : ça peut prendre un moment.",
+    "Still working: nothing has crashed.": "Toujours en cours : rien n'a planté.",
+    "Starting prep-a-fight&hellip;": "Démarrage de prep-a-fight&hellip;",
+    "The first launch prepares the game data: it can take a minute.":
+        "Le premier lancement prépare les données du jeu : ça peut prendre une minute.",
+    "Preparing": "Prépa de", "See &rarr;": "Voir &rarr;", "You can leave this page.": "Tu peux quitter cette page.",
+    "The prep keeps running: a banner on top of every page shows how far it is, and its sheet appears on the home page. You can even close the app.":
+        "La prépa continue : un bandeau en haut de chaque page montre où elle en est, et sa fiche apparaîtra sur l'accueil. Tu peux même fermer l'appli.",
+    "Your computer stays usable: the simulations run at low priority.":
+        "Ton ordinateur reste utilisable : les simulations tournent en priorité basse.",
     # the boss page: a short story before the prep (issue #12)
     "What do you want from this boss?": "Qu'est-ce que tu veux sur ce boss ?",
     "Progress: your raid lead wants everyone on the boss. Cooldowns and gear aim at the boss.":
@@ -540,6 +553,7 @@ PATTERNS: list[tuple[str, str]] = [
     (r"Cooldowns \(total damage, ([+-][\d.]+)%\):", r"CD (dégâts totaux, \1 %) :"),
     (r"Gear \(([+-][\d.]+)%\):", r"Stuff (\1 %) :"),
     (r"about (\d+)-(\d+) min left", r"environ \1 à \2 min restantes"),
+    (r"about (\d+) min left", r"environ \1 min restantes"),
     (r"Version ([\d.]+) is out", r"La version \1 est sortie"), (r"\(you have ([\d.]+)\)", r"(tu as la \1)"),
     (r"Updating to ([\d.]+)", r"Mise à jour vers la \1"),
     (r"A (\d+:\d\d) fight with (\d+) waves of adds", r"Un combat de \1 avec \2 vagues d'adds"),
