@@ -537,7 +537,10 @@ whether the others cover the adds (stay on the boss) or you should pad them.</p>
 
 def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
     """The home page once the app is set up (issue #13): your character, one big "prepare a boss", your bosses."""
-    from paf import icons
+    from paf import i18n, icons, names
+
+    if i18n.language() != "en":  # a new player's boss list in their language, before any prep
+        names.boss_names(i18n.wow_locale())
 
     diff = settings.get("difficulty")
     options = "".join(f'<option value="{x.id}">{e(x.name)}</option>' for x in encs)

@@ -46,7 +46,6 @@ def mapping(locale: str) -> dict[str, str]:
 
 def _journal_pairs(encounter_id: int, difficulty: str, locale: str) -> dict[str, str]:
     from paf.bossguide import bullets
-    from paf.gamedata import table_rows
     from paf.mechanics import encounter_sections, walk
 
     out: dict[str, str] = {}
@@ -74,12 +73,32 @@ def _journal_pairs(encounter_id: int, difficulty: str, locale: str) -> dict[str,
             ba, bb = bullets(a.text), bullets(b.text)
             if len(ba) == len(bb) > 1:  # the role summaries are shown as bullets
                 out.update({x: y for x, y in zip(ba, bb, strict=True) if x != y})
+    out.update(_encounter_pairs(locale))
+    return out
+
+
+def _encounter_pairs(locale: str) -> dict[str, str]:
+    """Every boss name, English -> localized (the Encounter Journal tables)."""
+    from paf.gamedata import table_rows
+
     names = {r.get("DungeonEncounterID"): r.get("Name_lang") for r in table_rows("JournalEncounter")}
     local = {r.get("DungeonEncounterID"): r.get("Name_lang") for r in table_rows("JournalEncounter", locale=locale)}
-    for k, v in names.items():
-        if v and local.get(k) and local[k] != v:
-            out[v] = local[k]
-    return out
+    return {v: local[k] for k, v in names.items() if v and local.get(k) and local[k] != v}
+
+
+def boss_names(locale: str) -> None:
+    """The boss names in the player's language from the very first launch (the home page's boss list), once."""
+    if locale == "enUS":
+        return
+    data = load(locale)
+    if data.get("bosses"):
+        return
+    try:
+        data.setdefault("names", {}).update(_encounter_pairs(locale))
+    except Exception:  # noqa: BLE001 - offline: the names stay in English for now
+        return
+    data["bosses"] = True
+    _save(locale, data)
 
 
 def _tooltip_name(ref: str, locale: str) -> str:

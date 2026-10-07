@@ -41,7 +41,7 @@ def save_profile(text: str) -> dict:
     p.write_text(text.replace("\r\n", "\n"), encoding="utf-8")
     prof = parse_simc_export(text)
     use_profile_spec(prof)
-    return {"ok": True, "name": prof.name, "spec": f"{prof.spec.title()} {prof.class_name.title()}"}
+    return {"ok": True, "name": prof.name, "spec": _say(f"{prof.spec.title()} {prof.class_name.title()}")}
 
 
 def find_character(name: str, server: str, region: str) -> dict:
