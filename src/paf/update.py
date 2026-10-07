@@ -61,10 +61,13 @@ def parse_releases(data: list[dict]) -> Release | None:
     for r in data:
         if r.get("draft"):
             continue
-        asset = next((a for a in r.get("assets") or [] if str(a.get("name", "")).endswith(".exe")), None)
+        version = str(r.get("tag_name", "")).lstrip("v")
+        # the installer of this very version: a release may carry another one by mistake (0.5.3 once held 0.5.2's)
+        asset = next((a for a in r.get("assets") or []
+                      if str(a.get("name", "")) == f"prep-a-fight-setup-{version}.exe"), None)
         if asset is None:
             continue
-        rel = Release(str(r.get("tag_name", "")).lstrip("v"), r.get("html_url", ""), r.get("body") or "",
+        rel = Release(version, r.get("html_url", ""), r.get("body") or "",
                       asset.get("browser_download_url", ""), int(asset.get("size") or 0),
                       str(asset.get("digest") or "").removeprefix("sha256:"))
         if best is None or parse_version(rel.version) > parse_version(best.version):

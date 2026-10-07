@@ -39,3 +39,25 @@ def test_banner_and_no_update_during_a_prep(monkeypatch):
     assert "A prep is running" in web.run_update()
     monkeypatch.setitem(update.STATE, "release", None)
     assert web.update_banner() == ""
+
+
+def test_a_release_with_another_versions_installer_is_ignored():
+    # 0.5.3 once held 0.5.2's installer next to its own: only the installer named after the release counts
+    rel = _rel("v0.5.3")
+    rel["assets"].insert(0, {"name": "prep-a-fight-setup-0.5.2.exe", "size": 9, "digest": "sha256:old",
+                             "browser_download_url": "https://github.com/x/y/releases/download/v0.5.3/old.exe"})
+    assert update.parse_releases([rel]).sha256 == "abc"
+    only_old = _rel("v0.5.4")
+    only_old["assets"][0]["name"] = "prep-a-fight-setup-0.5.2.exe"
+    assert update.parse_releases([only_old]) is None
+
+
+def test_the_app_knows_its_own_version():
+    # the updater compares __version__ with the releases: it must follow pyproject.toml (it once stayed at 0.3.1)
+    import tomllib
+    from pathlib import Path
+
+    import paf
+
+    project = tomllib.loads((Path(__file__).parent.parent / "pyproject.toml").read_text(encoding="utf-8"))
+    assert paf.__version__ == project["project"]["version"]
