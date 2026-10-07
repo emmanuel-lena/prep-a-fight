@@ -443,8 +443,8 @@ PATTERNS: list[tuple[str, str]] = [
     # numbers and names inside sentences (applied after the exact phrases)
     (r"Passer aux talents du top build ([A-F]) \(played by (\d+) top players\)", r"Passer aux talents du build top \1 (joué par \2 tops)"),
     (r"\btop build ([A-F])\b", r"build top \1"),
-    (r"(\d+) players hit per kill", r"\1 joueurs touchés par kill"),
-    (r"~(\d+) s of movement for you", r"~\1 s de déplacement pour toi"),
+    (r"(\d+) players hit (?:per|par) kill", r"\1 joueurs touchés par kill"),
+    (r"~([\d.]+) s of movement for you", r"~\1 s de déplacement pour toi"),
     (r"\baround ([\d:, …]+) &middot;", r"vers \1 &middot;"),
     (r"(\d+) players?, median rank (\d+)", r"\1 joueurs, rang médian \2"),
     (r"(\d+) ranked kills of your spec found\.", r"\1 kills classés de ta spé trouvés."),

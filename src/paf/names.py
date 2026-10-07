@@ -52,6 +52,17 @@ def _journal_pairs(encounter_id: int, difficulty: str, locale: str) -> dict[str,
     out: dict[str, str] = {}
     en = {s.id: s for _, s in walk(encounter_sections(encounter_id))}
     loc = {s.id: s for _, s in walk(encounter_sections(encounter_id, locale))}
+    from concurrent.futures import ThreadPoolExecutor
+
+    from paf.bossguide import describe
+
+    # the page shows a spell's own description when the journal has no text: both languages, fetched in parallel
+    wanted = sorted({a.spell_id for a in en.values() if not a.text and a.spell_id})
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        both = dict(zip(wanted, pool.map(lambda i: (describe(i), describe(i, locale)), wanted), strict=True))
+    for da, db in both.values():
+        if da and db and da != db:
+            out[da] = db
     for sid, a in en.items():
         b = loc.get(sid)
         if b is None:
@@ -92,9 +103,11 @@ def build(encounter_id: int | None, difficulty: str, refs: dict[str, str], local
         return 0
     data = load(locale)
     names, by_ref = data.setdefault("names", {}), data.setdefault("refs", {})
-    if encounter_id:
+    done = data.setdefault("journals", [])
+    if encounter_id and f"{encounter_id}" not in done:  # once per boss (the journal changes with patches only)
         try:
             names.update(_journal_pairs(encounter_id, difficulty, locale))
+            done.append(f"{encounter_id}")
         except Exception:  # noqa: BLE001 - no game data: the journal stays in English
             pass
     for name, ref in refs.items():

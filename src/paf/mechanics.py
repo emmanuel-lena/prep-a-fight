@@ -38,7 +38,7 @@ def clean_text(text: str, mythic: bool = True, locale: str = "") -> str:
             from paf.gamedata import spell_description
 
             try:
-                inner = spell_description(int(m.group(1))) or ""
+                inner = spell_description(int(m.group(1)), locale) or ""
             except Exception:  # noqa: BLE001 - a missing description is fine
                 inner = ""
             return re.sub(r"\$@spelldesc\d+", "", inner)

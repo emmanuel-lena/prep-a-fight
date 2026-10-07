@@ -605,6 +605,15 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
 
     sections = bossguide.load(enc.id, difficulty)
     guide = ""
+    from paf import i18n
+
+    if sections and i18n.language() != "en":  # the journal in the player's language, before the first prep too
+        from paf import names
+
+        try:
+            names.build(enc.id, difficulty, bossguide.spell_refs(sections), i18n.wow_locale())
+        except Exception:  # noqa: BLE001 - offline: the guide stays in English
+            pass
     if sections:
         gicons = icons_for(bossguide.spell_refs(sections))
         guide = (f"<h2>The boss in 60 seconds</h2>{bossguide.summary_html(sections, 'damage')}"

@@ -27,3 +27,22 @@ def test_journal_and_spell_names_in_french(tmp_path, monkeypatch):
     fr_page = i18n.translate(page, "fr")
     assert "Nek’zali l’Entortillâme" in fr_page and "Cape d&#x27;ombre" in fr_page and "Tuez-les." in fr_page
     assert "<td>Feint</td>" in fr_page  # not in the table: stays in English
+
+
+def test_spell_descriptions_and_long_texts_are_paired(tmp_path, monkeypatch):
+    from paf import bossguide
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    no_text = Section(5, "Serpent Flame", "ability", 777, [], "", 0, 5, -1)  # the page shows the spell's description
+    sections = {"": [no_text], "frFR": [Section(5, "Flamme serpentine", "ability", 777, [], "", 0, 5, -1)]}
+    descriptions = {"": "A flame slithers.", "frFR": "Une flamme rampe."}
+    monkeypatch.setattr("paf.mechanics.encounter_sections", lambda enc, locale="": sections[locale])
+    monkeypatch.setattr("paf.gamedata.table_rows", lambda table, locale="", **kw: [])
+    monkeypatch.setattr(bossguide, "describe", lambda sid, locale="": descriptions[locale])
+    names.build(3497, "mythic", {}, "frFR")
+    assert names.mapping("frFR")["A flame slithers."] == "Une flamme rampe."
+    assert names.load("frFR")["journals"] == ["3497"]  # built once per boss
+    long = "A fish found within one of Trader Gebbo's boxes. " * 5
+    unit = Section(1, "Unit", "creature", 0, [], long, 9, 1, -1)
+    html = bossguide.abilities_html([Section(9, "Stage One", "stage", 0, [], "", 0, 0, -1, [unit])])
+    assert bossguide.e(long) in html  # whole, never cut: the translation matches whole texts

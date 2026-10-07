@@ -92,11 +92,13 @@ AURA_MOD_DAMAGE_PERCENT_TAKEN = 87
 GAME_DIFFICULTY = {"lfr": 17, "normal": 14, "heroic": 15, "mythic": 16}
 
 
-def _filtered_rows(table: str, column: str, value: int) -> list[dict[str, str]]:
-    """A few rows of a big DB2 table, fetched with the wago.tools filter (cached per value)."""
-    p = data_dir() / "gamedata" / "filtered" / f"{table}-{column}-{value}.csv"
+def _filtered_rows(table: str, column: str, value: int, locale: str = "") -> list[dict[str, str]]:
+    """A few rows of a big DB2 table, fetched with the wago.tools filter (cached per value); locale: its texts in
+    that language."""
+    suffix = f"-{locale}" if locale else ""
+    p = data_dir() / "gamedata" / "filtered" / f"{table}-{column}-{value}{suffix}.csv"
     if not p.is_file():
-        url = WAGO_CSV.format(table=table) + f"?filter[{column}]={value}"
+        url = WAGO_CSV.format(table=table) + f"?filter[{column}]={value}" + (f"&locale={locale}" if locale else "")
         req = urllib.request.Request(url, headers={"User-Agent": "prep-a-fight"})
         with urllib.request.urlopen(req, timeout=60) as resp:
             data = resp.read()
@@ -127,8 +129,8 @@ def damage_taken_amp(spell_id: int, difficulty: str = "heroic") -> float | None:
     return round(1 + pct / 100, 2) if pct > 0 else None
 
 
-def spell_description(spell_id: int) -> str:
-    rows = _filtered_rows("Spell", "ID", spell_id)
+def spell_description(spell_id: int, locale: str = "") -> str:
+    rows = _filtered_rows("Spell", "ID", spell_id, locale)
     return (rows[0].get("Description_lang") or "") if rows else ""
 
 

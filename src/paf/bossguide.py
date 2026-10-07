@@ -68,15 +68,16 @@ def summary_html(sections: list[Section], role: str = "damage", full_link: str =
     return f'<div class="card guide">{"".join(out)}</div>'
 
 
-def describe(spell_id: int) -> str:
-    """The spell's own description when the journal has none (game variables made readable)."""
+def describe(spell_id: int, locale: str = "") -> str:
+    """The spell's own description when the journal has none (game variables made readable); locale: in that
+    language (paf.names pairs both to translate the page)."""
     if not spell_id:
         return ""
     try:
         from paf.gamedata import spell_description
         from paf.mechanics import clean_text
 
-        return clean_text(spell_description(spell_id) or "")
+        return clean_text(spell_description(spell_id, locale) or "", locale=locale)
     except Exception:  # noqa: BLE001 - a missing description is fine
         return ""
 
@@ -98,7 +99,7 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
     body = ""
     if text:
         body = (f"<div class='small'>{e(text)}</div>" if len(text) <= SHORT else
-                f"<details class='small'><summary>{e(text[:SHORT])}…</summary>{e(text[SHORT:])}</details>")
+                f"<details class='small fold'><summary><span>{e(text)}</span></summary></details>")
     pic = icons.img(ctx["icons"].get(s.title, ""), "small")
     fact = f"<div class='small muted'>{' &middot; '.join(facts)}</div>" if facts else ""
     return (f'<div class="ab" style="margin-left:{min(depth, 3) * 14}px"><div>{pic}<b>{e(s.title)}</b> {tags}</div>'
@@ -123,7 +124,8 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
                 rows.append(_ability(s, depth, ctx))
             elif s.kind == "creature":
                 rows.append(f'<div class="unit" style="margin-left:{min(depth, 3) * 14}px">{e(s.title)}'
-                            + (f" <span class='muted small'>{e(s.text[:160])}</span>" if s.text else "") + "</div>")
+                            # the whole text (the translation matches whole texts), folded by CSS when long
+                            + (f" <span class='muted small clamp'>{e(s.text)}</span>" if s.text else "") + "</div>")
         head = e(top.title) + "".join(f' <span class="pill">{SHOWN_FLAGS[f]}</span>'
                                        for f in top.flags if f in SHOWN_FLAGS)
         intro = f"<p class='small muted'>{e(top.text[:300])}</p>" if top.text and top.kind != "stage" else ""
@@ -138,6 +140,10 @@ CSS = """
 .guide ul{margin:6px 0 10px;padding-left:20px} .guide li{margin:4px 0}
 .stage summary{list-style:none;cursor:pointer} .stage summary h3{display:inline;font-size:16px}
 .stage summary::before{content:"\\25B8  ";color:var(--muted)} .stage[open] summary::before{content:"\\25BE  "}
+.fold>summary{list-style:none;cursor:pointer} .fold>summary::-webkit-details-marker{display:none}
+.fold:not([open])>summary span{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.fold:not([open])>summary::after{content:"\\2026 \\203A";color:var(--accent)}
+.unit .clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .ab{padding:8px 0;border-top:1px solid var(--line)} .ab .pill{font-size:11px;padding:1px 7px;margin-left:4px}
 .unit{padding:10px 0 2px;font-weight:700;color:var(--muted);text-transform:uppercase;font-size:12px;
   letter-spacing:.04em}
