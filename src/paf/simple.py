@@ -95,6 +95,10 @@ def change_card(d) -> str:
         rows.append(f"<li><span class='pics'>{pics}</span><div><b>Swap some gear</b><span class='sz {_size(w)}'>"
                     f"{SIZE_WORDS[_size(w)]}</span><span class='what'>{'; '.join(linkify(c, d.links) for c in changes.split('; '))}"
                     f"</span></div></li>")
+    if getattr(d, "imported", False):  # no bags: the best gear and the loot need the /simc export
+        rows.append("<li><span class='ok bad' aria-hidden='true'>!</span><div><b>Paste your /simc export</b>"
+                    "<span class='what'>Your character was read from a log, without your bags: with /simc the "
+                    "prep finds the best gear in them and what this boss drops for you.</span></div></li>")
     if not rows:
         rows.append("<li><span class='ok' aria-hidden='true'>&#10003;</span><div><b>Nothing to change</b>"
                     "<span class='what'>Your talents and gear are already right for this boss.</span></div></li>")

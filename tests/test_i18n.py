@@ -27,3 +27,11 @@ def test_languages(monkeypatch):
     assert i18n.language() == "en"
     monkeypatch.setattr(i18n, "system_language", lambda: "fr")
     assert i18n.language() == "fr"
+
+
+def test_a_textarea_placeholder_is_translated_not_its_content(monkeypatch):
+    monkeypatch.setenv("PAF_LANG", "fr")
+    box = '<textarea placeholder="Paste the /simc export here">Paste the /simc export here</textarea>'
+    out = i18n.translate(box, "fr")
+    assert 'placeholder="Colle l&#x27;export /simc ici"' in out
+    assert out.endswith(">Paste the /simc export here</textarea>")  # the content is the player's

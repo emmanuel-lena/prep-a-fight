@@ -49,6 +49,13 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .seg input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
 .btn.go{justify-self:start;font-size:18px;padding:12px 26px;border-radius:12px}
 .h-mine{margin-top:0}
+.chars{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
+.chars .ch button{display:flex;gap:8px;align-items:center;padding:5px 12px 5px 5px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--line);background:none;color:var(--fg);font:inherit;font-weight:600}
+.chars .ch button:hover{border-color:var(--accent)}
+.chars .ch-ic{width:26px;height:26px;border-radius:50%;margin:0}
+.ch-add{flex:1 1 100%} .ch-add>summary{display:inline-block;cursor:pointer;color:var(--accent);font-weight:600;padding:6px 2px}
+.ch-add textarea{width:100%;min-height:120px;box-sizing:border-box}
 .bcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
 .bcard{display:flex;gap:12px;align-items:center;padding:14px 16px;border-radius:12px;border:1px solid var(--line);
   background:var(--surface);color:var(--fg);text-decoration:none;transition:border-color .15s,transform .15s}
@@ -543,6 +550,24 @@ whether the others cover the adds (stay on the boss) or you should pad them.</p>
     return page("prep-a-fight", body)
 
 
+def characters_strip() -> str:
+    """Your other characters, one click to switch; and a new one (its /simc export)."""
+    from paf import characters, icons
+
+    others = [c for c in characters.all_characters() if not c.current]
+    chips = "".join(
+        f'<form method="post" action="/character/select" class="ch"><input type="hidden" name="slug" value="{e(c.slug)}">'
+        f'<button title="{e(c.spec.title())} {e(c.class_name.title())}">'
+        f'{icons.img(icons.CLASS_ICON.format(cls=c.class_name.lower()), "medium", "ch-ic")}<span>{e(c.name)}</span>'
+        f'</button></form>' for c in others)
+    add = ('<details class="ch-add"><summary>+ Add a character</summary><form method="post" action="/profile">'
+           '<p class="small muted">In game, on that character: type <code>/simc</code>, then Ctrl+A, Ctrl+C, and paste '
+           'here. Paste it again after a gear change to update it.</p>'
+           '<textarea name="simc" required placeholder="Paste the /simc export here"></textarea>'
+           '<p><button class="btn">Add this character</button></p></form></details>')
+    return f'<div class="chars">{chips}{add}</div>'
+
+
 def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
     """The home page once the app is set up (issue #13): your character, one big "prepare a boss", your bosses."""
     from paf import i18n, icons, names
@@ -560,6 +585,7 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
     g = settings.get("guild")
     return f"""<section class="home-hero"><div class="me">{ic}<div><b>{e(loaded.name)}</b>
 <span>{e(loaded.spec.title())} {e(loaded.class_name.title())}{(" &middot; " + e(g)) if g else ""}</span></div></div>
+{characters_strip()}
 <form method="get" action="/boss" class="start"><h1>Prepare a boss</h1>
 <select name="boss" aria-label="Boss" class="big">{options}</select>
 <div class="segs" role="radiogroup" aria-label="Difficulty">{diffs}</div>
@@ -1139,12 +1165,15 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(page("Not a /simc export", "<p>That does not look like a /simc export. "
                                                           "<a href='/'>Back</a></p>"), 400)
                     return
-                p = _profile_path()
-                p.parent.mkdir(parents=True, exist_ok=True)
-                p.write_text(text.replace("\r\n", "\n"), encoding="utf-8")
-                from paf.profile import parse_simc_export, use_profile_spec
+                from paf import characters
 
-                use_profile_spec(parse_simc_export(text))
+                characters.save(text)  # a new character, or an update of a known one; now the active one
+                self._redirect("/")
+            elif self.path in ("/character/select", "/character/remove"):
+                from paf import characters
+
+                s = (form.get("slug") or [""])[0]
+                (characters.select if self.path.endswith("select") else characters.remove)(s)
                 self._redirect("/")
             elif self.path == "/notes":
                 from paf.corpus.template import template_path

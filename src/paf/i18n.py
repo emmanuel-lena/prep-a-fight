@@ -158,6 +158,10 @@ def translate(html: str, lang: str | None = None) -> str:
         elif not part.lower().startswith(_RAW):  # a tag: only its visible attributes
             out.append(_VISIBLE_ATTR.sub(lambda m: m.group(1) + m.group(2) + _text(m.group(3), lang) + m.group(2),
                                          part))
+        elif part.lower().startswith("<textarea"):  # its content is the player's: only its opening tag's attributes
+            tag, _, rest = part.partition(">")
+            out.append(_VISIBLE_ATTR.sub(lambda m: m.group(1) + m.group(2) + _text(m.group(3), lang) + m.group(2),
+                                         tag) + ">" + rest)
         else:
             out.append(part)
     return "".join(out)

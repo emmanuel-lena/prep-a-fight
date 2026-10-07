@@ -32,16 +32,11 @@ def save_key(cid: str, secret: str) -> dict:
     return {"ok": True}
 
 
-def save_profile(text: str) -> dict:
-    from paf.profile import parse_simc_export, use_profile_spec
-    from paf.web import _profile_path
+def save_profile(text: str, imported: bool = False) -> dict:
+    from paf import characters
 
-    p = _profile_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(text.replace("\r\n", "\n"), encoding="utf-8")
-    prof = parse_simc_export(text)
-    use_profile_spec(prof)
-    return {"ok": True, "name": prof.name, "spec": _say(f"{prof.spec.title()} {prof.class_name.title()}")}
+    c = characters.save(text, imported)
+    return {"ok": True, "name": c.name, "spec": _say(f"{c.spec.title()} {c.class_name.title()}")}
 
 
 def find_character(name: str, server: str, region: str) -> dict:
@@ -55,7 +50,7 @@ def find_character(name: str, server: str, region: str) -> dict:
         profile, what = import_character(WCLClient(), name, server, region)
     except (ValueError, WCLError, OSError, KeyError, TypeError) as ex:
         return {"ok": False, "error": _say(str(ex))}
-    out = save_profile(profile)
+    out = save_profile(profile, imported=True)
     out["what"] = _say(what)
     return out
 
@@ -121,15 +116,15 @@ def page_body() -> str:
 
 <section class="ob-step" data-step="character">
 <h1>Your character</h1>
-<div class="ob-tabs" role="tablist"><button type="button" role="tab" class="on" data-tab="wcl">Find it on Warcraft Logs</button>
-<button type="button" role="tab" data-tab="simc">Paste /simc</button></div>
-<form class="ob-form ob-tab" data-tab="wcl" data-to="/onboard/character">
+<div class="ob-tabs" role="tablist"><button type="button" role="tab" class="on" data-tab="simc">Paste /simc (recommended)</button>
+<button type="button" role="tab" data-tab="wcl">Quick: from Warcraft Logs</button></div>
+<form class="ob-form ob-tab" data-tab="wcl" data-to="/onboard/character" hidden>
 <p class="small muted">Its latest logged boss fight gives its gear and talents. No bags: for Top Gear, paste /simc.</p>
 <div class="row"><input name="name" placeholder="Character name" required><input name="server" placeholder="Server" required>
 <select name="region" aria-label="Region">{regions}</select></div>
 <p class="ob-err" role="alert"></p>
 <div class="ob-actions"><button class="btn go">Find my character</button>{skip}</div></form>
-<form class="ob-form ob-tab" data-tab="simc" data-to="/onboard/simc" hidden method="post" action="/profile">
+<form class="ob-form ob-tab" data-tab="simc" data-to="/onboard/simc" method="post" action="/profile">
 <p class="small muted">In game: type <code>/simc</code>, then Ctrl+A, Ctrl+C, and paste here (it includes your bags).</p>
 <textarea name="simc" required placeholder="Paste the /simc export here"></textarea>
 <p class="ob-err" role="alert"></p>

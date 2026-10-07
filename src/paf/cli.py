@@ -59,7 +59,6 @@ def cmd_profile(args: argparse.Namespace) -> int:
     import sys
     from pathlib import Path
 
-    from paf.config import data_dir
     from paf.profile import parse_simc_export
 
     if args.file == "-":
@@ -90,16 +89,11 @@ def cmd_profile(args: argparse.Namespace) -> int:
     if "main_hand" in p.equipped and "off_hand" not in p.equipped:
         print("  note: no off-hand equipped. If you play 1H + off-hand, redo /simc with it equipped.")
 
-    dest = data_dir() / "profiles"
-    dest.mkdir(parents=True, exist_ok=True)
-    body = text.replace("\r\n", "\n")
-    (dest / "current.simc").write_text(body, encoding="utf-8")
-    print(f"Saved as the current profile: {dest / 'current.simc'}")
-    from paf.profile import use_profile_spec
+    from paf import characters, settings
 
-    names = use_profile_spec(parse_simc_export(body))
-    if names:
-        print(f"Analyzed spec: {names[1]} {names[0]} (its own corpus of top players)")
+    c = characters.save(text)
+    print(f"Saved as your character {c.name} ({c.spec} {c.class_name}), now the active one")
+    print(f"Analyzed spec: {settings.get('spec')} {settings.get('class')} (its own corpus of top players)")
     return 0
 
 
@@ -739,6 +733,9 @@ def cmd_prep(args: argparse.Namespace) -> int:
     refresh_notes(template_path(enc.name, diff_name), raw)
     fight = with_notes(raw, template_path(enc.name, diff_name), verbose=True)
     d = PrepData(enc.name, diff_name, spec, profile.name or origin, kills=kills, duration=fight.duration)
+    from paf.characters import is_imported
+
+    d.imported = is_imported(profile_text)  # found on Warcraft Logs: no bags, the sheet asks for the /simc export
     d.phases = list(phases)
     d.lust, d.pi, d.moving_share = fight.lust_time, fight.power_infusion, moving_share
     d.add_share_spec = add_share

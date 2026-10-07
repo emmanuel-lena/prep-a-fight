@@ -400,6 +400,15 @@ PHRASES: dict[str, str] = {
         "Ajoute d'abord ta clé Warcraft Logs (l'étape d'avant), ou colle ton export /simc.",
     "Ready": "C'est prêt", "You can set the rest later in Settings.": "Tu pourras régler le reste plus tard dans les Réglages.",
     "your raid is saved": "ton raid est enregistré",
+    # your characters (paf.characters)
+    "Paste /simc (recommended)": "Coller /simc (recommandé)", "Quick: from Warcraft Logs": "Rapide : depuis Warcraft Logs",
+    "+ Add a character": "+ Ajouter un perso", "Add this character": "Ajouter ce perso",
+    "In game, on that character: type": "En jeu, sur ce perso : tape",
+    ", then Ctrl+A, Ctrl+C, and paste here. Paste it again after a gear change to update it.":
+        ", puis Ctrl+A, Ctrl+C, et colle ici. Recolle-le après un changement de stuff pour le mettre à jour.",
+    "Paste your /simc export": "Colle ton export /simc",
+    "Your character was read from a log, without your bags: with /simc the prep finds the best gear in them and what this boss drops for you.":
+        "Ton perso a été lu dans un log, sans tes sacs : avec /simc, la prépa trouve le meilleur stuff dedans et ce que ce boss lâche pour toi.",
     # loading and running preps (paf.loading)
     "Loading&hellip;": "Chargement&hellip;",
     "The first time, the app downloads the game data and the logs: it can take a moment.":

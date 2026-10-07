@@ -91,6 +91,7 @@ class PrepData:
     precast: list[str] = field(default_factory=list)  # cooldowns the priority list casts before the pull
     movement: object | None = None  # paf.movement.Movement: move for the strategy, stand still otherwise
     review: object | None = None  # paf.review.Review: your own log next to the top players' (casting, moving)
+    imported: bool = False  # the character was read from a log (no bags): no gear nor loot until /simc
     class_name: str = ""  # e.g. "shaman" (class icon in the header)
     guide_summary: str = ""  # html: the boss in 60 seconds (Encounter Journal, your role)
     guide_abilities: str = ""  # html: every ability phase by phase, with what the logs add
