@@ -201,6 +201,48 @@ def move_card(d) -> str:
     return f"<article class='card s-move'><h2>Moving or standing still</h2><ul>{rows}</ul></article>"
 
 
+CAST_GAP = 0.03  # casting this much less than the top players is worth saying
+MOVE_GAP = 0.08  # moving this much more than them in a phase is worth saying
+
+
+def _bars(label: str, you: float, tops: float | None, good_high: bool) -> str:
+    worse = tops is not None and ((tops - you) if good_high else (you - tops)) >= (CAST_GAP if good_high else MOVE_GAP)
+    top = (f"<div class='bar tops'><span style='width:{tops * 100:.0f}%'></span><em>Top players {tops:.0%}</em></div>"
+           if tops is not None else "")
+    return (f"<div class='cmp'><b>{e(label)}</b><div class='bar you{' worse' if worse else ''}'>"
+            f"<span style='width:{you * 100:.0f}%'></span><em>You {you:.0%}</em></div>{top}</div>")
+
+
+def review_card(d) -> str:
+    """Your own pull next to the top players': do you keep casting, do you move more than they do."""
+    r = d.review
+    if r is None:
+        return ""
+    says = []
+    dur = d.duration or 0
+    if r.tops_active is not None and r.tops_active - r.active >= CAST_GAP:
+        worst = max(r.phases, key=lambda p: (p.tops_active or 0) - p.active, default=None)
+        where = f", above all in {worst.name}" if worst and (worst.tops_active or 0) - worst.active >= CAST_GAP else ""
+        says.append(f"You cast {(r.tops_active - r.active) * dur:.0f} s less than the top players over the fight{where}: "
+                    f"always have a spell going, even while moving (instant spells).")
+    elif r.tops_active is not None:
+        says.append("You keep casting like the top players do.")
+    moving = [p for p in r.phases if p.tops_moving is not None and p.moving - p.tops_moving >= MOVE_GAP]
+    if moving:
+        p = max(moving, key=lambda p: p.moving - p.tops_moving)
+        says.append(f"You move more than them in {p.name} ({p.moving:.0%} of the phase, top players {p.tops_moving:.0%}): "
+                    f"outside the strategy's moments, stand still.")
+    elif r.tops_moving is not None:
+        says.append("You do not move more than the top players.")
+    gaps = "".join(f"<time>{_mmss(a)} &middot; {b:.0f} s</time>" for a, b in r.gaps)
+    pauses = (f"<p class='what pauses'>Your longest pauses without casting:</p><div class='times'>{gaps}</div>"
+              if gaps else "")
+    return (f"<article class='card s-review'><h2>Your last pull</h2><p class='what'>{e(r.fight)}, from your raid's "
+            f"log.</p><div class='cmps'>{_bars('Casting', r.active, r.tops_active, True)}"
+            f"{_bars('Moving', r.moving, r.tops_moving, False)}</div>"
+            + "".join(f"<p class='say'>{e(s)}</p>" for s in says) + pauses + "</article>")
+
+
 # --- the whole fight, top to bottom (issue #9) ----------------------------------------------------------------------
 
 ROW_GAP = 3.0  # seconds; events this close share a row
@@ -292,7 +334,7 @@ def fight_html(d) -> str:
 
 
 def simple_html(d) -> str:
-    cards = change_card(d) + press_card(d) + watch_card(d) + move_card(d)
+    cards = change_card(d) + press_card(d) + watch_card(d) + move_card(d) + review_card(d)
     return (f"<div class='simple'><div class='cards'>{cards}</div>{fight_html(d)}"
             f"<p class='to-detail'><a class='btn' href='#overview'>See all the details &rarr;</a></p></div>")
 
@@ -326,6 +368,19 @@ body.simple-on .tabs{display:none}
 .simple .s-move ul{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px 22px}
 .simple .s-move b{font-weight:500;font-size:16px;line-height:1.45}
 .simple .ok.bad{background:var(--warn);font-weight:700}
+.simple .s-review{grid-column:1/-1}
+.simple .s-review>.what{margin:-6px 0 12px}
+.simple .cmps{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px 28px;margin-bottom:10px}
+.simple .cmp{display:flex;flex-direction:column;gap:5px}
+.simple .cmp b{font-size:15px}
+.simple .bar{position:relative;height:24px;border-radius:6px;background:var(--surface-2);overflow:hidden}
+.simple .bar span{position:absolute;left:0;top:0;bottom:0;border-radius:6px}
+.simple .bar.you span{background:color-mix(in srgb,var(--accent) 55%,transparent)}
+.simple .bar.you.worse span{background:color-mix(in srgb,var(--warn) 70%,transparent)}
+.simple .bar.tops span{background:color-mix(in srgb,var(--pos) 40%,transparent)}
+.simple .bar em{position:relative;font:600 13px/24px var(--font-data);font-style:normal;padding-left:8px;color:var(--fg)}
+.simple .s-review .say{margin:8px 0 0;font-size:16px;line-height:1.45}
+.simple .s-review .times{margin-top:6px} .simple .s-review .pauses{margin-top:14px}
 /* the fight, top to bottom: the boss on the left, you on the right, the time in the middle */
 .simple .s-fight{margin-top:16px}
 .simple .s-fight>.what{margin:-6px 0 10px}

@@ -375,7 +375,9 @@ PHRASES: dict[str, str] = {
     "NSRT reminders": "Rappels NSRT", "Method Raid Tools: paste it in your note": "Method Raid Tools : colle-la dans ta note",
     "Northern Sky Raid Tools: your personal reminders": "Northern Sky Raid Tools : tes rappels perso",
     "Moving or standing still": "Bouger ou rester planté", "Move: it is the strategy": "Bouge : c'est la strat",
-    "Before the pull:": "Avant le pull :","You": "Toi","Kill them": "Tue-les", "Interrupt": "Interromps", "Soak it": "Soak",
+    "Your last pull": "Ton dernier pull", "Casting": "Temps à caster", "Moving": "Temps en mouvement",
+    "Your longest pauses without casting:": "Tes plus longues pauses sans caster :",
+    "Before the pull:": "Avant le pull :", "You": "Toi","Kill them": "Tue-les", "Interrupt": "Interromps", "Soak it": "Soak",
     "See all the details &rarr;": "Voir tout le détail &rarr;", "&larr; Simple view": "&larr; Vue simple",
 }
 
@@ -558,6 +560,17 @@ PATTERNS: list[tuple[str, str]] = [
     (r"^Careful with (.+)$", r"Attention à \1"), (r"^Hit (.+)$", r"Tape \1"),
     (r"^Defensive: (.+)$", r"Défensif : \1"), (r"^precast$", r"avant le pull"),
     (r"^Everyone moves \((\d+) s\)$", r"Tout le monde bouge (\1 s)"),
+    # your last pull (paf.review); "top players" may already read "tops" (a phrase of its own)
+    (r"^(kill|pull) of (\d+:\d\d), from your raid's log\.$", r"\1 de \2, d'après le log de ton raid."),
+    (r"^You (\d+)%$", r"Toi \1 %"), (r"^(?:Top players|Tops) (\d+)%$", r"Tops \1 %"),
+    (r"You cast (\d+) s less than the (?:top players|tops) over the fight, above all in (.+?): always have a spell going, even while moving \(instant spells\)\.",
+     r"Tu castes \1 s de moins que les tops sur le combat, surtout en \2 : aie toujours un sort en cours, même en bougeant (sorts instantanés)."),
+    (r"You cast (\d+) s less than the (?:top players|tops) over the fight: always have a spell going, even while moving \(instant spells\)\.",
+     r"Tu castes \1 s de moins que les tops sur le combat : aie toujours un sort en cours, même en bougeant (sorts instantanés)."),
+    (r"You keep casting like the (?:top players|tops) do\.", r"Tu castes autant que les tops."),
+    (r"You move more than them in (.+?) \((\d+)% of the phase, (?:top players|tops) (\d+)%\): outside the strategy's moments, stand still\.",
+     r"Tu bouges plus qu'eux en \1 (\2 % de la phase, les tops \3 %) : hors des moments de la strat, reste planté."),
+    (r"You do not move more than the (?:top players|tops)\.", r"Tu ne bouges pas plus que les tops."),
     (r"Move when the strategy says so: (\d+) moments where most top players move \((\d+) s in all\), marked in the fight below\.",
      r"Bouge quand la strat le demande : \1 moments où la plupart des tops bougent (\2 s en tout), marqués dans le combat ci-dessous."),
     (r"The rest of the time, stand still and cast: 10 s of movement without casting costs you about ([\d.]+)% of your DPS\.",

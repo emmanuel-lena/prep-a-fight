@@ -812,6 +812,20 @@ def cmd_prep(args: argparse.Namespace) -> int:
                                         settings.get("guild_region"), enc.id, diff)
             d.raid = _raid_verdict(client, con, enc, diff, raid_url, profile, spec,
                                    types=pk.add_types if pk is not None else None)
+            from paf import review
+            from paf.wcl import WCLError
+
+            try:  # your own pull in that log next to the top players': casting, moving
+                activity = (pk.activity if pk is not None and pk.activity
+                            else review.tops_activity(con, enc.id, diff, spec))  # an older pack: the local corpus
+                d.review = review.review(client, raid_url, enc.id, diff, profile.name, [n for n, _ in d.phases],
+                                         activity) if activity and activity[0] is not None else None
+            except (WCLError, ValueError, KeyError, TypeError) as ex:
+                print(f"  your own pull could not be read: {str(ex)[:120]}")
+            if d.review:
+                r = d.review
+                print(f"  your {r.fight}: casting {r.active:.0%} of the time (top players {r.tops_active or 0:.0%}), "
+                      f"moving {r.moving:.0%} (top players {r.tops_moving or 0:.0%})")
         except (ValueError, OSError, KeyError, TypeError) as ex:
             print(f"  could not read your raid's log: {ex}")
             d.notes.append(f"Your raid's log could not be read ({ex}).")
@@ -911,10 +925,12 @@ def cmd_prep(args: argparse.Namespace) -> int:
             d.links.setdefault(m.boss_ability, spell_ref(m.boss_spell_id))
     if pk is None:  # share what the logs gave, computed: the next prep of this spec and boss skips the corpus
         from paf import raidneed
+        from paf import review as review_mod
 
         new = pack.PackData(enc.id, diff, cls, spec, pack.now_utc(), kills, boss, pack_fight, list(phases), add_share,
                             moving_share, target, d.validation, tl, tl_all, builds,
-                            raidneed.add_types(con, enc.id, diff), mechs, d.actions, d.defensives)
+                            raidneed.add_types(con, enc.id, diff), mechs, d.actions, d.defensives,
+                            review_mod.tops_activity(con, enc.id, diff, spec))
         print(f"  prep pack saved: {pack.save(new)}")
         if settings.get("share_packs") == "on" and new.validation:
             print(f"  prep pack {pack.publish(new)}")

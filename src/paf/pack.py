@@ -51,6 +51,8 @@ class PackData:
     mechanics: list[Mechanic] = field(default_factory=list)
     actions: list[Action] = field(default_factory=list)
     defensives: Defensives | None = None  # when the top players press their defensives
+    # how much the top players cast and move (paf.review.tops_activity): busy, moving, [(busy, moving) per phase]
+    activity: tuple | None = None
     version: int = VERSION
 
 
@@ -140,6 +142,9 @@ def from_json(text: str) -> PackData:
             [DefensiveMoment(m["time"], m["share"], [tuple(s) for s in m["spells"]], m["boss_ability"],
                              m["boss_spell_id"]) for m in df.get("moments", [])],
             [tuple(u) for u in df.get("usage", [])], df.get("kills", 0))
+    if d.get("activity"):
+        a = d["activity"]
+        d["activity"] = (a[0], a[1], [tuple(x) for x in a[2]])
     return PackData(**d)
 
 
