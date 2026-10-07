@@ -60,3 +60,40 @@ def test_simple_view_in_french(monkeypatch):
     page = translate(simple.simple_html(d))
     assert "Tes CD" in page and "Garde-les pour ces moments." in page and "Rien à changer" in page
     assert "Le combat, pas à pas" in page and "À gauche : ce que fait le boss." in page
+
+
+def test_copy_menu_offers_mrt_and_nsrt():
+    d = sheet()
+    d.mrt = {"boss": "{time:20}Ascendance"}
+    d.nsrt = {"boss": "EncounterID:1;Name:x"}
+    menu = simple.copy_menu(d)
+    assert menu.count("data-copy=") == 2 and "MRT note" in menu and "NSRT reminders" in menu
+    d.nsrt = {}
+    assert simple.copy_menu(d).count("data-copy=") == 1
+    d.mrt = {}
+    assert simple.copy_menu(d) == ""
+
+
+def test_spec_names_inside_french_sentences(monkeypatch):
+    from paf.i18n import translate
+
+    monkeypatch.setenv("PAF_LANG", "fr")
+    assert "Ixuu &middot; Élémentaire &middot;" in translate("<p>Ixuu &middot; Elemental &middot; 199 ranked kills</p>")
+    assert translate("<summary>Play your cooldowns for total (pad) damage.</summary>") == \
+        "<summary>Joue tes CD pour les dégâts totaux (pad).</summary>"
+
+
+def test_opener_and_precast_are_shown():
+    from paf.optimize import plan_moments
+
+    p = Plan("boss", {"stormkeeper": Rule("default", "", None)}, 1.0, 0.1)
+    # a rotational cooldown (cast often): only its opener is worth a reminder
+    p.timeline = [(0.0, "stormkeeper"), (1.0, "ascendance")] + [(30.0 * i, "stormkeeper") for i in range(1, 12)]
+    moments = plan_moments(p, Fight("B", 360), {"stormkeeper": "Stormkeeper", "ascendance": "Ascendance"})
+    assert moments[0] == (0.0, ["Stormkeeper", "Ascendance"])
+    d = sheet()
+    d.precast = ["Stormkeeper"]
+    d.optimized = [p]
+    view = simple.fight_html(d)
+    assert "<time>Pull</time>" in view and "Before the pull:" in view
+    assert view.index("<time>Pull</time>") < view.index("Ascendance")

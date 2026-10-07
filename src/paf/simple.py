@@ -11,7 +11,7 @@ from html import escape as e
 
 from paf import icons
 
-MAX_CDS = 3  # cooldowns on the "press" card
+MAX_CDS = 4  # cooldowns on the "press" card
 MAX_WATCH = 3  # lines on the "watch out" card
 # game icons for what has none of its own
 POTION_ICON = "inv_potion_54"
@@ -105,8 +105,15 @@ def _pressed(d) -> tuple[list[str], dict[str, list[float]], bool]:
     order: dict[str, list[float]] = {}
     for t, n in _presses(d):
         order.setdefault(n, []).append(t)
-    # the cooldowns the plan moves first (they are the point), then the others by how rarely they come back
-    names = sorted(order, key=lambda n: (n not in held, len(order[n])))[:MAX_CDS]
+    major = {d.cd_names.get(k, k) for k in plan.choice} if plan else set()  # the cooldowns the plan weighs
+    from paf.optimize import OPENER
+
+    def rank(n: str) -> tuple:
+        rotation = all(t <= OPENER for t in order[n]) and n not in held  # only its opener is worth a reminder
+        # the cooldowns the plan holds first (they are the point), then its big ones, the rotational ones last
+        return (n not in held, n not in major, rotation, len(order[n]))
+
+    names = sorted(order, key=rank)[:MAX_CDS]
     return names, order, bool(held)
 
 
@@ -116,11 +123,27 @@ def press_card(d) -> str:
         return ("<article class='card s-press'><h2>Your cooldowns</h2><p class='what'>Press them as soon as they are "
                 "ready.</p></article>")
     rows = "".join(f"<li>{_ic(d, n)}<div><b>{e(n)}</b><span class='times'>"
-                   + "".join(f"<time>{_mmss(t)}</time>" for t in order[n][:5])
+                   + "".join(f"<time>{'precast' if t < 0.5 and n in d.precast else _mmss(t)}</time>" for t in order[n][:5])
                    + ("<span class='more'>&hellip;</span>" if len(order[n]) > 5 else "") + "</span></div></li>"
                    for n in names)
     how = "Hold them for these moments." if held else "Press them as soon as they are ready."
-    return f"<article class='card s-press'><h2>Your cooldowns</h2><p class='what'>{how}</p><ul>{rows}</ul></article>"
+    return (f"<article class='card s-press'><h2>Your cooldowns</h2><p class='what'>{how}</p><ul>{rows}</ul>"
+            f"{copy_menu(d)}</article>")
+
+
+def copy_menu(d) -> str:
+    """One button that asks which note to copy: the MRT note or the NSRT reminders of the sheet's plan."""
+    plan = _plan(d)
+    want = plan.objective if plan is not None else "boss"
+    notes = [(d.mrt.get(want) or next(iter(d.mrt.values()), ""), "MRT note", "Method Raid Tools: paste it in your note"),
+             (d.nsrt.get(want) or next(iter(d.nsrt.values()), ""), "NSRT reminders",
+              "Northern Sky Raid Tools: your personal reminders")]
+    choices = "".join(f"<button type='button' data-copy='{e(text)}'><b>{e(label)}</b><span>{e(why)}</span></button>"
+                      for text, label, why in notes if text)
+    if not choices:
+        return ""
+    return (f"<details class='copy-menu'><summary class='btn ghost'>Copy the note</summary>"
+            f"<div class='menu' role='menu'>{choices}</div></details>")
 
 
 def _watch(d) -> list[tuple[str, str]]:
@@ -148,11 +171,15 @@ def watch_card(d) -> str:
 # --- the whole fight, top to bottom (issue #9) ----------------------------------------------------------------------
 
 ROW_GAP = 3.0  # seconds; events this close share a row
+PULL = -5.0  # the time of the row "before the pull" (precasts)
 
 
-def _item(d, name: str, label: str) -> str:
+def _item(d, name: str, label: str, before: str = "") -> str:
+    """An icon and its label; `before` is a word of the app in its own element, so that a game name stays a whole
+    text (the translation of a one-word name only applies to a whole text)."""
     pic = _ic(d, name, "medium", "vi")
-    return f"<span class='it'>{pic}<span>{e(label)}</span></span>"
+    pre = f"<em class='pre'>{e(before)}</em> " if before else ""
+    return f"<span class='it'>{pic}<span>{pre}<span>{e(label)}</span></span></span>"
 
 
 def _do(label: str) -> str:
@@ -183,7 +210,10 @@ def _events(d) -> list[tuple[float, str, str]]:
     names, order, _ = _pressed(d)
     for n in names:
         for t in order[n]:
-            out.append((t, "r", _item(d, n, n)))
+            if t < 0.5 and n in d.precast:  # cast before the pull: a row of its own, on top
+                out.append((PULL, "r", _item(d, n, n, "Before the pull:")))
+            else:
+                out.append((t, "r", _item(d, n, n)))
     for m in (d.defensives.moments if d.defensives else []):
         if m.spells:
             out.append((m.time, "r", _item(d, m.spells[0][0], f"Defensive: {m.spells[0][0]}")))
@@ -212,7 +242,7 @@ def fight_html(d) -> str:
         mine = [r for r in rows if (r[0] >= start - 0.5 or i == 0) and r[0] < end]
         if not mine:
             continue
-        lines = "".join(f"<li><div class='l'>{''.join(left)}</div><time>{_mmss(t)}</time>"
+        lines = "".join(f"<li><div class='l'>{''.join(left)}</div><time>{'Pull' if t == PULL else _mmss(t)}</time>"
                         f"<div class='r'>{''.join(right)}</div></li>" for t, left, right in mine)
         blocks.append(f"<details class='vp'{' open' if not blocks else ''}><summary><span class='vp-name'>{e(name)}</span>"
                       f"<span class='vp-time'>{_mmss(start)} &ndash; {_mmss(end)}</span></summary>"
@@ -277,7 +307,19 @@ body.simple-on .tabs{display:none}
 .vt .it{display:inline-flex;align-items:center;gap:8px;font-size:15.5px;line-height:1.3}
 .vt .l .it{flex-direction:row-reverse}
 .vt .it img,.vt .it .ic-none{width:30px;height:30px;font-size:13px;border-radius:5px}
-.vt .it.do{font-weight:600;color:var(--accent)}
+.vt .it.do{font-weight:600;color:var(--accent)} .vt .pre{font-style:normal;color:var(--muted)}
+.copy-menu{position:relative;margin-top:16px}
+.copy-menu>summary{list-style:none;display:inline-flex;cursor:pointer}
+.copy-menu>summary::-webkit-details-marker{display:none}
+.copy-menu>summary::after{content:"\\25BE";margin-left:8px}
+.copy-menu .menu{position:absolute;z-index:5;left:0;top:calc(100% + 6px);min-width:260px;display:flex;
+  flex-direction:column;padding:6px;border-radius:10px;background:var(--bg);border:1px solid var(--line);
+  box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.simple .card:has(.copy-menu[open]){position:relative;z-index:6}
+.copy-menu .menu button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;
+  padding:10px 12px;border:0;border-radius:7px;background:none;color:var(--fg);cursor:pointer;font:inherit}
+.copy-menu .menu button:hover,.copy-menu .menu button:focus-visible{background:var(--surface-2)}
+.copy-menu .menu b{font-size:15.5px} .copy-menu .menu span{font-size:13px;color:var(--muted)}
 .to-detail{margin:22px 0 0}
 .to-detail .btn{font-size:16px;padding:10px 18px}
 .back-simple{margin-right:8px}
@@ -286,4 +328,14 @@ body.simple-on .tabs{display:none}
   .vt .it img,.vt .it .ic-none{width:24px;height:24px}}
 """
 
-JS = ""
+JS = """<script>
+(function(){
+// the note menu: closes after a copy, or on a click elsewhere
+document.addEventListener('click', function(ev){
+  document.querySelectorAll('.copy-menu[open]').forEach(function(m){
+    if (!m.contains(ev.target)) { m.open = false; return; }
+    if (ev.target.closest('[data-copy]')) setTimeout(function(){ m.open = false; }, 900);
+  });
+});
+})();
+</script>"""

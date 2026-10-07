@@ -475,6 +475,7 @@ def adjust_alignment(alignment: list[Alignment], default_timeline: list[tuple[fl
 
 MRT_FREQUENT = 8  # a cooldown cast more often than this in the pull is part of the rotation
 MRT_MERGE = 5.0  # seconds: casts of the same cooldown closer than this (charges) are one line
+OPENER = 5.0  # seconds: every cooldown cast this early is the opener, always worth a reminder
 HOLD_RULES = ("hold_", "add_waves", "secondary_targets", "vulnerable_windows", "lust_pi")
 GOALS = {"boss": "boss damage", "total": "total damage (pad)", "secondary": "burst", "adds": "damage to adds"}
 
@@ -511,7 +512,7 @@ def plan_moments(plan: Plan, fight: Fight, names: dict[str, str] | None = None) 
     rules = {k.replace("use_item:", "").replace("_", " "): r.name for k, r in plan.choice.items()}
 
     def keep(label: str, t: float) -> bool:
-        if count[label] <= MRT_FREQUENT:
+        if count[label] <= MRT_FREQUENT or t <= OPENER:
             return True
         # a rotational cooldown the plan holds: only its casts on the moments it is held for
         return rules.get(label, "default").startswith(HOLD_RULES) and bool(_short_context(fight, t))

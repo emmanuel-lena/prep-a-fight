@@ -88,6 +88,7 @@ class PrepData:
     goal: str | None = None  # "boss" / "total" when the player chose it (else the raid's log decides)
     icons: dict[str, str] = field(default_factory=dict)  # spell / item / cooldown key name -> game icon file
     boss_casts: list[tuple[str, list[float]]] = field(default_factory=list)  # boss spell, typical times
+    precast: list[str] = field(default_factory=list)  # cooldowns the priority list casts before the pull
     class_name: str = ""  # e.g. "shaman" (class icon in the header)
     guide_summary: str = ""  # html: the boss in 60 seconds (Encounter Journal, your role)
     guide_abilities: str = ""  # html: every ability phase by phase, with what the logs add

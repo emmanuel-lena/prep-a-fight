@@ -1,5 +1,7 @@
 """French catalog of the app (see paf.i18n). WoW players' own words are kept: adds, pad, kick, soak, CD, stuff, kill."""
 
+import re
+
 NAME = "Français"
 
 PHRASES: dict[str, str] = {
@@ -369,7 +371,10 @@ PHRASES: dict[str, str] = {
     "The fight, step by step": "Le combat, pas à pas",
     "Left: what the boss does. Right: what you do. Open a phase to see it.":
         "À gauche : ce que fait le boss. À droite : ce que tu fais. Ouvre une phase pour la voir.",
-    "You": "Toi", "Kill them": "Tue-les", "Interrupt": "Interromps", "Soak it": "Soak",
+    "Copy the note": "Copier la note", "MRT note": "Note MRT",
+    "NSRT reminders": "Rappels NSRT", "Method Raid Tools: paste it in your note": "Method Raid Tools : colle-la dans ta note",
+    "Northern Sky Raid Tools: your personal reminders": "Northern Sky Raid Tools : tes rappels perso",
+    "Before the pull:": "Avant le pull :", "You": "Toi","Kill them": "Tue-les", "Interrupt": "Interromps", "Soak it": "Soak",
     "See all the details &rarr;": "Voir tout le détail &rarr;", "&larr; Simple view": "&larr; Vue simple",
 }
 
@@ -550,7 +555,7 @@ PATTERNS: list[tuple[str, str]] = [
     # the simple view (paf.simple): short sentences around a game name
     (r"^Kill the (.+)$", r"Tue : \1"), (r"^Interrupt (.+)$", r"Interromps \1"), (r"^Soak (.+)$", r"Soak \1"),
     (r"^Careful with (.+)$", r"Attention à \1"), (r"^Hit (.+)$", r"Tape \1"),
-    (r"^Defensive: (.+)$", r"Défensif : \1"),
+    (r"^Defensive: (.+)$", r"Défensif : \1"),(r"^precast$", r"avant le pull"),
     # the sheet picker of /view: "Boss (mythic Elemental)"
     (r"\(mythic\b", r"(mythique"), (r"\(heroic\b", r"(héroïque"), (r"\(normal\b", r"(normal"), (r"\(lfr\b", r"(LFR"),
 ]
@@ -574,3 +579,10 @@ for _spec, _spec_fr in SPECS.items():
         for _cls_name in {_cls, {"DeathKnight": "Death Knight", "DemonHunter": "Demon Hunter"}.get(_cls, _cls)}:
             PHRASES.setdefault(f"{_spec} {_cls_name}", f"{_cls_fr} {_spec_fr}")
             PHRASES.setdefault(f"{_spec.lower()} {_cls_name.lower()}", f"{_cls_fr} {_spec_fr}")
+    # a spec alone inside a sentence: "les meilleurs Elemental", "Ixuu · Elemental · 199 kills"
+    PATTERNS.append((rf"\b(meilleurs|tops|Les meilleurs) {re.escape(_spec)}\b", rf"\1 {_spec_fr}"))
+    PATTERNS.append((rf"(&middot;|·) {re.escape(_spec)} (&middot;|·)", rf"\1 {_spec_fr} \2"))
+# "Play your cooldowns" is a phrase of its own: translated before the sentence's pattern
+PATTERNS += [(r"Joue tes CD for total \(pad\) damage\.", "Joue tes CD pour les dégâts totaux (pad)."),
+             (r"Joue tes CD for boss damage\.", "Joue tes CD pour les dégâts sur le boss."),
+             (r"Joue tes CD for (.+?) damage\.", r"Joue tes CD pour les dégâts \1.")]

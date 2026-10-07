@@ -933,11 +933,15 @@ def cmd_prep(args: argparse.Namespace) -> int:
     d.export = {"": fight_lines(title, fight)}
     goal = wanted(d) or ("boss" if args.objective is not None and args.objective >= 0.5 else "total")
     plan = next((p for p in d.optimized if p.objective == goal and p.gain > 2 * p.error), None)
+    from paf.cdplan import action_name, dump_apl, parse_apl
+
+    apl = parse_apl(dump_apl(profile_text, root / "apl-export"))
+    # what the priority list casts before the pull (Stormkeeper...): the sheet says to precast it
+    d.precast = list(dict.fromkeys(d.cd_names[n] for n in (action_name(a) for a in apl.get("precombat", []))
+                                   if n in d.cd_names))
     if plan is not None:
-        from paf.cdplan import dump_apl, parse_apl
         from paf.optimize import apply_rules
 
-        apl = parse_apl(dump_apl(profile_text, root / "apl-export"))
         label = "boss damage" if goal == "boss" else "total damage (pad)"
         d.export[label] = fight_lines(title, fight, label, apply_rules(apl, plan.choice))
     (reports / f"fight-{report_key(enc.name, diff_name)}.simc").write_text(
