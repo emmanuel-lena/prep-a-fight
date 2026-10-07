@@ -593,7 +593,11 @@ def cmd_droptimizer(args: argparse.Namespace) -> int:
         encs = raid_encounters(client)
         zone = max(e.zone_id for e in encs)
         encs = [e for e in encs if e.zone_id == zone]
-    ilvl = args.ilvl or round(st.median(i.ilvl for i in profile.equipped.values() if i.ilvl) or 0)
+    levels = [i.ilvl for i in profile.equipped.values() if i.ilvl]
+    ilvl = args.ilvl or (round(st.median(levels)) if levels else 0)
+    if not ilvl:
+        print("Your profile has no item levels: give one with --ilvl, or load your /simc export.")
+        return 1
     items = usable_loot([e.id for e in encs], profile.class_name, encounter_loot(), item_classes(), item_names())
     owned = {i.item_id: i.ilvl for i in profile.equipped.values() if i.item_id}
     skipped = [it for it in items if (owned.get(it.item_id) or 0) >= ilvl]
@@ -1014,7 +1018,13 @@ def cmd_prep(args: argparse.Namespace) -> int:
 
         step("What this boss drops")
         items = usable_loot([enc.id], profile.class_name, encounter_loot(), item_classes(), item_names())
-        ilvl = args.ilvl or round(st.median(i.ilvl for i in profile.equipped.values() if i.ilvl) or 0)
+        levels = [i.ilvl for i in profile.equipped.values() if i.ilvl]
+        ilvl = args.ilvl or (round(st.median(levels)) if levels else 0)
+        if not ilvl:  # a profile without item levels (an old import): the loot cannot be valued
+            print("  skipped: your profile has no item levels (paste your /simc export to see what this boss drops)")
+            d.notes.append("What this boss drops was skipped: your character's profile has no item levels. Paste "
+                           "your /simc export in the app to get it.")
+            items = []
         owned = {i.item_id: i.ilvl for i in profile.equipped.values() if i.item_id}
         items = [it for it in items if (owned.get(it.item_id) or 0) < ilvl]
         if items:

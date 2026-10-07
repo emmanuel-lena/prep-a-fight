@@ -85,3 +85,20 @@ def test_missing_credentials(monkeypatch):
 def test_network_errors_are_retried(tmp_path):
     fake = FakeWCL([(599, {}), (200, {"data": {"ok": 1}})])
     assert make(tmp_path, fake).query("{ ok }") == {"ok": 1}
+
+
+def test_a_used_up_quota_is_waited_for(tmp_path, capsys):
+    # every retry refused (429), then the reset time is asked, the client waits, and the query goes through
+    refused = [(429, {})] * 5
+    fake = FakeWCL(refused + [(200, {"data": {"rateLimitData": {"pointsResetIn": 600}}}), (200, {"data": {"ok": 1}})])
+    waits = []
+    c = WCLClient("id", "secret", cache_dir=tmp_path / "wcl", transport=fake, sleep=waits.append)
+    assert c.query("{ ok }") == {"ok": 1}
+    assert 605 in waits and "quota used up" in capsys.readouterr().out
+
+
+def test_a_quota_that_never_comes_back_still_fails(tmp_path):
+    fake = FakeWCL([(429, {})] * 40)
+    c = WCLClient("id", "secret", cache_dir=tmp_path / "wcl", transport=fake, sleep=lambda s: None)
+    with pytest.raises(WCLError, match="429"):
+        c.query("{ ok }")

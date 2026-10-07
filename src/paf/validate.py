@@ -39,6 +39,8 @@ def profile_from_log(name: str, cls: str, spec: str, race: str, talents: str, ge
             v += ",gem_id=" + "/".join(gems)
         if it.get("itemLevel") and not it.get("bonusIDs"):
             v += f",ilevel={it['itemLevel']}"
+        if it.get("itemLevel"):  # "# Name (ilvl)" before the item, as in a /simc export (the loot step needs it)
+            lines.append(f"# {it.get('name') or 'item'} ({it['itemLevel']})")
         lines.append(v)
     return "\n".join(lines) + "\n"
 

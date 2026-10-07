@@ -46,6 +46,10 @@ def _urllib_transport(url: str, body: bytes, headers: dict[str, str]) -> tuple[i
         return 599, str(e).encode()
 
 
+QUOTA_WAITS = 2  # a query waits at most this many quota resets before failing
+QUOTA_FALLBACK_WAIT = 900.0  # seconds to wait when the reset time cannot be read
+
+
 class WCLClient:
     def __init__(
         self,
@@ -126,7 +130,10 @@ class WCLClient:
 
         body = json.dumps({"query": query, "variables": variables}).encode()
         delay = 2.0
-        for attempt in range(self.max_retries + 1):
+        quota_waits = 0
+        attempt = -1
+        while attempt < self.max_retries:
+            attempt += 1
             status, raw = self.transport(
                 API_URL, body,
                 {"Authorization": f"Bearer {self.token()}", "Content-Type": "application/json"},
@@ -134,6 +141,15 @@ class WCLClient:
             if status == 401 and attempt == 0:
                 self._token = None
                 self._token_file().unlink(missing_ok=True)
+                continue
+            if status == 429 and attempt == self.max_retries and quota_waits < QUOTA_WAITS:
+                # the hourly quota is used up: wait for its reset instead of failing every query until then
+                wait = self._quota_reset()
+                print(f"  Warcraft Logs quota used up for this hour: waiting {max(1, round(wait / 60))} min for "
+                      f"its reset, then the prep goes on by itself...", flush=True)
+                self.sleep(wait)
+                quota_waits += 1
+                attempt, delay = -1, 2.0
                 continue
             if status == 429 or status >= 500:
                 if attempt == self.max_retries:
@@ -154,6 +170,19 @@ class WCLClient:
             cache_file.parent.mkdir(parents=True, exist_ok=True)
             cache_file.write_text(json.dumps(data), encoding="utf-8")
         return data
+
+    def _quota_reset(self) -> float:
+        """Seconds until the hourly quota resets (asked directly: the query itself may be refused)."""
+        q = json.dumps({"query": "{ rateLimitData { pointsResetIn } }"}).encode()
+        try:
+            status, raw = self.transport(API_URL, q, {"Authorization": f"Bearer {self.token()}",
+                                                      "Content-Type": "application/json"})
+            if status == 200:
+                left = float(json.loads(raw)["data"]["rateLimitData"]["pointsResetIn"])
+                return min(3600.0, max(30.0, left + 5))
+        except (ValueError, KeyError, TypeError, OSError):
+            pass
+        return QUOTA_FALLBACK_WAIT
 
     def rate_limit(self) -> dict[str, Any]:
         q = "{ rateLimitData { limitPerHour pointsSpentThisHour pointsResetIn } }"
