@@ -33,8 +33,33 @@ def server(tmp_path, monkeypatch):
     srv.shutdown()
 
 
-def test_home_and_profile_upload(server):
+def test_first_run_shows_the_steps_then_home(server):
+    from paf import settings
+
+    url, _home = server
+    page = fetch(url + "/")  # first run: the onboarding steps
+    assert 'data-step="welcome"' in page and 'data-step="character"' in page and "Skip all" in page
+    assert '"ok": false' in fetch(url + "/onboard/simc", b"simc=hello")
+    fetch(url + "/onboard/skip")
+    assert settings.get("onboarded") == "on" and "Prepare a boss fight" in fetch(url + "/")
+
+
+def test_onboarding_saves_a_pasted_export(server):
+    import json as _json
+
     url, home = server
+    data = b'shaman="T"\nspec=elemental\nhead=,id=1\n'
+    out = _json.loads(fetch(url + "/onboard/simc", b"simc=" + urllib.parse.quote(data).encode()))
+    assert out["ok"] and out["name"] == "T" and (home / "profiles" / "current.simc").is_file()
+    raid = _json.loads(fetch(url + "/onboard/raid", b"guild=G&server=Kazzak&region=eu"))
+    assert raid["ok"]
+
+
+def test_home_and_profile_upload(server):
+    from paf import settings
+
+    url, home = server
+    settings.set_value("onboarded", "on")
     page = fetch(url + "/")
     assert "Prepare a boss fight" in page and 'name="simc"' in page and "items in bags" not in page
     data = b'shaman="T"\nspec=elemental\nhead=,id=1\n'
@@ -261,3 +286,13 @@ def test_ago():
     now = 1_000_000.0
     assert web.ago(now - 30, now) == "just now" and web.ago(now - 600, now) == "10 min ago"
     assert web.ago(now - 7200, now) == "2 h ago" and web.ago(now - 100_000, now) == "yesterday"
+
+
+def test_finding_a_character_needs_the_key(tmp_path, monkeypatch):
+    from paf import onboarding
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    monkeypatch.delenv("WCL_CLIENT_ID", raising=False)
+    monkeypatch.delenv("WCL_CLIENT_SECRET", raising=False)
+    out = onboarding.find_character("Someone", "Kazzak", "eu")
+    assert not out["ok"] and "Warcraft Logs key first" in out["error"]

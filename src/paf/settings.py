@@ -33,6 +33,7 @@ SETTINGS: dict[str, Setting] = {
     "check_updates": Setting("on", "look for a new version of the app every 10 minutes", ("on", "off")),
     "share_packs": Setting("on", "share the prep packs you compute (fight data only, no names) so others skip the log "
                                   "collection", ("on", "off")),
+    "onboarded": Setting("off", "the first-run steps were done or skipped (off: show them again)", ("on", "off")),
 }
 
 

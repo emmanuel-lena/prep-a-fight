@@ -949,7 +949,21 @@ class Handler(BaseHTTPRequestHandler):
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         try:
             if url.path == "/":
+                from paf import onboarding
+
+                if onboarding.needed():  # the first run: the steps (issue #11)
+                    self._redirect("/welcome")
+                    return
                 self._send(home())
+            elif url.path == "/welcome":
+                from paf import onboarding
+
+                self._send(page("Welcome", f"<style>{onboarding.CSS}</style>{onboarding.page_body()}{onboarding.JS}"))
+            elif url.path in ("/onboard/skip", "/onboard/finish"):
+                from paf import onboarding
+
+                onboarding.finish()
+                self._redirect("/")
             elif url.path == "/boss":
                 self._send(boss_page(q.get("boss", ""), q.get("difficulty", settings.get("difficulty"))))
             elif url.path == "/tools":
@@ -994,7 +1008,24 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length") or 0)
         form = parse_qs(self.rfile.read(length).decode("utf-8", "replace"), keep_blank_values=True)
         try:
-            if self.path == "/profile":
+            if self.path.startswith("/onboard/"):
+                from paf import onboarding
+
+                f = {k: v[0] for k, v in form.items()}
+                step = self.path.rsplit("/", 1)[1]
+                out = {"key": lambda: onboarding.save_key(f.get("id", ""), f.get("secret", "")),
+                       "character": lambda: onboarding.find_character(f.get("name", ""), f.get("server", ""),
+                                                                       f.get("region", "eu")),
+                       "simc": lambda: onboarding.paste_simc(f.get("simc", "")),
+                       "raid": lambda: onboarding.save_raid(f.get("guild", ""), f.get("server", ""),
+                                                            f.get("region", "eu"))}.get(step)
+                if out is None:
+                    self._send(b'{"ok": false}', 404, "application/json")
+                    return
+                import json
+
+                self._send(json.dumps(out()).encode(), ctype="application/json")
+            elif self.path == "/profile":
                 from paf.profile import looks_like_export
 
                 text = (form.get("simc") or [""])[0]

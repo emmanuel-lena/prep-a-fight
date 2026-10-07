@@ -375,6 +375,31 @@ PHRASES: dict[str, str] = {
     "NSRT reminders": "Rappels NSRT", "Method Raid Tools: paste it in your note": "Method Raid Tools : colle-la dans ta note",
     "Northern Sky Raid Tools: your personal reminders": "Northern Sky Raid Tools : tes rappels perso",
     "Moving or standing still": "Bouger ou rester planté", "Move: it is the strategy": "Bouge : c'est la strat",
+    # the first run (paf.onboarding)
+    "Welcome": "Bienvenue", "Your boss, prepared in a few minutes": "Ton boss, préparé en quelques minutes",
+    "What the best players do": "Ce que font les meilleurs", "on this boss, read from their logs.": "sur ce boss, lu dans leurs logs.",
+    "Your character simmed on the real fight": "Ton perso simmé sur le vrai combat",
+    ", rebuilt from those logs: talents, gear, cooldowns.": ", reconstruit depuis ces logs : talents, stuff, CD.",
+    "One sheet": "Une seule fiche", ": what to change, when to press what, what to watch out for.":
+        " : quoi changer, quoi lancer quand, à quoi faire attention.",
+    "Free, on your computer. Four short steps; skip any of them, everything is in Settings later.":
+        "Gratuit, sur ton ordinateur. Quatre petites étapes ; passe celles que tu veux, tout se retrouve dans les Réglages.",
+    "Start &rarr;": "C'est parti &rarr;", "Skip all": "Tout passer", "Skip": "Passer",
+    "Your Warcraft Logs key": "Ta clé Warcraft Logs", "The app reads the top players' logs with": "L'appli lit les logs des meilleurs avec",
+    "A key is already saved: you can go on.": "Une clé est déjà enregistrée : tu peux continuer.",
+    "Find it on Warcraft Logs": "Le trouver sur Warcraft Logs", "Paste /simc": "Coller /simc",
+    "Its latest logged boss fight gives its gear and talents. No bags: for Top Gear, paste /simc.":
+        "Son dernier boss loggé donne son stuff et ses talents. Pas les sacs : pour le Top Gear, colle /simc.",
+    "Character name": "Nom du personnage", "Find my character": "Trouver mon perso",
+    "In game: type": "En jeu : tape", ", then Ctrl+A, Ctrl+C, and paste here (it includes your bags).":
+        ", puis Ctrl+A, Ctrl+C, et colle ici (ça inclut tes sacs).",
+    "Paste the /simc export here": "Colle l'export /simc ici",
+    "Your guild's latest public log tells the prep who plays what in your raid: whether the others cover the adds (stay on the boss) or you should pad them, and how your last pull compares with the top players'.":
+        "Le dernier log public de ta guilde dit à la prépa qui joue quoi dans ton raid : si les autres couvrent les adds (reste sur le boss) ou si tu dois les pad, et comment ton dernier pull se compare aux tops.",
+    "Add your Warcraft Logs key first (the step before), or paste your /simc export.":
+        "Ajoute d'abord ta clé Warcraft Logs (l'étape d'avant), ou colle ton export /simc.",
+    "Ready": "C'est prêt", "You can set the rest later in Settings.": "Tu pourras régler le reste plus tard dans les Réglages.",
+    "your raid is saved": "ton raid est enregistré",
     # the home page once set up (paf.web.simple_home)
     "Let's go &rarr;": "C'est parti &rarr;", "Your bosses": "Tes boss",
     "Difficulty": "Difficulté", "Normal": "Normal", "Heroic": "Héroïque", "Mythic": "Mythique", "just now": "à l'instant", "yesterday": "hier",
@@ -564,6 +589,14 @@ PATTERNS: list[tuple[str, str]] = [
     (r"^Careful with (.+)$", r"Attention à \1"), (r"^Hit (.+)$", r"Tape \1"),
     (r"^Defensive: (.+)$", r"Défensif : \1"), (r"^precast$", r"avant le pull"),
     (r"^Everyone moves \((\d+) s\)$", r"Tout le monde bouge (\1 s)"),
+    # the first run's answers (paf.onboarding, paf.character)
+    (r"^(.+?), (.+?): gear and talents from your log of (.+)$", r"\1, \2 : stuff et talents de ton log du \3"),
+    (r"^(.+?) \((.+?), (\w+)\) is not (?:on|sur) Warcraft Logs:.*$",
+     r"\1 (\2, \3) n'est pas sur Warcraft Logs : vérifie le nom et le serveur, ou colle ton export /simc"),
+    (r"^no recent boss fight of (.+?) in a public log:.*$",
+     r"aucun combat de boss récent de \1 dans un log public : colle plutôt ton export /simc"),
+    (r"^Warcraft Logs refused this key: (.*)$", r"Warcraft Logs a refusé cette clé : \1"),
+    (r"^That does not look like a /simc export\.$", r"Ça ne ressemble pas à un export /simc."),
     (r"^(\d+) h ago$", r"il y a \1 h"), (r"^(\d+) min ago$", r"il y a \1 min"), (r"^(\d+) more$", r"\1 de plus"),
     # your last pull (paf.review); "top players" may already read "tops" (a phrase of its own)
     (r"^(kill|pull) of (\d+:\d\d), from your raid's log\.$", r"\1 de \2, d'après le log de ton raid."),
