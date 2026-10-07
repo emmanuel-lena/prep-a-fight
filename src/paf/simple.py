@@ -17,6 +17,7 @@ MAX_WATCH = 3  # lines on the "watch out" card
 POTION_ICON = "inv_potion_54"
 ADDS_ICON = "inv_misc_groupneedmore"
 LUST_ICON = "spell_nature_bloodlust"
+MOVE_ICON = "ability_rogue_sprint"
 
 
 def _mmss(t: float) -> str:
@@ -29,6 +30,8 @@ def _fallback(d, name: str) -> str:
         return POTION_ICON
     if name.lower() == "bloodlust":
         return LUST_ICON
+    if name == "Movement":
+        return MOVE_ICON
     adds = {w[3] for w in d.waves if w[1]} | {a.name for a in d.actions if a.kind in ("kill", "ignore")}
     return ADDS_ICON if name in adds else ""
 
@@ -168,6 +171,36 @@ def watch_card(d) -> str:
     return f"<article class='card s-watch'><h2>Watch out</h2><ul>{rows}</ul></article>"
 
 
+def move_card(d) -> str:
+    """Moving or standing still: the strategy's movement windows, what a second of movement costs, how the top
+    players keep casting while they move."""
+    m = d.movement
+    if m is None or not (m.windows or m.cost_10s):
+        return ""
+    lines = []
+    if m.windows:
+        lines.append(("Movement", f"Move when the strategy says so: {len(m.windows)} moments where most top players "
+                                 f"move ({m.covered:.0f} s in all), marked in the fight below.", ""))
+    if m.cost_10s:
+        lines.append(("", f"The rest of the time, stand still and cast: 10 s of movement without casting costs you "
+                          f"about {m.cost_10s:.1f}% of your DPS.", "cost"))
+    spells = {}
+    for w in m.windows:
+        for s, share in w.spells:
+            spells[s] = max(spells.get(s, 0.0), share)
+    if m.cost_10s and m.scale < 0.5:
+        lost = m.cost_10s * m.scale
+        how = f", {', '.join(list(spells)[:2])}" if spells else ""
+        lines.append((next(iter(spells), ""), f"The top players lose only about {lost:.1f}% per 10 s: they keep casting "
+                                              f"while they move (instant spells{how}).", ""))
+    elif spells:
+        s = next(iter(spells))
+        lines.append((s, f"For these moments the top players use {s}.", ""))
+    warn = "<span class='ok bad' aria-hidden='true'>!</span>"
+    rows = "".join(f"<li>{_ic(d, ic) if ic else warn}<div><b>{e(say)}</b></div></li>" for ic, say, _ in lines)
+    return f"<article class='card s-move'><h2>Moving or standing still</h2><ul>{rows}</ul></article>"
+
+
 # --- the whole fight, top to bottom (issue #9) ----------------------------------------------------------------------
 
 ROW_GAP = 3.0  # seconds; events this close share a row
@@ -217,6 +250,11 @@ def _events(d) -> list[tuple[float, str, str]]:
     for m in (d.defensives.moments if d.defensives else []):
         if m.spells:
             out.append((m.time, "r", _item(d, m.spells[0][0], f"Defensive: {m.spells[0][0]}")))
+    for w in (d.movement.windows if d.movement else []):  # the strategy makes everyone move: so do you
+        out.append((w.start, "l", _item(d, "Movement", f"Everyone moves ({w.duration:.0f} s)")))
+        out.append((w.start, "r", _do("Move: it is the strategy")))
+        for s, _share in w.spells[:1]:
+            out.append((w.start, "r", _item(d, s, s)))
     return sorted(out, key=lambda x: x[0])
 
 
@@ -254,7 +292,7 @@ def fight_html(d) -> str:
 
 
 def simple_html(d) -> str:
-    cards = change_card(d) + press_card(d) + watch_card(d)
+    cards = change_card(d) + press_card(d) + watch_card(d) + move_card(d)
     return (f"<div class='simple'><div class='cards'>{cards}</div>{fight_html(d)}"
             f"<p class='to-detail'><a class='btn' href='#overview'>See all the details &rarr;</a></p></div>")
 
@@ -284,6 +322,10 @@ body.simple-on .tabs{display:none}
 .simple .times time{font:600 15px var(--font-data);padding:2px 8px;border-radius:999px;background:var(--surface-2);
   border:1px solid var(--line)}
 .simple .s-press .what{margin:-6px 0 12px}
+.simple .s-move{grid-column:1/-1}
+.simple .s-move ul{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px 22px}
+.simple .s-move b{font-weight:500;font-size:16px;line-height:1.45}
+.simple .ok.bad{background:var(--warn);font-weight:700}
 /* the fight, top to bottom: the boss on the left, you on the right, the time in the middle */
 .simple .s-fight{margin-top:16px}
 .simple .s-fight>.what{margin:-6px 0 10px}

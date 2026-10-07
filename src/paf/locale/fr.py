@@ -374,7 +374,8 @@ PHRASES: dict[str, str] = {
     "Copy the note": "Copier la note", "MRT note": "Note MRT",
     "NSRT reminders": "Rappels NSRT", "Method Raid Tools: paste it in your note": "Method Raid Tools : colle-la dans ta note",
     "Northern Sky Raid Tools: your personal reminders": "Northern Sky Raid Tools : tes rappels perso",
-    "Before the pull:": "Avant le pull :", "You": "Toi","Kill them": "Tue-les", "Interrupt": "Interromps", "Soak it": "Soak",
+    "Moving or standing still": "Bouger ou rester planté", "Move: it is the strategy": "Bouge : c'est la strat",
+    "Before the pull:": "Avant le pull :","You": "Toi","Kill them": "Tue-les", "Interrupt": "Interromps", "Soak it": "Soak",
     "See all the details &rarr;": "Voir tout le détail &rarr;", "&larr; Simple view": "&larr; Vue simple",
 }
 
@@ -555,7 +556,15 @@ PATTERNS: list[tuple[str, str]] = [
     # the simple view (paf.simple): short sentences around a game name
     (r"^Kill the (.+)$", r"Tue : \1"), (r"^Interrupt (.+)$", r"Interromps \1"), (r"^Soak (.+)$", r"Soak \1"),
     (r"^Careful with (.+)$", r"Attention à \1"), (r"^Hit (.+)$", r"Tape \1"),
-    (r"^Defensive: (.+)$", r"Défensif : \1"),(r"^precast$", r"avant le pull"),
+    (r"^Defensive: (.+)$", r"Défensif : \1"), (r"^precast$", r"avant le pull"),
+    (r"^Everyone moves \((\d+) s\)$", r"Tout le monde bouge (\1 s)"),
+    (r"Move when the strategy says so: (\d+) moments where most top players move \((\d+) s in all\), marked in the fight below\.",
+     r"Bouge quand la strat le demande : \1 moments où la plupart des tops bougent (\2 s en tout), marqués dans le combat ci-dessous."),
+    (r"The rest of the time, stand still and cast: 10 s of movement without casting costs you about ([\d.]+)% of your DPS\.",
+     r"Le reste du temps, reste planté et caste : 10 s de déplacement sans caster te coûtent environ \1 % de DPS."),
+    (r"The top players lose only about ([\d.]+)% per 10 s: they keep casting while they move \(instant spells(.*?)\)\.",
+     r"Les tops n'en perdent qu'environ \1 % par 10 s : ils continuent de caster en bougeant (sorts instantanés\2)."),
+    (r"For these moments the top players use (.+)\.", r"Pour ces moments, les tops utilisent \1."),
     # the sheet picker of /view: "Boss (mythic Elemental)"
     (r"\(mythic\b", r"(mythique"), (r"\(heroic\b", r"(héroïque"), (r"\(normal\b", r"(normal"), (r"\(lfr\b", r"(LFR"),
 ]

@@ -832,6 +832,23 @@ def cmd_prep(args: argparse.Namespace) -> int:
                                                      "desired_targets=1"]), root / "patchwerk", target_error=args.error)
     d.sim_dps, d.patchwerk_dps = real.baseline["dps"].mean, dummy.baseline["dps"].mean
     d.sim_boss_dps = real.baseline["prioritydps"].mean if "prioritydps" in real.baseline else None
+    from paf.fight import merged_movement
+
+    strat_moves = [w for w in merged_movement(fight.movement) if not w.distance]
+    moving_s = sum(w.duration for w in strat_moves)
+    move_cost = None
+    if moving_s >= 10:  # what moving without casting costs you: the fight without, then with its movement windows
+        from paf import movement
+
+        still = [line for line in fight.to_simc() if not line.startswith("raid_events")]
+        res = simc.run(simc.build_input(profile_text, still + fight.raid_event_lines(movement_scale=0.0),
+                                        {"moving": fight.raid_event_lines(movement_scale=1.0)}),
+                       root / "movement", target_error=args.error)
+        ps = next((p for p in res.profilesets if p.name == "moving"), None)
+        if ps is not None:
+            move_cost = movement.cost(res.baseline["dps"].mean, ps.dps.mean, moving_s)
+            print(f"  10 s of movement without casting: -{move_cost:.2f}% DPS"
+                  f" (the top players lose x{fight.movement_scale:g} of that)")
 
     step("Cooldown timelines of the top players")
     if pk is not None:
@@ -847,6 +864,10 @@ def cmd_prep(args: argparse.Namespace) -> int:
     tl_file = reports / f"timeline-{report_key(enc.name, diff_name)}.html"
     tl_file.write_text(render_html(tl), encoding="utf-8")
     d.timeline_file = tl_file.name
+    from paf import movement
+
+    d.movement = movement.Movement(movement.mobility(tl_all, strat_moves), move_cost, fight.movement_scale,
+                                   d.moving_share)
 
     fights = {"boss fight": fight.to_simc(),
               "patchwerk": ["fight_style=Patchwerk", f"max_time={simc.fmt(fight.duration)}", "desired_targets=1"]}
