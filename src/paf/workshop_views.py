@@ -282,7 +282,7 @@ def comp(d: dict) -> str:
     swaps = d.get("swaps") or []
     swap_html = ""
     if swaps:
-        swap_html = ("<h3>Change spec for more boss damage</h3><ul class='glist items'>" + "".join(
+        swap_html = ("<h3>Change spec for more boss damage</h3><ul class='glist items three'>" + "".join(
             f"<li>{ic(x['better'], 'large')}<span class='l-name'><b>{e(x['name'])}</b><small><span class='was'>"
             f"{e(x['current'])}</span> &rarr; {e(x['better'])}</small></span><span class='l-val pos'>"
             f"{_pct(x['gain'] * 100, 0)}</span></li>" for x in swaps) + "</ul><p class='ws-fine'>Optional: the boss "
@@ -354,7 +354,7 @@ def wipe(d: dict) -> str:
     death_html = ""
     if deaths:
         death_html = (f"<h3>The deaths: <span class='num'>{lost:.1%}</span> of the boss's health</h3>"
-                      f"<ul class='glist items deaths'>{''.join(who(x) for x in sorted(deaths, key=lambda x: -x['lost']))}</ul>")
+                      f"<ul class='glist items three'>{''.join(who(x) for x in sorted(deaths, key=lambda x: -x['lost']))}</ul>")
     share = (f"<h3>The damage off the boss</h3><p><span>Your raid put</span> <b class='num'>{d['raid_share']:.0%}</b> "
              f"<span>of its damage on the boss, the top kills</span> <b class='num'>{d['tops_share']:.0%}</b>.</p>")
     culprits = [c for c in d.get("culprits", []) if c["lost_alive"] + c["lost_dead"] >= 0.002]
@@ -501,7 +501,7 @@ details.more{margin:6px 0} details.more>summary{cursor:pointer;color:var(--muted
 .job .lab.go{color:var(--pos)} .job .lab.warn{color:var(--warn)}
 .rank{counter-reset:r} .rank li{grid-template-columns:32px minmax(0,1fr) auto!important}
 .l-name .was{text-decoration:line-through}
-.glist.items.deaths li{grid-template-columns:44px minmax(0,1fr) 78px}
+.glist.items.three li{grid-template-columns:44px minmax(0,1fr) 78px}
 .kts{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:0 0 14px}
 .kt{padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);display:grid;gap:4px}
 .kt small{color:var(--muted);font-size:13px} .kt b{font:700 24px/1 var(--font-data)} .kt span{color:var(--muted);font-size:13px}

@@ -91,6 +91,7 @@ class PrepData:
     precast: list[str] = field(default_factory=list)  # cooldowns the priority list casts before the pull
     movement: object | None = None  # paf.movement.Movement: move for the strategy, stand still otherwise
     review: object | None = None  # paf.review.Review: your own log next to the top players' (casting, moving)
+    raid_tools: dict = field(default_factory=dict)  # comp / wipe / night: paf.workshop_views data
     imported: bool = False  # the character was read from a log (no bags): no gear nor loot until /simc
     class_name: str = ""  # e.g. "shaman" (class icon in the header)
     guide_summary: str = ""  # html: the boss in 60 seconds (Encounter Journal, your role)
@@ -786,6 +787,17 @@ def render(d: PrepData) -> str:
                              + "".join(f"<li>{e(a)}</li>" for a in d.assigns) + "</ul></div>")
 
     # your raid
+    if d.raid_tools:
+        from paf import workshop_views
+
+        tools = getattr(d, "raid_tools", {}) or {}
+        titles = {"comp": "Who hits what in your raid", "wipe": "Your best pull, in detail",
+                  "night": "This boss in your raid's night"}
+        for kind in ("comp", "wipe", "night"):
+            if tools.get(kind):
+                tabs["raid"].append(f"<h2>{e(titles[kind])}</h2><div class='ws-answer'>"
+                                    f"{workshop_views.render({'kind': kind, **tools[kind]})}</div>")
+        tabs["raid"].append(workshop_views.CSS)
     if d.raid:
         tabs["raid"].append(raid_section(d.raid))
     else:

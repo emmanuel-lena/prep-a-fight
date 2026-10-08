@@ -67,8 +67,8 @@ class PullRow:
     players: dict[str, PlayerPull] = field(default_factory=dict)
 
 
-def night(client, code: str) -> tuple[list[PullRow], dict[str, str]]:
-    """The pulls of the log, and player name -> icon ("Class-Spec")."""
+def night(client, code: str, encounter_id: int | None = None) -> tuple[list[PullRow], dict[str, str]]:
+    """The pulls of the log (of one boss when encounter_id is given), and player name -> icon ("Class-Spec")."""
     rep = client.query(ABILITIES, {"c": code}, cache_ttl=3600)["reportData"]["report"]
     kinds = {a["gameID"]: k for a in rep["masterData"]["abilities"] or [] if (k := kind(a.get("name") or ""))}
     actors = {a["id"]: a for a in rep["masterData"]["actors"] or []}
@@ -77,7 +77,7 @@ def night(client, code: str) -> tuple[list[PullRow], dict[str, str]]:
     rows = []
     for f in rep["fights"] or []:
         dur = (f["endTime"] - f["startTime"]) / 1000
-        if dur < MIN_PULL:
+        if dur < MIN_PULL or (encounter_id is not None and f["encounterID"] != encounter_id):
             continue
         t0 = f["startTime"]
         row = PullRow(f["id"], f.get("name") or str(f["encounterID"]), f["difficulty"], bool(f["kill"]), dur,

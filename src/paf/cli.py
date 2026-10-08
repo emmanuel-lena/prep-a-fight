@@ -839,6 +839,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
                 r = d.review
                 print(f"  your {r.fight}: casting {r.active:.0%} of the time (top players {r.tops_active or 0:.0%}), "
                       f"moving {r.moving:.0%} (top players {r.tops_moving or 0:.0%})")
+            d.raid_tools = _raid_tools(client, con, enc, diff, raid_url)
         except (ValueError, OSError, KeyError, TypeError) as ex:
             print(f"  could not read your raid's log: {ex}")
             d.notes.append(f"Your raid's log could not be read ({ex}).")
@@ -1489,6 +1490,52 @@ def _plan_raid(enc, diff_name: str) -> str:
         return parse_plan(p.read_text(encoding="utf-8-sig")).raid if p.is_file() else ""
     except ValueError:
         return ""
+
+
+def _raid_tools(client, con, enc, diff: int, url: str) -> dict:
+    """For the "Your raid" tab of the prep: who hits what (paf.comp), the best pull if the boss is not dead in that
+    log (paf.wipe), this boss's pulls of the night (paf.tracker). Each one on its own: a failure only skips it."""
+    import statistics as st
+
+    from paf import comp, raidplan, raidreview, tracker, wipe
+    from paf.raidneed import raid_from_report, report_code
+
+    out: dict = {}
+    code = report_code(url)
+    boss = main_boss(con, enc.id, diff, enc.name)
+    targets, _ = raidreview.references(con, enc.id, diff, boss)  # empty with a prep pack and no local corpus
+    if targets:
+        try:
+            rc = raid_from_report(client, url, enc.id, diff)
+            if rc.same_boss:
+                refs = comp.references(con, enc.id, diff, targets)
+                bosses = {boss} | {r.name for r in refs if r.second_boss}
+                swaps = comp.swaps(rc, comp.boss_dps(con, enc.id, diff, bosses),
+                                   raidplan.class_specs(con, enc.id, diff))
+                out["comp"] = comp.to_dict(boss, rc.fight, comp.assign(rc, refs), swaps)
+        except Exception as ex:  # noqa: BLE001 - an extra of the prep: never fails it
+            print(f"  who hits what: skipped ({str(ex)[:100]})")
+        try:
+            main = next(t for t in targets if t.main)
+            fight = wipe.best_wipe(client, code, enc.id, diff)
+            durations = sorted(r[0] for r in con.execute(
+                "SELECT duration_s FROM fight WHERE encounter_id=? AND difficulty=? AND status='done'", (enc.id, diff)))
+            if fight and durations:
+                p = wipe.analyze(client, code, fight, boss, main.tops_share, comp.boss_dps(con, enc.id, diff, {boss}))
+                wipe.add_talents(client, code, p, enc.id, diff)
+                out["wipe"] = wipe.to_dict(p, enc.name, durations[-1], st.median(durations))
+                t = p.kill_time("no_deaths")
+                print(f"  best pull: boss at {p.boss_left:.1%}, kill estimated at {int(t // 60)}:{int(t % 60):02d} "
+                      f"without the deaths")
+        except Exception as ex:  # noqa: BLE001
+            print(f"  best pull: skipped ({str(ex)[:100]})")
+    try:
+        rows, icons = tracker.night(client, code, enc.id)
+        if rows:
+            out["night"] = tracker.to_dict(code, rows, icons)
+    except Exception as ex:  # noqa: BLE001
+        print(f"  the night's pulls: skipped ({str(ex)[:100]})")
+    return out
 
 
 def _raid_verdict(client, con, enc, diff: int, url: str, profile, spec: str, fill: bool = False, types=None):

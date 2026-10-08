@@ -96,3 +96,13 @@ def test_the_night_tracker():
     assert d["summary"]["Moon"]["bare"] == 1 and d["summary"]["Dk"]["pulls_damage_potion"] == 1
     page = workshop_views.render({"kind": "night", **d})
     assert "1 pulls, 1 deaths before the wipes" in page and "Pull by pull" in page
+
+
+def test_the_raid_tab_of_the_sheet_shows_the_raid_tools():
+    from paf.prep_report import PrepData, render
+
+    d = PrepData("Boss", "mythic", "Elemental", "X", duration=300)
+    d.raid_tools = {"comp": comp.to_dict("Boss", "this boss, kill of 1:40", rows())}
+    html = render(d)
+    assert "Who hits what in your raid" in html and "Put them on it" in html
+    assert "Your best pull, in detail" not in html  # no wipe in that log: nothing shown
