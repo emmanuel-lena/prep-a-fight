@@ -62,3 +62,12 @@ def test_a_whole_raid_add_lists_who_missed_it_and_the_ranked_player_is_left_out(
 def test_the_page():
     page = workshop_views.render({"kind": "comp", **comp.to_dict("Boss", "this boss, kill of 1:40", rows())})
     assert "Who hits what in your raid" in page and "Put them on it" in page and "Hardly hit it" in page
+
+
+def test_a_spec_change_for_boss_damage():
+    dps = comp.boss_dps(corpus(), 9, 5, {"Boss"})
+    assert round(dps["Fire Mage"]) == 10  # 1000 in 100 s: the ranked Fire Mage's 2000 left out
+    out = comp.swaps(pull(), {"Fire Mage": 10.0, "Arcane Mage": 12.0}, {"Mage": ["Arcane Mage", "Fire Mage"]})
+    assert [(x.name, x.better, round(x.gain, 2)) for x in out] == [("Fire", "Arcane Mage", 0.2)]
+    page = workshop_views.render({"kind": "comp", **comp.to_dict("Boss", "", rows(), out)})
+    assert "Change spec for more boss damage" in page

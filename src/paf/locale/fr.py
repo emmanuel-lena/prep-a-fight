@@ -506,6 +506,9 @@ PHRASES: dict[str, str] = {
     "(on top of the whole raid)": "(en plus de tout le raid)",
     "In the top raids, the whole raid hits it.": "Chez les meilleurs raids, tout le raid tape dessus.",
     "The specs of your raid that do the most damage on it": "Les specs de ton raid qui y font le plus de dégâts",
+    "Change spec for more boss damage": "Changer de spec pour plus de dégâts sur le boss",
+    "Optional: the boss damage of the other spec's players in the top kills of this boss, vs the current spec's (medians). It does not know each player's gear or practice on the other spec.":
+        "Optionnel : les dégâts sur le boss des joueurs de l'autre spec dans les meilleurs kills de ce boss, comparés à ceux de la spec actuelle (médianes). Ça ne connaît ni le stuff ni l'habitude de chacun sur l'autre spec.",
     "Put them on it": "Faites-les taper dessus", "Hardly hit it in your pull": "L'ont à peine tapé dans ton pull",
     "DPS on the target of each spec's players in the top kills of this boss (those assigned to it for an assigned target; on both bosses for a second boss). It compares specs, not your players' skill, and does not know your strategy.":
         "DPS sur la cible des joueurs de chaque spec dans les meilleurs kills de ce boss (ceux qui y sont assignés pour une cible assignée ; sur les deux boss pour un deuxième boss). Ça compare des specs, pas le niveau de tes joueurs, et ça ne connaît pas votre strat.",

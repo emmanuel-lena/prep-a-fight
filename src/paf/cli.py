@@ -1155,7 +1155,7 @@ def cmd_review(args: argparse.Namespace) -> int:
 
 def cmd_comp(args: argparse.Namespace) -> int:
     """Who hits what in your raid: the targets the top raids cannot skip, and who takes them (paf.comp)."""
-    from paf import comp, raidreview, results, settings, simc
+    from paf import comp, raidplan, raidreview, results, settings, simc
     from paf.corpus import db
     from paf.raidneed import guild_report, raid_from_report
 
@@ -1177,7 +1177,10 @@ def cmd_comp(args: argparse.Namespace) -> int:
     if not rc.same_boss:
         print(f"This log has no pull of {enc.name}.")
         return 1
-    rows = comp.assign(rc, comp.references(con, enc.id, diff, targets))
+    refs = comp.references(con, enc.id, diff, targets)
+    rows = comp.assign(rc, refs)
+    bosses = {boss} | {r.name for r in refs if r.second_boss}
+    swap_list = comp.swaps(rc, comp.boss_dps(con, enc.id, diff, bosses), raidplan.class_specs(con, enc.id, diff))
     print(f"{enc.name} {diff_name}, your raid's pull ({rc.fight}): who hits what")
     for a in rows:
         kind = ("second boss" if a.second_boss else
@@ -1191,8 +1194,10 @@ def cmd_comp(args: argparse.Namespace) -> int:
             print("    missed it: " + ", ".join(f"{n} {x:.0%} (their spec {h:.0%})" for n, _, x, h in a.missed))
     if not rows:
         print("  Nothing but the boss: no add to assign.")
+    for x in swap_list:
+        print(f"  {x.name}: {x.better} does {x.gain:+.0%} boss damage vs {x.current} on this boss")
     root = simc.new_run_dir(label="comp")
-    results.write(root, "comp", comp.to_dict(boss, rc.fight, rows))
+    results.write(root, "comp", comp.to_dict(boss, rc.fight, rows, swap_list))
     print(f"Runs: {root}")
     return 0
 

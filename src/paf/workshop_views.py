@@ -279,7 +279,16 @@ def comp(d: dict) -> str:
             block += (f"<p class='lab warn'>Hardly hit it in your pull</p><div class='whos'>{names(t['missed'])}</div>")
         cards += (f"<div class='job'><div class='j-head'><b>{e(t['name'])}</b><small>{kind}</small></div>{say}{block}"
                   "</div>")
-    return (f"{head}<div class='jobs wide'>{cards}</div><p class='ws-fine'>DPS on the target of each spec's players in "
+    swaps = d.get("swaps") or []
+    swap_html = ""
+    if swaps:
+        swap_html = ("<h3>Change spec for more boss damage</h3><ul class='glist items'>" + "".join(
+            f"<li>{ic(x['better'], 'large')}<span class='l-name'><b>{e(x['name'])}</b><small><span class='was'>"
+            f"{e(x['current'])}</span> &rarr; {e(x['better'])}</small></span><span class='l-val pos'>"
+            f"{_pct(x['gain'] * 100, 0)}</span></li>" for x in swaps) + "</ul><p class='ws-fine'>Optional: the boss "
+            "damage of the other spec's players in the top kills of this boss, vs the current spec's (medians). "
+            "It does not know each player's gear or practice on the other spec.</p>")
+    return (f"{head}<div class='jobs wide'>{cards}</div>{swap_html}<p class='ws-fine'>DPS on the target of each spec's players in "
             "the top kills of this boss (those assigned to it for an assigned target; on both bosses for a second "
             "boss). It compares specs, not your players' skill, and does not know your strategy.</p>")
 
@@ -359,6 +368,7 @@ details.more{margin:6px 0} details.more>summary{cursor:pointer;color:var(--muted
 .job .lab{color:var(--muted);font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;margin-top:4px}
 .job .lab.go{color:var(--pos)} .job .lab.warn{color:var(--warn)}
 .rank{counter-reset:r} .rank li{grid-template-columns:32px minmax(0,1fr) auto!important}
+.l-name .was{text-decoration:line-through}
 .whos{display:flex;flex-wrap:wrap;gap:6px}
 .who{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;border-radius:999px;
   border:1px solid var(--line);background:var(--surface-2);font-size:14px}
