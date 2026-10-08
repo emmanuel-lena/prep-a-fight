@@ -41,5 +41,7 @@ def test_characters_page_and_the_add_button(tmp_path, monkeypatch):
     page = web.characters_page()
     assert page.count("class=\"ccard") == 2 and "Play this character" in page and "id='add'" in page
     assert 'action="/profile"' in page and 'action="/character/remove"' in page
+    # removing asks first: the remove form sits inside a folded confirmation
+    assert page.count('<details class="rm">') == 2 and "Yes, remove it" in page and "Keep it" in page
     assert 'href="/characters#add"' in web.characters_strip()
     assert 'href="/characters"' in web.page("X", "").decode()  # in the top bar

@@ -6,7 +6,7 @@ NAME = "Français"
 
 PHRASES: dict[str, str] = {
     # navigation, app
-    "Home": "Accueil", "Tools": "Outils", "Settings": "Réglages", "Feedback": "Retours",
+    "Home": "Accueil", "Tools": "Outils", "Settings": "Réglages", "Feedback": "Signaler un souci",
     "Prepare a boss fight": "Préparer un boss",
     "The top players' logs, your character and SimulationCraft: your plan for this fight.":
         "Les logs des meilleurs joueurs, ton personnage et SimulationCraft : ton plan pour ce combat.",
@@ -555,6 +555,8 @@ PHRASES: dict[str, str] = {
     "One /simc export per character: switch in one click, paste again after a gear change.":
         "Un export /simc par perso : change d'un clic, recolle-le après un changement de stuff.",
     "Play this character": "Jouer ce perso", "Remove": "Supprimer", "active": "actif",
+    "Remove this character? Its /simc export is deleted.": "Supprimer ce perso ? Son export /simc est effacé.",
+    "Yes, remove it": "Oui, le supprimer", "Keep it": "Le garder",
     "from a log: no bags": "depuis un log : sans sacs", "updated": "mis à jour",
     "No character yet: add your first one below.": "Aucun perso pour l'instant : ajoute le premier ci-dessous.",
     "In game, on that character: type": "En jeu, sur ce perso : tape",

@@ -28,3 +28,14 @@ def test_percent_stays_between_1_and_99():
 
 def test_the_startup_page_has_a_spinner():
     assert "class=\"spin\"" in loading.startup_page() and "Starting prep-a-fight" in loading.STARTUP
+
+
+def test_top_gear_left_from_its_passes():
+    from paf.progress import _gear_left
+
+    log = ("== Top Gear with your 36 items  [+3s]\nPass 1: 47 single swaps x 1 fight(s)\n  boss fight: 25s\n"
+           "  kept: shoulder: 1\nPass 2: 215 combinations x 1 fight(s)\n")
+    # 25 s for 47 -> 215 at the same pace = 114 s; 25 s of pass 1 + 30 s of pass 2 elapsed
+    left = _gear_left(log, 55 / 60)
+    assert round(left * 60) == round(215 * 25 / 47 - 30)
+    assert _gear_left("== Top Gear  [+3s]\nPass 1: 47 single swaps x 1 fight(s)\n", 0.2) is None  # no pace yet

@@ -62,6 +62,9 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .ccard .cc-ic{width:48px;height:48px;border-radius:10px;margin:0}
 .cc-txt{display:flex;flex-direction:column;gap:4px;flex:1;min-width:180px} .cc-txt b{font-size:18px}
 .cc-act{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .cc-act form{margin:0}
+.rm>summary{list-style:none;cursor:pointer} .rm>summary::-webkit-details-marker{display:none}
+.rm[open]>summary{display:none} .rm-ask{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rm-ask span{color:var(--neg);font-size:14px}
 .btn.danger{color:var(--neg)}
 .add-form textarea{width:100%;min-height:160px;box-sizing:border-box}
 .bcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
@@ -624,8 +627,12 @@ def characters_page() -> str:
                   f'<span>{e(c.spec.title())} {e(c.class_name.title())}</span><span>{badge} '
                   f'<span class="muted small">updated <span>{ago(c.mtime)}</span></span></span></div><div class="cc-act">{play}'
                   f'<a class="btn ghost" href="#add">Update</a>'
+                  f'<details class="rm"><summary class="btn ghost danger">Remove</summary><div class="rm-ask">'
+                  f'<span>Remove this character? Its /simc export is deleted.</span>'
                   f'<form method="post" action="/character/remove"><input type="hidden" name="slug" value="{e(c.slug)}">'
-                  f'<button class="btn ghost danger" title="Remove">Remove</button></form></div></div>')
+                  f'<button class="btn danger">Yes, remove it</button></form>'
+                  '<button type="button" class="btn ghost" onclick="this.closest(\'details\').open=false">Keep it'
+                  f'</button></div></details></div></div>')
     empty = "" if cards else "<p class='muted'>No character yet: add your first one below.</p>"
     return (f"<h1>Your characters</h1><p class='lead'>One /simc export per character: switch in one click, paste "
             f"again after a gear change.</p><div class='ccards'>{cards}</div>{empty}"

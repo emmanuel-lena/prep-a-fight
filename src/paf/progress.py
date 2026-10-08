@@ -3,7 +3,8 @@
 The prep prints ``== <step>  [+<seconds since the start>s]``; the app reads the log of the job. Step durations of
 finished preps are kept (``<data>/web/step-times.json``, the last ten per step) and their median predicts the next
 prep; the very first prep uses typical minutes. The corpus step is predicted from its own pace (kills left x time
-per kill so far) plus an announced quota wait.
+per kill so far) plus an announced quota wait; Top Gear from its passes (the combinations of the pass running x the
+seconds per combination of the passes done).
 """
 
 from __future__ import annotations
@@ -129,6 +130,8 @@ def prep_progress(log: str, elapsed: float | None = None) -> tuple[list[tuple[st
             since = max(0.0, elapsed - start) / 60
         if prefix.startswith("Collecting the corpus"):
             left += _corpus_left(log, since, typical)
+        elif prefix.startswith("Top Gear") and (gear := _gear_left(log, since)) is not None:
+            left += gear
         else:
             left += max(typical - since, typical * 0.1) if since is not None else typical / 2
     return rows, left
@@ -150,6 +153,31 @@ def _corpus_left(log: str, since: float | None, typical: float) -> float:
     done, total = kills[-1]
     pace = since / max(done, 1)
     return pace * (total - done) + wait
+
+
+_PASS = re.compile(r"^Pass \d+: (\d+) ")
+_FIGHT_TIME = re.compile(r"^\s+.+: (\d+)s$")
+
+
+def _gear_left(log: str, since: float | None) -> float | None:
+    """Minutes left of Top Gear from its passes ("Pass 2: 215 combinations", then "  boss fight: 126s" per fight):
+    None before a pass is done (no pace yet)."""
+    if since is None or "== Top Gear" not in log:
+        return None
+    part = log[log.rfind("== Top Gear"):].split("\n== ", 1)[0]
+    passes: list[list] = []  # [combinations, seconds or None]
+    for line in part.splitlines():
+        if m := _PASS.match(line):
+            passes.append([int(m.group(1)), None])
+        elif (m := _FIGHT_TIME.match(line)) and passes:
+            passes[-1][1] = (passes[-1][1] or 0) + int(m.group(1))
+    done = [x for x in passes if x[1] is not None]
+    if not done or not passes or passes[-1][1] is not None:
+        return None
+    pace = sum(x[1] for x in done) / max(1, sum(x[0] for x in done))  # seconds per combination
+    running = passes[-1][0] * pace / 60
+    elapsed = since - sum(x[1] for x in done) / 60
+    return max(running - elapsed, running * 0.1)
 
 
 FINDINGS = (
