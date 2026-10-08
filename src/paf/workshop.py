@@ -54,9 +54,9 @@ TOOLS: tuple[Tool, ...] = (
          "target? Your raid's pull next to the top raids.", "inv_misc_spyglass_03", "raid", "1",
          ("boss", "difficulty", "raid"), "Each player's damage on the boss and on each target, next to the top "
          "players of their spec, and what to change for more boss damage."),
-    Tool("raidplan", "Your raid's plan", "Who brings which spec, and who pads the adds?",
-         "achievement_guildperk_everybodysfriend", "raid", "1-3", ("boss", "difficulty", "raid"),
-         "A page with your raid's comp and who should pad what."),
+    Tool("comp", "Your raid's best comp", "Which spec should each player bring, and who goes on which target, for "
+         "the most boss damage?", "achievement_guildperk_everybodysfriend", "raid", "1",
+         ("boss", "difficulty", "raid"), "The spec changes and who goes where, with the boss damage gained."),
     Tool("mechanics", "The boss's mechanics", "Every ability from the Encounter Journal, by role: what concerns you?",
          "inv_misc_book_09", "boss", "1", ("boss", "difficulty"),
          "The boss's abilities by role, and who handles what in the top kills.", needs_prep=False),

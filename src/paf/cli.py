@@ -1153,6 +1153,50 @@ def cmd_review(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_comp(args: argparse.Namespace) -> int:
+    """Your raid's best comp on this boss: each player's spec and target, for the most boss damage (paf.comp)."""
+    from paf import comp, raidplan, raidreview, results, settings, simc
+    from paf.corpus import db
+    from paf.raidneed import guild_report, raid_from_report
+
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    con = db.connect()
+    boss = main_boss(con, enc.id, diff, enc.name)
+    targets, _habits = raidreview.references(con, enc.id, diff, boss)
+    if not targets:
+        print(f"No kill of {enc.name} {diff_name} in the corpus yet: prepare this boss first.")
+        return 1
+    url = args.raid or _plan_raid(enc, diff_name)
+    if not url and settings.get("guild"):
+        url = guild_report(client, settings.get("guild"), settings.get("guild_server"), settings.get("guild_region"),
+                           enc.id, diff)
+    if not url:
+        print("Give a log of your raid (--raid <link>) or set your guild in the settings.")
+        return 1
+    rc = raid_from_report(client, url, enc.id, diff)
+    if not rc.same_boss:
+        print(f"This log has no pull of {enc.name}.")
+        return 1
+    stats = comp.spec_stats(con, enc.id, diff, [t.name for t in targets])
+    specs = {} if args.no_swaps else raidplan.class_specs(con, enc.id, diff)
+    c = comp.propose(rc, targets, stats, specs)
+    print(f"{enc.name} {diff_name}, from your raid's pull ({rc.fight}): boss damage "
+          f"{c.gain:+.1%} vs your comp playing like the top players of each spec")
+    for t in c.need:
+        print(f"  {t:<30} needs {c.need[t] / 1000:,.0f}k/s, gets {c.got[t] / 1000:,.0f}k/s")
+    for p in c.picks:
+        if p.role == "support":
+            continue
+        swap = f" (instead of {p.current})" if p.spec != p.current else ""
+        print(f"  {p.name:<16} {p.spec + swap:<50} {'boss' if p.job == c.boss_name else p.job}")
+    for n in c.notes:
+        print("  " + n)
+    root = simc.new_run_dir(label="comp")
+    results.write(root, "comp", dict(comp.to_dict(c), fight=rc.fight))
+    print(f"Runs: {root}")
+    return 0
+
+
 def cmd_raid(args: argparse.Namespace) -> int:
     from paf import settings
     from paf.corpus import db
@@ -1815,6 +1859,14 @@ def build_parser() -> argparse.ArgumentParser:
                     help="let every damage dealer switch to another damage spec of their class")
     rp.add_argument("--options", help='other specs players can play: "Name: Fire Mage, Frost Mage; Name2: ..."')
     rp.set_defaults(func=cmd_raidplan)
+
+    cp = sub.add_parser("comp", help="your raid's best comp on a boss: each player's spec and target, for the most "
+                                     "boss damage")
+    cp.add_argument("boss")
+    cp.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    cp.add_argument("--raid", help="link to one of your raid's logs (default: the boss plan's or your guild's)")
+    cp.add_argument("--no-swaps", action="store_true", help="everyone keeps the spec they played")
+    cp.set_defaults(func=cmd_comp)
 
     rd = sub.add_parser("raid", help="pad the adds or stay on the boss, from your raid's composition and DPS")
     rd.add_argument("boss")

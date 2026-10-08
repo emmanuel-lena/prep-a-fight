@@ -227,7 +227,67 @@ def review(d: dict) -> str:
             "habits: it does not know your raid's assignments (a soak, a kick, an add someone must hold).</p>")
 
 
-VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review}
+def comp(d: dict) -> str:
+    """The raid's best comp: the gain first, then the spec changes, then who goes on which target."""
+    from paf import icons
+
+    boss = d.get("boss", "")
+    picks = d.get("picks", [])
+    gain = (d.get("gain") or 0.0) * 100
+    sub = ("<span>more boss damage than your raid playing like the top players of each spec.</span>")
+    head = (_verdict("go", "Your raid's best comp", sub, _pct(gain)) if gain >= 0.5 else
+            _verdict("ok", "Your comp is already the best one for this boss", sub, _pct(gain)))
+
+    def ic(spec: str) -> str:
+        return icons.img(icons.CLASS_ICON.format(cls=spec.split(" ")[-1].lower()), "medium", "it-ic")
+
+    swaps = [p for p in picks if p["role"] == "damage" and p["spec"] != p["current"]]
+    out = head
+    if swaps:
+        out += "<h3>Spec changes</h3><ul class='plist'>" + "".join(
+            f"<li class='pl to_boss'>{ic(p['spec'])}<span class='l-name'><b>{e(p['name'])}</b></span>"
+            f"<span class='p-swap'><span class='was'>{e(p['current'])}</span> <span aria-hidden='true'>&rarr;</span> "
+            f"<b>{e(p['spec'])}</b></span></li>" for p in swaps) + "</ul>"
+    need = {t["name"]: t for t in d.get("targets", [])}
+    jobs: dict[str, list[dict]] = {}
+    for p in picks:
+        if p["role"] != "support":
+            jobs.setdefault(p["job"], []).append(p)
+    order = [boss] + [t for t in need if t in jobs] + [j for j in jobs if j != boss and j not in need]
+    cards = ""
+    for job in order:
+        if job not in jobs:
+            continue
+        lst = jobs[job]
+        if job == boss:
+            meta = f"<small><span>the boss</span> &middot; <span class='num'>{len(lst)}</span></small>"
+            bar = ""
+        else:
+            t = need.get(job, {"need": 0, "got": 0})
+            ok = t["got"] >= t["need"] - 1
+            pct = min(100.0, t["got"] / t["need"] * 100) if t["need"] else 100.0
+            meta = f"<small>{'covered' if ok else 'not enough'}</small>"
+            bar = (f"<span class='cov'><span class='c-raid {'ok' if ok else 'short'}' style='width:{pct:.1f}%'></span>"
+                   "</span>")
+        rows = "".join(f"<li>{ic(p['spec'])}<span class='l-name'><b>{e(p['name'])}</b><small>{e(p['spec'])}</small>"
+                       f"</span></li>" for p in sorted(lst, key=lambda p: -p["boss"]))
+        cards += (f"<div class='job{' main' if job == boss else ''}'><div class='j-head'><b>{e(job)}</b>{meta}</div>"
+                  f"{bar}<ul>{rows}</ul></div>")
+    out += f"<h3>Who goes where</h3><div class='jobs'>{cards}</div>"
+    support = [p for p in picks if p["role"] == "support"]
+    if support:
+        out += (f"<details class='more'><summary>Tanks and healers: as in your pull ({len(support)})</summary>"
+                "<ul class='plist'>" + "".join(
+                    f"<li class='pl'>{ic(p['spec'])}<span class='l-name'><b>{e(p['name'])}</b><small>{e(p['spec'])}"
+                    "</small></span></li>" for p in support) + "</ul></details>")
+    out += "".join(f"<p class='ws-fine'>! {e(n)}</p>" for n in d.get("notes", []))
+    return out + ("<p class='ws-fine'>Estimated from each player's DPS in your pull and from every player of the top "
+                  "kills of this boss: what each spec does, and how much the players who take a target put on it. "
+                  "It does not know your raid's assignments, the gear for another spec, or who enjoys playing what."
+                  "</p>")
+
+
+VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review, "comp": comp}
 
 
 def render(data: dict) -> str | None:
@@ -289,6 +349,16 @@ details.more{margin:6px 0} details.more>summary{cursor:pointer;color:var(--muted
 .p-say b{font:700 15px var(--font-data)} .p-say i{font-style:normal;font-weight:600}
 .p-tops{color:var(--muted);font-size:13.5px} .p-tops b{color:var(--fg);font-size:13.5px}
 .p-say small{color:var(--muted);font-size:13.5px}
+.p-swap{font-size:15px}.p-swap .was{color:var(--muted);text-decoration:line-through}
+.jobs{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.job{padding:14px 16px;border-radius:14px;border:1px solid var(--line);background:var(--surface);display:grid;gap:10px;
+  align-content:start}
+.job.main{border-color:color-mix(in srgb,var(--accent) 50%,var(--line))}
+.j-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.j-head b{font:600 17px 'Fraunces',Georgia,serif} .j-head small{color:var(--muted);font-size:13px;white-space:nowrap}
+.job ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.job li{display:grid;grid-template-columns:32px minmax(0,1fr);gap:10px;align-items:center}
+.job .it-ic{width:32px;height:32px}
 @media (max-width:640px){.plist .pl{grid-template-columns:36px minmax(0,1fr)}.plist .p-say{grid-column:1/-1}}
 @media (max-width:640px){.glist li{grid-template-columns:minmax(0,1fr) 70px}.glist li .gbar{display:none}
   .glist.items li{grid-template-columns:40px minmax(0,1fr) 70px}.verdict{flex-wrap:wrap}}
