@@ -262,9 +262,12 @@ class Jobs:
         def run() -> None:
             with log.open("w", encoding="utf-8", errors="replace") as out:
                 flags = {"creationflags": 0x08000000} if sys.platform == "win32" else {}  # CREATE_NO_WINDOW
-                proc = subprocess.run([_python(), "-m", "paf", *args], stdout=out, stderr=subprocess.STDOUT,
-                                      env={**_env(), "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}, **flags)
-            job["status"] = "done" if proc.returncode == 0 else f"failed (exit {proc.returncode})"
+                proc = subprocess.Popen([_python(), "-m", "paf", *args], stdout=out, stderr=subprocess.STDOUT,
+                                        env={**_env(), "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}, **flags)
+                job["pid"] = proc.pid
+                self._save(jid, job)
+                code = proc.wait()
+            job["status"] = "done" if code == 0 else f"failed (exit {code})"
             self._save(jid, job)
 
         threading.Thread(target=run, daemon=True).start()
@@ -276,7 +279,7 @@ class Jobs:
         import json
 
         meta = {"args": job["args"], "result": str(job["result"] or ""), "status": job["status"],
-                "started": job["started"]}
+                "started": job["started"], "pid": job.get("pid")}
         (data_dir() / "web" / f"job-{jid}.json").write_text(json.dumps(meta), encoding="utf-8")
 
     def get(self, jid: str) -> dict | None:
@@ -295,10 +298,37 @@ class Jobs:
         text = log.read_text(encoding="utf-8", errors="replace") if log.is_file() else ""
         status = meta["status"]
         if status == "running":  # started by an earlier run of the app: read the outcome from the log
+            # still running: its process is alive (a long silent step, like extracting simc, writes nothing for
+            # minutes); without a pid (an older app), a log written in the last 15 min
+            alive = pid_alive(meta["pid"]) if meta.get("pid") else (
+                log.is_file() and time.time() - log.stat().st_mtime < 900)
             status = "done" if "Prep sheet:" in text else "failed" if "Traceback" in text else (
-                "running" if log.is_file() and time.time() - log.stat().st_mtime < 900 else "stopped")
+                "running" if alive else "stopped")
         return {"args": meta["args"], "log": log, "result": Path(meta["result"]) if meta["result"] else None,
                 "status": status, "started": meta["started"]}
+
+
+def pid_alive(pid: int) -> bool:
+    """Whether a process with this id runs (a job started by an earlier run of the app)."""
+    if sys.platform == "win32":
+        import ctypes
+
+        k = ctypes.windll.kernel32
+        h = k.OpenProcess(0x1000, False, int(pid))  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            return bool(k.GetExitCodeProcess(h, ctypes.byref(code))) and code.value == 259  # STILL_ACTIVE
+        finally:
+            k.CloseHandle(h)
+    import os
+
+    try:
+        os.kill(int(pid), 0)
+    except OSError:
+        return False
+    return True
 
 
 def _python() -> str:

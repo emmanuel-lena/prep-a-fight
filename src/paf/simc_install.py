@@ -130,9 +130,22 @@ def install_nightly(force: bool = False) -> Path:
     archive = target / build.filename
     print(f"Downloading {build.url}")
     _download(build.url, archive)
-    print("Extracting...")
-    with py7zr.SevenZipFile(archive, "r") as z:
-        z.extractall(target)
+    print("Extracting... (a few minutes)", flush=True)
+    import threading
+    import time
+
+    done = threading.Event()
+
+    def alive() -> None:  # a sign of life in the log: the app tells a long step from a stopped prep
+        t0 = time.time()
+        while not done.wait(30):
+            print(f"    still extracting ({int(time.time() - t0)} s)", flush=True)
+    threading.Thread(target=alive, daemon=True).start()
+    try:
+        with py7zr.SevenZipFile(archive, "r") as z:
+            z.extractall(target)
+    finally:
+        done.set()
     archive.unlink()
     exe = next(target.glob("**/simc.exe"), None)
     if exe is None:

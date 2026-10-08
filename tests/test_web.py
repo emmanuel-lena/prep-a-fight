@@ -180,6 +180,21 @@ def test_prep_progress_and_job_from_disk(tmp_path, monkeypatch):
     (d / "job-abcd1234.log").write_text(log + "Prep sheet: x\n")
     assert web.JOBS.get("abcd1234")["status"] == "done"
     assert web.JOBS.get("../etc") is None
+    # a long silent step (extracting simc): an old log, but the process is alive -> still running (issue #18)
+    import os
+    import subprocess
+    import sys
+
+    for jid, pid in (("abcd1235", os.getpid()), ("abcd1236", None)):
+        (d / f"job-{jid}.json").write_text(json.dumps({"args": ["prep"], "result": "", "status": "running",
+                                                       "started": time.time() - 3600, "pid": pid}))
+        (d / f"job-{jid}.log").write_text("Extracting...\n")
+        os.utime(d / f"job-{jid}.log", (time.time() - 3600, time.time() - 3600))
+    assert web.JOBS.get("abcd1235")["status"] == "running"
+    assert web.JOBS.get("abcd1236")["status"] == "stopped"  # no pid: the log's age decides
+    dead = subprocess.Popen([sys.executable, "-c", "pass"])
+    dead.wait()
+    assert not web.pid_alive(dead.pid)
     page = web.job_page("abcd1234").decode()
     assert "The prep finished" in page and "failed" not in page
 
