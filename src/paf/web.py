@@ -984,6 +984,11 @@ def job_page(jid: str, part: str = "") -> bytes:
         from paf.webtools import new_reports
 
         name = job["args"][0]
+        from paf import workshop
+
+        nice = workshop.job_page(jid, job, log, elapsed, new_reports(job["started"]) if status == "done" else [])
+        if nice is not None:
+            return page(workshop.BY_CMD[name].title, nice, 5 if status == "running" else None, job=jid)
         if status == "running":
             return page(name, f"<h1>Running: {e(name)}</h1><p class='lead'><span id='el' "
                               f"data-start='{job['started']:.0f}'>{elapsed // 60} min {elapsed % 60:02d} s</span>. "
@@ -1133,13 +1138,16 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/boss":
                 self._send(boss_page(q.get("boss", ""), q.get("difficulty", settings.get("difficulty"))))
             elif url.path == "/tools":
-                from paf.webtools import tools_page
+                from paf import workshop
 
-                self._send(page("Tools", tools_page()))
+                self._send(page("Tools", workshop.index()))
             elif url.path.startswith("/tool/"):
+                from paf import workshop
                 from paf.webtools import tool_page
 
-                body = tool_page(url.path.rsplit("/", 1)[1], _encounters())
+                name = url.path.rsplit("/", 1)[1]
+                body = (None if q.get("raw") else workshop.tool_page(name, _encounters())) or \
+                    tool_page(name, _encounters())
                 self._send(page("Tool", body) if body else page("Not found", "<p>Unknown tool.</p>"),
                            200 if body else 404)
             elif url.path == "/characters":
@@ -1229,9 +1237,11 @@ class Handler(BaseHTTPRequestHandler):
                 notes_path(template_path(enc.name, difficulty)).write_text(text, encoding="utf-8")
                 self._redirect(f"/boss?boss={boss_id}&difficulty={difficulty}")
             elif self.path.startswith("/tool/"):
+                from paf import workshop
                 from paf.webtools import tool_args
 
-                args = tool_args(self.path.rsplit("/", 1)[1], form)
+                name = self.path.rsplit("/", 1)[1]
+                args = workshop.args(name, form) if "_curated" in form else tool_args(name, form)
                 if args is None or args[0] in ("serve", "profile", "config"):
                     self._send(page("Not found", "<p>Unknown tool.</p>"), 404)
                     return

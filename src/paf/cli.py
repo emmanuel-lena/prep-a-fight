@@ -365,6 +365,9 @@ def cmd_topgear(args: argparse.Namespace) -> int:
                       pass2_error=args.pass2_error, objective=args.objective, max_combos=args.max_combos,
                       min_tier=args.min_tier)
     report = format_result(res, pool, top=args.top)
+    from paf import results
+
+    results.write(root, "topgear", results.topgear(res))
     print()
     print(report)
     (root / "results.txt").write_text(report + "\n", encoding="utf-8")
@@ -431,6 +434,9 @@ def cmd_talents(args: argparse.Namespace) -> int:
         print(f"No ranked {spec} players in the corpus for {enc.name} {diff_name}: run `paf corpus` first.")
         return 1
     print_talents(tc)
+    from paf import results
+
+    results.write(tc.run_dir, "talents", results.talents(tc, enc.name, diff_name))
     print(f"\nRuns: {tc.run_dir}")
     return 0
 
@@ -626,6 +632,9 @@ def cmd_droptimizer(args: argparse.Namespace) -> int:
     for boss, ev, n in boss_ev(items, weights):
         print(f"  {ev:+6.2f}%  {boss} ({n} usable items)")
     err = max((i.error for i in ranked[:args.top]), default=0)
+    from paf import results
+
+    results.write(root, "loot", results.loot(items, weights, boss_ev(items, weights), ilvl, [e.name for e in encs]))
     print(f"\nStatistical error: about +/-{err:.2f}%. Items are simmed at item level {ilvl} (--ilvl to change).")
     print(f"Runs: {root}")
     return 0
@@ -1479,6 +1488,9 @@ def cmd_optimize(args: argparse.Namespace) -> int:
     plans, _ = optimize_all(profile_text, fight, root, objectives=objectives, target_error=args.error,
                             alignment=tops_alignment(tl, fight))
     print_optimized(plans, fight)
+    from paf import results
+
+    results.write(root, "cooldowns", results.cooldowns(plans, enc.name, diff_name))
     print_alignment(enc, diff_name, diff, fight)
     notes = data_dir() / "reports" / f"mrt-{report_key(enc.name, diff_name)}.txt"
     notes.parent.mkdir(parents=True, exist_ok=True)

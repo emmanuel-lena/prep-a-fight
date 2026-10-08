@@ -43,15 +43,24 @@ def _help(name: str) -> str:
     return ""
 
 
-def tools_page() -> str:
+def raw_index() -> str:
+    """Every command, raw (the workshop's "for the curious"): its name, its help, all its options."""
     cmds = subparsers()
-    out = ["<h1>Tools</h1><p class='lead'>Every command of prep-a-fight, with its options. The prep (on a boss "
-           "page) runs most of them for you; use these to redo one part, or to dig further.</p>"]
+    out = []
     for title, names in GROUPS:
-        tiles = "".join(f'<a class="tile" href="/tool/{n}"><b>{e(n)}</b><div class="small muted">{e(_help(n))}</div>'
-                        f"</a>" for n in names if n in cmds)
-        out.append(f"<h2>{e(title)}</h2><div class='grid'>{tiles}</div>")
+        tiles = "".join(f'<a class="tile" href="/tool/{n}?raw=1"><b>{e(n)}</b><div class="small muted">{e(_help(n))}'
+                        f"</div></a>" for n in names if n in cmds)
+        out.append(f"<h3>{e(title)}</h3><div class='grid'>{tiles}</div>")
     return "".join(out)
+
+
+def advanced_fields(name: str, encounters: list, skip: set[str]) -> str:
+    """The options of a command that a workshop form does not set itself."""
+    sp = subparsers().get(name)
+    if sp is None:
+        return ""
+    return "".join(_field(a, encounters) for a in sp._actions  # noqa: SLF001
+                   if a.dest not in SKIP_OPTIONS and a.dest not in skip and a.dest != "open")
 
 
 def _field(a: argparse.Action, encounters: list) -> str:
