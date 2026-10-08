@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "prep-a-fight"
-version = "0.6.13"
+version = "0.6.14"
 description = "Analyze top Warcraft Logs and adapt your gear and cooldowns to a specific boss fight, with a local SimulationCraft."
 readme = "README.md"
 license = "MIT"

@@ -64,6 +64,10 @@ TOOLS: tuple[Tool, ...] = (
     Tool("night", "Your raid night, pull by pull", "Who died, who used a healthstone or a health potion, who pressed "
          "a damage potion?", "inv_stone_04", "raid", "1", ("raid",),
          "Each player over the night, then each pull: deaths, healthstones, potions.", needs_prep=False),
+    Tool("diff", "Two pulls side by side", "What went better in one pull than in another, for the raid and for "
+         "you?", "inv_misc_spyglass_02", "raid", "1-2", ("boss", "difficulty", "raid"),
+         "Both pulls' boss health, deaths, damage per target, and your damage, casts and buffs in each.",
+         needs_prep=False),
     Tool("mechanics", "The boss's mechanics", "Every ability from the Encounter Journal, by role: what concerns you?",
          "inv_misc_book_09", "boss", "1", ("boss", "difficulty"),
          "The boss's abilities by role, and who handles what in the top kills.", needs_prep=False),

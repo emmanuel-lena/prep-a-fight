@@ -548,6 +548,24 @@ PHRASES: dict[str, str] = {
     "Health potions": "Potions de soins", "Pulls with a damage potion": "Pulls avec potion DPS",
     "Read from the casts of the log: a potion pressed before the pull is not counted, nor the deaths of the wipe itself. A name in red died without a healthstone or a health potion first.":
         "Lu dans les casts du log : une potion prise avant le pull ne compte pas, ni les morts du wipe lui-même. Un nom en rouge est mort sans pierre ni potion de soins avant.",
+    # two pulls side by side (paf.pulldiff)
+    "Two pulls side by side": "Deux pulls côte à côte",
+    "What went better in one pull than in another, for the raid and for you?":
+        "Qu'est-ce qui a mieux marché dans un pull que dans un autre, pour le raid et pour toi ?",
+    "Both pulls' boss health, deaths, damage per target, and your damage, casts and buffs in each.":
+        "La vie du boss, les morts et les dégâts par cible des deux pulls, et tes dégâts, casts et buffs dans chacun.",
+    "Pull B next to pull A": "Le pull B à côté du pull A", "What changed, biggest first": "Ce qui a changé, le plus gros d'abord",
+    "The boss's health": "La vie du boss", "Pull A": "Pull A", "Pull B": "Pull B",
+    "Pick a player to see their own damage, casts and buffs in both pulls.":
+        "Choisis un joueur pour voir ses dégâts, ses casts et ses buffs dans les deux pulls.",
+    "Damage per second": "Dégâts par seconde", "On the bosses": "Sur les boss", "Active": "Actif",
+    "Damage per second of each ability": "Dégâts par seconde de chaque sort", "Ability": "Sort", "Change": "Écart",
+    "Casts per minute (cooldowns: when)": "Casts par minute (CD : quand)", "Cast at, A / B": "Lancé à, A / B",
+    "Uptime of your buffs and procs": "Uptime de tes buffs et procs", "Buff": "Buff",
+    "Consumables and deaths": "Consommables et morts", "Healthstones:": "Pierres de soins :",
+    "Health potions:": "Potions de soins :", "Damage potions:": "Potions DPS :", "Deaths:": "Morts :",
+    "Both pulls read from your log, 15 s at a time. The pulls compared by default are your worst and your best by your own damage, among those where you did not die and of a similar length: the gap is gameplay. Buffs that players of other classes also have (a healer's) are left out.":
+        "Les deux pulls lus dans ton log, 15 s par 15 s. Par défaut, ce sont ton pire et ton meilleur pull selon tes propres dégâts, parmi ceux où tu n'es pas mort et de durée proche : l'écart, c'est du gameplay. Les buffs qu'ont aussi des joueurs d'autres classes (ceux d'un heal) sont écartés.",
     # your characters (paf.characters)
     "Paste /simc (recommended)": "Coller /simc (recommandé)", "Quick: from Warcraft Logs": "Rapide : depuis Warcraft Logs",
     "+ Add a character": "+ Ajouter un perso", "Add this character": "Ajouter ce perso",
@@ -865,6 +883,16 @@ PATTERNS: list[tuple[str, str]] = [
     (r"^Boss at ([\d.]+)% after ([\d:]+)$", r"Boss à \1 % après \2"),
     (r"^(\d+) pulls, (\d+) deaths before the wipes$", r"\1 pulls, \2 morts avant les wipes"),
     (r"^Pull by pull \((\d+)\)$", r"Pull par pull (\1)"),
+    (r"^(.+): pull B next to pull A$", r"\1 : le pull B à côté du pull A"),
+    (r"^At ([\d:]+), (?:the boss|le boss) had (\d+%) left in B against (\d+%) in A\.$",
+     r"À \1, il restait \2 au boss dans B contre \3 dans A."),
+    (r"^Deaths before the wipe: (\d+) in B, (\d+) in A\.$", r"Morts avant le wipe : \1 dans B, \2 dans A."),
+    (r"^Share of the raid's damage (?:on|sur) (.+): (\d+%) in B, (\d+%) in A\.$",
+     r"Part des dégâts du raid sur \1 : \2 dans B, \3 dans A."),
+    (r"^(.+): ([\d,]+k) (?:on|sur) (?:the boss|le boss) in B, ([\d,]+k) in A\.$", r"\1 : \2 sur le boss dans B, \3 dans A."),
+    (r"^(.+): active (\d+%) of the pull in B, (\d+%) in A\.$", r"\1 : actif \2 du pull dans B, \3 dans A."),
+    (r"^(.+): died (\d+) time\(s\) in B, (\d+) in A\.$", r"\1 : mort \2 fois dans B, \3 dans A."),
+    (r"^kill of ([\d:]+)$", r"kill en \1"), (r"^wipe at (\d+%) after ([\d:]+)$", r"wipe à \1 après \2"),
     # the sheet picker of /view: "Boss (mythic Elemental)"
     (r"\(mythic\b", r"(mythique"), (r"\(heroic\b", r"(héroïque"), (r"\(normal\b", r"(normal"), (r"\(lfr\b", r"(LFR"),
 ]

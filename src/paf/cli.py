@@ -1294,6 +1294,55 @@ def cmd_night(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_diff(args: argparse.Namespace) -> int:
+    """Two pulls of a boss side by side, for the raid and for one player (paf.pulldiff)."""
+    from paf import characters, pulldiff, results, settings, simc, tracker
+    from paf.corpus import db
+    from paf.raidneed import guild_report, report_code
+
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    con = db.connect()
+    boss = main_boss(con, enc.id, diff, enc.name)
+    url = args.raid or _plan_raid(enc, diff_name)
+    if not url and settings.get("guild"):
+        url = guild_report(client, settings.get("guild"), settings.get("guild_server"), settings.get("guild_region"),
+                           enc.id, diff)
+    if not url:
+        print("Give a log of your raid (--raid <link>) or set your guild in the settings.")
+        return 1
+    code = report_code(url)
+    fights, actors = pulldiff.pulls(client, code, enc.id, diff)
+    rows = {r.fight: r for r in tracker.night(client, code, enc.id)[0]}
+    who = args.player or next((c.name for c in characters.all_characters() if c.current), "")
+    actor = next((a for n, a in actors.items() if n.lower() == who.lower()), None) if who else None
+    if who and not actor:
+        print(f"{who} is not in this log: the raid only.")
+    if args.pulls:
+        ids = [int(x) for x in args.pulls.replace(" ", "").split(",")]
+        by_id = {f["id"]: f for f in fights}
+        pair = (by_id.get(ids[0]), by_id.get(ids[-1])) if len(ids) == 2 else None
+        if not pair or None in pair:
+            print(f"Pulls of {enc.name} {diff_name} in this log: {', '.join(str(f['id']) for f in fights)}")
+            return 1
+    else:
+        pair = (pulldiff.player_pair(client, code, fights, actor["name"], rows) if actor else None) or \
+            pulldiff.default_pair(fights)
+    if not pair:
+        print(f"Fewer than two pulls of {enc.name} {diff_name} to compare in this log.")
+        return 1
+    print("Reading both pulls, 15 s at a time...", flush=True)
+    others = list(actors.values())
+    a, b = (pulldiff.side(client, code, f, boss, rows.get(f["id"]), actor, others) for f in pair)
+    d = pulldiff.to_dict(boss, a, b)
+    print(f"{enc.name} {diff_name}: A = {a.label} (pull {a.fight}), B = {b.label} (pull {b.fight})")
+    for h in d["highlights"]:
+        print(f"  {'+' if h['kind'] == 'good' else '-'} {h['text']}")
+    root = simc.new_run_dir(label="diff")
+    results.write(root, "diff", d)
+    print(f"Runs: {root}")
+    return 0
+
+
 def cmd_raid(args: argparse.Namespace) -> int:
     from paf import settings
     from paf.corpus import db
@@ -2021,6 +2070,16 @@ def build_parser() -> argparse.ArgumentParser:
                                       "potions")
     nt.add_argument("--raid", help="link to the log (default: your guild's latest)")
     nt.set_defaults(func=cmd_night)
+
+    df = sub.add_parser("diff", help="two pulls of a boss side by side: what went better, for the raid and for a "
+                                      "player")
+    df.add_argument("boss")
+    df.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    df.add_argument("--raid", help="link to one of your raid's logs (default: the boss plan's or your guild's)")
+    df.add_argument("--player", help="the player to compare (default: your active character)")
+    df.add_argument("--pulls", help="two pull numbers of the log, A,B (default: the player's worst and best pulls "
+                                    "without a death, else the best wipe and the kill)")
+    df.set_defaults(func=cmd_diff)
 
     rd = sub.add_parser("raid", help="pad the adds or stay on the boss, from your raid's composition and DPS")
     rd.add_argument("boss")

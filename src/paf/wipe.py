@@ -92,6 +92,8 @@ class Pull:
     tops_windows: list[float] = field(default_factory=list)  # boss damage per window, playing like the tops
     players: dict[str, tuple[str, dict[int, float]]] = field(default_factory=dict)  # name -> (icon, window -> boss)
     culprits: list[Culprit] = field(default_factory=list)
+    targets: dict[str, float] = field(default_factory=dict)  # target -> the raid's damage on it
+    bosses: set[str] = field(default_factory=set)  # the targets Warcraft Logs marks as bosses (a council: several)
 
     @property
     def share_ratio(self) -> float:
@@ -142,6 +144,8 @@ def analyze(client, code: str, fight: dict, boss: str, raid_share_tops: float,
     on_boss: dict[str, dict[int, float]] = defaultdict(dict)
     icon: dict[str, str] = {}
     raid_total = boss_total = 0.0
+    by_target: dict[str, float] = defaultdict(float)
+    boss_units: set[str] = set()
     for w in range(n):
         s = t0 + w * STEP * 1000
         e = min(t1, s + STEP * 1000)
@@ -155,11 +159,15 @@ def analyze(client, code: str, fight: dict, boss: str, raid_share_tops: float,
             on_boss[ent["name"]][w] = b
             boss_total += b
             raid_total += sum(t.get("total", 0) for t in ent.get("targets") or [])
+            for t in ent.get("targets") or []:
+                by_target[t.get("name", "?")] += t.get("total", 0)
+                if t.get("type") == "Boss":
+                    boss_units.add(t.get("name", "?"))
     windows = [sum(v.get(w, 0.0) for v in on_boss.values()) for w in range(n)]
     left = fight["bossPercentage"] / 100
     p = Pull(fid, (t1 - t0) / 1000, left, boss_total / (1 - left) if left < 1 else 0.0, windows,
              raid_share=boss_total / raid_total if raid_total else 0.0, tops_share=raid_share_tops, lost=[0.0] * n,
-             players={k: (icon.get(k, ""), v) for k, v in on_boss.items()})
+             players={k: (icon.get(k, ""), v) for k, v in on_boss.items()}, targets=dict(by_target), bosses=boss_units)
     table = client.query(DEATHS, {"c": code, "f": [fid]}, cache_ttl=86400)["reportData"]["report"]["table"]
     table = table.get("data", table) if isinstance(table, dict) else {}
     deaths = sorted(((e["timestamp"] - t0) / 1000, e["name"], e.get("icon", "")) for e in table.get("entries") or [])

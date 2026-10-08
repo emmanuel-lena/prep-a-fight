@@ -424,7 +424,86 @@ def night(d: dict) -> str:
             "pressed before the pull is not counted, nor the deaths of the wipe itself. A name in red died without a "
             "healthstone or a health potion first.</p>")
 
-VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review, "comp": comp, "wipe": wipe, "night": night}
+def pulldiff(d: dict) -> str:
+    """Two pulls side by side: the highlights first, the boss health, then the player's detail."""
+    from paf import icons
+
+    a, b = d.get("a", {}), d.get("b", {})
+    pl = d.get("player")
+    head = _verdict("go", f"{pl['name']}: pull B next to pull A" if pl else "Pull B next to pull A",
+                    f"<span class='pab a'>A</span> <span>{e(a.get('label', ''))}</span> &middot; "
+                    f"<span class='pab b'>B</span> <span>{e(b.get('label', ''))}</span>")
+    hl = "".join(f"<li class='{h['kind']}'><span class='hm'>{'&#8593;' if h['kind'] == 'good' else '&#8595;'}</span>"
+                 f"<span>{e(h['text'])}</span></li>" for h in d.get("highlights", []))
+    out = head + (f"<h3>What changed, biggest first</h3><ul class='hl'>{hl}</ul>" if hl else "")
+    curves = d.get("curves", {})
+    span = max(a.get("duration", 0), b.get("duration", 0), 1)
+    W, H, L, B = 640, 200, 40, 26
+
+    def pts(vals: list[float]) -> str:
+        return " ".join(f"{L + i * 15 / span * (W - L - 10):.1f},{10 + (1 - v) * (H - B - 20):.1f}"
+                        for i, v in enumerate(vals))
+    if curves:
+        ticks = "".join(f"<text x='{L + t / span * (W - L - 10):.1f}' y='{H - 6}' class='tk'>{int(t // 60)}:00</text>"
+                        for t in range(0, int(span) + 1, 120))
+        out += (f"<h3>The boss's health</h3><svg class='hp' viewBox='0 0 {W} {H}' role='img' aria-label='Boss health'>"
+                f"<line class='ax' x1='{L}' x2='{W - 10}' y1='{H - B}' y2='{H - B}'/><text x='4' y='16' class='tk'>"
+                f"100%</text><text x='4' y='{H - B}' class='tk'>0%</text>{ticks}"
+                f"<polyline class='c-now' points='{pts(curves.get('a', []))}'/>"
+                f"<polyline class='c-best' points='{pts(curves.get('b', []))}'/></svg><div class='legend'>"
+                "<span class='c-now'>Pull A</span><span class='c-best'>Pull B</span></div>")
+    if not pl:
+        return out + "<p class='ws-fine'>Pick a player to see their own damage, casts and buffs in both pulls.</p>"
+    cls = pl["icon"].partition("-")[0]
+    ic = icons.img(icons.CLASS_ICON.format(cls=cls.lower()), "medium", "it-ic") if cls else ""
+
+    def k(v: float | None) -> str:
+        return "&ndash;" if v is None else f"{v / 1000:,.0f}k"
+
+    def pct(v: float | None) -> str:
+        return "&ndash;" if v is None else f"{v:.0%}"
+    tiles = "".join(f"<div class='kt'><small>{label}</small><b>{va} <span>&rarr;</span> {vb}</b></div>" for label, va, vb in (
+        ("Damage per second", k(pl["dps_a"]), k(pl["dps_b"])), ("On the bosses", k(pl["boss_a"]), k(pl["boss_b"])),
+        ("Active", pct(pl["active_a"]), pct(pl["active_b"]))))
+    out += f"<h3 class='who-c'>{ic}<span>{e(pl['name'])}</span></h3><div class='kts'>{tiles}</div>"
+
+    def table(title: str, head: tuple[str, str, str], rows: list[str]) -> str:
+        return (f"<h3>{title}</h3><div class='scroll'><table class='night'><tr><th>{head[0]}</th><th>A</th><th>B</th>"
+                f"<th>{head[1]}</th></tr>{''.join(rows)}</table></div>") if rows else ""
+
+    def delta(va: float, vb: float, fmt: str) -> str:
+        cls = "pos" if vb > va else "neg" if vb < va else ""
+        return f"<td class='n {cls}'>{fmt.format(vb - va) if fmt else ''}</td>"
+    out += table("Damage per second of each ability", ("Ability", "Change", ""), [
+        f"<tr><td>{e(r['name'])}</td><td class='n'>{k(r['a'])}</td><td class='n'>{k(r['b'])}</td>"
+        f"{delta(r['a'], r['b'], '')}</tr>".replace("<td class='n pos'></td>", f"<td class='n pos'>+{(r['b'] - r['a']) / 1000:,.0f}k</td>")
+        .replace("<td class='n neg'></td>", f"<td class='n neg'>&minus;{(r['a'] - r['b']) / 1000:,.0f}k</td>")
+        for r in pl.get("abilities", [])])
+
+    def times(ts: list[float]) -> str:
+        return " ".join(_mmss(t) for t in ts[:8])
+    out += table("Casts per minute (cooldowns: when)", ("Ability", "Cast at, A / B", ""), [
+        f"<tr><td>{e(r['name'])}</td><td class='n'>{r['a']:.1f}</td><td class='n'>{r['b']:.1f}</td>"
+        f"<td class='small'>{(times(r['times_a']) + ' / ' + times(r['times_b'])) if r['cooldown'] else ''}</td></tr>"
+        for r in pl.get("casts", [])[:12]])
+    out += table("Uptime of your buffs and procs", ("Buff", "Change", ""), [
+        f"<tr><td>{e(r['name'])}</td><td class='n'>{r['a']:.0%}</td><td class='n'>{r['b']:.0%}</td>"
+        f"<td class='n {'pos' if r['b'] > r['a'] else 'neg'}'>{(r['b'] - r['a']) * 100:+.0f}</td></tr>"
+        for r in pl.get("buffs", [])])
+    cons = pl.get("consumables", {})
+    out += ("<h3>Consumables and deaths</h3><ul class='hl'>"
+            + "".join(f"<li><span>{label}:</span> <b class='num'>{cons.get(key, [0, 0])[0]}</b> <span>&rarr;</span> "
+                      f"<b class='num'>{cons.get(key, [0, 0])[1]}</b></li>"
+                      for key, label in (("healthstone", "Healthstones"), ("health", "Health potions"),
+                                         ("damage_potion", "Damage potions")))
+            + f"<li><span>Deaths:</span> <b class='num'>{len(pl['deaths'][0])}</b> <span>&rarr;</span> "
+              f"<b class='num'>{len(pl['deaths'][1])}</b></li></ul>")
+    return out + ("<p class='ws-fine'>Both pulls read from your log, 15 s at a time. The pulls compared by default are "
+                  "your worst and your best by your own damage, among those where you did not die and of a similar "
+                  "length: the gap is gameplay. Buffs that players of other classes also have (a healer's) are left "
+                  "out.</p>")
+
+VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review, "comp": comp, "wipe": wipe, "night": night, "diff": pulldiff}
 
 
 def render(data: dict) -> str | None:
@@ -525,6 +604,13 @@ table.night td.bad{color:var(--neg);font-weight:700}
 .pulls{list-style:none;margin:0;padding:0;display:grid;gap:10px}
 .pulls li{padding:10px 12px;border:1px solid var(--line);border-radius:12px;display:grid;gap:8px}
 .who.bare{border-color:color-mix(in srgb,var(--neg) 60%,var(--line));color:var(--neg)}
+.hl{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.hl li{display:flex;gap:10px;align-items:baseline;padding:8px 12px;border:1px solid var(--line);border-radius:10px}
+.hl .hm{font-weight:700} .hl li.good .hm{color:var(--pos)} .hl li.bad .hm{color:var(--neg)}
+.pab{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;font-weight:700;font-size:13px;color:#fff}
+.pab.a{background:var(--neg)} .pab.b{background:var(--pos)}
+table.night td.pos{color:var(--pos)} table.night td.neg{color:var(--neg)}
+.kt b span{color:var(--muted);font-weight:400}
 .whos{display:flex;flex-wrap:wrap;gap:6px}
 .who{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;border-radius:999px;
   border:1px solid var(--line);background:var(--surface-2);font-size:14px}

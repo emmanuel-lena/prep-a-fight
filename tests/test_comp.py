@@ -106,3 +106,26 @@ def test_the_raid_tab_of_the_sheet_shows_the_raid_tools():
     html = render(d)
     assert "Who hits what in your raid" in html and "Put them on it" in html
     assert "Your best pull, in detail" not in html  # no wipe in that log: nothing shown
+
+
+def test_two_pulls_side_by_side():
+    from paf import pulldiff, wipe
+
+    wipes = [{"id": i, "kill": False, "bossPercentage": pct, "startTime": 0, "endTime": 300_000}
+             for i, pct in ((1, 60.0), (2, 20.0), (3, 40.0))]
+    assert [f["id"] for f in pulldiff.default_pair(wipes)] == [3, 2]  # the two best wipes
+    kill = {"id": 4, "kill": True, "bossPercentage": 0.01, "startTime": 0, "endTime": 300_000}
+    assert [f["id"] for f in pulldiff.default_pair(wipes + [kill])] == [2, 4]  # the best wipe, then the kill
+
+    def side(fid, left, dead, boss_dps):
+        p = wipe.Pull(fid, 60.0, left, 400.0, [100.0] * 4, lost=[0.0] * 4, targets={"Boss": 300.0, "Add": 100.0},
+                      bosses={"Boss"})
+        pl = pulldiff.Player("Me", "Rogue-Subtlety", 100.0, boss_dps, 0.9, {"Backstab": 50.0}, {"Shadow Blades": 1},
+                             {"Shadow Blades": [5.0]}, {"Symbols of Death": 0.5})
+        return pulldiff.Side(fid, False, left, 60.0, p, {"Boss": 0.75, "Add": 0.25}, {"X": [10.0]} if dead else {},
+                             int(dead), pl)
+    d = pulldiff.to_dict("Boss", side(1, 0.6, True, 50.0), side(2, 0.2, False, 80.0))
+    kinds = [h["kind"] for h in d["highlights"]]
+    assert "good" in kinds and any("on the boss in B" in h["text"] for h in d["highlights"])
+    page = workshop_views.render({"kind": "diff", **d})
+    assert "What changed, biggest first" in page and "Casts per minute" in page and "<svg" in page
