@@ -164,3 +164,24 @@ def topbar(right: str = "", home: str = "/", back: bool = False, who: str = "") 
     window has no browser buttons), shown when there is a page to go back to; who: the active character's menu."""
     return (f'<header class="topbar"><div class="in">{BACK + HOME if back else ""}<a class="brand" href="{home}">'
             f'prep-a-<b>fight</b></a>{who}<div class="nav">{right}</div></div></header>')
+
+
+# the game's class colors: the app takes the active character's (accent, its soft background, the header's stripe)
+CLASS_COLORS = {"deathknight": "#C41E3A", "demonhunter": "#A330C9", "druid": "#FF7C0A", "evoker": "#33937F",
+                "hunter": "#AAD372", "mage": "#3FC7EB", "monk": "#00FF98", "paladin": "#F48CBA", "priest": "#FFFFFF",
+                "rogue": "#FFF468", "shaman": "#0070DD", "warlock": "#8788EE", "warrior": "#C69B6D"}
+
+
+def class_accent(class_name: str) -> str:
+    """A <style> giving the app the color of the class: darkened on the light theme, lightened a little on the dark
+    one, so every class reads on both. '' for an unknown class."""
+    color = CLASS_COLORS.get((class_name or "").lower().replace(" ", ""))
+    if not color:
+        return ""
+    dark = ("--accent:color-mix(in srgb,var(--class) 82%,#fff);"
+            "--accent-soft:color-mix(in srgb,var(--class) 22%,#181219)")
+    return (f"<style>:root{{--class:{color};--accent:color-mix(in srgb,var(--class) 68%,#000);"
+            "--accent-soft:color-mix(in srgb,var(--class) 16%,#fff);"
+            "--stripe:linear-gradient(90deg,var(--class),color-mix(in srgb,var(--class) 55%,#000))}"
+            f"@media (prefers-color-scheme:dark){{:root:not([data-theme=\"light\"]){{{dark}}}}}"
+            f":root[data-theme=\"dark\"]{{{dark}}}</style>")

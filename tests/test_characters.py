@@ -58,3 +58,5 @@ def test_the_active_character_in_the_top_bar(tmp_path, monkeypatch):
     page = web.page("X", "").decode()
     assert 'class="who"' in page and 'action="/character/select"' in page.split('class="who"', 1)[1]
     assert "Manage your characters" in page
+
+    assert "--class:#" in page  # the app takes the active character's class color

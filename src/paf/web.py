@@ -152,7 +152,7 @@ def page(title: str, body: str, refresh: int | None = None, nav: str = "", job: 
     nav = nav or ('<a href="/">Home</a><a href="/characters">Characters</a><a href="/tools">Tools</a>'
                   '<a href="/settings">Settings</a><a href="/feedback">Feedback</a>')
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
-            f"{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}{loading.CSS}</style></head><body>"
+            f"{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}{loading.CSS}</style>{_class_style()}</head><body>"
             f"{theme.topbar(nav + lang_switch(), back=True, who=character_menu())}{loading.LOADER}"
             f"<main>{update_banner()}{running}{body}</main>{loading.JS}</body></html>").encode()
 
@@ -640,6 +640,17 @@ whether the others cover the adds (stay on the boss) or you should pad them.</p>
 <div class="card step"><div class="num">2</div><div class="body"><h3>The boss</h3>{boss_form}</div></div>
 {guild}"""
     return page("prep-a-fight", body)
+
+
+def _class_style() -> str:
+    """The active character's class color for the whole app (paf.theme.class_accent)."""
+    from paf import characters
+
+    try:
+        cur = next((c for c in characters.all_characters() if c.current), None)
+    except Exception:  # noqa: BLE001 - a color never breaks a page
+        return ""
+    return theme.class_accent(cur.class_name) if cur else ""
 
 
 def character_menu() -> str:
