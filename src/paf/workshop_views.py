@@ -503,7 +503,68 @@ def pulldiff(d: dict) -> str:
                   "length: the gap is gameplay. Buffs that players of other classes also have (a healer's) are left "
                   "out.</p>")
 
-VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review, "comp": comp, "wipe": wipe, "night": night, "diff": pulldiff}
+def rotation(d: dict) -> str:
+    """A player's rotation: the points to work on, each context's spells next to the rotation's, DoTs, cooldowns."""
+    from paf import icons
+
+    cls = d.get("spec", "").rpartition(" ")[2]
+    ic = icons.img(icons.CLASS_ICON.format(cls=cls.lower()), "large", "it-ic") if cls else ""
+    hl = d.get("highlights", [])
+    head = _verdict("go" if hl else "ok", f"{d['player']}: your rotation",
+                    f"<span>{e(d.get('spec', ''))}</span> &middot; <span>{e(d.get('boss', ''))}</span> &middot; "
+                    f"<span>{e(d.get('pull', ''))}</span> &middot; <span class='num'>{_mmss(d.get('duration'))}</span>")
+    out = f"<div class='rot-head'>{ic}{head}</div>"
+    if hl:
+        out += ("<h3>To work on</h3><ol class='todo'>" + "".join(f"<li>{e(t)}</li>" for t in hl) + "</ol>")
+    else:
+        out += "<p>Nothing stands out next to the rotation: well played.</p>"
+    cards = ""
+    total = sum(c["seconds"] for c in d.get("contexts", [])) or 1
+    for c in d.get("contexts", []):
+        rows = ""
+        for x in c["rows"][:9]:
+            gap = x["player"] - x["sim"]
+            cls_ = "far" if abs(gap) >= 0.08 else ""
+            rows += (f"<li class='{cls_}'><span class='l-name'><b>{e(x['name'])}</b><small>{x['per_min']:.1f}/min</small>"
+                     f"</span><span class='cov'><span class='c-raid {'short' if cls_ else 'ok'}' "
+                     f"style='width:{min(100, x['player'] * 100 / 0.6):.1f}%'></span><span class='c-tops' "
+                     f"style='left:{min(100, x['sim'] * 100 / 0.6):.1f}%' title='rotation'></span></span>"
+                     f"<span class='l-val'>{x['player']:.0%} <small>/ {x['sim']:.0%}</small></span></li>")
+        cards += (f"<div class='job ctx'><div class='j-head'><b>{e(c['label'])}</b><small><span class='num'>"
+                  f"{_mmss(c['seconds'])}</span> &middot; {c['seconds'] / total:.0%}</small></div>"
+                  f"<ul class='glist cov-list'>{rows}</ul></div>")
+    if cards:
+        out += ("<h3>Your spells, by number of targets</h3><p class='ws-fine'>Bar: your share of casts; mark: the "
+                "rotation's (SimulationCraft's default rotation, your gear and talents, same number of targets).</p>"
+                f"<div class='jobs wide'>{cards}</div>")
+    dots = d.get("dots", [])
+    if dots:
+        out += "<h3>Your DoTs</h3><ul class='glist items three'>" + "".join(
+            f"<li><span class='dot-ic'>{x['uptime']:.0%}</span><span class='l-name'><b>{e(x['name'])}</b><small>"
+            f"<span>refreshed too early</span> {x['early']}/{x['refreshes']} &middot; <span>median left</span> "
+            f"{x['median_left']:.1f} s &middot; <span>window</span> {0.3 * x['duration']:.1f} s"
+            + ("<br><span>as often as the rotation casts it: its own way</span>" if x.get("like_rotation") else "")
+            + f"</small></span><span class='l-val {'neg' if not x.get('like_rotation') and x['early'] / x['refreshes'] >= 0.3 else ''}'>"
+            f"{x['early'] / x['refreshes']:.0%}</span></li>" for x in dots if x["refreshes"]) + "</ul>"
+    cds = d.get("cooldowns", [])
+    if cds:
+        out += "<h3>Your cooldowns</h3><ul class='glist items three cds'>" + "".join(
+            f"<li><span class='pips'>{'&#9679;' * x['casts']}{'&#9675;' * max(0, x['possible'] - x['casts'])}</span>"
+            f"<span class='l-name'><b>{e(x['name'])}</b><small><span>every</span> {x['cooldown']:.0f} s &middot; "
+            f"{' '.join(_mmss(t) for t in x['times'][:8])}</small></span><span class='l-val "
+            f"{'neg' if x['casts'] < x['possible'] else 'pos'}'>{x['casts']}/{x['possible']}</span></li>"
+            for x in cds) + "</ul>"
+    waste = [w for w in d.get("waste", []) if w["capped"]]
+    if waste:
+        out += "<h3>Resource lost</h3><ul class='hl'>" + "".join(
+            f"<li class='bad'><span class='hm'>!</span><span>{e(w['builder'])}: {w['capped']}/{w['casts']} "
+            f"<span>at full</span> {e(w['resource'])}</span></li>" for w in waste) + "</ul>"
+    return out + ("<p class='ws-fine'>Read from your log, for every spec alike: no analyzer written per class. The "
+                  "rotation is SimulationCraft's default one, simulated with your gear and talents of that pull on 1, "
+                  "3 and 5 targets; the number of targets comes from the enemies you hit every 5 s. A gap is a "
+                  "reading, not a fault: a mechanic, a movement or an assignment can explain it.</p>")
+
+VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review, "comp": comp, "wipe": wipe, "night": night, "diff": pulldiff, "rotation": rotation}
 
 
 def render(data: dict) -> str | None:
@@ -611,6 +672,18 @@ table.night td.bad{color:var(--neg);font-weight:700}
 .pab.a{background:var(--neg)} .pab.b{background:var(--pos)}
 table.night td.pos{color:var(--pos)} table.night td.neg{color:var(--neg)}
 .kt b span{color:var(--muted);font-weight:400}
+.rot-head{display:flex;gap:14px;align-items:center} .rot-head .verdict{flex:1;margin:0}
+.rot-head>.it-ic{width:56px;height:56px;border-radius:12px}
+.todo{margin:0;padding:0 0 0 22px;display:grid;gap:8px;font-size:15.5px;line-height:1.45}
+.todo li::marker{color:var(--accent);font-weight:700}
+.ctx .glist li{grid-template-columns:minmax(0,1.1fr) minmax(70px,1fr) 74px;padding:6px 4px}
+.ctx .glist li.far .l-val{color:var(--warn)}
+.dot-ic{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font:700 13px var(--font-data);
+  border:2px solid var(--accent);color:var(--fg)}
+.pips{font-size:15px;letter-spacing:1px;color:var(--accent);white-space:nowrap}
+.glist.items.three.cds li{grid-template-columns:104px minmax(0,1fr) 78px}
+.ctx .cov .c-raid.ok{background:color-mix(in srgb,var(--fg) 45%,transparent)}
+.ctx .cov .c-raid.short{background:var(--warn)}
 .whos{display:flex;flex-wrap:wrap;gap:6px}
 .who{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;border-radius:999px;
   border:1px solid var(--line);background:var(--surface-2);font-size:14px}

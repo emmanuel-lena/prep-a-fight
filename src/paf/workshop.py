@@ -68,6 +68,10 @@ TOOLS: tuple[Tool, ...] = (
          "you?", "inv_misc_spyglass_02", "raid", "1-2", ("boss", "difficulty", "raid"),
          "Both pulls' boss health, deaths, damage per target, and your damage, casts and buffs in each.",
          needs_prep=False),
+    Tool("rotation", "Your rotation, spell by spell", "In single target, cleave and AoE: do you cast what the best "
+         "rotation casts, with your gear and talents?", "spell_holy_borrowedtime", "raid", "1-2",
+         ("boss", "difficulty", "raid"), "The points to work on, your share of each spell next to the rotation's, "
+         "your DoTs and your cooldowns.", needs_prep=False),
     Tool("mechanics", "The boss's mechanics", "Every ability from the Encounter Journal, by role: what concerns you?",
          "inv_misc_book_09", "boss", "1", ("boss", "difficulty"),
          "The boss's abilities by role, and who handles what in the top kills.", needs_prep=False),

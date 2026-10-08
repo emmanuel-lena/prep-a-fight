@@ -1343,6 +1343,62 @@ def cmd_diff(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_rotation(args: argparse.Namespace) -> int:
+    """A player's rotation in one pull, next to SimulationCraft's on the same targets (paf.rotation)."""
+    import tempfile
+    from pathlib import Path
+
+    from paf import apl, characters, pulldiff, results, rotation, settings, simc, tracker
+    from paf.gamedata import spell_cooldowns, spell_durations
+    from paf.raidneed import guild_report, report_code
+
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    url = args.raid or _plan_raid(enc, diff_name)
+    if not url and settings.get("guild"):
+        url = guild_report(client, settings.get("guild"), settings.get("guild_server"), settings.get("guild_region"),
+                           enc.id, diff)
+    if not url:
+        print("Give a log of your raid (--raid <link>) or set your guild in the settings.")
+        return 1
+    code = report_code(url)
+    fights, actors = pulldiff.pulls(client, code, enc.id, diff)
+    who = args.player or next((c.name for c in characters.all_characters() if c.current), "")
+    actor = next((a for n, a in actors.items() if n.lower() == who.lower()), None) if who else None
+    if not actor:
+        print(f"{who or 'Nobody'} is not in this log: give the player with --player.")
+        return 1
+    if args.pull:
+        fight = next((f for f in fights if f["id"] == args.pull), None)
+    else:  # their best pull without a death, else the kill / the best wipe
+        rows = {r.fight: r for r in tracker.night(client, code, enc.id)[0]}
+        pair = pulldiff.player_pair(client, code, fights, actor["name"], rows) or pulldiff.default_pair(fights)
+        fight = pair[1] if pair else (fights[0] if fights else None)
+    if not fight:
+        print(f"No pull of {enc.name} {diff_name} in this log.")
+        return 1
+    cls, spec = rotation.spec_of(rotation.player_details(client, code, fight, actor["id"]))
+    print(f"Reading {actor['name']}'s pull {fight['id']} ({spec} {cls})...", flush=True)
+    log = rotation.fetch(client, code, fight, actor["id"], actor["name"])
+    spells = apl.spells(apl.default_apl(cls, spec))
+    r = rotation.review(log, actor["name"], f"{spec} {cls}", f"pull {fight['id']}", spell_cooldowns(),
+                        spell_durations(), spells)
+    profile = rotation.profile_from_pull(client, code, fight, actor)
+    if profile and spells:
+        print("Simulating the same character with the default rotation on 1, 3 and 5 targets...", flush=True)
+        windows = rotation.targets_per_window(client, code, fight, actor["id"])
+        sims = {k: rotation.sim_casts(profile, n, Path(tempfile.mkdtemp(prefix="paf-rot-")))
+                for k, n in rotation.SIM_TARGETS.items()}
+        r.contexts = rotation.contexts(log, windows, sims, spells)
+    else:
+        print("  no SimulationCraft comparison: the log lacks this player's gear or talents, or simc has no APL")
+    for _, text in rotation.highlights(r):
+        print("  " + text)
+    root = simc.new_run_dir(label="rotation")
+    results.write(root, "rotation", dict(rotation.to_dict(r), boss=enc.name, kill=bool(fight["kill"])))
+    print(f"Runs: {root}")
+    return 0
+
+
 def cmd_raid(args: argparse.Namespace) -> int:
     from paf import settings
     from paf.corpus import db
@@ -2080,6 +2136,16 @@ def build_parser() -> argparse.ArgumentParser:
     df.add_argument("--pulls", help="two pull numbers of the log, A,B (default: the player's worst and best pulls "
                                     "without a death, else the best wipe and the kill)")
     df.set_defaults(func=cmd_diff)
+
+    ro = sub.add_parser("rotation", help="a player's rotation in one pull, next to SimulationCraft's default "
+                                         "rotation with their gear and talents, in single target, cleave and AoE")
+    ro.add_argument("boss")
+    ro.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    ro.add_argument("--raid", help="link to one of your raid's logs (default: the boss plan's or your guild's)")
+    ro.add_argument("--player", help="the player (default: your active character)")
+    ro.add_argument("--pull", type=int, help="a pull number of the log (default: the player's best pull without a "
+                                             "death)")
+    ro.set_defaults(func=cmd_rotation)
 
     rd = sub.add_parser("raid", help="pad the adds or stay on the boss, from your raid's composition and DPS")
     rd.add_argument("boss")

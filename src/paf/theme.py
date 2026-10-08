@@ -88,6 +88,7 @@ code{font:12.5px ui-monospace,Consolas,monospace;background:var(--surface-2);pad
 .topbar a{color:#fff} .brand{font-weight:700;font-size:17px;letter-spacing:.01em}
 .nav-back{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;cursor:pointer;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.08);color:#fff;font:inherit;font-weight:600}
 .nav-back:hover{background:rgba(255,255,255,.18)} .nav-back[hidden]{display:none}
+.nav-home{text-decoration:none;margin-right:4px} .nav-home:hover{text-decoration:none} .nav-home svg{display:block}
 @media (max-width:640px){.nav-back span{display:none}}
 .brand b{color:var(--sand)}
 .topbar .nav{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
@@ -150,10 +151,16 @@ HEAD = ('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="p
 BACK = ("<button type='button' class='nav-back' hidden aria-label='Go back' title='Go back' onclick='history.back()'>"
         "&larr; <span>Go back</span></button><script>(function(){var b=document.currentScript.previousElementSibling;"
         "if(history.length>1&&location.pathname!=='/')b.hidden=false;})();</script>")
+# a Home button with a little house, back to the home page from anywhere (hidden on the home page itself)
+HOME = ("<a class='nav-back nav-home' href='/' hidden aria-label='Home' title='Home'><svg viewBox='0 0 24 24' "
+        "width='16' height='16' aria-hidden='true'><path d='M3 11.5 12 4l9 7.5M6 10v9.5h4.5V15h3v4.5H18V10' "
+        "fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>"
+        "<span>Home</span></a><script>(function(){var b=document.currentScript.previousElementSibling;"
+        "if(location.pathname!=='/')b.hidden=false;})();</script>")
 
 
 def topbar(right: str = "", home: str = "/", back: bool = False) -> str:
     """The gradient header with the brand; `right` holds navigation or selectors. back: a Back button (the desktop
     window has no browser buttons), shown when there is a page to go back to."""
-    return (f'<header class="topbar"><div class="in">{BACK if back else ""}<a class="brand" href="{home}">'
+    return (f'<header class="topbar"><div class="in">{BACK + HOME if back else ""}<a class="brand" href="{home}">'
             f'prep-a-<b>fight</b></a><div class="nav">{right}</div></div></header>')

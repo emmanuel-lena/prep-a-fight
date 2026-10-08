@@ -62,6 +62,41 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .ccard .cc-ic{width:48px;height:48px;border-radius:10px;margin:0}
 .cc-txt{display:flex;flex-direction:column;gap:4px;flex:1;min-width:180px} .cc-txt b{font-size:18px}
 .cc-act{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .cc-act form{margin:0}
+.rb-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:10px;margin:0 0 6px}
+.rb-boss{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;border-radius:14px;
+  cursor:pointer;outline:none} .rb-boss:hover,.rb-boss:focus-within{background:var(--surface)}
+.rb-face{position:relative;width:64px;height:64px;border-radius:50%;overflow:hidden;background:#efe9df;
+  box-shadow:0 0 0 2px var(--line);display:block}
+.rb-img{width:100%;height:100%;object-fit:cover;object-position:50% 6%;transform:scale(1.9);transform-origin:50% 10%;display:block}
+.rb-img.none{display:grid;place-items:center;transform:none;font:700 24px var(--font-data);color:#5a4b3c}
+.rb-face .rb-img:not(.none),.rb-in .rb-img:not(.none){position:absolute;inset:0;background:#efe9df}
+.rb-in{position:relative} .rb-face .rb-img.none,.rb-in .rb-img.none{position:absolute;inset:0}
+.rb-boss.grey .rb-face{filter:grayscale(1) brightness(.75);box-shadow:0 0 0 2px var(--line)}
+.rb-boss:not(.grey) .rb-face{box-shadow:0 0 0 2px var(--accent)}
+.rb-n{position:absolute;right:2px;bottom:2px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:rgba(0,0,0,.65);
+  color:#fff;font:700 11px/18px var(--font-data);text-align:center}
+.rb-name{font-size:12px;font-weight:600;text-align:center;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden}
+.rb-boss.grey .rb-name{color:var(--muted)}
+.rb-pop{position:absolute;top:calc(100% - 4px);left:50%;transform:translateX(-50%);z-index:20;display:none;width:max-content;
+  padding:12px 14px;border-radius:12px;background:#0b0a10;border:1px solid #5d5a52;box-shadow:0 10px 30px rgba(0,0,0,.5);color:#fff}
+.rb-boss:hover .rb-pop,.rb-boss:focus-within .rb-pop{display:block}
+.rb-row>.rb-boss:nth-child(-n+2) .rb-pop{left:0;transform:none} .rb-row>.rb-boss:nth-last-child(-n+2) .rb-pop{left:auto;right:0;transform:none}
+.rb-title{display:block;font:600 15px 'Fraunces',Georgia,serif;color:#ffd100;margin:0 0 10px}
+.rb-ds{display:flex;gap:14px}
+.rb-d{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:78px;color:#fff;text-decoration:none}
+.rb-d:hover{text-decoration:none} .rb-d b{font-size:12.5px} .rb-d small{font-size:11.5px;color:#bdb6a8}
+.rb-frame{width:58px;height:58px;display:grid;place-items:center;transition:transform .12s}
+.rb-d:hover .rb-frame{transform:scale(1.07)}
+.rb-frame .rb-in{width:calc(100% - 6px);height:calc(100% - 6px);overflow:hidden;background:#efe9df;display:block}
+.rb-frame.tri{background:#1eff00;clip-path:polygon(50% 0,100% 100%,0 100%)}
+.rb-frame.tri .rb-in{clip-path:polygon(50% 0,100% 100%,0 100%);margin-top:5px;width:calc(100% - 10px);height:calc(100% - 9px)}
+.rb-frame.sq{background:#0070dd;border-radius:6px} .rb-frame.sq .rb-in{border-radius:4px}
+.rb-frame.penta{background:#a335ee;clip-path:polygon(50% 0,100% 38%,81% 100%,19% 100%,0 38%)}
+.rb-frame.penta .rb-in{clip-path:polygon(50% 0,100% 38%,81% 100%,19% 100%,0 38%)}
+.rb-d.no .rb-frame .rb-in,.rb-d.old .rb-frame .rb-in{filter:grayscale(1) brightness(.7)}
+.rb-d.ok small{color:#1eff00} .rb-d.old small{color:#ffb84d} .rb-d.run small{color:#ffd100}
+.rb-legend span+span::before{content:" · "}
 .rm>summary{list-style:none;cursor:pointer} .rm>summary::-webkit-details-marker{display:none}
 .rm[open]>summary{display:none} .rm-ask{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .rm-ask span{color:var(--neg);font-size:14px}
@@ -639,6 +674,72 @@ def characters_page() -> str:
             f"<h2 id='add'>+ Add a character</h2><div class='card'>{ADD_FORM}</div>")
 
 
+BOSS_THUMB = "https://wow.zamimg.com/modelviewer/live/webthumbs/npc/{bucket}/{display}.png"
+DIFF_SHAPES = (("normal", "tri"), ("heroic", "sq"), ("mythic", "penta"))  # WoW's green, blue, purple
+
+
+def raid_board(encs, class_name: str, spec: str) -> str:
+    """The raid at a glance for the active character: a row of the bosses' portraits (grey while not prepared at any
+    difficulty); hovering or tapping one opens, under it, its three difficulties, like a talent's tooltip: a green
+    triangle (normal), a blue square (heroic), a purple pentagon (mythic), each prepared (since when), to redo (made
+    before this week's reset), in progress or not yet, and a link straight to the sheet or the prep."""
+    from datetime import UTC, datetime
+
+    from paf import loading, pack
+    from paf.corpus.template import _slug
+
+    if not encs:
+        return ""
+    try:
+        from paf.gamedata import boss_display_ids
+
+        displays = boss_display_ids()
+    except Exception:  # noqa: BLE001 - offline: no portraits, the names stay
+        displays = {}
+    mine = f"{spec}-{class_name}".lower().replace(" ", "-")
+    done = {x["key"]: x for x in prepared()}
+    running = {}
+    for jid, job in loading.running_preps():
+        args = job["args"]
+        diff = args[args.index("--difficulty") + 1] if "--difficulty" in args else settings.get("difficulty")
+        running[(args[1] if len(args) > 1 else "", diff)] = (jid, job)
+
+    def portrait(x, cls: str = "") -> str:
+        d = displays.get(x.id)
+        if not d:
+            return f"<span class='rb-img none {cls}'>{e(x.name[:1])}</span>"
+        # no portrait on Wowhead for some bosses: the initial behind it shows instead
+        return (f"<span class='rb-img none {cls}'>{e(x.name[:1])}</span><img class='rb-img {cls}' "
+                f"src='{BOSS_THUMB.format(bucket=d % 256, display=d)}' alt='' loading='lazy' "
+                f"referrerpolicy='no-referrer' onerror=\"this.remove()\">")
+    items = ""
+    for i, x in enumerate(encs, 1):
+        states, ready = "", False
+        for diff, shape in DIFF_SHAPES:
+            key = f"{_slug(x.name)}-{diff}-{mine}"
+            item = done.get(key)
+            run = running.get((str(x.id), diff))
+            if run:
+                log = run[1]["log"].read_text(encoding="utf-8", errors="replace") if run[1]["log"].is_file() else ""
+                pct, _ = loading.percent(log, time.time() - run[1]["started"])
+                href, state, word = f"/job/{e(run[0])}", "run", f"{pct}%"
+            elif item and "prep" in item["files"]:
+                stale = pack.is_stale(datetime.fromtimestamp(item["mtime"], UTC).isoformat())
+                href, state, word = f"/view/{e(key)}", "old" if stale else "ok", "to redo" if stale else ago(item["mtime"])
+                ready = ready or not stale
+            else:
+                href, state, word = f"/boss?boss={x.id}&amp;difficulty={diff}", "no", "prepare"
+            states += (f"<a class='rb-d {state}' href='{href}'><span class='rb-frame {shape}'><span class='rb-in'>"
+                       f"{portrait(x)}</span></span><b>{e(DIFF_LABELS.get(diff, diff))}</b><small>{word}</small></a>")
+        items += (f"<div class='rb-boss{'' if ready else ' grey'}' tabindex='0'><span class='rb-face'>{portrait(x)}"
+                  f"<span class='rb-n'>{i}</span></span><span class='rb-name'>{e(x.name)}</span>"
+                  f"<div class='rb-pop' role='group' aria-label='{e(x.name)}'><b class='rb-title'>{e(x.name)}</b>"
+                  f"<div class='rb-ds'>{states}</div></div></div>")
+    return (f"<h2 class='h-mine'>Your raid, boss by boss</h2><div class='rb-row'>{items}</div>"
+            "<p class='small muted rb-legend'><span>Point at a boss: its three difficulties, and a click to the "
+            "sheet or the prep.</span> <span>A grey boss is not prepared for this week yet.</span></p>")
+
+
 def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
     """The home page once the app is set up (issue #13): your character, one big "prepare a boss", your bosses."""
     from paf import i18n, icons, names
@@ -652,7 +753,9 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
                     f'<span>{e(DIFF_LABELS.get(d, d))}</span></label>' for d in settings.DIFFICULTIES if d != "lfr")
     ic = icons.img(icons.CLASS_ICON.format(cls=loaded.class_name.lower()), "large", "me-ic")
     items = prepared()
-    mine = (f'<h2 class="h-mine">Your bosses</h2>{boss_cards(items)}' if items else "")
+    board = raid_board(encs, loaded.class_name, loaded.spec)
+    mine = (f'<details class="home-more"><summary>Every prep sheet ({len(items)})</summary>{boss_cards(items)}'
+            f'</details>' if items else "")
     g = settings.get("guild")
     return f"""<section class="home-hero"><div class="me">{ic}<div><b>{e(loaded.name)}</b>
 <span>{e(loaded.spec.title())} {e(loaded.class_name.title())}{(" &middot; " + e(g)) if g else ""}</span></div></div>
@@ -661,7 +764,7 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
 <select name="boss" aria-label="Boss" class="big">{options}</select>
 <div class="segs" role="radiogroup" aria-label="Difficulty">{diffs}</div>
 <button class="btn go">Let's go &rarr;</button></form></section>
-{mine}
+{board}{mine}
 <details class="home-more"><summary>Change your character, your raid or your Warcraft Logs key</summary>
 <div class="card step"><div class="num">1</div><div class="body"><h3>Your character</h3>{character}</div></div>
 {guild}{creds}</details>"""

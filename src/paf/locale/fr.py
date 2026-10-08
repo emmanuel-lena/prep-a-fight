@@ -566,6 +566,30 @@ PHRASES: dict[str, str] = {
     "Health potions:": "Potions de soins :", "Damage potions:": "Potions DPS :", "Deaths:": "Morts :",
     "Both pulls read from your log, 15 s at a time. The pulls compared by default are your worst and your best by your own damage, among those where you did not die and of a similar length: the gap is gameplay. Buffs that players of other classes also have (a healer's) are left out.":
         "Les deux pulls lus dans ton log, 15 s par 15 s. Par défaut, ce sont ton pire et ton meilleur pull selon tes propres dégâts, parmi ceux où tu n'es pas mort et de durée proche : l'écart, c'est du gameplay. Les buffs qu'ont aussi des joueurs d'autres classes (ceux d'un heal) sont écartés.",
+    # your rotation (paf.rotation)
+    "Your rotation, spell by spell": "Ta rotation, sort par sort",
+    "In single target, cleave and AoE: do you cast what the best rotation casts, with your gear and talents?":
+        "En mono-cible, en cleave et en AoE : lances-tu ce que lance la meilleure rotation, avec ton stuff et tes talents ?",
+    "The points to work on, your share of each spell next to the rotation's, your DoTs and your cooldowns.":
+        "Les points à travailler, ta part de chaque sort à côté de celle de la rotation, tes DoTs et tes CD.",
+    "To work on": "À travailler", "Nothing stands out next to the rotation: well played.":
+        "Rien ne ressort à côté de la rotation : bien joué.",
+    "Your spells, by number of targets": "Tes sorts, selon le nombre de cibles",
+    "Bar: your share of casts; mark: the rotation's (SimulationCraft's default rotation, your gear and talents, same number of targets).":
+        "Barre : ta part des casts ; repère : celle de la rotation (la rotation par défaut de SimulationCraft, ton stuff et tes talents, même nombre de cibles).",
+    "Single target": "Mono-cible", "Cleave (2-3 targets)": "Cleave (2-3 cibles)", "AoE (4+ targets)": "AoE (4+ cibles)",
+    "Your DoTs": "Tes DoTs", "refreshed too early": "refresh trop tôt", "median left": "médiane restante",
+    "window": "fenêtre", "every": "toutes les", "Resource lost": "Ressource perdue",
+    "at full": "au max de",
+    "as often as the rotation casts it: its own way": "aussi souvent que la rotation : c'est sa façon de le jouer",
+    "Read from your log, for every spec alike: no analyzer written per class. The rotation is SimulationCraft's default one, simulated with your gear and talents of that pull on 1, 3 and 5 targets; the number of targets comes from the enemies you hit every 5 s. A gap is a reading, not a fault: a mechanic, a movement or an assignment can explain it.":
+        "Lu dans ton log, de la même façon pour toutes les specs : aucun analyseur écrit par classe. La rotation est celle de SimulationCraft par défaut, simulée avec ton stuff et tes talents de ce pull sur 1, 3 et 5 cibles ; le nombre de cibles vient des ennemis que tu touches toutes les 5 s. Un écart est un constat, pas une faute : une mécanique, un déplacement ou un assign peut l'expliquer.",
+    # the raid board of the home page
+    "Your raid, boss by boss": "Ton raid, boss par boss", "to redo": "à refaire",
+    "prepare": "préparer", "Every prep sheet": "Toutes les fiches",
+    "Point at a boss: its three difficulties, and a click to the sheet or the prep.":
+        "Survole un boss : ses trois difficultés, et un clic vers la fiche ou la prépa.",
+    "A grey boss is not prepared for this week yet.": "Un boss grisé n'est pas encore préparé cette semaine.",
     # your characters (paf.characters)
     "Paste /simc (recommended)": "Coller /simc (recommandé)", "Quick: from Warcraft Logs": "Rapide : depuis Warcraft Logs",
     "+ Add a character": "+ Ajouter un perso", "Add this character": "Ajouter ce perso",
@@ -893,6 +917,15 @@ PATTERNS: list[tuple[str, str]] = [
     (r"^(.+): active (\d+%) of the pull in B, (\d+%) in A\.$", r"\1 : actif \2 du pull dans B, \3 dans A."),
     (r"^(.+): died (\d+) time\(s\) in B, (\d+) in A\.$", r"\1 : mort \2 fois dans B, \3 dans A."),
     (r"^kill of ([\d:]+)$", r"kill en \1"), (r"^wipe at (\d+%) after ([\d:]+)$", r"wipe à \1 après \2"),
+    (r"^(.+): your rotation$", r"\1 : ta rotation"),
+    (r"^(Single target|Cleave \(2-3 targets\)|AoE \(4\+ targets\)|Mono-cible|Cleave \(2-3 cibles\)|AoE \(4\+ cibles\)): (.+) is (\d+%) of your casts, (\d+%) in the rotation \((more|less) than it\)\.$",
+     lambda m: f"{ {'Single target': 'Mono-cible', 'Cleave (2-3 targets)': 'Cleave (2-3 cibles)', 'AoE (4+ targets)': 'AoE (4+ cibles)'}.get(m.group(1), m.group(1))} : {m.group(2)} fait {m.group(3)} de tes casts, {m.group(4)} dans la rotation ({'plus' if m.group(5) == 'more' else 'moins'} qu'elle)."),
+    (r"^(.+) (?:refreshed too early|refresh trop tôt) (\d+) times out of (\d+) \(median ([\d.]+) s left; refresh under ([\d.]+) s\)\.$",
+     r"\1 refresh trop tôt \2 fois sur \3 (médiane \4 s restantes ; refresh sous \5 s)."),
+    (r"^(.+): (\d+) casts, (\d+) possible in the pull\.$", r"\1 : \2 casts, \3 possibles dans le pull."),
+    (r"^(.+) cast at full (.+) (\d+) times out of (\d+): what it builds is lost\.$",
+     r"\1 lancé au max de \2 \3 fois sur \4 : ce qu'il génère est perdu."),
+    (r"^Every prep sheet \((\d+)\)$", r"Toutes les fiches (\1)"),
     # the sheet picker of /view: "Boss (mythic Elemental)"
     (r"\(mythic\b", r"(mythique"), (r"\(heroic\b", r"(héroïque"), (r"\(normal\b", r"(normal"), (r"\(lfr\b", r"(LFR"),
 ]

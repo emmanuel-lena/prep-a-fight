@@ -195,3 +195,52 @@ def encounter_loot() -> dict[int, tuple[str, list[int]]]:
         if je:
             out.setdefault(je[0], (je[1], []))[1].append(int(r["ItemID"]))
     return out
+
+
+def spell_cooldowns() -> dict[int, tuple[float, int]]:
+    """Spell id -> (cooldown in seconds, charges): the longest of the spell's own and category cooldowns, or the
+    recharge time of its charges. Base values: talents may shorten them."""
+    cats = {r["ID"]: r for r in table_rows("SpellCategory")}
+    charge_of = {r["SpellID"]: cats.get(r.get("ChargeCategory") or "") for r in table_rows("SpellCategories")
+                 if r.get("ChargeCategory") not in (None, "", "0")}
+    out: dict[int, tuple[float, int]] = {}
+    for r in table_rows("SpellCooldowns"):
+        if r.get("DifficultyID") not in (None, "", "0") or not r.get("SpellID", "").isdigit():
+            continue
+        cd = max(int(r.get("RecoveryTime") or 0), int(r.get("CategoryRecoveryTime") or 0)) / 1000
+        if cd > 0:
+            out[int(r["SpellID"])] = (cd, 1)
+    for sid, cat in charge_of.items():
+        if cat and sid.isdigit() and int(cat.get("MaxCharges") or 0) > 1 and int(cat.get("ChargeRecoveryTime") or 0):
+            out[int(sid)] = (int(cat["ChargeRecoveryTime"]) / 1000, int(cat["MaxCharges"]))
+    return out
+
+
+def spell_durations() -> dict[int, float]:
+    """Spell id -> base duration of its aura in seconds (spells whose duration grows with a resource, like a
+    finisher's with combo points, are left out: their duration is read in the log)."""
+    durations = {r["ID"]: r for r in table_rows("SpellDuration")}
+    out: dict[int, float] = {}
+    for r in table_rows("SpellMisc"):
+        d = durations.get(r.get("DurationIndex") or "")
+        if not d or not r.get("SpellID", "").isdigit() or r.get("DifficultyID") not in (None, "", "0"):
+            continue
+        if int(d.get("DurationPerResource") or 0) or int(d.get("Duration") or 0) <= 0:
+            continue
+        out[int(r["SpellID"])] = int(d["Duration"]) / 1000
+    return out
+
+
+def boss_display_ids() -> dict[int, int]:
+    """Encounter id (Warcraft Logs' / DungeonEncounter) -> creature display id of its first boss in the Encounter
+    Journal (for a portrait)."""
+    journal = {r["ID"]: int(r["DungeonEncounterID"]) for r in table_rows("JournalEncounter")
+               if (r.get("DungeonEncounterID") or "").isdigit()}
+    out: dict[int, tuple[int, int]] = {}
+    for r in table_rows("JournalEncounterCreature"):
+        enc = journal.get(r.get("JournalEncounterID") or "")
+        disp = int(r.get("CreatureDisplayInfoID") or 0)
+        order = int(r.get("OrderIndex") or 0)
+        if enc and disp and (enc not in out or order < out[enc][1]):
+            out[enc] = (disp, order)
+    return {k: v[0] for k, v in out.items()}
