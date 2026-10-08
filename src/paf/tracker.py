@@ -6,6 +6,9 @@ or French: Healthstone, Pierre de soins, Health/Healing Potion, Potion de soins.
 potions are damage potions. The potion counters of Warcraft Logs' player details stay at 0 in this expansion: the
 casts are read instead. A potion pressed before the pull is not a cast of the pull: it is missed. The deaths of
 the wipe itself (from the death that leaves half the raid dead) are left out.
+
+The log: the one given, else the latest log of your active character (a live log too, while your raid uploads it),
+else your guild's latest. Live, the pulls are read again every 90 s until 30 min pass without a new one.
 """
 
 from __future__ import annotations
@@ -67,9 +70,21 @@ class PullRow:
     players: dict[str, PlayerPull] = field(default_factory=dict)
 
 
-def night(client, code: str, encounter_id: int | None = None) -> tuple[list[PullRow], dict[str, str]]:
+def character_report(client, name: str, server: str, region: str) -> str | None:
+    """The latest log of a character (a live log too, while the raid uploads it), from Warcraft Logs."""
+    from paf.character import CHARACTER_QUERY, server_slug
+
+    ch = client.query(CHARACTER_QUERY, {"n": name, "s": server_slug(server), "r": (region or "eu").upper()},
+                      cache_ttl=60)["characterData"]["character"]
+    reports = sorted(((ch or {}).get("recentReports") or {}).get("data") or [], key=lambda r: -r["startTime"])
+    return reports[0]["code"] if reports else None
+
+
+def night(client, code: str, encounter_id: int | None = None, live: bool = False
+          ) -> tuple[list[PullRow], dict[str, str]]:
     """The pulls of the log (of one boss when encounter_id is given), and player name -> icon ("Class-Spec")."""
-    rep = client.query(ABILITIES, {"c": code}, cache_ttl=3600)["reportData"]["report"]
+    # a live log grows: its pulls are read again every minute (a finished pull's events never change: cached)
+    rep = client.query(ABILITIES, {"c": code}, cache_ttl=60 if live else 3600)["reportData"]["report"]
     kinds = {a["gameID"]: k for a in rep["masterData"]["abilities"] or [] if (k := kind(a.get("name") or ""))}
     actors = {a["id"]: a for a in rep["masterData"]["actors"] or []}
     icons = {a["name"]: a.get("icon", "") for a in actors.values()}

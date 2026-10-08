@@ -143,3 +143,20 @@ def test_bonus_rolls_rank_the_bosses():
 
     d["ev"] = [{"boss": "A", "ev": 0.1, "n": 5}]
     assert "No boss stands out for a bonus roll" in workshop_views.render(d)  # under the noise
+
+
+def test_the_night_finds_the_active_characters_latest_log(tmp_path, monkeypatch):
+    from paf import tracker
+    from paf.cli import _active_character
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    (tmp_path / "profiles").mkdir()
+    (tmp_path / "profiles" / "current.simc").write_text('# x\nrogue="Moon"\nlevel=90\nregion=eu\nserver=ysondre\n')
+    assert _active_character() == ("Moon", "ysondre", "eu")
+
+    class Client:
+        def query(self, q, v, cache_ttl=0):
+            assert v == {"n": "Moon", "s": "ysondre", "r": "EU"} and cache_ttl <= 60  # a live log: fresh
+            return {"characterData": {"character": {"recentReports": {"data": [
+                {"code": "old", "startTime": 1}, {"code": "tonight", "startTime": 9}]}}}}
+    assert tracker.character_report(Client(), "Moon", "ysondre", "eu") == "tonight"

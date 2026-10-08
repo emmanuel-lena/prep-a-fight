@@ -65,7 +65,7 @@ TOOLS: tuple[Tool, ...] = (
          "the boss have died without them?", "spell_shadow_soulleech_3", "raid", "1", ("boss", "difficulty", "raid"),
          "The boss's health over your best pull, as played and without the deaths, and what each death cost."),
     Tool("night", "Your raid night, pull by pull", "Who died, who used a healthstone or a health potion, who pressed "
-         "a damage potion?", "inv_stone_04", "raid", "1", ("raid",),
+         "a damage potion? Tonight's log, live too.", "inv_stone_04", "raid", "1", ("raid",),
          "Each player over the night, then each pull: deaths, healthstones, potions.", needs_prep=False),
     Tool("diff", "Two pulls side by side", "What went better in one pull than in another, for the raid and for "
          "you?", "inv_misc_spyglass_02", "raid", "1-2", ("boss", "difficulty", "raid"),
@@ -272,6 +272,15 @@ def job_page(jid: str, job: dict, log: str, elapsed: int, reports: list[str]) ->
     head = (f"<header class='ws-tool'>{_icon(t.icon, 'ws-big')}<div><h1>{e(t.title)}</h1><p class='lead'>"
             f"{e(t.question)}</p></div></header>")
     if status == "running":
+        from paf import results, workshop_views
+
+        rd = workshop_views.run_dir(log)  # a tool that writes its result as it goes (a live log): shown so far
+        data = results.read(rd) if rd else None
+        partial = workshop_views.render(data) if data else None
+        if partial:
+            return (f"<div class='ws'>{head}<div class='ws-run'><span class='pl-spin'></span><div><b>Live</b> "
+                    f"<span class='muted'>&middot; updated every 90 s, this page every 5 s</span></div></div>"
+                    f"<div class='ws-answer'>{partial}</div></div>{CSS}{workshop_views.CSS}")
         tail = "\n".join(log.rstrip().splitlines()[-12:])
         return (f"<div class='ws'>{head}<div class='ws-run'><span class='pl-spin'></span><div><b>Working&hellip;</b> "
                 f"<span id='el' data-start='{job['started']:.0f}'>{elapsed // 60} min {elapsed % 60:02d} s</span> "

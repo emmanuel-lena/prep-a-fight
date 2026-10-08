@@ -159,8 +159,8 @@ HOME = ("<a class='nav-back nav-home' href='/' hidden aria-label='Home' title='H
         "if(location.pathname!=='/')b.hidden=false;})();</script>")
 
 
-def topbar(right: str = "", home: str = "/", back: bool = False) -> str:
+def topbar(right: str = "", home: str = "/", back: bool = False, who: str = "") -> str:
     """The gradient header with the brand; `right` holds navigation or selectors. back: a Back button (the desktop
-    window has no browser buttons), shown when there is a page to go back to."""
+    window has no browser buttons), shown when there is a page to go back to; who: the active character's menu."""
     return (f'<header class="topbar"><div class="in">{BACK + HOME if back else ""}<a class="brand" href="{home}">'
-            f'prep-a-<b>fight</b></a><div class="nav">{right}</div></div></header>')
+            f'prep-a-<b>fight</b></a>{who}<div class="nav">{right}</div></div></header>')

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import time
 
 from paf import __version__
 from paf.config import load_dotenv
@@ -1260,6 +1261,23 @@ def cmd_wipe(args: argparse.Namespace) -> int:
     return 0
 
 
+def _active_character() -> tuple[str, str, str]:
+    """(name, server, region) of the active character, from its /simc export."""
+    import re
+
+    from paf.config import data_dir
+
+    path = data_dir() / "profiles" / "current.simc"
+    text = path.read_text(encoding="utf-8-sig") if path.is_file() else ""
+
+    def field(key: str) -> str:
+        m = re.search(rf'^{key}="?([^"\n]+)"?\s*$', text, re.M)
+        return m.group(1).strip() if m else ""
+    m = re.search(r'^(?:deathknight|demonhunter|druid|evoker|hunter|mage|monk|paladin|priest|rogue|shaman|warlock|'
+                  r'warrior)="?([^"\n]+)"?', text, re.M)
+    return (m.group(1).strip() if m else ""), field("server"), field("region")
+
+
 def cmd_night(args: argparse.Namespace) -> int:
     """Your raid night, pull by pull: deaths, healthstones, health and damage potions (paf.tracker)."""
     from paf import results, settings, simc, tracker
@@ -1268,29 +1286,47 @@ def cmd_night(args: argparse.Namespace) -> int:
 
     client = WCLClient()
     code = report_code(args.raid) if args.raid else None
+    name, server, region = _active_character()
+    if not code and name and server:  # your character's latest log: tonight's, live too
+        code = tracker.character_report(client, name, server, region)
+        if code:
+            print(f"The latest log of {name}.")
     if not code and settings.get("guild"):
         data = client.query(GUILD_REPORTS_QUERY, {"name": settings.get("guild"),
                                                   "server": server_slug(settings.get("guild_server")),
-                                                  "region": settings.get("guild_region").upper()}, cache_ttl=1800)
+                                                  "region": settings.get("guild_region").upper()}, cache_ttl=300)
         reports = (data["reportData"]["reports"] or {}).get("data") or []
         code = reports[0]["code"] if reports else None
     if not code:
-        print("Give a log of your raid (--raid <link>) or set your guild in the settings.")
+        print("Give a log of your raid (--raid <link>), load your character, or set your guild in the settings.")
         return 1
-    print("Reading the pulls of the log...", flush=True)
-    rows, icons = tracker.night(client, code)
+    root = simc.new_run_dir(label="night")
+    seen, quiet_since = -1, time.time()
+    while True:
+        print("Reading the pulls of the log...", flush=True)
+        rows, icons = tracker.night(client, code, live=args.live)
+        if len(rows) != seen:
+            seen, quiet_since = len(rows), time.time()
+            if rows:
+                results.write(root, "night", tracker.to_dict(code, rows, icons))
+                print(f"Runs: {root}", flush=True)  # the page shows the night so far
+                print(f"{len(rows)} pulls so far.", flush=True)
+        if not args.live:
+            break
+        if time.time() - quiet_since > 30 * 60:
+            print("No new pull for 30 minutes: the night is over.")
+            break
+        time.sleep(90)
     if not rows:
         print("No boss pull in this log.")
         return 1
     s = tracker.summary(rows)
     print(f"{len(rows)} pulls. Per player: deaths (without a healthstone or health potion first), healthstones, "
           f"health potions, pulls with a damage potion")
-    for name, v in sorted(s.items(), key=lambda x: (-x[1]["bare"], -x[1]["deaths"])):
-        print(f"  {name:<16} {icons.get(name, ''):<24} deaths {v['deaths']:2} ({v['bare']} bare)  "
+    for pname, v in sorted(s.items(), key=lambda x: (-x[1]["bare"], -x[1]["deaths"])):
+        print(f"  {pname:<16} {icons.get(pname, ''):<24} deaths {v['deaths']:2} ({v['bare']} bare)  "
               f"healthstones {v['healthstone']:2}  health potions {v['health']:2}  "
               f"damage potion {v['pulls_damage_potion']}/{len(rows)}")
-    root = simc.new_run_dir(label="night")
-    results.write(root, "night", tracker.to_dict(code, rows, icons))
     print(f"Runs: {root}")
     return 0
 
@@ -2134,7 +2170,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     nt = sub.add_parser("night", help="your raid night, pull by pull: deaths, healthstones, health and damage "
                                       "potions")
-    nt.add_argument("--raid", help="link to the log (default: your guild's latest)")
+    nt.add_argument("--raid", help="link to the log (default: your active character's latest, else your guild's)")
+    nt.add_argument("--live", action="store_true", help="follow a live log: read the new pulls every 90 s until 30 "
+                                                        "minutes pass without one")
     nt.set_defaults(func=cmd_night)
 
     df = sub.add_parser("diff", help="two pulls of a boss side by side: what went better, for the raid and for a "

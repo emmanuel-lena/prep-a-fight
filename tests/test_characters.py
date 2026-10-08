@@ -45,3 +45,16 @@ def test_characters_page_and_the_add_button(tmp_path, monkeypatch):
     assert page.count('<details class="rm">') == 2 and "Yes, remove it" in page and "Keep it" in page
     assert 'href="/characters#add"' in web.characters_strip()
     assert 'href="/characters"' in web.page("X", "").decode()  # in the top bar
+
+
+
+def test_the_active_character_in_the_top_bar(tmp_path, monkeypatch):
+    from paf import web
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    assert "+ Add your character" in web.page("X", "").decode()  # none yet
+    characters.save(SHAMAN)
+    characters.save(ROGUE)
+    page = web.page("X", "").decode()
+    assert 'class="who"' in page and 'action="/character/select"' in page.split('class="who"', 1)[1]
+    assert "Manage your characters" in page

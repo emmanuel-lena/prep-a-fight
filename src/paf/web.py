@@ -62,6 +62,22 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .ccard .cc-ic{width:48px;height:48px;border-radius:10px;margin:0}
 .cc-txt{display:flex;flex-direction:column;gap:4px;flex:1;min-width:180px} .cc-txt b{font-size:18px}
 .cc-act{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .cc-act form{margin:0}
+.who{position:relative;margin-left:6px} .who>summary{list-style:none;display:flex;align-items:center;gap:8px;cursor:pointer;
+  padding:4px 10px 4px 4px;border-radius:999px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff}
+.who>summary::-webkit-details-marker{display:none} .who>summary:hover{background:rgba(255,255,255,.18)}
+.who-ic{width:28px;height:28px;border-radius:50%;margin:0}
+.who summary span,.who-menu button span{display:flex;flex-direction:column;line-height:1.15;text-align:left}
+.who summary b{font-size:13.5px} .who summary small{font-size:11px;opacity:.8}
+.who-caret{font-size:11px;opacity:.8}
+.who-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:60;min-width:230px;padding:6px;border-radius:12px;
+  background:var(--surface);border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.45);display:grid;gap:2px}
+.who-menu form{margin:0} .who-menu button{display:flex;gap:10px;align-items:center;width:100%;padding:6px 8px;border:0;
+  border-radius:8px;background:none;color:var(--fg);font:inherit;cursor:pointer}
+.who-menu button:hover,.who-menu a:hover{background:var(--surface-2);text-decoration:none}
+.who-menu button small{color:var(--muted);font-size:12px}
+.who-menu a{display:block;padding:8px;border-radius:8px;color:var(--accent);font-weight:600;font-size:14px}
+.who-add{margin-left:8px;color:#fff;font-weight:600;font-size:13.5px}
+@media (max-width:640px){.who summary span{display:none}}
 .rb-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:10px;margin:0 0 6px}
 .rb-boss{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;border-radius:14px;
   cursor:pointer;outline:none} .rb-boss:hover,.rb-boss:focus-within{background:var(--surface)}
@@ -137,7 +153,7 @@ def page(title: str, body: str, refresh: int | None = None, nav: str = "", job: 
                   '<a href="/settings">Settings</a><a href="/feedback">Feedback</a>')
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}{loading.CSS}</style></head><body>"
-            f"{theme.topbar(nav + lang_switch(), back=True)}{loading.LOADER}"
+            f"{theme.topbar(nav + lang_switch(), back=True, who=character_menu())}{loading.LOADER}"
             f"<main>{update_banner()}{running}{body}</main>{loading.JS}</body></html>").encode()
 
 
@@ -624,6 +640,33 @@ whether the others cover the adds (stay on the boss) or you should pad them.</p>
 <div class="card step"><div class="num">2</div><div class="body"><h3>The boss</h3>{boss_form}</div></div>
 {guild}"""
     return page("prep-a-fight", body)
+
+
+def character_menu() -> str:
+    """The active character next to the brand, on every page: the whole app is about it. Its menu switches to another
+    character (staying on the page) or adds one."""
+    from paf import characters, icons
+
+    try:
+        chars = characters.all_characters()
+    except Exception:  # noqa: BLE001 - a menu never breaks a page
+        return ""
+    cur = next((c for c in chars if c.current), None)
+    if cur is None:
+        return '<a class="who-add" href="/characters#add">+ Add your character</a>'
+
+    def ic(c) -> str:
+        return icons.img(icons.CLASS_ICON.format(cls=c.class_name.lower()), "medium", "who-ic")
+    back = "this.form.back.value=location.pathname+location.search"
+    others = "".join(
+        f'<form method="post" action="/character/select"><input type="hidden" name="slug" value="{e(c.slug)}">'
+        f'<input type="hidden" name="back" value="/"><button onclick="{back}">{ic(c)}<span><b>{e(c.name)}</b>'
+        f'<small>{e(c.spec.title())} {e(c.class_name.title())}</small></span></button></form>'
+        for c in chars if not c.current)
+    return (f'<details class="who"><summary>{ic(cur)}<span><b>{e(cur.name)}</b><small>{e(cur.spec.title())} '
+            f'{e(cur.class_name.title())}</small></span><span class="who-caret">&#9662;</span></summary>'
+            f'<div class="who-menu">{others}<a href="/characters#add">+ Add a character</a>'
+            f'<a href="/characters">Manage your characters</a></div></details>')
 
 
 def characters_strip() -> str:
@@ -1372,7 +1415,8 @@ class Handler(BaseHTTPRequestHandler):
 
                 s = (form.get("slug") or [""])[0]
                 (characters.select if self.path.endswith("select") else characters.remove)(s)
-                self._redirect("/")
+                back = (form.get("back") or ["/"])[0]
+                self._redirect(back if back.startswith("/") and not back.startswith("//") else "/")
             elif self.path == "/notes":
                 from paf.corpus.template import template_path
                 from paf.encounters import raid_encounters
