@@ -564,7 +564,49 @@ def rotation(d: dict) -> str:
                   "3 and 5 targets; the number of targets comes from the enemies you hit every 5 s. A gap is a "
                   "reading, not a fault: a mechanic, a movement or an assignment can explain it.</p>")
 
-VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review, "comp": comp, "wipe": wipe, "night": night, "diff": pulldiff, "rotation": rotation}
+def bonusroll(d: dict) -> str:
+    """Bonus rolls: each boss ranked by the mean gain of one roll (its usable items, losses as 0), its best item."""
+    evs = sorted(d.get("ev", []), key=lambda x: -x["ev"])
+    rows = d.get("rows", [])
+    err = d.get("error") or 0.2
+    try:  # the bosses' portraits (paf.bossimg), by name
+        from paf.web import _encounters
+
+        ids = {x.name: x.id for x in _encounters()}
+    except Exception:  # noqa: BLE001 - offline: no portraits
+        ids = {}
+    if not evs or evs[0]["ev"] <= 0:
+        return _verdict("ok", "No boss is worth a bonus roll for you",
+                        "<span>Nothing they drop beats what you wear.</span>")
+    top = evs[0]
+    if top["ev"] < 2 * err:  # the best is within the noise of the sims: no boss stands out
+        head = _verdict("ok", "No boss stands out for a bonus roll",
+                        f"<span>The best mean gain of a roll is under the noise of the sims (&plusmn;{2 * err:.2f}%): "
+                        "spend your rolls where you like, or try a higher difficulty.</span>", _pct(top["ev"], 2))
+    else:
+        head = _verdict("go", f"Bonus roll on {top['boss']} first",
+                        "<span>The mean gain of one roll: every item it can give you counts, an item that is no "
+                        "upgrade counts as 0.</span>", _pct(top["ev"], 2))
+    scale = max(x["ev"] for x in evs) or 1
+    out = ""
+    for i, x in enumerate(evs, 1):
+        mine = [r for r in rows if r["boss"] == x["boss"]]
+        ups = [r for r in mine if r["gain"] > 2 * err]
+        best = max(mine, key=lambda r: r["gain"], default=None)
+        face = (f"<img class='br-face' src='/bossimg/{ids[x['boss']]}.png' alt='' loading='lazy' "
+                f"onerror=\"this.remove()\">" if x["boss"] in ids else "")
+        best_txt = (f"<span>best:</span> {e(best['name'])} <b class='pos'>{_pct(best['gain'])}</b>"
+                    if best and best["gain"] > 2 * err else "<span>no real upgrade</span>")
+        out += (f"<li class='br'><span class='br-rank'>{i}</span>{face}<span class='l-name'><b>{e(x['boss'])}</b>"
+                f"<small><span>upgrades:</span> {len(ups)}/{x['n']} &middot; {best_txt}</small></span>"
+                f"{_bar(x['ev'], scale)}<span class='l-val {'pos' if x['ev'] > 0 else ''}'>{_pct(x['ev'], 2)}</span>"
+                "</li>")
+    return (f"{head}<h3>Every boss, best roll first</h3><ul class='glist brs'>{out}</ul>"
+            f"<p class='ws-fine'>Each item simmed in its slot on your character, at item level {d.get('ilvl')}; "
+            f"a roll gives one item of the boss's loot for your spec, any of them alike. Gains under "
+            f"&plusmn;{2 * err:.2f}% are noise.</p>")
+
+VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review, "comp": comp, "wipe": wipe, "night": night, "diff": pulldiff, "rotation": rotation, "bonusroll": bonusroll}
 
 
 def render(data: dict) -> str | None:
@@ -684,6 +726,10 @@ table.night td.pos{color:var(--pos)} table.night td.neg{color:var(--neg)}
 .glist.items.three.cds li{grid-template-columns:104px minmax(0,1fr) 78px}
 .ctx .cov .c-raid.ok{background:color-mix(in srgb,var(--fg) 45%,transparent)}
 .ctx .cov .c-raid.short{background:var(--warn)}
+.glist.brs li{grid-template-columns:28px 44px minmax(0,1.3fr) minmax(80px,1fr) 78px}
+.glist.brs li:not(:has(.br-face)){grid-template-columns:28px minmax(0,1.3fr) minmax(80px,1fr) 78px}
+.br-rank{font:700 16px var(--font-data);color:var(--muted);text-align:center}
+.br-face{width:44px;height:44px;border-radius:50%;object-fit:cover;object-position:50% 30%;background:#15121c}
 .whos{display:flex;flex-wrap:wrap;gap:6px}
 .who{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;border-radius:999px;
   border:1px solid var(--line);background:var(--surface-2);font-size:14px}

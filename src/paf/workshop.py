@@ -38,6 +38,9 @@ TOOLS: tuple[Tool, ...] = (
     Tool("droptimizer", "What a boss drops for you", "Which items of this boss, or of the whole raid, are real "
          "upgrades for you?", "inv_misc_coin_02", "gear", "5-10", ("boss?", "difficulty", "goal"),
          "Every item worth it for you, with its gain in %, best first.", needs_prep=False),
+    Tool("bonusroll", "Where to use your bonus rolls", "Which boss gives you the most, on average, when you spend "
+         "a bonus roll on it?", "inv_misc_coin_17", "gear", "5-10", ("difficulty", "goal"),
+         "Every boss of the raid ranked by what a bonus roll brings you, with its best item.", needs_prep=False),
     Tool("talents", "The top players' talents, on you", "Which talent build of the best players does the most "
          "damage with your character, on this fight?", "inv_misc_book_11", "gear", "3-6", ("boss", "difficulty"),
          "The builds compared on your character, with their gain and the talents to change."),

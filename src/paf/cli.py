@@ -637,7 +637,8 @@ def cmd_droptimizer(args: argparse.Namespace) -> int:
     err = max((i.error for i in ranked[:args.top]), default=0)
     from paf import results
 
-    results.write(root, "loot", results.loot(items, weights, boss_ev(items, weights), ilvl, [e.name for e in encs]))
+    kind = "bonusroll" if getattr(args, "bonus", False) else "loot"  # the same numbers, ranked for bonus rolls
+    results.write(root, kind, results.loot(items, weights, boss_ev(items, weights), ilvl, [e.name for e in encs]))
     print(f"\nStatistical error: about +/-{err:.2f}%. Items are simmed at item level {ilvl} (--ilvl to change).")
     print(f"Runs: {root}")
     return 0
@@ -2085,6 +2086,15 @@ def build_parser() -> argparse.ArgumentParser:
     dr.add_argument("--error", type=float, default=0.2)
     dr.add_argument("--top", type=int, default=25)
     dr.set_defaults(func=cmd_droptimizer)
+
+    br = sub.add_parser("bonusroll", help="where to use your bonus rolls: each boss of the raid ranked by the gain a "
+                                          "bonus roll brings you on average")
+    br.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    br.add_argument("--ilvl", type=int, help="item level of the drops (default: median of your equipped items)")
+    br.add_argument("--objective", type=_objective, default=0.0)
+    br.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
+    br.add_argument("--error", type=float, default=0.2)
+    br.set_defaults(func=cmd_droptimizer, boss=None, fight=None, preset=None, top=25, bonus=True)
 
     me = sub.add_parser("mechanics", help="boss mechanics from the Encounter Journal (roles, interrupts, mythic)")
     me.add_argument("boss")

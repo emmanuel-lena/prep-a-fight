@@ -129,3 +129,17 @@ def test_two_pulls_side_by_side():
     assert "good" in kinds and any("on the boss in B" in h["text"] for h in d["highlights"])
     page = workshop_views.render({"kind": "diff", **d})
     assert "What changed, biggest first" in page and "Casts per minute" in page and "<svg" in page
+
+
+
+def test_bonus_rolls_rank_the_bosses():
+    d = {"kind": "bonusroll", "ilvl": 300, "error": 0.2,
+         "ev": [{"boss": "A", "ev": 0.4, "n": 5}, {"boss": "B", "ev": 1.2, "n": 4}],
+         "rows": [{"boss": "B", "name": "Ring", "gain": 3.0, "slot": "finger", "item_id": 1},
+                  {"boss": "A", "name": "Belt", "gain": 0.1, "slot": "waist", "item_id": 2}]}
+    page = workshop_views.render(d)
+    assert "Bonus roll on B first" in page and page.index(">B<") < page.index(">A<")
+    assert "Ring" in page and "no real upgrade" in page
+
+    d["ev"] = [{"boss": "A", "ev": 0.1, "n": 5}]
+    assert "No boss stands out for a bonus roll" in workshop_views.render(d)  # under the noise
