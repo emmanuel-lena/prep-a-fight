@@ -65,11 +65,11 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .rb-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:10px;margin:0 0 6px}
 .rb-boss{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;border-radius:14px;
   cursor:pointer;outline:none} .rb-boss:hover,.rb-boss:focus-within{background:var(--surface)}
-.rb-face{position:relative;width:64px;height:64px;border-radius:50%;overflow:hidden;background:#efe9df;
+.rb-face{position:relative;width:64px;height:64px;border-radius:50%;overflow:hidden;background:#15121c;
   box-shadow:0 0 0 2px var(--line);display:block}
-.rb-img{width:100%;height:100%;object-fit:cover;object-position:50% 6%;transform:scale(1.9);transform-origin:50% 10%;display:block}
-.rb-img.none{display:grid;place-items:center;transform:none;font:700 24px var(--font-data);color:#5a4b3c}
-.rb-face .rb-img:not(.none),.rb-in .rb-img:not(.none){position:absolute;inset:0;background:#efe9df}
+.rb-img{width:100%;height:100%;object-fit:cover;object-position:50% 30%;display:block}
+.rb-img.none{display:grid;place-items:center;font:700 24px var(--font-data);color:var(--muted)}
+.rb-face .rb-img:not(.none),.rb-in .rb-img:not(.none){position:absolute;inset:0;background:#15121c}
 .rb-in{position:relative} .rb-face .rb-img.none,.rb-in .rb-img.none{position:absolute;inset:0}
 .rb-boss.grey .rb-face{filter:grayscale(1) brightness(.75);box-shadow:0 0 0 2px var(--line)}
 .rb-boss:not(.grey) .rb-face{box-shadow:0 0 0 2px var(--accent)}
@@ -88,7 +88,7 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .rb-d:hover{text-decoration:none} .rb-d b{font-size:12.5px} .rb-d small{font-size:11.5px;color:#bdb6a8}
 .rb-frame{width:58px;height:58px;display:grid;place-items:center;transition:transform .12s}
 .rb-d:hover .rb-frame{transform:scale(1.07)}
-.rb-frame .rb-in{width:calc(100% - 6px);height:calc(100% - 6px);overflow:hidden;background:#efe9df;display:block}
+.rb-frame .rb-in{width:calc(100% - 6px);height:calc(100% - 6px);overflow:hidden;background:#15121c;display:block}
 .rb-frame.tri{background:#1eff00;clip-path:polygon(50% 0,100% 100%,0 100%)}
 .rb-frame.tri .rb-in{clip-path:polygon(50% 0,100% 100%,0 100%);margin-top:5px;width:calc(100% - 10px);height:calc(100% - 9px)}
 .rb-frame.sq{background:#0070dd;border-radius:6px} .rb-frame.sq .rb-in{border-radius:4px}
@@ -674,7 +674,6 @@ def characters_page() -> str:
             f"<h2 id='add'>+ Add a character</h2><div class='card'>{ADD_FORM}</div>")
 
 
-BOSS_THUMB = "https://wow.zamimg.com/modelviewer/live/webthumbs/npc/{bucket}/{display}.png"
 DIFF_SHAPES = (("normal", "tri"), ("heroic", "sq"), ("mythic", "penta"))  # WoW's green, blue, purple
 
 
@@ -691,11 +690,12 @@ def raid_board(encs, class_name: str, spec: str) -> str:
     if not encs:
         return ""
     try:
-        from paf.gamedata import boss_display_ids
+        from paf.bossimg import journal
 
-        displays = boss_display_ids()
-    except Exception:  # noqa: BLE001 - offline: no portraits, the names stay
-        displays = {}
+        portraits, order = journal()
+    except Exception:  # noqa: BLE001 - offline: no portraits, the names stay, the raid's order
+        portraits, order = {}, {}
+    encs = sorted(encs, key=lambda x: order.get(x.id, (1 << 30, 0)))  # the Encounter Journal's order
     mine = f"{spec}-{class_name}".lower().replace(" ", "-")
     done = {x["key"]: x for x in prepared()}
     running = {}
@@ -705,13 +705,12 @@ def raid_board(encs, class_name: str, spec: str) -> str:
         running[(args[1] if len(args) > 1 else "", diff)] = (jid, job)
 
     def portrait(x, cls: str = "") -> str:
-        d = displays.get(x.id)
-        if not d:
+        if x.id not in portraits:
             return f"<span class='rb-img none {cls}'>{e(x.name[:1])}</span>"
-        # no portrait on Wowhead for some bosses: the initial behind it shows instead
+        # the Journal's portrait, served by the app (paf.bossimg); the initial shows if it cannot be had
         return (f"<span class='rb-img none {cls}'>{e(x.name[:1])}</span><img class='rb-img {cls}' "
-                f"src='{BOSS_THUMB.format(bucket=d % 256, display=d)}' alt='' loading='lazy' "
-                f"referrerpolicy='no-referrer' onerror=\"this.remove()\">")
+                f"src='/bossimg/{x.id}.png' alt='' loading='lazy' onerror=\"if(this.dataset.r)this.remove();"
+                f"else{{this.dataset.r=1;this.src+='?r=1'}}\">")  # one retry, then the initial
     items = ""
     for i, x in enumerate(encs, 1):
         states, ready = "", False
@@ -1279,6 +1278,17 @@ class Handler(BaseHTTPRequestHandler):
 
                 onboarding.finish()
                 self._redirect("/")
+            elif url.path.startswith("/bossimg/"):  # a boss's portrait from the Encounter Journal
+                import re
+
+                from paf import bossimg
+
+                m = re.fullmatch(r"/bossimg/(\d+)\.png", url.path)
+                img = bossimg.path(int(m.group(1))) if m else None
+                if img:
+                    self._send(img.read_bytes(), ctype="image/png")
+                else:
+                    self._send(b"", 404, "image/png")
             elif url.path == "/boss":
                 self._send(boss_page(q.get("boss", ""), q.get("difficulty", settings.get("difficulty"))))
             elif url.path == "/tools":
