@@ -10,14 +10,14 @@ from paf.raidneed import AddType
 from paf.talent_sim import Build
 
 
-def test_refresh_is_daily_at_4am_paris():
-    summer = datetime(2026, 7, 10, 1, 59, tzinfo=UTC)  # 03:59 in Paris (UTC+2)
-    assert pack.last_refresh(summer).isoformat() == "2026-07-09T04:00:00+02:00"
-    assert pack.last_refresh(datetime(2026, 7, 10, 2, 0, tzinfo=UTC)).isoformat() == "2026-07-10T04:00:00+02:00"
-    winter = datetime(2026, 12, 10, 3, 0, tzinfo=UTC)  # 04:00 in Paris (UTC+1)
-    assert pack.last_refresh(winter).isoformat() == "2026-12-10T04:00:00+01:00"
-    assert pack.is_stale("2026-12-10T02:59:00+00:00", winter)
-    assert not pack.is_stale("2026-12-10T03:00:00+00:00", winter)
+def test_a_pack_lasts_until_the_weekly_reset_of_the_region():
+    # the weekly reset of the region: EU Wednesday 04:00 UTC, NA Tuesday 15:00 UTC
+    wed = datetime(2026, 10, 7, 4, 0, tzinfo=UTC)  # a Wednesday
+    assert pack.last_refresh(datetime(2026, 10, 8, 12, 0, tzinfo=UTC), "eu") == wed
+    assert pack.last_refresh(datetime(2026, 10, 7, 3, 59, tzinfo=UTC), "eu") == datetime(2026, 9, 30, 4, 0, tzinfo=UTC)
+    assert pack.last_refresh(datetime(2026, 10, 8, 12, 0, tzinfo=UTC), "us") == datetime(2026, 10, 6, 15, 0, tzinfo=UTC)
+    assert pack.is_stale("2026-10-07T03:59:00+00:00", datetime(2026, 10, 13, tzinfo=UTC), "eu")
+    assert not pack.is_stale("2026-10-07T04:00:00+00:00", datetime(2026, 10, 13, tzinfo=UTC), "eu")  # a week long
     assert pack.is_stale("not a date")
 
 

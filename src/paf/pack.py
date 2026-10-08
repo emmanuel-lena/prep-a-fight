@@ -5,7 +5,8 @@ builds (string + count), the mechanics / actions stats and the add data of the r
 report code, no position, no raw event: only our own computed numbers, so it can be shared (issue #6). JSON only,
 so a downloaded pack can never run code.
 
-A pack is stale once a day: when it was made before the last 04:00 Europe/Paris, the next prep refreshes it.
+A pack lasts a week: it is stale once the weekly reset of the player's region has passed since it was made (the top
+kills and rankings move mostly at the reset), and the next prep refreshes it; `paf prep --refresh` forces it.
 """
 
 from __future__ import annotations
@@ -25,8 +26,9 @@ from paf.raidneed import AddType
 from paf.talent_sim import Build
 
 VERSION = 1
-REFRESH_HOUR = 4  # daily, Europe/Paris
-TZ = "Europe/Paris"
+# weekly reset per region, in UTC (weekday: Monday = 0). To check against Blizzard's announcements: EU Wednesday
+# morning, NA Tuesday, Asia Thursday morning local time (Wednesday evening UTC).
+RESETS = {"eu": (2, 4), "us": (1, 15), "kr": (2, 23), "tw": (2, 23), "cn": (2, 23)}
 
 
 @dataclass
@@ -60,23 +62,30 @@ def now_utc() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
-def last_refresh(now: datetime | None = None) -> datetime:
-    """The last 04:00 in Paris (summer and winter time), as an aware datetime."""
-    from zoneinfo import ZoneInfo
+def region() -> str:
+    """The player's region (the rankings' region setting, else the guild's), for its weekly reset."""
+    from paf import settings
 
-    now = (now or datetime.now(UTC)).astimezone(ZoneInfo(TZ))
-    cut = now.replace(hour=REFRESH_HOUR, minute=0, second=0, microsecond=0)
-    return cut if now >= cut else cut - timedelta(days=1)
+    r = (settings.get("region") or settings.get("guild_region") or "eu").lower()
+    return r if r in RESETS else "eu"
 
 
-def is_stale(created: str, now: datetime | None = None) -> bool:
+def last_refresh(now: datetime | None = None, where: str | None = None) -> datetime:
+    """The last weekly reset of the region (an aware UTC datetime)."""
+    day, hour = RESETS.get((where or region()).lower(), RESETS["eu"])
+    now = (now or datetime.now(UTC)).astimezone(UTC)
+    cut = (now - timedelta(days=(now.weekday() - day) % 7)).replace(hour=hour, minute=0, second=0, microsecond=0)
+    return cut if now >= cut else cut - timedelta(days=7)
+
+
+def is_stale(created: str, now: datetime | None = None, where: str | None = None) -> bool:
     try:
         made = datetime.fromisoformat(created)
     except ValueError:
         return True
     if made.tzinfo is None:
         made = made.replace(tzinfo=UTC)
-    return made < last_refresh(now)
+    return made < last_refresh(now, where)
 
 
 # --- JSON ----------------------------------------------------------------------------------------

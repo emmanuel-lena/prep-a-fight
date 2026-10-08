@@ -699,8 +699,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
             pk = shared
             print(f"Downloaded the shared prep pack of {spec} {cls} ({pk.created[:16].replace('T', ' ')} UTC).")
     if pk is not None and pack.is_stale(pk.created):
-        print(f"Prep pack from {pk.created[:16].replace('T', ' ')} UTC: older than today's 04:00 (Paris) refresh, "
-              f"rebuilding it from the logs.")
+        print(f"Prep pack from {pk.created[:16].replace('T', ' ')} UTC: made before this week's reset, rebuilding it "
+              f"from the logs.")
         pk = None
     if pk is not None:  # what the logs give, already computed: no corpus, no validation sims
         step(f"Using the prep pack ({pk.kills} top kills, {pk.created[:10]})")
