@@ -77,6 +77,22 @@ def test_the_best_pull_without_the_deaths():
     from paf import wipe
 
     p = wipe.Pull(1, 60.0, 0.5, 300.0, [50.0, 50.0, 50.0, 50.0], lost=[0.0, 0.0, 50.0, 50.0])
-    assert round(p.kill_time()) == 90 and round(p.kill_time(deaths=False)) == 60
+    assert round(p.kill_time()) == 90 and round(p.kill_time("no_deaths")) == 60
     page = workshop_views.render({"kind": "wipe", **wipe.to_dict(p, "Boss", 70.0, 50.0)})
     assert "Without the deaths" in page and "<svg" in page
+
+
+def test_the_night_tracker():
+    from paf import tracker
+
+    assert tracker.kind("Healthstone") == "healthstone" and tracker.kind("Pierre de soins") == "healthstone"
+    assert tracker.kind("Silvermoon Health Potion") == "health" and tracker.kind("Potion de soins") == "health"
+    assert tracker.kind("Potion of Recklessness") == "damage" and tracker.kind("Lightfused Mana Potion") is None
+    assert tracker.kind("Create Healthstone") is None
+    p = tracker.PlayerPull(deaths=[100.0], healthstone=[120.0])
+    assert p.died_bare  # the healthstone came after the death
+    row = tracker.PullRow(1, "Boss", 5, False, 300.0, 0.2, {"Moon": p, "Dk": tracker.PlayerPull(damage=[1.0])})
+    d = tracker.to_dict("x", [row], {"Moon": "Druid-Balance"})
+    assert d["summary"]["Moon"]["bare"] == 1 and d["summary"]["Dk"]["pulls_damage_potion"] == 1
+    page = workshop_views.render({"kind": "night", **d})
+    assert "1 pulls, 1 deaths before the wipes" in page and "Pull by pull" in page

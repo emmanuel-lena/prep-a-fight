@@ -512,6 +512,42 @@ PHRASES: dict[str, str] = {
     "Put them on it": "Faites-les taper dessus", "Hardly hit it in your pull": "L'ont à peine tapé dans ton pull",
     "DPS on the target of each spec's players in the top kills of this boss (those assigned to it for an assigned target; on both bosses for a second boss). It compares specs, not your players' skill, and does not know your strategy.":
         "DPS sur la cible des joueurs de chaque spec dans les meilleurs kills de ce boss (ceux qui y sont assignés pour une cible assignée ; sur les deux boss pour un deuxième boss). Ça compare des specs, pas le niveau de tes joueurs, et ça ne connaît pas votre strat.",
+    # your best pull in detail (paf.wipe)
+    "Your best pull, in detail": "Ton meilleur pull, en détail",
+    "What did the deaths and the damage off the boss cost, and when would the boss have died without them?":
+        "Combien ont coûté les morts et les dégâts hors du boss, et quand le boss serait-il mort sans eux ?",
+    "The boss's health over your best pull, as played and without the deaths, and what each death cost.":
+        "La vie du boss sur ton meilleur pull, tel que joué et sans les morts, et ce qu'a coûté chaque mort.",
+    "Without the deaths, and with the top kills' share of damage on the boss:":
+        "Sans les morts, et avec la part de dégâts sur le boss des meilleurs kills :",
+    "kill at": "kill à", "As played": "Tel que joué", "Without the deaths": "Sans les morts",
+    "And the top kills' boss share": "Et la part boss des meilleurs kills",
+    "Like the top players of each spec": "Comme les tops de chaque spec", "Top kills": "Meilleurs kills",
+    "longest": "le plus long", "Longest top kill": "Le plus long des meilleurs kills", "A death": "Une mort",
+    "Who lost the most boss damage": "Qui a perdu le plus de dégâts sur le boss",
+    "Share of the boss's health, next to the median boss DPS of the top kills' players of the same spec.":
+        "En part de la vie du boss, à côté du DPS boss médian des joueurs de la même spec dans les meilleurs kills.",
+    "on the boss while alive:": "sur le boss en vie :", "deaths:": "morts :",
+    "Talents the padders take more:": "Talents que les padders prennent plus :",
+    "Talents the boss top takes more:": "Talents que les tops en dégâts boss prennent plus :",
+    "died at": "mort à", "back at": "relevé à", "never back": "jamais relevé",
+    "The deaths:": "Les morts :", "of the boss's health": "de la vie du boss",
+    "The damage off the boss": "Les dégâts hors du boss", "Your raid put": "Ton raid a mis",
+    "of its damage on the boss, the top kills": "de ses dégâts sur le boss, les meilleurs kills",
+    "From your log, 15 s at a time. A dead player loses the boss damage they did per 15 s before dying, until a battle res; the deaths of the wipe itself are left out. The boss share part is an upper bound: a longer pull sees more adds. A kill past the end of the pull is extrapolated at the boss damage of its last minute.":
+        "D'après ton log, 15 s par 15 s. Un joueur mort perd les dégâts boss qu'il faisait par tranche de 15 s avant de mourir, jusqu'à un battle rez ; les morts du wipe lui-même ne comptent pas. La part boss est un maximum : un pull plus long voit plus d'adds. Un kill après la fin du pull est extrapolé avec les dégâts boss de sa dernière minute.",
+    # your raid night (paf.tracker)
+    "Your raid night, pull by pull": "Ta soirée de raid, pull par pull",
+    "Who died, who used a healthstone or a health potion, who pressed a damage potion?":
+        "Qui est mort, qui a pris une pierre de soins ou une potion de soins, qui a pris une potion DPS ?",
+    "Each player over the night, then each pull: deaths, healthstones, potions.":
+        "Chaque joueur sur la soirée, puis chaque pull : morts, pierres de soins, potions.",
+    "Died without a healthstone or a health potion first:": "Morts sans pierre ni potion de soins avant :",
+    "Over the night": "Sur la soirée", "Deaths": "Morts",
+    "Without a healthstone or potion": "Sans pierre ni potion", "Healthstones": "Pierres de soins",
+    "Health potions": "Potions de soins", "Pulls with a damage potion": "Pulls avec potion DPS",
+    "Read from the casts of the log: a potion pressed before the pull is not counted, nor the deaths of the wipe itself. A name in red died without a healthstone or a health potion first.":
+        "Lu dans les casts du log : une potion prise avant le pull ne compte pas, ni les morts du wipe lui-même. Un nom en rouge est mort sans pierre ni potion de soins avant.",
     # your characters (paf.characters)
     "Paste /simc (recommended)": "Coller /simc (recommandé)", "Quick: from Warcraft Logs": "Rapide : depuis Warcraft Logs",
     "+ Add a character": "+ Ajouter un perso", "Add this character": "Ajouter ce perso",
@@ -824,6 +860,9 @@ PATTERNS: list[tuple[str, str]] = [
      r"Les tops n'en perdent qu'environ \1 % par 10 s : ils continuent de caster en bougeant (sorts instantanés\2)."),
     (r"For these moments the top players use (.+)\.", r"Pour ces moments, les tops utilisent \1."),
     (r"^On it in your pull \((\d+)\)$", r"Dessus dans ton pull (\1)"),
+    (r"^Boss at ([\d.]+)% after ([\d:]+)$", r"Boss à \1 % après \2"),
+    (r"^(\d+) pulls, (\d+) deaths before the wipes$", r"\1 pulls, \2 morts avant les wipes"),
+    (r"^Pull by pull \((\d+)\)$", r"Pull par pull (\1)"),
     # the sheet picker of /view: "Boss (mythic Elemental)"
     (r"\(mythic\b", r"(mythique"), (r"\(heroic\b", r"(héroïque"), (r"\(normal\b", r"(normal"), (r"\(lfr\b", r"(LFR"),
 ]

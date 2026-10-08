@@ -14,7 +14,8 @@ from paf.config import data_dir
 e = html.escape
 
 GROUPS = (
-    ("Prepare a boss", ("prep", "raid", "review", "comp", "wipe", "raidplan", "timeline", "mechanics", "assigns")),
+    ("Prepare a boss", ("prep", "raid", "review", "comp", "wipe", "night", "raidplan", "timeline", "mechanics",
+                        "assigns")),
     ("Sims on the fight", ("topgear", "droptimizer", "talents", "optimize", "cdplan", "plan", "sim")),
     ("The fight model", ("corpus", "analyze", "template", "calibrate", "validate")),
     ("Maintenance", ("setup", "doctor")),

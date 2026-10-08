@@ -1207,7 +1207,7 @@ def cmd_wipe(args: argparse.Namespace) -> int:
     died without them (paf.wipe)."""
     import statistics as st
 
-    from paf import raidreview, results, settings, simc, wipe
+    from paf import comp, raidreview, results, settings, simc, wipe
     from paf.corpus import db
     from paf.raidneed import guild_report, report_code
 
@@ -1234,20 +1234,61 @@ def cmd_wipe(args: argparse.Namespace) -> int:
         print(f"No wipe on {enc.name} {diff_name} in this log.")
         return 1
     print(f"Reading your best pull of {enc.name} {diff_name}, 15 s at a time...", flush=True)
-    p = wipe.analyze(client, code, fight, boss, main.tops_share)
+    p = wipe.analyze(client, code, fight, boss, main.tops_share, comp.boss_dps(con, enc.id, diff, {boss}))
+    wipe.add_talents(client, code, p, enc.id, diff)
 
     def mmss(t: float) -> str:
         return "never" if t == float("inf") else f"{int(t // 60)}:{int(t % 60):02d}"
     print(f"Best pull: {mmss(p.duration)}, boss at {p.boss_left:.1%}. Top kills: {mmss(st.median(durations))} "
           f"(longest {mmss(durations[-1])}).")
-    for d in p.deaths:
-        back = f"back at {mmss(d.back)}" if d.back is not None else "never back"
-        print(f"  {d.spec:24} died at {mmss(d.t)}, {back}: {d.lost / p.health:.1%} of the boss's health lost")
-    print(f"Boss damage share {p.raid_share:.0%} (top kills {p.tops_share:.0%}).")
-    print(f"Kill estimated at {mmss(p.kill_time())} as played, {mmss(p.kill_time(deaths=False))} without the deaths, "
-          f"{mmss(p.kill_time(deaths=False, share=True))} with the top kills' boss share too.")
+    print(f"Kill estimated at {mmss(p.kill_time())} as played, {mmss(p.kill_time('no_deaths'))} without the deaths, "
+          f"{mmss(p.kill_time('no_deaths_share'))} with the top kills' boss share too, "
+          f"{mmss(p.kill_time('like_tops'))} playing like the top players of each spec.")
+    print(f"Boss damage share {p.raid_share:.0%} (top kills {p.tops_share:.0%}). Boss damage lost per player:")
+    for c in p.culprits:
+        h = p.health or 1
+        ref = f"{c.tops_dps / 1000:,.0f}k" if c.tops_dps else "?"
+        extra = (f"; padding talents: {', '.join(c.pad_talents)}" if c.pad_talents else "") + (
+            f"; boss talents missing: {', '.join(c.boss_talents)}" if c.boss_talents else "")
+        print(f"  {c.spec:24} {c.lost / h:5.1%} (dead {c.lost_dead / h:.1%}, alive {c.alive_dps / 1000:,.0f}k vs "
+              f"{ref}){extra}")
     root = simc.new_run_dir(label="wipe")
     results.write(root, "wipe", wipe.to_dict(p, enc.name, durations[-1], st.median(durations)))
+    print(f"Runs: {root}")
+    return 0
+
+
+def cmd_night(args: argparse.Namespace) -> int:
+    """Your raid night, pull by pull: deaths, healthstones, health and damage potions (paf.tracker)."""
+    from paf import results, settings, simc, tracker
+    from paf.raidneed import GUILD_REPORTS_QUERY, report_code, server_slug
+    from paf.wcl import WCLClient
+
+    client = WCLClient()
+    code = report_code(args.raid) if args.raid else None
+    if not code and settings.get("guild"):
+        data = client.query(GUILD_REPORTS_QUERY, {"name": settings.get("guild"),
+                                                  "server": server_slug(settings.get("guild_server")),
+                                                  "region": settings.get("guild_region").upper()}, cache_ttl=1800)
+        reports = (data["reportData"]["reports"] or {}).get("data") or []
+        code = reports[0]["code"] if reports else None
+    if not code:
+        print("Give a log of your raid (--raid <link>) or set your guild in the settings.")
+        return 1
+    print("Reading the pulls of the log...", flush=True)
+    rows, icons = tracker.night(client, code)
+    if not rows:
+        print("No boss pull in this log.")
+        return 1
+    s = tracker.summary(rows)
+    print(f"{len(rows)} pulls. Per player: deaths (without a healthstone or health potion first), healthstones, "
+          f"health potions, pulls with a damage potion")
+    for name, v in sorted(s.items(), key=lambda x: (-x[1]["bare"], -x[1]["deaths"])):
+        print(f"  {name:<16} {icons.get(name, ''):<24} deaths {v['deaths']:2} ({v['bare']} bare)  "
+              f"healthstones {v['healthstone']:2}  health potions {v['health']:2}  "
+              f"damage potion {v['pulls_damage_potion']}/{len(rows)}")
+    root = simc.new_run_dir(label="night")
+    results.write(root, "night", tracker.to_dict(code, rows, icons))
     print(f"Runs: {root}")
     return 0
 
@@ -1928,6 +1969,11 @@ def build_parser() -> argparse.ArgumentParser:
     wp.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
     wp.add_argument("--raid", help="link to one of your raid's logs (default: the boss plan's or your guild's)")
     wp.set_defaults(func=cmd_wipe)
+
+    nt = sub.add_parser("night", help="your raid night, pull by pull: deaths, healthstones, health and damage "
+                                      "potions")
+    nt.add_argument("--raid", help="link to the log (default: your guild's latest)")
+    nt.set_defaults(func=cmd_night)
 
     rd = sub.add_parser("raid", help="pad the adds or stay on the boss, from your raid's composition and DPS")
     rd.add_argument("boss")

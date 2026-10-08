@@ -61,6 +61,9 @@ TOOLS: tuple[Tool, ...] = (
     Tool("wipe", "Your best pull, in detail", "What did the deaths and the damage off the boss cost, and when would "
          "the boss have died without them?", "spell_shadow_soulleech_3", "raid", "1", ("boss", "difficulty", "raid"),
          "The boss's health over your best pull, as played and without the deaths, and what each death cost."),
+    Tool("night", "Your raid night, pull by pull", "Who died, who used a healthstone or a health potion, who pressed "
+         "a damage potion?", "inv_stone_04", "raid", "1", ("raid",),
+         "Each player over the night, then each pull: deaths, healthstones, potions.", needs_prep=False),
     Tool("mechanics", "The boss's mechanics", "Every ability from the Encounter Journal, by role: what concerns you?",
          "inv_misc_book_09", "boss", "1", ("boss", "difficulty"),
          "The boss's abilities by role, and who handles what in the top kills.", needs_prep=False),

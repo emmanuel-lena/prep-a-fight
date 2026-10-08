@@ -311,7 +311,8 @@ def wipe(d: dict) -> str:
     tiles = "".join(
         f"<div class='kt {cls}'><small>{label}</small><b>{_mmss(k.get(key))}</b></div>"
         for key, label, cls in (("as_is", "As played", ""), ("no_deaths", "Without the deaths", ""),
-                                ("no_deaths_share", "And the top kills' boss share", "go")))
+                                ("no_deaths_share", "And the top kills' boss share", "go"),
+                                ("like_tops", "Like the top players of each spec", "go")) if key in k)
     tiles += (f"<div class='kt'><small>Top kills</small><b>{_mmss(d.get('median_kill'))}</b>"
               f"<span><span>longest</span> {_mmss(longest)}</span></div>")
     # boss health curves over the pull
@@ -324,7 +325,8 @@ def wipe(d: dict) -> str:
         return " ".join(f"{L + i * 15 / span * (W - L - 10):.1f},{10 + (1 - v) * (H - B - 20):.1f}"
                         for i, v in enumerate(vals))
     lines = ""
-    for key, cls in (("as_is", "c-now"), ("no_deaths", "c-alive"), ("no_deaths_share", "c-best")):
+    for key, cls in (("as_is", "c-now"), ("no_deaths", "c-alive"), ("no_deaths_share", "c-best"),
+                     ("like_tops", "c-tops")):
         if curves.get(key):
             lines += f"<polyline class='{cls}' points='{pts(curves[key])}'/>"
     xk = L + longest / span * (W - L - 10)
@@ -338,7 +340,8 @@ def wipe(d: dict) -> str:
            f"<text x='4' y='16' class='tk'>100%</text><text x='4' y='{H - B}' class='tk'>0%</text>{ticks}{marks}"
            f"<line class='kl' x1='{xk:.1f}' x2='{xk:.1f}' y1='10' y2='{H - B}'/>{lines}</svg>"
            "<div class='legend'><span class='c-now'>As played</span><span class='c-alive'>Without the deaths</span>"
-           "<span class='c-best'>And the top kills' boss share</span><span class='kl'>Longest top kill</span>"
+           "<span class='c-best'>And the top kills' boss share</span><span class='c-tops'>Like the top players of "
+           "each spec</span><span class='kl'>Longest top kill</span>"
            "<span class='dm'>A death</span></div>") if n else ""
 
     def who(x: dict) -> str:
@@ -354,12 +357,74 @@ def wipe(d: dict) -> str:
                       f"<ul class='glist items deaths'>{''.join(who(x) for x in sorted(deaths, key=lambda x: -x['lost']))}</ul>")
     share = (f"<h3>The damage off the boss</h3><p><span>Your raid put</span> <b class='num'>{d['raid_share']:.0%}</b> "
              f"<span>of its damage on the boss, the top kills</span> <b class='num'>{d['tops_share']:.0%}</b>.</p>")
-    return (f"{head}<div class='kts'>{tiles}</div>{svg}{death_html}{share}<p class='ws-fine'>From your log, 15 s at a "
+    culprits = [c for c in d.get("culprits", []) if c["lost_alive"] + c["lost_dead"] >= 0.002]
+
+    def culprit(c: dict) -> str:
+        cls = c["spec"].partition("-")[0]
+        ic = icons.img(icons.CLASS_ICON.format(cls=cls.lower()), "medium", "it-ic")
+        why = []
+        if c["tops_dps"]:
+            why.append(f"<span class='p-num'><span>on the boss while alive:</span> <b>{c['alive_dps'] / 1000:,.0f}k</b> "
+                       f"<span>top players of the spec:</span> <b>{c['tops_dps'] / 1000:,.0f}k</b></span>")
+        if c["lost_dead"] >= 0.001:
+            why.append(f"<span class='p-tops'><span>deaths:</span> <b>&minus;{c['lost_dead']:.1%}</b></span>")
+        chips = "".join(f"<span class='chip drop'>{e(t)}</span>" for t in c["pad_talents"])
+        if chips:
+            why.append(f"<span class='p-tops'>Talents the padders take more:</span><span class='chips'>{chips}</span>")
+        chips = "".join(f"<span class='chip add'>{e(t)}</span>" for t in c["boss_talents"])
+        if chips:
+            why.append(f"<span class='p-tops'>Talents the boss top takes more:</span><span class='chips'>{chips}</span>")
+        lost = c["lost_alive"] + c["lost_dead"]
+        return (f"<li class='pl'>{ic}<span class='l-name'><b>{e(c['name'])}</b><small>&minus;{lost:.1%}</small></span>"
+                f"<span class='p-say'>{''.join(why)}</span></li>")
+    culprit_html = ""
+    if culprits:
+        culprit_html = ("<h3>Who lost the most boss damage</h3><p class='ws-fine'>Share of the boss's health, next to "
+                        "the median boss DPS of the top kills' players of the same spec.</p><ul class='plist'>"
+                        + "".join(culprit(c) for c in culprits) + "</ul>")
+    return (f"{head}<div class='kts'>{tiles}</div>{svg}{culprit_html}{death_html}{share}<p class='ws-fine'>From your log, 15 s at a "
             "time. A dead player loses the boss damage they did per 15 s before dying, until a battle res; the deaths "
             "of the wipe itself are left out. The boss share part is an upper bound: a longer pull sees more adds. "
             "A kill past the end of the pull is extrapolated at the boss damage of its last minute.</p>")
 
-VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review, "comp": comp, "wipe": wipe}
+def night(d: dict) -> str:
+    """The raid night: per player, then per pull."""
+    from paf import icons
+
+    pulls = d.get("pulls", [])
+    summary = d.get("summary", {})
+    ic_of = d.get("icons", {})
+
+    def ic(name: str) -> str:
+        cls = ic_of.get(name, "").partition("-")[0]
+        return icons.img(icons.CLASS_ICON.format(cls=cls.lower()), "medium", "it-ic") if cls else _img("")
+    deaths = sum(v["deaths"] for v in summary.values())
+    bare = sum(v["bare"] for v in summary.values())
+    head = _verdict("warn" if bare else "ok", f"{len(pulls)} pulls, {deaths} deaths before the wipes",
+                    f"<span>Died without a healthstone or a health potion first:</span> <span class='num'>{bare}</span>")
+    rows = ""
+    for name, v in sorted(summary.items(), key=lambda x: (-x[1]["bare"], -x[1]["deaths"])):
+        pot = v["pulls_damage_potion"]
+        rows += (f"<tr><td class='who-c'>{ic(name)}<b>{e(name)}</b></td><td class='n'>{v['deaths']}</td>"
+                 f"<td class='n {'bad' if v['bare'] else ''}'>{v['bare']}</td><td class='n'>{v['healthstone']}</td>"
+                 f"<td class='n'>{v['health']}</td><td class='n {'bad' if not pot else ''}'>{pot}/{len(pulls)}</td></tr>")
+    table = (f"<div class='scroll'><table class='night'><tr><th>Player</th><th>Deaths</th><th>Without a healthstone or "
+             f"potion</th><th>Healthstones</th><th>Health potions</th><th>Pulls with a damage potion</th></tr>{rows}"
+             "</table></div>")
+    detail = ""
+    for r in pulls:
+        dead = sorted(((min(p["deaths"]), n, p["bare"]) for n, p in r["players"].items() if p["deaths"]))
+        end = "Kill" if r["kill"] else f"{(r['left'] or 0):.0%}"
+        who = "".join(f"<span class='who {'bare' if b else ''}'>{ic(n)}<b>{e(n)}</b> {_mmss(t)}</span>"
+                      for t, n, b in dead[:12])
+        detail += (f"<li><div class='j-head'><b>{e(r['boss'])}</b><small><span class='num'>{_mmss(r['duration'])}</span>"
+                   f" &middot; {end}</small></div><div class='whos'>{who}</div></li>")
+    return (f"{head}<h3>Over the night</h3>{table}<details class='more'><summary>Pull by pull ({len(pulls)})</summary>"
+            f"<ul class='pulls'>{detail}</ul></details><p class='ws-fine'>Read from the casts of the log: a potion "
+            "pressed before the pull is not counted, nor the deaths of the wipe itself. A name in red died without a "
+            "healthstone or a health potion first.</p>")
+
+VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review, "comp": comp, "wipe": wipe, "night": night}
 
 
 def render(data: dict) -> str | None:
@@ -444,12 +509,22 @@ details.more{margin:6px 0} details.more>summary{cursor:pointer;color:var(--muted
 .hp{width:100%;height:auto;max-width:100%;display:block}
 .hp polyline{fill:none;stroke-width:2.5;stroke-linejoin:round}
 .hp .c-now{stroke:var(--neg)} .hp .c-alive{stroke:var(--warn)} .hp .c-best{stroke:var(--pos)}
+.hp .c-tops{stroke:var(--accent);stroke-dasharray:6 4}
 .hp .ax{stroke:var(--line)} .hp .kl{stroke:var(--fg);stroke-dasharray:4 4;opacity:.6}
 .hp .dm{stroke:var(--neg);opacity:.35} .hp .tk{fill:var(--muted);font-size:11px}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin:6px 0 4px}
 .legend span::before{content:"";display:inline-block;width:14px;height:3px;margin-right:6px;vertical-align:middle;background:currentColor}
 .legend .c-now{color:var(--neg)} .legend .c-alive{color:var(--warn)} .legend .c-best{color:var(--pos)}
+.legend .c-tops{color:var(--accent)} .p-say .chips{margin:2px 0 4px}
 .legend .kl::before{background:var(--fg)} .legend .dm::before{background:var(--neg);opacity:.4}
+table.night{width:100%;border-collapse:collapse;font-size:14.5px}
+table.night th{text-align:left;color:var(--muted);font-weight:500;font-size:13px;padding:6px 8px}
+table.night td{padding:6px 8px;border-top:1px solid var(--line)} table.night td.n{text-align:right;font-variant-numeric:tabular-nums}
+table.night td.bad{color:var(--neg);font-weight:700}
+.who-c{display:flex;align-items:center;gap:8px} .who-c .it-ic{width:24px;height:24px}
+.pulls{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.pulls li{padding:10px 12px;border:1px solid var(--line);border-radius:12px;display:grid;gap:8px}
+.who.bare{border-color:color-mix(in srgb,var(--neg) 60%,var(--line));color:var(--neg)}
 .whos{display:flex;flex-wrap:wrap;gap:6px}
 .who{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;border-radius:999px;
   border:1px solid var(--line);background:var(--surface-2);font-size:14px}
