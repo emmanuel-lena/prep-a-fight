@@ -904,6 +904,11 @@ def cmd_prep(args: argparse.Namespace) -> int:
         builds = top_builds(con, enc.id, diff, spec)
         fetch_codes(client, con, builds)
     d.talents = compare_builds(profile_text, builds, fights, root / "talents", target_error=args.error)
+    for r in d.talents.rows if d.talents else []:  # the swapped talents: icons and Wowhead tooltips on the sheet
+        for side in r.swaps:
+            for t in side:
+                if t and t[1]:
+                    d.links.setdefault(t[0], f"spell={t[1]}")
     from paf.prep_report import _key as cd_key_of
 
     for ab in tl_all.abilities:  # when the top players cast each cooldown (for the plan timelines)
@@ -1076,7 +1081,12 @@ def cmd_prep(args: argparse.Namespace) -> int:
         saved = copy.copy(d)  # the plans' rules carry functions: only their names and descriptions are kept
         saved.optimized = [dataclasses.replace(p, choice={k: Rule(r.name, r.description, None)
                                                           for k, r in p.choice.items()}) for p in d.optimized]
-        (root / "prepdata.pickle").write_bytes(pickle.dumps(saved))
+        try:
+            data = pickle.dumps(saved)
+        except (pickle.PicklingError, AttributeError, TypeError):  # the compared plans carry functions too
+            saved.plans = None
+            data = pickle.dumps(saved)
+        (root / "prepdata.pickle").write_bytes(data)
     except Exception as exc:  # noqa: BLE001 - only a convenience
         print(f"  (the sheet's data was not saved for a later render: {str(exc)[:120]})")
     import json

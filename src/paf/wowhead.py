@@ -25,14 +25,34 @@ def item_ref(item_id: int, ilvl: int | None = None, bonus: str | None = None) ->
     return ref
 
 
+# the app's languages -> Wowhead's site language (its tooltips in that language)
+DOMAINS = {"fr": "fr", "de": "de", "es": "es", "it": "it", "pt": "pt", "ru": "ru", "ko": "ko", "zh": "cn"}
+
+
+def domain() -> str:
+    try:
+        from paf.i18n import language
+
+        return DOMAINS.get(language(), "")
+    except Exception:  # noqa: BLE001 - English when the language cannot be read
+        return ""
+
+
+def url(ref: str) -> tuple[str, str]:
+    """(href, data-wowhead) of a reference, in the player's language."""
+    kind, _, rest = ref.partition("=")
+    path = f"{kind}={rest.split('&', 1)[0]}"
+    d = domain()
+    return (f"https://www.wowhead.com/{d + '/' if d else ''}{path}", ref + (f"&domain={d}" if d else ""))
+
+
 def link(text: str, ref: str | None) -> str:
     """Escaped text, as a Wowhead link when a reference is known."""
     t = html.escape(text)
     if not ref:
         return t
-    kind, _, rest = ref.partition("=")
-    path = f"{kind}={rest.split('&', 1)[0]}"
-    return (f'<a class="wh" href="https://www.wowhead.com/{path}" data-wowhead="{html.escape(ref)}" '
+    href, data = url(ref)
+    return (f'<a class="wh" href="{href}" data-wowhead="{html.escape(data)}" '
             f'target="_blank" rel="noopener">{t}</a>')
 
 

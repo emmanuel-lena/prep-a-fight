@@ -76,6 +76,30 @@ SIZE_WORDS = {"big": "a big gain", "some": "a small gain", "tiny": "barely matte
 
 # --- the three cards -----------------------------------------------------------------------------------------------
 
+def _talent(d, t) -> str:
+    """A talent with its icon, linked to Wowhead (its tooltip on hover); an empty slot when there is none."""
+    if not t:
+        return "<span class='tal none'>&mdash;</span>"
+    name, sid = t
+    pic = icons.img(d.icons.get(name, ""), "medium", "tal-ic") if d.icons.get(name) else "<span class='tal-ic none'></span>"
+    if not sid:
+        return f"<span class='tal'>{pic}<span>{e(name)}</span></span>"
+    from paf.wowhead import url
+
+    href, data = url(f"spell={sid}")
+    return (f"<a class='tal' href='{e(href)}' data-wowhead='{e(data)}' data-wh-icon-added='true' target='_blank' "
+            f"rel='noopener'>{pic}<span>{e(name)}</span></a>")
+
+
+def swaps_html(d, swaps: list) -> str:
+    """Your talent -> the build's talent, one line per point moved."""
+    if not swaps:
+        return ""
+    lines = "".join(f"<li class='sw'>{_talent(d, a)}<span class='arr' aria-label='becomes'>&rarr;</span>{_talent(d, b)}</li>"
+                    for a, b in swaps)
+    return f"<li class='sw-list'><ul class='swaps'>{lines}</ul></li>"
+
+
 def change_card(d) -> str:
     from paf.prep_report import best_build, copy_button, linkify
 
@@ -87,7 +111,8 @@ def change_card(d) -> str:
             spec_ic = icons.img(icons.CLASS_ICON.format(cls=d.class_name.lower()), "medium") if d.class_name else ""
             button = copy_button(best.build.code, "Copy the talents") if best.build.code else ""
             rows.append(f"<li>{spec_ic}<div><b>Change your talents</b><span class='sz {_size(g)}'>"
-                        f"{SIZE_WORDS[_size(g)]}</span>{button}</div></li>")
+                        f"{SIZE_WORDS[_size(g)]}</span></div></li>{swaps_html(d, getattr(best, 'swaps', []))}"
+                        f"<li class='sw-copy'>{button}</li>")
     if d.gear and d.gear[0][2] > 2 * d.gear_error:
         changes, _, w = d.gear[0]
         items = [c.split(": ", 1)[-1].rsplit(" (", 1)[0] for c in changes.split("; ")]
@@ -368,6 +393,18 @@ body.simple-on .tabs{display:none}
 .simple .times time{font:600 15px var(--font-data);padding:2px 8px;border-radius:999px;background:var(--surface-2);
   border:1px solid var(--line)}
 .simple .s-press .what{margin:-6px 0 12px}
+.simple .cards li.sw-list{display:block}
+.swaps{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.swaps .sw{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:6px;align-items:center}
+.tal{display:inline-flex;gap:7px;align-items:center;min-width:0;color:var(--fg);text-decoration:none;font-size:14px;
+  line-height:1.25;padding:3px 6px 3px 3px;border-radius:8px}
+a.tal:hover{background:var(--surface-2)}
+.tal span{overflow:hidden;text-overflow:ellipsis}
+.simple .tal-ic,.simple .tal-ic.none{width:28px;height:28px;border-radius:6px;flex:none;margin:0}
+.sw .tal:first-child{opacity:.75} .sw .tal:first-child span{text-decoration:line-through;text-decoration-color:var(--neg)}
+.sw .arr{color:var(--pos);font-weight:700;text-align:center}
+.tal.none{color:var(--muted);justify-content:center}
+.simple .cards li.sw-copy:empty{display:none}
 .simple .s-move{grid-column:1/-1}
 .simple .s-move ul{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px 22px}
 .simple .s-move b{font-weight:500;font-size:16px;line-height:1.45}

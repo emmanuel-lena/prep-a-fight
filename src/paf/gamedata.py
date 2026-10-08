@@ -57,6 +57,31 @@ def talent_entry_names() -> dict[int, str]:
     return out
 
 
+@cache
+def talent_entries() -> dict[int, tuple[str, int, int, float, float]]:
+    """TraitNodeEntry id -> (talent name, spell id, node id, x, y): to show a talent (icon, Wowhead tooltip) and to
+    pair the talents two builds swap (the same choice node, else the nearest in the tree)."""
+    spells = spell_names()
+    defs: dict[int, tuple[str, int]] = {}
+    for r in table_rows("TraitDefinition"):
+        if r.get("ID", "").isdigit():
+            sid = int(r.get("SpellID") or 0)
+            defs[int(r["ID"])] = (r.get("OverrideName_lang") or spells.get(sid, ""), sid)
+    node_of = {int(r["TraitNodeEntryID"]): int(r["TraitNodeID"]) for r in table_rows("TraitNodeXTraitNodeEntry")
+               if r.get("TraitNodeEntryID", "").isdigit() and r.get("TraitNodeID", "").isdigit()}
+    pos = {int(r["ID"]): (float(r.get("PosX") or 0), float(r.get("PosY") or 0)) for r in table_rows("TraitNode")
+           if r.get("ID", "").isdigit()}
+    out: dict[int, tuple[str, int, int, float, float]] = {}
+    for r in table_rows("TraitNodeEntry"):
+        if r.get("ID", "").isdigit():
+            eid = int(r["ID"])
+            name, sid = defs.get(int(r.get("TraitDefinitionID") or 0), ("", 0))
+            node = node_of.get(eid, 0)
+            x, y = pos.get(node, (0.0, 0.0))
+            out[eid] = (name, sid, node, x, y)
+    return out
+
+
 # InventoryType values (Item.db2)
 INV_ONE_HAND = 13
 INV_SHIELD = 14

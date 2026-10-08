@@ -130,6 +130,54 @@ class TalentRow:
     per_fight: dict[str, tuple[float, float | None]]  # fight -> (total delta %, boss delta % or None)
     add: list[str]
     drop: list[str]
+    # [(your talent, its spell id), (the build's talent, its spell id)]; one side None when nothing pairs with it
+    swaps: list = field(default_factory=list)
+
+
+NEAR = 1500.0  # tree units: a talent dropped and one taken this close are shown as one swap
+
+
+def swaps(mine: set[int], other: set[int], entries: dict[int, tuple[str, int, int, float, float]]) -> list:
+    """The talents a build swaps, paired: your talent -> its talent. A choice node first (two talents of one
+    node), then the nearest taken talent in the tree; the rest alone. A name on both sides (a talent on two nodes)
+    is not a change."""
+    def info(e: int):
+        return entries.get(e, (f"talent {e}", 0, 0, 0.0, 0.0))
+
+    taken, dropped = sorted(other - mine), sorted(mine - other)
+    both = {info(e)[0] for e in taken} & {info(e)[0] for e in dropped}
+    def once(es: list[int]) -> list[int]:  # a talent with two ranks is two entries: one line
+        out_, seen = [], set()
+        for e in es:
+            name = info(e)[0]
+            if name and name not in both and name not in seen:
+                seen.add(name)
+                out_.append(e)
+        return out_
+
+    taken, dropped = once(taken), once(dropped)
+    out = []
+    for d in list(dropped):  # the same choice node
+        t = next((t for t in taken if info(t)[2] and info(t)[2] == info(d)[2]), None)
+        if t is not None:
+            out.append(((info(d)[0], info(d)[1]), (info(t)[0], info(t)[1])))
+            dropped.remove(d)
+            taken.remove(t)
+    while dropped and taken:  # the nearest in the tree
+        d, t = min(((d, t) for d in dropped for t in taken),
+                   key=lambda p: (info(p[0])[3] - info(p[1])[3]) ** 2 + (info(p[0])[4] - info(p[1])[4]) ** 2)
+        if ((info(d)[3] - info(t)[3]) ** 2 + (info(d)[4] - info(t)[4]) ** 2) ** 0.5 > NEAR:
+            break
+        out.append(((info(d)[0], info(d)[1]), (info(t)[0], info(t)[1])))
+        dropped.remove(d)
+        taken.remove(t)
+    for d, t in zip(list(dropped), list(taken), strict=False):  # the points left: moved from one to the other
+        out.append(((info(d)[0], info(d)[1]), (info(t)[0], info(t)[1])))
+        dropped.remove(d)
+        taken.remove(t)
+    out += [((info(d)[0], info(d)[1]), None) for d in dropped]
+    out += [(None, (info(t)[0], info(t)[1])) for t in taken]
+    return out
 
 
 @dataclass
@@ -153,11 +201,15 @@ def compare_builds(profile_text: str, con: sqlite3.Connection, client: WCLClient
 def compare(profile_text: str, builds: list[Build], fights: dict[str, list[str]], run_dir: Path, *,
             target_error: float = 0.2) -> TalentComparison | None:
     """Sim the player's character with each build (from the corpus or a prep pack)."""
-    from paf.gamedata import talent_entry_names
+    from paf.gamedata import talent_entries, talent_entry_names
 
     if not builds:
         return None
     names = talent_entry_names()
+    try:
+        entries = talent_entries()
+    except Exception:  # noqa: BLE001 - without the tree data, the talents are only named
+        entries = {}
     mine = my_talent_entries(profile_text, sorted(builds[0].key))
     results = sim_builds(profile_text, builds, fights, run_dir, target_error=target_error)
     rows = []
@@ -169,6 +221,6 @@ def compare(profile_text: str, builds: list[Build], fights: dict[str, list[str]]
                 has_boss = "prioritydps" in ps.metrics and "prioritydps" in res.baseline
                 per[fname] = (res.delta_pct(ps, "dps"), res.delta_pct(ps, "prioritydps") if has_boss else None)
         add, drop = build_diff(mine, set(b.key), names) if mine else ([], [])
-        rows.append(TalentRow(b, per, add, drop))
+        rows.append(TalentRow(b, per, add, drop, swaps(mine, set(b.key), entries) if mine and entries else []))
     err = max(r.baseline["dps"].error / r.baseline["dps"].mean * 100 for r in results.values())
     return TalentComparison(list(fights), rows, err, run_dir)
