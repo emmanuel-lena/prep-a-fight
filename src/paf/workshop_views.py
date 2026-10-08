@@ -292,7 +292,74 @@ def comp(d: dict) -> str:
             "the top kills of this boss (those assigned to it for an assigned target; on both bosses for a second "
             "boss). It compares specs, not your players' skill, and does not know your strategy.</p>")
 
-VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review, "comp": comp}
+def _mmss(t: float | None) -> str:
+    if t is None or t == float("inf"):
+        return "&ndash;"
+    return f"{int(t // 60)}:{int(t % 60):02d}"
+
+
+def wipe(d: dict) -> str:
+    """The best pull in detail: when the boss would have died, the boss health curves, the deaths and their cost."""
+    from paf import icons
+
+    k = d.get("kill", {})
+    longest = d.get("longest_kill") or 0
+    big = _mmss(k.get("no_deaths_share"))
+    head = _verdict("go", f"Boss at {d['left']:.1%} after {_mmss(d['duration'])}",
+                    f"<span>Without the deaths, and with the top kills' share of damage on the boss:</span> "
+                    f"<span>kill at</span> <span class='num'>{big}</span>.", big)
+    tiles = "".join(
+        f"<div class='kt {cls}'><small>{label}</small><b>{_mmss(k.get(key))}</b></div>"
+        for key, label, cls in (("as_is", "As played", ""), ("no_deaths", "Without the deaths", ""),
+                                ("no_deaths_share", "And the top kills' boss share", "go")))
+    tiles += (f"<div class='kt'><small>Top kills</small><b>{_mmss(d.get('median_kill'))}</b>"
+              f"<span><span>longest</span> {_mmss(longest)}</span></div>")
+    # boss health curves over the pull
+    curves = d.get("curves", {})
+    n = max((len(v) for v in curves.values()), default=0)
+    span = max(d["duration"], longest, 1)
+    W, H, L, B = 640, 220, 40, 26
+
+    def pts(vals: list[float]) -> str:
+        return " ".join(f"{L + i * 15 / span * (W - L - 10):.1f},{10 + (1 - v) * (H - B - 20):.1f}"
+                        for i, v in enumerate(vals))
+    lines = ""
+    for key, cls in (("as_is", "c-now"), ("no_deaths", "c-alive"), ("no_deaths_share", "c-best")):
+        if curves.get(key):
+            lines += f"<polyline class='{cls}' points='{pts(curves[key])}'/>"
+    xk = L + longest / span * (W - L - 10)
+    ticks = "".join(f"<text x='{L + t / span * (W - L - 10):.1f}' y='{H - 6}' class='tk'>{int(t // 60)}:00</text>"
+                    for t in range(0, int(span) + 1, 120))
+    deaths = d.get("deaths", [])
+    marks = "".join(f"<line class='dm' x1='{L + x['t'] / span * (W - L - 10):.1f}' x2='{L + x['t'] / span * (W - L - 10):.1f}' "
+                    f"y1='10' y2='{H - B}'/>" for x in deaths)
+    svg = (f"<svg class='hp' viewBox='0 0 {W} {H}' role='img' aria-label='Boss health over the pull'>"
+           f"<line class='ax' x1='{L}' x2='{W - 10}' y1='{H - B}' y2='{H - B}'/>"
+           f"<text x='4' y='16' class='tk'>100%</text><text x='4' y='{H - B}' class='tk'>0%</text>{ticks}{marks}"
+           f"<line class='kl' x1='{xk:.1f}' x2='{xk:.1f}' y1='10' y2='{H - B}'/>{lines}</svg>"
+           "<div class='legend'><span class='c-now'>As played</span><span class='c-alive'>Without the deaths</span>"
+           "<span class='c-best'>And the top kills' boss share</span><span class='kl'>Longest top kill</span>"
+           "<span class='dm'>A death</span></div>") if n else ""
+
+    def who(x: dict) -> str:
+        cls, _, spec = x["spec"].partition("-")
+        ic = icons.img(icons.CLASS_ICON.format(cls=cls.lower()), "medium", "it-ic")
+        back = (f"<span>back at</span> {_mmss(x['back'])}" if x["back"] is not None else "<span>never back</span>")
+        return (f"<li>{ic}<span class='l-name'><b>{e(x['name'])}</b><small><span>died at</span> {_mmss(x['t'])} "
+                f"&middot; {back}</small></span><span class='l-val neg'>&minus;{x['lost']:.1%}</span></li>")
+    lost = sum(x["lost"] for x in deaths)
+    death_html = ""
+    if deaths:
+        death_html = (f"<h3>The deaths: <span class='num'>{lost:.1%}</span> of the boss's health</h3>"
+                      f"<ul class='glist items deaths'>{''.join(who(x) for x in sorted(deaths, key=lambda x: -x['lost']))}</ul>")
+    share = (f"<h3>The damage off the boss</h3><p><span>Your raid put</span> <b class='num'>{d['raid_share']:.0%}</b> "
+             f"<span>of its damage on the boss, the top kills</span> <b class='num'>{d['tops_share']:.0%}</b>.</p>")
+    return (f"{head}<div class='kts'>{tiles}</div>{svg}{death_html}{share}<p class='ws-fine'>From your log, 15 s at a "
+            "time. A dead player loses the boss damage they did per 15 s before dying, until a battle res; the deaths "
+            "of the wipe itself are left out. The boss share part is an upper bound: a longer pull sees more adds. "
+            "A kill past the end of the pull is extrapolated at the boss damage of its last minute.</p>")
+
+VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review, "comp": comp, "wipe": wipe}
 
 
 def render(data: dict) -> str | None:
@@ -369,6 +436,20 @@ details.more{margin:6px 0} details.more>summary{cursor:pointer;color:var(--muted
 .job .lab.go{color:var(--pos)} .job .lab.warn{color:var(--warn)}
 .rank{counter-reset:r} .rank li{grid-template-columns:32px minmax(0,1fr) auto!important}
 .l-name .was{text-decoration:line-through}
+.glist.items.deaths li{grid-template-columns:44px minmax(0,1fr) 78px}
+.kts{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:0 0 14px}
+.kt{padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);display:grid;gap:4px}
+.kt small{color:var(--muted);font-size:13px} .kt b{font:700 24px/1 var(--font-data)} .kt span{color:var(--muted);font-size:13px}
+.kt.go{border-color:color-mix(in srgb,var(--pos) 55%,var(--line))} .kt.go b{color:var(--pos)}
+.hp{width:100%;height:auto;max-width:100%;display:block}
+.hp polyline{fill:none;stroke-width:2.5;stroke-linejoin:round}
+.hp .c-now{stroke:var(--neg)} .hp .c-alive{stroke:var(--warn)} .hp .c-best{stroke:var(--pos)}
+.hp .ax{stroke:var(--line)} .hp .kl{stroke:var(--fg);stroke-dasharray:4 4;opacity:.6}
+.hp .dm{stroke:var(--neg);opacity:.35} .hp .tk{fill:var(--muted);font-size:11px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin:6px 0 4px}
+.legend span::before{content:"";display:inline-block;width:14px;height:3px;margin-right:6px;vertical-align:middle;background:currentColor}
+.legend .c-now{color:var(--neg)} .legend .c-alive{color:var(--warn)} .legend .c-best{color:var(--pos)}
+.legend .kl::before{background:var(--fg)} .legend .dm::before{background:var(--neg);opacity:.4}
 .whos{display:flex;flex-wrap:wrap;gap:6px}
 .who{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;border-radius:999px;
   border:1px solid var(--line);background:var(--surface-2);font-size:14px}

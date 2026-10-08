@@ -71,3 +71,12 @@ def test_a_spec_change_for_boss_damage():
     assert [(x.name, x.better, round(x.gain, 2)) for x in out] == [("Fire", "Arcane Mage", 0.2)]
     page = workshop_views.render({"kind": "comp", **comp.to_dict("Boss", "", rows(), out)})
     assert "Change spec for more boss damage" in page
+
+
+def test_the_best_pull_without_the_deaths():
+    from paf import wipe
+
+    p = wipe.Pull(1, 60.0, 0.5, 300.0, [50.0, 50.0, 50.0, 50.0], lost=[0.0, 0.0, 50.0, 50.0])
+    assert round(p.kill_time()) == 90 and round(p.kill_time(deaths=False)) == 60
+    page = workshop_views.render({"kind": "wipe", **wipe.to_dict(p, "Boss", 70.0, 50.0)})
+    assert "Without the deaths" in page and "<svg" in page

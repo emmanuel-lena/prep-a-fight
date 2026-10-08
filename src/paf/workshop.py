@@ -58,6 +58,9 @@ TOOLS: tuple[Tool, ...] = (
          "players? Who, in your raid?", "achievement_guildperk_everybodysfriend", "raid", "1",
          ("boss", "difficulty", "raid"), "Each add with who takes it in the top raids and in your pull, and who "
          "should, in their own spec."),
+    Tool("wipe", "Your best pull, in detail", "What did the deaths and the damage off the boss cost, and when would "
+         "the boss have died without them?", "spell_shadow_soulleech_3", "raid", "1", ("boss", "difficulty", "raid"),
+         "The boss's health over your best pull, as played and without the deaths, and what each death cost."),
     Tool("mechanics", "The boss's mechanics", "Every ability from the Encounter Journal, by role: what concerns you?",
          "inv_misc_book_09", "boss", "1", ("boss", "difficulty"),
          "The boss's abilities by role, and who handles what in the top kills.", needs_prep=False),

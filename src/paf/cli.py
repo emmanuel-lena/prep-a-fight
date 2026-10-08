@@ -1202,6 +1202,56 @@ def cmd_comp(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_wipe(args: argparse.Namespace) -> int:
+    """Your best pull of a boss not killed yet, in detail: the deaths, the damage off the boss, and when it would have
+    died without them (paf.wipe)."""
+    import statistics as st
+
+    from paf import raidreview, results, settings, simc, wipe
+    from paf.corpus import db
+    from paf.raidneed import guild_report, report_code
+
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    con = db.connect()
+    boss = main_boss(con, enc.id, diff, enc.name)
+    targets, _habits = raidreview.references(con, enc.id, diff, boss)
+    main = next((t for t in targets if t.main), None)
+    durations = sorted(r[0] for r in con.execute(
+        "SELECT duration_s FROM fight WHERE encounter_id=? AND difficulty=? AND status='done'", (enc.id, diff)))
+    if not main or not durations:
+        print(f"No kill of {enc.name} {diff_name} in the corpus yet: prepare this boss first.")
+        return 1
+    url = args.raid or _plan_raid(enc, diff_name)
+    if not url and settings.get("guild"):
+        url = guild_report(client, settings.get("guild"), settings.get("guild_server"), settings.get("guild_region"),
+                           enc.id, diff)
+    if not url:
+        print("Give a log of your raid (--raid <link>) or set your guild in the settings.")
+        return 1
+    code = report_code(url)
+    fight = wipe.best_wipe(client, code, enc.id, diff)
+    if not fight:
+        print(f"No wipe on {enc.name} {diff_name} in this log.")
+        return 1
+    print(f"Reading your best pull of {enc.name} {diff_name}, 15 s at a time...", flush=True)
+    p = wipe.analyze(client, code, fight, boss, main.tops_share)
+
+    def mmss(t: float) -> str:
+        return "never" if t == float("inf") else f"{int(t // 60)}:{int(t % 60):02d}"
+    print(f"Best pull: {mmss(p.duration)}, boss at {p.boss_left:.1%}. Top kills: {mmss(st.median(durations))} "
+          f"(longest {mmss(durations[-1])}).")
+    for d in p.deaths:
+        back = f"back at {mmss(d.back)}" if d.back is not None else "never back"
+        print(f"  {d.spec:24} died at {mmss(d.t)}, {back}: {d.lost / p.health:.1%} of the boss's health lost")
+    print(f"Boss damage share {p.raid_share:.0%} (top kills {p.tops_share:.0%}).")
+    print(f"Kill estimated at {mmss(p.kill_time())} as played, {mmss(p.kill_time(deaths=False))} without the deaths, "
+          f"{mmss(p.kill_time(deaths=False, share=True))} with the top kills' boss share too.")
+    root = simc.new_run_dir(label="wipe")
+    results.write(root, "wipe", wipe.to_dict(p, enc.name, durations[-1], st.median(durations)))
+    print(f"Runs: {root}")
+    return 0
+
+
 def cmd_raid(args: argparse.Namespace) -> int:
     from paf import settings
     from paf.corpus import db
@@ -1871,6 +1921,13 @@ def build_parser() -> argparse.ArgumentParser:
     cp.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
     cp.add_argument("--raid", help="link to one of your raid's logs (default: the boss plan's or your guild's)")
     cp.set_defaults(func=cmd_comp)
+
+    wp = sub.add_parser("wipe", help="your best pull of a boss not killed yet: what the deaths and the damage off the "
+                                     "boss cost, and when it would have died without them")
+    wp.add_argument("boss")
+    wp.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    wp.add_argument("--raid", help="link to one of your raid's logs (default: the boss plan's or your guild's)")
+    wp.set_defaults(func=cmd_wipe)
 
     rd = sub.add_parser("raid", help="pad the adds or stay on the boss, from your raid's composition and DPS")
     rd.add_argument("boss")
