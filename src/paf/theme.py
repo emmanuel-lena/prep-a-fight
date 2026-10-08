@@ -86,6 +86,9 @@ code{font:12.5px ui-monospace,Consolas,monospace;background:var(--surface-2);pad
 .topbar .in{max-width:1040px;margin:0 auto;padding:12px 16px 15px;display:flex;gap:16px;align-items:center;
   flex-wrap:wrap}
 .topbar a{color:#fff} .brand{font-weight:700;font-size:17px;letter-spacing:.01em}
+.nav-back{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;cursor:pointer;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.08);color:#fff;font:inherit;font-weight:600}
+.nav-back:hover{background:rgba(255,255,255,.18)} .nav-back[hidden]{display:none}
+@media (max-width:640px){.nav-back span{display:none}}
 .brand b{color:var(--sand)}
 .topbar .nav{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
 .topbar .nav a{padding:6px 12px;border-radius:8px;color:#f3e9f2;font-size:14px}
@@ -144,7 +147,13 @@ HEAD = ('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="p
         '&display=swap">')
 
 
-def topbar(right: str = "", home: str = "/") -> str:
-    """The gradient header with the brand; `right` holds navigation or selectors."""
-    return (f'<header class="topbar"><div class="in"><a class="brand" href="{home}">prep-a-<b>fight</b></a>'
-            f'<div class="nav">{right}</div></div></header>')
+BACK = ("<button type='button' class='nav-back' hidden aria-label='Go back' title='Go back' onclick='history.back()'>"
+        "&larr; <span>Go back</span></button><script>(function(){var b=document.currentScript.previousElementSibling;"
+        "if(history.length>1&&location.pathname!=='/')b.hidden=false;})();</script>")
+
+
+def topbar(right: str = "", home: str = "/", back: bool = False) -> str:
+    """The gradient header with the brand; `right` holds navigation or selectors. back: a Back button (the desktop
+    window has no browser buttons), shown when there is a page to go back to."""
+    return (f'<header class="topbar"><div class="in">{BACK if back else ""}<a class="brand" href="{home}">'
+            f'prep-a-<b>fight</b></a><div class="nav">{right}</div></div></header>')

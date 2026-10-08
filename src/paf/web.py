@@ -99,7 +99,7 @@ def page(title: str, body: str, refresh: int | None = None, nav: str = "", job: 
                   '<a href="/settings">Settings</a><a href="/feedback">Feedback</a>')
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}{loading.CSS}</style></head><body>"
-            f"{theme.topbar(nav + lang_switch())}{loading.LOADER}"
+            f"{theme.topbar(nav + lang_switch(), back=True)}{loading.LOADER}"
             f"<main>{update_banner()}{running}{body}</main>{loading.JS}</body></html>").encode()
 
 

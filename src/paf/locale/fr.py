@@ -538,7 +538,7 @@ PHRASES: dict[str, str] = {
     "(the slowest part: 20 to 40 min)": "(le plus long : 20 à 40 min)",
     "Prepare this fight &rarr;": "Préparer ce combat &rarr;",
     "Runs on your computer; you can follow it live.": "Tourne sur ton ordinateur ; tu peux suivre en direct.",
-    "Advanced": "Avancé", "For": "Pour les", "&larr; Home": "&larr; Accueil",
+    "Advanced": "Avancé", "Go back": "Retour", "For": "Pour les", "&larr; Home": "&larr; Accueil",
     "Your fight plan: your own movements, Bloodlust, Power Infusion":
         "Ton plan de combat : tes propres déplacements, Furie sanguinaire, Infusion de puissance",
     "What you know about this boss: damage amps, targets to ignore":
