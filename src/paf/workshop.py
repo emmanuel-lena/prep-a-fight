@@ -50,6 +50,10 @@ TOOLS: tuple[Tool, ...] = (
     Tool("raid", "Pad the adds or stay on the boss?", "From your raid's composition and DPS: do the others already "
          "cover the adds?", "inv_misc_groupneedmore", "raid", "1-3", ("boss", "difficulty", "raid"),
          "The verdict for each add type, and why."),
+    Tool("review", "Who does what in your raid", "Who stays on the boss, who pads, who should go on a secondary "
+         "target? Your raid's pull next to the top raids.", "inv_misc_spyglass_03", "raid", "1",
+         ("boss", "difficulty", "raid"), "Each player's damage on the boss and on each target, next to the top "
+         "players of their spec, and what to change for more boss damage."),
     Tool("raidplan", "Your raid's plan", "Who brings which spec, and who pads the adds?",
          "achievement_guildperk_everybodysfriend", "raid", "1-3", ("boss", "difficulty", "raid"),
          "A page with your raid's comp and who should pad what."),

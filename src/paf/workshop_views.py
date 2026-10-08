@@ -162,7 +162,72 @@ def cooldowns(d: dict) -> str:
     return out or _verdict("warn", "No plan", "The optimization found nothing to compare.")
 
 
-VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns}
+def _pull(d: dict) -> str:
+    """'Your raid's kill of 7:11, next to the top raids of this boss', from 'this boss, kill of 7:11'."""
+    import re
+
+    m = re.search(r"(kill|pull) of ([\d:]+)", d.get("fight", ""))
+    what = (f"<span>Your raid's {m.group(1)}</span> <span class='num'>{m.group(2)}</span>" if m
+            else "<span>Your raid's pull</span>")
+    return f"{what} <span>next to the top raids of this boss.</span>"
+
+
+def review(d: dict) -> str:
+    """Who does what in the raid's pull: the targets first (your raid vs the top raids), then each player."""
+    from paf import icons
+
+    targets = d.get("targets", [])
+    main = next((t["name"] for t in targets if t["main"]), "")
+    players = d.get("players", [])
+    moves = [p for p in players if p["verdict"] in ("to_target", "to_boss")]
+    if moves:
+        head = _verdict("go", "1 player can do better for the boss" if len(moves) == 1 else
+                        f"{len(moves)} players can do better for the boss", _pull(d))
+    else:
+        head = _verdict("ok", "Your raid plays like the top raids", _pull(d))
+    scale = max((max(t["raid"], t["tops"]) for t in targets), default=1) or 1
+    rows = "".join(
+        f"<li class='tg'><span class='l-name'><b>{e(t['name'])}</b><small>{'the boss' if t['main'] else ('covered' if t['covered'] else 'not enough')}"
+        f"</small></span><span class='cov'><span class='c-raid {'ok' if t['covered'] else 'short'}' style='width:{t['raid'] / scale * 100:.1f}%'></span>"
+        f"<span class='c-tops' style='left:{t['tops'] / scale * 100:.1f}%' title='top raids'></span></span>"
+        f"<span class='l-val'>{t['raid']:.0%} <small>/ {t['tops']:.0%}</small></span></li>" for t in targets)
+
+    def who(p: dict) -> str:
+        cls = p["spec"].split(" ")[-1].lower()
+        ic = icons.img(icons.CLASS_ICON.format(cls=cls), "medium", "it-ic")
+        mine, habit = p["shares"].get(p["target"], 0.0), p["habit"].get(p["target"], 0.0)
+        # short pieces, each a whole text (the translation matches whole texts): numbers and names apart
+        def line(target: str, you: float, tops: float) -> str:
+            return (f"<span class='p-num'><b>{you:.0%}</b> <span>on</span> <i>{e(target)}</i></span>"
+                    f"<span class='p-tops'><span>top players of the spec:</span> <b>{tops:.0%}</b></span>")
+        if p["verdict"] == "to_boss":
+            say = line(p["target"], mine, habit) + ("<small>Your raid already covers it: that damage is better on "
+                                                    "the boss.</small>")
+        elif p["verdict"] == "to_target":
+            say = line(p["target"], mine, habit) + "<small>Your raid lacks damage there.</small>"
+        else:
+            say = (line(main, p["shares"].get(main, 0.0), p["habit"].get(main, 0.0)) if p["habit"]
+                   else "<small>Spec not measured on this boss.</small>")
+        return (f"<li class='pl {p['verdict']}'>{ic}<span class='l-name'><b>{e(p['name'])}</b><small>{e(p['spec'])}</small>"
+                f"</span><span class='p-say'>{say}</span></li>")
+    groups = [("to_target", "Should go on a target"), ("to_boss", "Can move damage to the boss"),
+              ("ok", "Play like the top players of their spec"), ("unknown", "Not measured")]
+    blocks = ""
+    for key, title in groups:
+        lst = [p for p in players if p["verdict"] == key]
+        if not lst:
+            continue
+        items = "".join(who(p) for p in lst)
+        if key in ("ok", "unknown"):
+            blocks += f"<details class='more'><summary>{e(title)} ({len(lst)})</summary><ul class='plist'>{items}</ul></details>"
+        else:
+            blocks += f"<h3>{e(title)}</h3><ul class='plist'>{items}</ul>"
+    return (f"{head}<h3>Where your raid's damage goes</h3><ul class='glist cov-list'>{rows}</ul>{blocks}"
+            "<p class='ws-fine'>Your raid's share of damage on each target, the mark is the top raids'. This compares "
+            "habits: it does not know your raid's assignments (a soak, a kick, an add someone must hold).</p>")
+
+
+VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review}
 
 
 def render(data: dict) -> str | None:
@@ -210,6 +275,21 @@ details.more{margin:6px 0} details.more>summary{cursor:pointer;color:var(--muted
 .p-head b{font:600 19px 'Fraunces',Georgia,serif} .p-head .v-big{font-size:22px}
 .rules{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:8px}
 .rules li{display:flex;gap:10px;flex-wrap:wrap} .rules li b{min-width:150px} .rules li span{color:var(--muted)}
+.cov{position:relative;height:12px;border-radius:6px;background:var(--surface-2)}
+.cov .c-raid{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:var(--accent)}
+.cov .c-raid.short{background:var(--warn)}
+.cov .c-tops{position:absolute;top:-4px;bottom:-4px;width:3px;margin-left:-1.5px;border-radius:2px;background:var(--fg)}
+.cov-list .l-val small{color:var(--muted);font-weight:500}
+.plist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.plist .pl{display:grid;grid-template-columns:40px minmax(140px,220px) minmax(0,1fr);gap:12px;align-items:center;
+  padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface)}
+.plist .pl.to_target{border-color:color-mix(in srgb,var(--warn) 55%,var(--line))}
+.plist .pl.to_boss{border-color:color-mix(in srgb,var(--accent) 50%,var(--line))}
+.p-say{display:flex;flex-direction:column;gap:3px;font-size:14.5px;line-height:1.4}
+.p-say b{font:700 15px var(--font-data)} .p-say i{font-style:normal;font-weight:600}
+.p-tops{color:var(--muted);font-size:13.5px} .p-tops b{color:var(--fg);font-size:13.5px}
+.p-say small{color:var(--muted);font-size:13.5px}
+@media (max-width:640px){.plist .pl{grid-template-columns:36px minmax(0,1fr)}.plist .p-say{grid-column:1/-1}}
 @media (max-width:640px){.glist li{grid-template-columns:minmax(0,1fr) 70px}.glist li .gbar{display:none}
   .glist.items li{grid-template-columns:40px minmax(0,1fr) 70px}.verdict{flex-wrap:wrap}}
 </style>"""

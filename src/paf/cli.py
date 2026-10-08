@@ -1100,6 +1100,46 @@ def cmd_prep(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_review(args: argparse.Namespace) -> int:
+    """Who does what in your raid's pull, next to the top raids (paf.raidreview)."""
+    from paf import raidreview, results, settings, simc
+    from paf.corpus import db
+    from paf.raidneed import guild_report, raid_from_report
+
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    con = db.connect()
+    boss = main_boss(con, enc.id, diff, enc.name)
+    targets, habits = raidreview.references(con, enc.id, diff, boss)
+    if not targets:
+        print(f"No kill of {enc.name} {diff_name} in the corpus yet: prepare this boss first.")
+        return 1
+    url = args.raid or _plan_raid(enc, diff_name)
+    if not url and settings.get("guild"):
+        url = guild_report(client, settings.get("guild"), settings.get("guild_server"), settings.get("guild_region"),
+                           enc.id, diff)
+    if not url:
+        print("Give a log of your raid (--raid <link>) or set your guild in the settings.")
+        return 1
+    rc = raid_from_report(client, url, enc.id, diff)
+    if not rc.same_boss:
+        print(f"This log has no pull of {enc.name}.")
+        return 1
+    r = raidreview.review(rc, targets, habits, boss)
+    print(f"{enc.name} {diff_name}: your raid's {rc.fight}, next to the top raids")
+    for t in r.targets:
+        print(f"  {t.name:<30} your raid {t.raid_share:6.1%}  top raids {t.tops_share:6.1%}"
+              + ("" if t.covered else "  <- short"))
+    words = {"to_target": "should go on", "to_boss": "can move to the boss what goes on", "ok": "plays like the tops",
+             "unknown": "spec not measured"}
+    for p in r.players:
+        what = f" {p.target} ({p.moved:+.0%} of their damage)" if p.target else ""
+        print(f"  {p.name:<16} {p.spec:<26} {words[p.verdict]}{what}")
+    root = simc.new_run_dir(label="review")
+    results.write(root, "review", raidreview.to_dict(r))
+    print(f"Runs: {root}")
+    return 0
+
+
 def cmd_raid(args: argparse.Namespace) -> int:
     from paf import settings
     from paf.corpus import db
@@ -1773,6 +1813,12 @@ def build_parser() -> argparse.ArgumentParser:
                     help="measure the specs of your raid that are too rare in the corpus on ~20 of their ranked kills "
                          "each (~10 quota points per kill) instead of estimating them from their rankings")
     rd.set_defaults(func=cmd_raid)
+    rv = sub.add_parser("review", help="who does what in your raid's pull (boss, adds, secondary targets), next to "
+                                       "the top raids")
+    rv.add_argument("boss")
+    rv.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    rv.add_argument("--raid", help="link to one of your raid's logs (default: your guild's latest log)")
+    rv.set_defaults(func=cmd_review)
 
     va = sub.add_parser("validate", help="sim the top players' own characters on the rebuilt fight and compare "
                                          "with their real DPS")
