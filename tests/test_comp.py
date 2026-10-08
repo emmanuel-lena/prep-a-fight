@@ -4,59 +4,61 @@ from types import SimpleNamespace
 from paf import comp, raidreview, workshop_views
 from paf.corpus.db import SCHEMA
 
+SPECS = (("Subtlety", "Rogue"), ("Frost", "DeathKnight"), ("Fire", "Mage"), ("Balance", "Druid"),
+         ("Arcane", "Mage"), ("Unholy", "DeathKnight"))
+
 
 def corpus():
-    """Ten top kills of 300 s: Fire Mages do 400 on the boss and never touch the Echo; Frost Mages do 300 and take
-    the Echo in half the kills (100 there); Balance Druids always put 30 of 100 on it."""
+    """Ten top kills of 100 s with six damage dealers: two of them (a Subtlety Rogue and a Frost DK, rogue first)
+    take the Echo (an assigned add); everyone hits the Slime a little (a whole-raid add). The ranked Fire Mage of
+    each kill is a top player: left out."""
     con = sqlite3.connect(":memory:")
     con.executescript(SCHEMA)
     for k in range(10):
         rep = f"r{k}"
         con.execute("INSERT INTO fight(report, fight_id, encounter_id, difficulty, duration_s, status) "
-                    "VALUES(?, 1, 9, 5, 1, 'done')", (rep,))
-        rows = ((1, "Mage", "Fire", 400, 0), (2, "Mage", "Frost", 300 - 100 * (k % 2), 100 * (k % 2)),
-                (3, "Druid", "Balance", 70, 30))
-        for actor, cls, spec, boss, echo in rows:
-            con.execute("INSERT INTO player VALUES(?, 1, ?, ?, ?, 0, ?)", (rep, actor, cls, spec, boss + echo))
-            con.execute("INSERT INTO damage_by_target VALUES(?, 1, ?, 'Boss', ?)", (rep, actor, boss))
-            if echo:
-                con.execute("INSERT INTO damage_by_target VALUES(?, 1, ?, 'Echo', ?)", (rep, actor, echo))
+                    "VALUES(?, 1, 9, 5, 100, 'done')", (rep,))
+        con.execute("INSERT INTO ranked(report, fight_id, actor_id) VALUES(?, 1, 99)", (rep,))
+        rows = [(i + 1, cls, spec, {"Boss": 1000, "Slime": 100, "Echo": {0: 300, 1: 250}.get(i, 0)})
+                for i, (spec, cls) in enumerate(SPECS)]
+        rows.append((99, "Mage", "Fire", {"Boss": 2000, "Slime": 900}))
+        for actor, cls, spec, dmg in rows:
+            con.execute("INSERT INTO player VALUES(?, 1, ?, ?, ?, 0, ?)", (rep, actor, cls, spec, sum(dmg.values())))
+            for target, amount in dmg.items():
+                if amount:
+                    con.execute("INSERT INTO damage_by_target VALUES(?, 1, ?, ?, ?)", (rep, actor, target, amount))
     return con
 
 
-def pull(mage_spec: str = "Frost Mage"):
-    return SimpleNamespace(fight="this boss, kill of 5:00", duration=1.0, players=[
-        ("Mago", mage_spec, 300.0), ("Moon", "Balance Druid", 100.0), ("Heal", "Restoration Druid", 10.0)],
-        targets={"Mago": {"Boss": 300.0}, "Moon": {"Boss": 70.0, "Echo": 30.0}, "Heal": {"Boss": 10.0}})
+def pull():
+    players = [("Rogue", "Subtlety Rogue", 14.0), ("Dk", "Frost DeathKnight", 13.0), ("Fire", "Fire Mage", 12.0),
+               ("Moon", "Balance Druid", 11.0), ("Heal", "Restoration Druid", 1.0)]
+    targets = {"Rogue": {"Boss": 1100, "Slime": 100, "Echo": 200}, "Dk": {"Boss": 1200, "Slime": 100},
+               "Fire": {"Boss": 1100, "Slime": 100}, "Moon": {"Boss": 1100}, "Heal": {"Boss": 10}}
+    return SimpleNamespace(fight="this boss, kill of 1:40", duration=100.0, players=players, targets=targets)
 
 
-def propose(rc, specs=None):
+def rows():
     con = corpus()
     targets, _ = raidreview.references(con, 9, 5, "Boss")
-    stats = comp.spec_stats(con, 9, 5, [t.name for t in targets])
-    return comp.propose(rc, targets, stats, {"Mage": ["Fire Mage", "Frost Mage"]} if specs is None else specs)
+    return comp.assign(pull(), comp.references(con, 9, 5, targets))
 
 
-def test_the_stronger_spec_of_the_class_goes_on_the_boss():
-    c = propose(pull())
-    mago = next(p for p in c.picks if p.name == "Mago")
-    # Frost at the median (300 of 300): as Fire, 400 on the boss
-    assert mago.spec == "Fire Mage" and mago.job == "Boss" and round(mago.boss) == 400
-    assert c.gain > 0.2 and not c.notes
-    heal = next(p for p in c.picks if p.name == "Heal")
-    assert heal.role == "support" and heal.spec == "Restoration Druid"
+def test_the_specs_that_hit_an_assigned_add_the_most_are_put_on_it():
+    echo = next(a for a in rows() if a.target == "Echo")
+    assert not echo.whole_raid and echo.players == 2
+    assert [s for s, _, _ in echo.ranking[:2]] == ["Subtlety Rogue", "Frost DeathKnight"]
+    assert [n for n, _ in echo.proposed] == ["Rogue", "Dk"]
 
 
-def test_no_spec_change_without_the_class_specs():
-    c = propose(pull(), specs={})
-    assert next(p for p in c.picks if p.name == "Mago").spec == "Frost Mage"
+def test_a_whole_raid_add_lists_who_missed_it_and_the_ranked_player_is_left_out():
+    slime = next(a for a in rows() if a.target == "Slime")
+    assert slime.whole_raid and slime.players == 0 and not slime.proposed
+    assert [n for n, *_ in slime.missed] == ["Moon"]
+    fire = next(r for r in slime.ranking if r[0] == "Fire Mage")
+    assert round(fire[1]) == 1  # 100 damage in 100 s, the ranked player's 900 left out
 
 
-def test_a_target_short_of_damage_gets_the_cheapest_player():
-    # the Echo needs the top raids' weakest quarter of its share: the Druid covers it at their focus
-    c = propose(pull())
-    assert c.got["Echo"] >= c.need["Echo"] - 1
-    moon = next(p for p in c.picks if p.name == "Moon")
-    assert moon.job in ("Boss", "Echo")
-    page = workshop_views.render({"kind": "comp", **comp.to_dict(c)})
-    assert "Your raid's best comp" in page and "Spec changes" in page and "Who goes where" in page
+def test_the_page():
+    page = workshop_views.render({"kind": "comp", **comp.to_dict("Boss", "this boss, kill of 1:40", rows())})
+    assert "Who hits what in your raid" in page and "Put them on it" in page and "Hardly hit it" in page

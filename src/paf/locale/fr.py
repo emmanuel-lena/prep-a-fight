@@ -487,20 +487,28 @@ PHRASES: dict[str, str] = {
     "of their damage on": "de ses dégâts sur", "on the boss, top": "sur le boss, les tops",
     ": your raid already covers it, that damage is better on the boss.": " : ton raid le couvre déjà, ces dégâts sont mieux sur le boss.",
     ": your raid lacks damage there.": " : ton raid manque de dégâts dessus.",
-    # your raid's best comp (paf.comp)
-    "Your raid's best comp": "La meilleure compo de ton raid",
-    "Which spec should each player bring, and who goes on which target, for the most boss damage?":
-        "Quelle spec chaque joueur doit prendre, et qui va sur quelle cible, pour le plus de dégâts sur le boss ?",
-    "The spec changes and who goes where, with the boss damage gained.":
-        "Les changements de spec et qui va où, avec les dégâts sur le boss gagnés.",
-    "more boss damage than your raid playing like the top players of each spec.":
-        "de dégâts sur le boss en plus que ton raid joué comme les tops de chaque spec.",
-    "Your comp is already the best one for this boss": "Ta compo est déjà la meilleure pour ce boss",
-    "Spec changes": "Changements de spec", "Who goes where": "Qui va où",
-    "Some specs are not measured on this boss yet: they are kept as they played.":
-        "Certaines specs ne sont pas encore mesurées sur ce boss : elles restent comme dans le pull.",
-    "Estimated from each player's DPS in your pull and from every player of the top kills of this boss: what each spec does, and how much the players who take a target put on it. It does not know your raid's assignments, the gear for another spec, or who enjoys playing what.":
-        "Estimé à partir du DPS de chaque joueur dans ton pull et de tous les joueurs des meilleurs kills de ce boss : ce que fait chaque spec, et combien mettent ceux qui prennent une cible. Ça ne connaît pas les assigns de ton raid, le stuff pour une autre spec, ni qui aime jouer quoi.",
+    # who hits what in your raid (paf.comp)
+    "Who hits what in your raid": "Qui tape quoi dans ton raid",
+    "The adds you cannot skip: does the whole raid hit them, or a few players? Who, in your raid?":
+        "Les adds qu'on ne peut pas skip : tout le raid tape dessus, ou quelques joueurs ? Lesquels, dans ton raid ?",
+    "Each add with who takes it in the top raids and in your pull, and who should, in their own spec.":
+        "Chaque add avec qui le prend chez les meilleurs raids et dans ton pull, et qui devrait le taper, chacun dans sa spec.",
+    "Nothing to assign on this boss": "Rien à assigner sur ce boss",
+    "The top raids put their damage on the boss.": "Les meilleurs raids mettent leurs dégâts sur le boss.",
+    "The specs of your raid that do the most damage on each target, from the top kills of this boss.":
+        "Les specs de ton raid qui font le plus de dégâts sur chaque cible, d'après les meilleurs kills de ce boss.",
+    "No add is assigned in the top raids: the whole raid switches.":
+        "Aucun add n'est assigné chez les meilleurs raids : tout le raid switch.",
+    "Second boss": "Deuxième boss", "Whole raid": "Tout le raid", "Assigned": "Assigné",
+    "The top raids split their damage:": "Les meilleurs raids partagent leurs dégâts :",
+    "The specs of your raid that hit both bosses the hardest": "Les specs de ton raid qui tapent le plus fort sur les deux boss",
+    "Players on it in the top raids:": "Joueurs dessus chez les meilleurs raids :",
+    "(on top of the whole raid)": "(en plus de tout le raid)",
+    "In the top raids, the whole raid hits it.": "Chez les meilleurs raids, tout le raid tape dessus.",
+    "The specs of your raid that do the most damage on it": "Les specs de ton raid qui y font le plus de dégâts",
+    "Put them on it": "Faites-les taper dessus", "Hardly hit it in your pull": "L'ont à peine tapé dans ton pull",
+    "DPS on the target of each spec's players in the top kills of this boss (those assigned to it for an assigned target; on both bosses for a second boss). It compares specs, not your players' skill, and does not know your strategy.":
+        "DPS sur la cible des joueurs de chaque spec dans les meilleurs kills de ce boss (ceux qui y sont assignés pour une cible assignée ; sur les deux boss pour un deuxième boss). Ça compare des specs, pas le niveau de tes joueurs, et ça ne connaît pas votre strat.",
     # your characters (paf.characters)
     "Paste /simc (recommended)": "Coller /simc (recommandé)", "Quick: from Warcraft Logs": "Rapide : depuis Warcraft Logs",
     "+ Add a character": "+ Ajouter un perso", "Add this character": "Ajouter ce perso",
@@ -812,9 +820,7 @@ PATTERNS: list[tuple[str, str]] = [
     (r"The top players lose only about ([\d.]+)% per 10 s: they keep casting while they move \(instant spells(.*?)\)\.",
      r"Les tops n'en perdent qu'environ \1 % par 10 s : ils continuent de caster en bougeant (sorts instantanés\2)."),
     (r"For these moments the top players use (.+)\.", r"Pour ces moments, les tops utilisent \1."),
-    (r"^Tanks and healers: as in your pull \((\d+)\)$", r"Tanks et heals : comme dans ton pull (\1)"),
-    (r"^! Even with the best moves, (.+) stays under the top raids' damage on it\.$",
-     r"! Même avec les meilleurs choix, \1 reste sous les dégâts qu'y mettent les meilleurs raids."),
+    (r"^On it in your pull \((\d+)\)$", r"Dessus dans ton pull (\1)"),
     # the sheet picker of /view: "Boss (mythic Elemental)"
     (r"\(mythic\b", r"(mythique"), (r"\(heroic\b", r"(héroïque"), (r"\(normal\b", r"(normal"), (r"\(lfr\b", r"(LFR"),
 ]
