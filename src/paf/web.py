@@ -1063,7 +1063,7 @@ def feedback_page(jid: str = "", note: str = "") -> str:
     from paf import feedback
 
     what, log = feedback.job_log(jid) if jid else ("", feedback.app_log())
-    _, preview = feedback.report("(your message)", what, log)
+    _, preview = feedback.report("(your message)", what, log, feedback.performance(log if jid else ""))
     dest = ("sent to the prep-a-fight team" if feedback.endpoint() else
             "opened as a GitHub issue in your browser, for you to post (a free GitHub account is needed)")
     return f'''<h1>Send feedback</h1>{note}<p class="lead">A bug, a wrong number, an idea: it is {dest}.</p>
@@ -1072,6 +1072,9 @@ def feedback_page(jid: str = "", note: str = "") -> str:
 Your spec and the boss help."></textarea></label>
 <label class="chip"><input type="checkbox" name="log" checked> Attach the {"log of this prep" if jid else "app's log"}
 (below; your Warcraft Logs key, user folder and email addresses are removed)</label>
+<label class="chip"><input type="checkbox" name="perf" checked> Attach performance measures: your computer's CPU,
+cores and memory, and how long each step took (nothing personal: no name, no log, no folder). They help make the app
+faster on every computer.</label>
 <div class="cta"><button class="btn">Send</button></div></form>
 <details class="card"><summary>Exactly what is sent</summary><pre class="log">{e(preview[-20000:])}</pre></details>'''
 
@@ -1082,7 +1085,8 @@ def send_feedback(form: dict) -> str:
     jid = (form.get("job") or [""])[0]
     message = (form.get("message") or [""])[0]
     what, log = feedback.job_log(jid) if jid else ("", feedback.app_log())
-    title, body = feedback.report(message, what, log if form.get("log") else "")
+    title, body = feedback.report(message, what, log if form.get("log") else "",
+                                  feedback.performance(log if jid else "") if form.get("perf") else "")
     url = feedback.endpoint()
     if url:
         try:

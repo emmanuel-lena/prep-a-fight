@@ -590,6 +590,8 @@ PHRASES: dict[str, str] = {
     "Point at a boss: its three difficulties, and a click to the sheet or the prep.":
         "Survole un boss : ses trois difficultés, et un clic vers la fiche ou la prépa.",
     "A grey boss is not prepared for this week yet.": "Un boss grisé n'est pas encore préparé cette semaine.",
+    "Attach performance measures: your computer's CPU, cores and memory, and how long each step took (nothing personal: no name, no log, no folder). They help make the app faster on every computer.":
+        "Joindre les mesures de performance : le CPU, les cœurs et la mémoire de ton PC, et la durée de chaque étape (rien de personnel : ni nom, ni log, ni dossier). Elles aident à rendre l'appli plus rapide sur tous les PC.",
     # your characters (paf.characters)
     "Paste /simc (recommended)": "Coller /simc (recommandé)", "Quick: from Warcraft Logs": "Rapide : depuis Warcraft Logs",
     "+ Add a character": "+ Ajouter un perso", "Add this character": "Ajouter ce perso",

@@ -79,11 +79,87 @@ def app_log() -> str:
     return p.read_text(encoding="utf-8", errors="replace") if p.is_file() else ""
 
 
-def report(message: str, what: str, log: str) -> tuple[str, str]:
-    """(title, body) of the feedback, scrubbed, log cut to its end."""
+def _cpu_name() -> str:
+    if platform.system() == "Windows":
+        try:
+            import winreg
+
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0") as k:
+                return str(winreg.QueryValueEx(k, "ProcessorNameString")[0]).strip()
+        except OSError:
+            pass
+    return platform.processor() or platform.machine()
+
+
+def _memory_gb() -> float | None:
+    if platform.system() != "Windows":
+        try:
+            return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2**30
+        except (ValueError, OSError, AttributeError):
+            return None
+    import ctypes
+
+    class Status(ctypes.Structure):
+        _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong), ("total", ctypes.c_ulonglong),
+                    ("avail", ctypes.c_ulonglong), ("page_total", ctypes.c_ulonglong),
+                    ("page_avail", ctypes.c_ulonglong), ("virtual_total", ctypes.c_ulonglong),
+                    ("virtual_avail", ctypes.c_ulonglong), ("extended", ctypes.c_ulonglong)]
+    st = Status()
+    st.length = ctypes.sizeof(Status)
+    return st.total / 2**30 if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st)) else None
+
+
+STEP_LINE = re.compile(r"^== (.+?)\s+\[\+(\d+)s\]", re.M)
+
+
+def performance(log: str = "") -> str:
+    """Measures to make the app faster on players' computers, nothing personal: the machine (CPU, cores, memory),
+    the simc version, the collection settings, the duration of each step of the prep reported (its log's step lines
+    and quota waits) and the median of each step over the last preps."""
+    import statistics as st
+
+    from paf import settings
+
+    lines = [f"CPU: {_cpu_name()} · {os.cpu_count()} logical cores"
+             + (f" · {mem:.0f} GB memory" if (mem := _memory_gb()) else "")]
+    try:
+        from paf.simc_install import find_simc
+
+        exe = find_simc()
+        lines.append(f"simc: {exe.parent.name if exe else 'not installed'}")
+    except Exception:  # noqa: BLE001 - a measure, never a failure
+        pass
+    lines.append(f"settings: corpus_size {settings.get('corpus_size')} · corpus_points {settings.get('corpus_points')}")
+    steps = [(m.group(1), int(m.group(2))) for m in STEP_LINE.finditer(log or "")]
+    if steps:
+        ends = [t for _, t in steps[1:]] + [None]
+        rows = []
+        for (name, t0), t1 in zip(steps, ends, strict=True):
+            if name.startswith("Done"):  # the end mark, not a step
+                continue
+            name = re.sub(r"\d[\d,]*", "#", name)[:48]  # step names only, their numbers (kills, items) masked
+            rows.append(f"  {name}: {'running' if t1 is None else f'{t1 - t0} s'}")
+        lines.append("this prep, step by step:\n" + "\n".join(rows))
+        lines.append(f"this prep: {steps[-1][1]} s to its last step, {log.count('quota used up')} quota waits")
+    try:
+        from paf.progress import history
+
+        hist = history()
+        if hist:
+            lines.append("last preps, median per step: " + ", ".join(
+                f"{k} {st.median(v):.0f} s" for k, v in sorted(hist.items(), key=lambda x: -st.median(x[1])) if v))
+    except Exception:  # noqa: BLE001
+        pass
+    return "\n".join(lines)
+
+
+def report(message: str, what: str, log: str, perf: str = "") -> tuple[str, str]:
+    """(title, body) of the feedback, scrubbed, log cut to its end; perf: performance() to attach."""
     log = scrub(log)[-MAX_LOG:]
     title = (message.strip().splitlines() or ["Feedback"])[0][:80]
     body = f"{message.strip()}\n\n{system_line()}\n" + (f"Command: paf {scrub(what)}\n" if what else "")
+    if perf:
+        body += f"\n--- performance ---\n{scrub(perf)}\n"
     return title, body + (f"\n--- log (end) ---\n{log}" if log else "")
 
 
