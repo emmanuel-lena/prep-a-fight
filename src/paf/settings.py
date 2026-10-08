@@ -24,6 +24,8 @@ SETTINGS: dict[str, Setting] = {
     "class": Setting("Shaman", "class analyzed by default (Warcraft Logs name)"),
     "spec": Setting("Elemental", "spec analyzed by default (Warcraft Logs name)"),
     "corpus_size": Setting(200, "number of kills collected per boss", kind=int),
+    "corpus_points": Setting(1500, "Warcraft Logs points per hour the log collection may use (of 3600): the rest "
+                                   "stays for the app", kind=int),
     "cache_max_mb": Setting(2000, "disk cache cap in MB (sim results + Warcraft Logs responses)", kind=int),
     "guild": Setting("", "your guild's name: its latest log gives your raid's composition (pad the adds or not)"),
     "guild_server": Setting("", "your guild's server (e.g. Kazzak)"),

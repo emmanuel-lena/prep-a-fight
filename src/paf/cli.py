@@ -166,7 +166,10 @@ def cmd_corpus(args: argparse.Namespace) -> int:
     if args.refetch:
         con.execute("UPDATE fight SET status='pending' WHERE encounter_id=? AND difficulty=?", (enc.id, diff))
         con.commit()
-    stats = collect(client, con, enc, diff, retry_errors=args.retry)
+    from paf import settings as _settings
+
+    stats = collect(client, con, enc, diff, retry_errors=args.retry,
+                    points_per_hour=_settings.get("corpus_points"))
     total = con.execute("SELECT COUNT(*) FROM fight WHERE encounter_id=? AND difficulty=? AND status='done'",
                         (enc.id, diff)).fetchone()[0]
     print(f"Done: {stats['done']} fetched, {stats['error']} skipped; {total} kills in the corpus ({db.db_path()})")
