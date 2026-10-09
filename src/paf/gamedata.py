@@ -211,8 +211,11 @@ def spell_cooldowns() -> dict[int, tuple[float, int]]:
         if cd > 0:
             out[int(r["SpellID"])] = (cd, 1)
     for sid, cat in charge_of.items():
-        if cat and sid.isdigit() and int(cat.get("MaxCharges") or 0) > 1 and int(cat.get("ChargeRecoveryTime") or 0):
-            out[int(sid)] = (int(cat["ChargeRecoveryTime"]) / 1000, int(cat["MaxCharges"]))
+        if not cat or not sid.isdigit() or not int(cat.get("ChargeRecoveryTime") or 0):
+            continue
+        charges = int(cat.get("MaxCharges") or 0)
+        if charges > 1 or int(sid) not in out:  # several charges, or the spell's only cooldown (Spirit Link Totem)
+            out[int(sid)] = (int(cat["ChargeRecoveryTime"]) / 1000, max(1, charges))
     return out
 
 

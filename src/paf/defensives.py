@@ -16,6 +16,11 @@ from paf.corpus.analyze import kills_filter
 # personal defensives by spell id (the name is a fallback for logs in another language), all classes: a spec only
 # ever casts its own
 DEFENSIVES: dict[int, str] = {
+    # tanks' big defensives (issue #15)
+    871: "Shield Wall", 12975: "Last Stand", 55233: "Vampiric Blood", 49028: "Dancing Rune Weapon",
+    22842: "Frenzied Regeneration", 200851: "Rage of the Sleeper", 322507: "Celestial Brew",
+    115176: "Zen Meditation", 132578: "Invoke Niuzao", 31850: "Ardent Defender", 86659: "Guardian of Ancient Kings",
+    389539: "Sentinel", 187827: "Metamorphosis", 204021: "Fiery Brand", 196718: "Darkness",
     # Shaman
     108271: "Astral Shift", 108270: "Stone Bulwark Totem", 198103: "Earth Elemental",
     # Rogue

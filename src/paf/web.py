@@ -615,8 +615,10 @@ placeholder="In game: type /simc, then Ctrl+A, Ctrl+C, and paste here"></textare
         from paf.profile import role
 
         warn = ("" if role(loaded) == "damage" else
-                f'<p class="notice small">{e(loaded.spec.title())} is a {role(loaded)} spec: prep-a-fight only '
-                f'prepares damage dealers for now (healers and tanks come later).</p>')
+                f'<p class="notice small">{e(loaded.spec.title())} is a {role(loaded)} spec: its prep comes from the '
+                f'logs of the top {role(loaded)}s (what they face, when they press their cooldowns, their talents and '
+                f'trinkets); SimulationCraft does not sim {"healing" if role(loaded) == "healer" else "survival"}, '
+                f'so there are no gear sims.</p>')
         character = (f"""<p><b>{e(loaded.name)}</b> <span class="pill gold">{e(loaded.spec)} {e(loaded.class_name)}</span>
 <span class="pill">{len(loaded.candidates)} items in bags</span></p>{warn}
 <details><summary>Load another character or an updated export</summary>{paste}</details>""")

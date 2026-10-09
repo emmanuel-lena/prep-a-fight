@@ -22,9 +22,10 @@ from paf.encounters import Encounter
 from paf.wcl import WCLClient, WCLError
 
 RANKINGS_QUERY = """
-query($id:Int!, $diff:Int!, $page:Int, $bracket:Int, $region:String, $cls:String!, $spec:String!) {
+query($id:Int!, $diff:Int!, $page:Int, $bracket:Int, $region:String, $cls:String!, $spec:String!,
+      $metric:CharacterRankingMetricType) {
   worldData { encounter(id:$id) {
-    characterRankings(className:$cls, specName:$spec, difficulty:$diff, metric:dps, page:$page,
+    characterRankings(className:$cls, specName:$spec, difficulty:$diff, metric:$metric, page:$page,
                       bracket:$bracket, serverRegion:$region, includeCombatantInfo:true)
   } }
 }
@@ -82,6 +83,13 @@ class RankedKill:
     row: dict[str, Any]
 
 
+def ranking_metric(cls: str, spec: str) -> str:
+    """Healers are ranked by healing per second (their damage says nothing), every other spec by damage."""
+    from paf.raidneed import HEALERS
+
+    return "hps" if f"{spec} {cls}" in HEALERS else "dps"
+
+
 def enumerate_kills(client: WCLClient, enc: Encounter, difficulty: int, cls: str, spec: str, *,
                     count: int, brackets: Iterable[int | None] = (None,),
                     pages: Iterable[int] | None = None, region: str = "",
@@ -93,7 +101,8 @@ def enumerate_kills(client: WCLClient, enc: Encounter, difficulty: int, cls: str
         got: list[RankedKill] = []
         want_pages = list(pages) if pages else list(range(1, (count + 99) // 100 + 1))
         for page in want_pages:
-            v: dict[str, Any] = {"id": enc.id, "diff": difficulty, "page": page, "cls": cls, "spec": spec}
+            v: dict[str, Any] = {"id": enc.id, "diff": difficulty, "page": page, "cls": cls, "spec": spec,
+                                 "metric": ranking_metric(cls, spec)}
             if br is not None:
                 v["bracket"] = br
             if region:
