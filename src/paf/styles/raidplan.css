@@ -1,0 +1,1 @@
+.tabs{display:flex;gap:6px;margin:14px 0}.tabs a{padding:7px 14px;border-radius:8px;border:1px solid var(--line)}.tabs a.on{background:var(--accent-soft);border-color:var(--accent)}

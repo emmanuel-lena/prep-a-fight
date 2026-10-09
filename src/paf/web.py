@@ -29,115 +29,7 @@ def bossguide_css() -> str:
 
     return GUIDE_CSS
 
-CSS = theme.CSS + bossguide_css() + """
-pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius:8px;padding:10px 12px}
-.boss-tile .name{font-weight:700;font-size:16px;margin-bottom:6px}
-/* the home page once set up (simple_home) */
-.home-hero{display:grid;gap:18px;margin:6px 0 30px;padding:24px;border-radius:16px;background:var(--surface);
-  border:1px solid var(--line)}
-.home-hero .me{display:flex;gap:14px;align-items:center}
-.home-hero .me-ic{width:56px;height:56px;border-radius:10px;margin:0}
-.home-hero .me b{display:block;font-size:20px} .home-hero .me span{color:var(--muted)}
-.start{display:grid;gap:14px;max-width:560px}
-.start h1{margin:4px 0 0;font:600 30px/1.15 'Fraunces',Georgia,serif}
-.start select.big{font-size:18px;padding:12px 14px;border-radius:10px}
-.segs{display:flex;gap:8px;flex-wrap:wrap}
-.seg input{position:absolute;opacity:0;pointer-events:none}
-.seg span{display:inline-block;padding:10px 18px;border-radius:999px;border:1.5px solid var(--line);cursor:pointer;
-  font-weight:600;font-size:16px}
-.seg input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--bg)}
-.seg input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
-.btn.go{justify-self:start;font-size:18px;padding:12px 26px;border-radius:12px}
-.h-mine{margin-top:0}
-.chars{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
-.chars .ch button{display:flex;gap:8px;align-items:center;padding:5px 12px 5px 5px;border-radius:999px;cursor:pointer;
-  border:1px solid var(--line);background:none;color:var(--fg);font:inherit;font-weight:600}
-.chars .ch button:hover{border-color:var(--accent)}
-.chars .ch-ic{width:26px;height:26px;border-radius:50%;margin:0}
-.ch-new{display:inline-flex;align-items:center;padding:6px 14px;border-radius:999px;border:1.5px dashed var(--accent);
-  color:var(--accent);font-weight:600;text-decoration:none} .ch-new:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
-.ccards{display:grid;gap:12px;margin-bottom:24px}
-.ccard{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:14px 16px;border-radius:14px;border:1px solid var(--line);
-  background:var(--surface)} .ccard.on{border-color:var(--accent)}
-.ccard .cc-ic{width:48px;height:48px;border-radius:10px;margin:0}
-.cc-txt{display:flex;flex-direction:column;gap:4px;flex:1;min-width:180px} .cc-txt b{font-size:18px}
-.cc-act{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .cc-act form{margin:0}
-.who{position:relative;margin-left:6px} .who>summary{list-style:none;display:flex;align-items:center;gap:8px;cursor:pointer;
-  padding:4px 10px 4px 4px;border-radius:999px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff}
-.who>summary::-webkit-details-marker{display:none} .who>summary:hover{background:rgba(255,255,255,.18)}
-.who-ic{width:28px;height:28px;border-radius:50%;margin:0}
-.who summary span,.who-menu button span{display:flex;flex-direction:column;line-height:1.15;text-align:left}
-.who summary b{font-size:13.5px} .who summary small{font-size:11px;opacity:.8}
-.who-caret{font-size:11px;opacity:.8}
-.who-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:60;min-width:230px;padding:6px;border-radius:12px;
-  background:var(--surface);border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.45);display:grid;gap:2px}
-.who-menu form{margin:0} .who-menu button{display:flex;gap:10px;align-items:center;width:100%;padding:6px 8px;border:0;
-  border-radius:8px;background:none;color:var(--fg);font:inherit;cursor:pointer}
-.who-menu button:hover,.who-menu a:hover{background:var(--surface-2);text-decoration:none}
-.who-menu button small{color:var(--muted);font-size:12px}
-.who-menu a{display:block;padding:8px;border-radius:8px;color:var(--accent);font-weight:600;font-size:14px}
-.who-add{margin-left:8px;color:#fff;font-weight:600;font-size:13.5px}
-@media (max-width:640px){.who summary span{display:none}}
-.rb-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:10px;margin:0 0 6px}
-.rb-boss{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;border-radius:14px;
-  cursor:pointer;outline:none} .rb-boss:hover,.rb-boss:focus-within{background:var(--surface)}
-.rb-face{position:relative;width:64px;height:64px;border-radius:50%;overflow:hidden;background:#15121c;
-  box-shadow:0 0 0 2px var(--line);display:block}
-.rb-img{width:100%;height:100%;object-fit:cover;object-position:50% 30%;display:block}
-.rb-img.none{display:grid;place-items:center;font:700 24px var(--font-data);color:var(--muted)}
-.rb-face .rb-img:not(.none),.rb-in .rb-img:not(.none){position:absolute;inset:0;background:#15121c}
-.rb-in{position:relative} .rb-face .rb-img.none,.rb-in .rb-img.none{position:absolute;inset:0}
-.rb-boss.grey .rb-face{filter:grayscale(1) brightness(.75);box-shadow:0 0 0 2px var(--line)}
-.rb-boss:not(.grey) .rb-face{box-shadow:0 0 0 2px var(--accent)}
-.rb-n{position:absolute;right:2px;bottom:2px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:rgba(0,0,0,.65);
-  color:#fff;font:700 11px/18px var(--font-data);text-align:center}
-.rb-name{font-size:12px;font-weight:600;text-align:center;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;
-  -webkit-box-orient:vertical;overflow:hidden}
-.rb-boss.grey .rb-name{color:var(--muted)}
-.rb-pop{position:absolute;top:calc(100% - 4px);left:50%;transform:translateX(-50%);z-index:20;display:none;width:max-content;
-  padding:12px 14px;border-radius:12px;background:#0b0a10;border:1px solid #5d5a52;box-shadow:0 10px 30px rgba(0,0,0,.5);color:#fff}
-.rb-boss:hover .rb-pop,.rb-boss:focus-within .rb-pop{display:block}
-.rb-row>.rb-boss:nth-child(-n+2) .rb-pop{left:0;transform:none} .rb-row>.rb-boss:nth-last-child(-n+2) .rb-pop{left:auto;right:0;transform:none}
-.rb-title{display:block;font:600 15px 'Fraunces',Georgia,serif;color:#ffd100;margin:0 0 10px}
-.rb-ds{display:flex;gap:14px}
-.rb-d{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:78px;color:#fff;text-decoration:none}
-.rb-d:hover{text-decoration:none} .rb-d b{font-size:12.5px} .rb-d small{font-size:11.5px;color:#bdb6a8}
-.rb-frame{width:58px;height:58px;display:grid;place-items:center;transition:transform .12s}
-.rb-d:hover .rb-frame{transform:scale(1.07)}
-.rb-frame .rb-in{width:calc(100% - 6px);height:calc(100% - 6px);overflow:hidden;background:#15121c;display:block}
-.rb-frame.tri{background:#1eff00;clip-path:polygon(50% 0,100% 100%,0 100%)}
-.rb-frame.tri .rb-in{clip-path:polygon(50% 0,100% 100%,0 100%);margin-top:5px;width:calc(100% - 10px);height:calc(100% - 9px)}
-.rb-frame.sq{background:#0070dd;border-radius:6px} .rb-frame.sq .rb-in{border-radius:4px}
-.rb-frame.penta{background:#a335ee;clip-path:polygon(50% 0,100% 38%,81% 100%,19% 100%,0 38%)}
-.rb-frame.penta .rb-in{clip-path:polygon(50% 0,100% 38%,81% 100%,19% 100%,0 38%)}
-.rb-d.no .rb-frame .rb-in,.rb-d.old .rb-frame .rb-in{filter:grayscale(1) brightness(.7)}
-.rb-d.ok small{color:#1eff00} .rb-d.old small{color:#ffb84d} .rb-d.run small{color:#ffd100}
-.rb-legend span+span::before{content:" · "}
-.rm>summary{list-style:none;cursor:pointer} .rm>summary::-webkit-details-marker{display:none}
-.rm[open]>summary{display:none} .rm-ask{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.rm-ask span{color:var(--neg);font-size:14px}
-.btn.danger{color:var(--neg)}
-.add-form textarea{width:100%;min-height:160px;box-sizing:border-box}
-.bcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
-.bcard{display:flex;gap:12px;align-items:center;padding:14px 16px;border-radius:12px;border:1px solid var(--line);
-  background:var(--surface);color:var(--fg);text-decoration:none;transition:border-color .15s,transform .15s}
-.bcard:hover{border-color:var(--accent);transform:translateY(-1px)}
-.bcard .bc-ic{width:40px;height:40px;border-radius:8px;margin:0;flex:none}
-.bc-txt{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
-.bc-txt b{font-size:16px} .bc-meta{font-size:13px;color:var(--muted)}
-.bc-when{font-size:12.5px;color:var(--muted);white-space:nowrap}
-.bc-more,.home-more{margin-top:18px} .bc-more>summary,.home-more>summary{cursor:pointer;color:var(--muted)}
-.home-more[open]>summary{margin-bottom:12px}
-.boss-tile .when{font-size:12px;color:var(--muted);margin-top:8px}
-.boss-tile .top{font-size:13px;margin-top:10px;line-height:1.35}
-.cta{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:18px 0 6px}
-.lead{font-size:16px;color:var(--muted);margin-bottom:18px}
-.ring{vertical-align:-3px;margin-left:4px} .ring circle{fill:none;stroke-width:3} .ring-bg{stroke:var(--line)} .ring-fg{stroke:var(--accent);stroke-dasharray:50.3;stroke-dashoffset:50.3;transform:rotate(-90deg);transform-origin:center;animation:ring linear forwards} @keyframes ring{to{stroke-dashoffset:0}} @media (prefers-reduced-motion:reduce){.ring-fg{animation:none;stroke-dashoffset:25}}
-ol.steps{list-style:none;margin:0;padding:0} .st{padding:7px 0;border-bottom:1px solid var(--line);display:flex;gap:4px}
-.st:last-child{border-bottom:0} .st>span:first-child{display:inline-block;width:22px;flex:none} .st .small{font-weight:400}
-.st.done{color:var(--muted)} .st.done span:first-child{color:var(--pos)} .st.now{font-weight:700}
-.st.now span:first-child{color:var(--accent)} .st.next{color:var(--muted)}
-"""
+CSS = theme.CSS + bossguide_css() + theme.style("web")
 
 
 def page(title: str, body: str, refresh: int | None = None, nav: str = "", job: str = "") -> bytes:
@@ -534,7 +426,7 @@ def view_page(key: str, tab: str) -> bytes:
            + (f'<a href="{e(boss_link)}">Edit &amp; re-run</a>' if boss_link else "")
            + (f'<a href="/share/{e(key)}">Share</a>' if "prep" in item["files"] else "")
            + f'<a href="{PUBLIC_BASE}{src}" target="_blank">Open alone</a>')
-    css = "body{display:flex;flex-direction:column;height:100vh}iframe{border:0;width:100%;flex:1;display:block}"
+    css = theme.style("view")
     watch = ""
     try:  # the full pass of this sheet running: the page reloads when it is done
         from paf import loading
@@ -964,26 +856,7 @@ placeholder="Link to one of your raid's logs: https://www.warcraftlogs.com/repor
 def _story_css() -> str:
     from paf.onboarding import CSS as ONBOARDING_CSS
 
-    return "<style>" + ONBOARDING_CSS + """
-.est{display:flex;flex-direction:column;gap:4px;max-width:640px;margin:0 0 18px;padding:12px 16px;border-radius:12px;
-  border:1px solid var(--line);border-left:4px solid var(--pos);background:var(--surface)}
-.est.collect{border-left-color:var(--warn)} .est b{font-size:15px} .est span{color:var(--muted);font-size:14.5px}
-.est-again{color:var(--muted);font-size:14px;margin:12px 0 0}
-.story{margin:10px 0 30px;max-width:640px}
-.story h2{font:600 26px/1.2 'Fraunces',Georgia,serif;margin:0 0 16px;text-transform:none;letter-spacing:0;color:var(--fg)}
-.goals{display:grid;gap:10px}
-.goal{display:block;cursor:pointer}
-.goal input{position:absolute;opacity:0;pointer-events:none}
-.goal>span{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border:1.5px solid var(--line);border-radius:12px;
-  transition:border-color .15s,background .15s}
-.goal b{font-size:17px} .goal small{color:var(--muted);font-size:14.5px;line-height:1.45}
-.goal input:checked+span{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
-.goal input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
-.recap{list-style:none;padding:0;margin:0 0 14px;display:grid;gap:8px;font-size:17px}
-.recap li::before{content:"\\2713";color:var(--pos);font-weight:700;margin-right:10px}
-.recap li[hidden]{display:none}
-.what-sim{margin:6px 0 0} .what-sim label{display:block;margin:6px 0}
-</style>"""
+    return "<style>" + ONBOARDING_CSS + theme.style("story") + "</style>"
 
 
 STORY_JS = """<script>

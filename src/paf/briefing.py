@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import html
 
-from paf import icons
+from paf import icons, theme
 
 e = html.escape
 FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;'
@@ -268,98 +268,7 @@ def confidence_pill(d) -> str:
     return f"<p class='trust {level} rv'><span>How much to trust this:</span> {e(say)}</p>"
 
 
-CSS = """
-/* the briefing */
-.js .rv{opacity:0;transform:translateY(8px)}
-.rv{transition:opacity .6s ease,transform .6s ease}
-.js .rv.in{opacity:1;transform:none}
-#overview>*:not(.tl-scroll){max-width:760px}
-.tl-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:thin} .tl{min-width:900px}
-#overview h2{font:600 26px/1.2 'Fraunces',Georgia,serif;letter-spacing:0;text-transform:none;color:var(--fg);
-  margin:44px 0 14px}
-.lede{font:400 22px/1.5 'Fraunces',Georgia,serif;margin:8px 0 6px;color:var(--fg)}
-.trust{font-size:13.5px;color:var(--muted);margin:10px 0 0;padding-left:12px;border-left:2px solid var(--line)}
-.trust span{font-style:italic} .trust.high{border-color:var(--pos)} .trust.low{border-color:var(--neg)}
-.aside{font:italic 400 16px 'Fraunces',Georgia,serif;color:var(--muted);margin:-4px 0 10px}
-/* what matters */
-.moves{list-style:none;margin:0;padding:0;counter-reset:m}
-.moves li{display:grid;grid-template-columns:44px 1fr auto;gap:14px;align-items:baseline;padding:16px 0;
-  border-top:1px solid var(--line)} .moves li:last-child{border-bottom:1px solid var(--line)}
-.moves .n{font:400 40px/1 'Fraunces',Georgia,serif;color:var(--accent)}
-.moves summary,.moves .say{font-size:17px;line-height:1.45;cursor:pointer;margin:0;list-style:none}
-.moves summary::-webkit-details-marker{display:none}
-.moves summary::after{content:" \\203A";color:var(--muted);display:inline-block;transition:transform .2s}
-.moves details[open] summary::after{transform:rotate(90deg)}
-.moves .why{margin:8px 0 0;font-size:14px;color:var(--muted);line-height:1.55}
-.moves .why button{margin-left:6px}
-.gain{font:600 18px var(--font-data);white-space:nowrap;color:var(--fg)}
-.gain.big{font-size:24px;color:var(--pos)} .gain.tiny{color:var(--muted);font-weight:500;font-size:15px}
-.gain.ok{color:var(--pos);font-size:20px}
-/* the timeline: phases on top, then the notes above the axis, the axis, the notes below it */
-.tl{position:relative;--lh:28px;--axis:calc(34px + var(--up) * var(--lh) + 14px);
-  height:calc(var(--axis) + 30px + var(--down) * var(--lh) + 34px);margin-top:6px}
-.tl-phases{position:absolute;left:0;right:0;top:0;height:30px}
-.ph{position:absolute;top:16px;height:12px;border-top:1.5px solid var(--muted);border-left:1.5px solid var(--muted);
-  border-right:1.5px solid var(--muted);border-radius:6px 6px 0 0;opacity:.8}
-.ph span{position:absolute;top:-17px;left:6px;font:italic 400 13px 'Fraunces',Georgia,serif;color:var(--muted);
-  white-space:nowrap;max-width:calc(100% - 8px);overflow:hidden;text-overflow:ellipsis}
-.tl-zone{display:none}
-.tl-axis{position:absolute;left:0;right:0;top:var(--axis);height:0;border-top:2px solid var(--fg)}
-.tl-axis .adds,.tl-axis .burst{position:absolute;top:-6px;height:10px;border-radius:5px}
-.tl-axis .adds{background:color-mix(in srgb,var(--pos) 55%,transparent)}
-.tl-axis .burst{background:repeating-linear-gradient(135deg,var(--sand) 0 3px,transparent 3px 6px)}
-.tl-ticks span{position:absolute;top:8px;transform:translateX(-50%);font:500 11px var(--font-data);color:var(--muted);
-  background:var(--bg);padding:0 3px;z-index:1}
-.tl-ticks span:first-child{transform:none} .tl-ticks span:first-child::before{left:0}
-.tl-ticks span::before{content:"";position:absolute;left:50%;top:-12px;height:6px;border-left:1.5px solid var(--fg)}
-.note{position:absolute;padding:0;background:none;border:0;color:var(--fg);cursor:pointer;font:inherit;z-index:2}
-.note .pin{position:absolute;left:0;width:1.5px;background:currentColor;opacity:.35;pointer-events:none}
-.note .lab{position:relative;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-size:12.5px;
-  height:22px;padding:0 7px 0 6px;border-radius:4px;background:var(--bg);border:1px solid transparent;
-  transition:border-color .15s,background .15s}
-.note:hover,.note.on,.note:focus-visible{z-index:3} .note:focus-visible{outline:none}
-.note:hover .lab,.note.on .lab,.note:focus-visible .lab{border-color:currentColor;background:var(--surface)}
-.note:hover .pin,.note.on .pin{opacity:.9}
-.note.up{top:calc(34px + (var(--up) - 1 - var(--row)) * var(--lh) + 4px)}
-.note.up .pin{top:22px;height:calc((var(--row) + 1) * var(--lh) - 12px)}
-.note.down{top:calc(var(--axis) + 30px + var(--row) * var(--lh))}
-.note.down .pin{bottom:22px;height:calc(30px + var(--row) * var(--lh) - 22px + 22px)}
-.note.down .pin{top:calc(-30px - var(--row) * var(--lh));height:calc(30px + var(--row) * var(--lh))}
-.note.flip{transform:translateX(calc(-100% + 1px))} .note.flip .pin{left:auto;right:0}
-.k-adds{color:var(--pos)} .k-burst{color:var(--warn)} .k-lust{color:var(--neg)} .k-you{color:var(--accent)} .k-def{color:#4f8fd0} .k-focus{color:#9a6fc4}
-.note .nt-ic{width:16px;height:16px;border-radius:3px;margin:0;vertical-align:0}
-.tl-legend{position:absolute;right:0;bottom:0;display:flex;gap:14px}
-.lg::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:5px}
-.margin{min-height:48px;margin:10px 0 0;padding:10px 14px;border-left:3px solid var(--accent);background:var(--surface-2);
-  border-radius:0 8px 8px 0;font-size:15px} .margin .m-t{font:600 15px var(--font-data);color:var(--accent)}
-.margin .m-text{color:var(--muted)}
-/* once the pull starts */
-.checks{list-style:none;margin:0;padding:0}
-.checks li{padding:10px 0;border-bottom:1px dotted var(--line)} .checks li:last-child{border:0}
-.checks label{display:flex;gap:12px;align-items:flex-start;margin:0;cursor:pointer;font-size:15.5px;line-height:1.5}
-.checks input{position:absolute;opacity:0;pointer-events:none}
-.checks .box{flex:none;width:20px;height:20px;margin-top:2px;border:1.5px solid var(--muted);border-radius:4px;position:relative}
-.checks .box::after{content:"";position:absolute;left:5px;top:0;width:6px;height:12px;border:solid var(--pos);
-  border-width:0 2.5px 2.5px 0;transform:rotate(45deg) scale(0);transition:transform .2s cubic-bezier(.3,1.6,.5,1)}
-.checks input:checked+.box::after{transform:rotate(45deg) scale(1)}
-.checks input:checked~.t{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
-.checks input:focus-visible+.box{outline:2px solid var(--accent);outline-offset:2px}
-.ready{margin-left:auto;display:flex;align-items:center;gap:8px;color:#fff}
-.ready svg{width:44px;height:44px;transform:rotate(-90deg)}
-.ready circle{fill:none;stroke-width:3.5} .ready .r-bg{stroke:rgba(255,255,255,.2)}
-.ready .r-fg{stroke:var(--sand);stroke-linecap:round;stroke-dasharray:119.4;stroke-dashoffset:119.4;
-  transition:stroke-dashoffset .6s ease}
-.ready .r-txt{display:flex;flex-direction:column;line-height:1.1}
-.ready .r-n{font:600 17px var(--font-data)} .ready span{font-size:11px;opacity:.8}
-.ready.done .r-fg{stroke:var(--pos)}
-.ready.pop{animation:pop .45s} @keyframes pop{40%{transform:scale(1.12)}}
-#overview .guide{border:0;background:none;box-shadow:none;padding:0}
-details.more{margin-top:40px;border-top:1px solid var(--line);padding-top:10px}
-details.more>summary{font:italic 400 17px 'Fraunces',Georgia,serif;color:var(--muted);padding:6px 0}
-@media (max-width:640px){.lede{font-size:19px}.moves li{grid-template-columns:30px 1fr auto;gap:10px}
-  .moves .n{font-size:30px}}
-@media (prefers-reduced-motion:reduce){.js .rv{opacity:1;transform:none}.ready .r-fg{transition:none}}
-"""
+CSS = theme.style("briefing")
 
 JS = """<script>
 (function(){

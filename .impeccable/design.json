@@ -1,0 +1,368 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-09T23:02:22.172068+00:00",
+  "title": "Design System: prep-a-fight",
+  "extensions": {
+    "colorMeta": {
+      "vintage-grape": {
+        "role": "primary",
+        "displayName": "Vintage Grape",
+        "canonical": "#5c415d",
+        "tonalRamp": [
+          "#2d1f2d",
+          "#4e374f",
+          "#704f72",
+          "#926794",
+          "#ab89ad",
+          "#c4abc5",
+          "#dccedd",
+          "#f4f0f5"
+        ]
+      },
+      "golden-bronze": {
+        "role": "primary",
+        "displayName": "Golden Bronze",
+        "canonical": "#c89933",
+        "tonalRamp": [
+          "#3d2f10",
+          "#6b521b",
+          "#9a7627",
+          "#c89933",
+          "#d6b15f",
+          "#e2c88e",
+          "#eedebc",
+          "#faf5eb"
+        ]
+      },
+      "golden-sand": {
+        "role": "primary",
+        "displayName": "Golden Sand",
+        "canonical": "#dbd053",
+        "tonalRamp": [
+          "#3f3b0d",
+          "#6f6817",
+          "#a09521",
+          "#d0c32c",
+          "#dcd259",
+          "#e6df8a",
+          "#f0ecba",
+          "#fbf9ea"
+        ]
+      },
+      "vintage-grape-2": {
+        "role": "primary",
+        "displayName": "Vintage Grape 2",
+        "canonical": "#694966",
+        "tonalRamp": [
+          "#2d1f2c",
+          "#50374d",
+          "#724f6f",
+          "#946790",
+          "#ad89a9",
+          "#c5abc2",
+          "#ddcedb",
+          "#f5f0f4"
+        ]
+      },
+      "dusty-lavender": {
+        "role": "primary",
+        "displayName": "Dusty Lavender",
+        "canonical": "#74526c",
+        "tonalRamp": [
+          "#2d202a",
+          "#4f384a",
+          "#715069",
+          "#936889",
+          "#ac8aa4",
+          "#c4acbe",
+          "#dcced9",
+          "#f4f0f3"
+        ]
+      },
+      "rarity-green": {
+        "role": "tertiary",
+        "displayName": "Rarity Green (normal)",
+        "canonical": "#1eff00",
+        "tonalRamp": [
+          "#094c00",
+          "#108700",
+          "#17c100",
+          "#1efb00",
+          "#4eff37",
+          "#82ff71",
+          "#b5ffab",
+          "#e9ffe6"
+        ]
+      },
+      "rarity-blue": {
+        "role": "tertiary",
+        "displayName": "Rarity Blue (heroic)",
+        "canonical": "#0070dd",
+        "tonalRamp": [
+          "#00274c",
+          "#004487",
+          "#0062c1",
+          "#007ffb",
+          "#379cff",
+          "#71b9ff",
+          "#abd6ff",
+          "#e6f2ff"
+        ]
+      },
+      "rarity-purple": {
+        "role": "tertiary",
+        "displayName": "Rarity Purple (mythic)",
+        "canonical": "#a335ee",
+        "tonalRamp": [
+          "#2c0647",
+          "#4e0a7c",
+          "#700fb2",
+          "#9214e8",
+          "#ab46ef",
+          "#c37cf4",
+          "#dcb2f8",
+          "#f4e7fd"
+        ]
+      },
+      "bg-light": {
+        "role": "neutral",
+        "displayName": "Plum Paper",
+        "canonical": "#f6f2f5",
+        "tonalRamp": [
+          "#2d1f2a",
+          "#50374a",
+          "#724f69",
+          "#956789",
+          "#ad89a4",
+          "#c5abbe",
+          "#ddcdd9",
+          "#f5f0f3"
+        ]
+      },
+      "bg-dark": {
+        "role": "neutral",
+        "displayName": "Night Plum",
+        "canonical": "#181219",
+        "tonalRamp": [
+          "#2b202c",
+          "#4b384e",
+          "#6c5170",
+          "#8c6992",
+          "#a68bab",
+          "#c0acc4",
+          "#dacedc",
+          "#f4f0f4"
+        ]
+      },
+      "fg-light": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#2a1f2b",
+        "tonalRamp": [
+          "#2b202c",
+          "#4c384e",
+          "#6e5170",
+          "#8f6992",
+          "#a88bab",
+          "#c2acc3",
+          "#dbcedc",
+          "#f4f0f4"
+        ]
+      },
+      "muted-light": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "#6f5c6d",
+        "tonalRamp": [
+          "#2a2329",
+          "#4a3d48",
+          "#6a5868",
+          "#897287",
+          "#a491a2",
+          "#bfb1bd",
+          "#d9d1d8",
+          "#f3f1f3"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page titles: the boss name with its difficulty pill."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Quiet uppercase section headings, muted."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card and block titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Sentences, 68 to 80 characters wide."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Pills, table headers, KPI labels."
+      },
+      "data": {
+        "displayName": "Data",
+        "purpose": "Key figures, tabular."
+      }
+    },
+    "shadows": [
+      {
+        "name": "surface",
+        "value": "0 1px 2px rgba(42,31,43,.06),0 4px 16px rgba(42,31,43,.06)",
+        "purpose": "Cards, tiles, the hero (light theme)."
+      },
+      {
+        "name": "surface-dark",
+        "value": "0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25)",
+        "purpose": "Cards, tiles, the hero (dark theme)."
+      },
+      {
+        "name": "accent-halo",
+        "value": "0 0 0 3px color-mix(in srgb,var(--accent) 30%,transparent)",
+        "purpose": "Button hover."
+      }
+    ],
+    "motion": [
+      {
+        "name": "press",
+        "value": ".12s ease",
+        "purpose": "Buttons: halo, brightness, 1px press."
+      },
+      {
+        "name": "lift",
+        "value": ".15s ease",
+        "purpose": "Link tiles: border to accent, 2px lift."
+      },
+      {
+        "name": "minute",
+        "value": ".45s ease",
+        "purpose": "The minute view: a minute fades and rises in."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "narrow",
+        "value": "640px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one filled action of a screen.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Prepare this boss</button>",
+      "css": ".ds-btn{font:600 15px 'Chakra Petch','Segoe UI',sans-serif;letter-spacing:.03em;border:0;border-radius:10px;padding:9px 16px;cursor:pointer;transition:box-shadow .12s ease,filter .12s ease,transform .12s ease}.ds-btn-primary{background:var(--primary,#5c415d);color:var(--on-primary,#fff)}.ds-btn-primary:hover{filter:brightness(1.08);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent,#c89933) 30%,transparent)}.ds-btn-primary:active{transform:translateY(1px)}.ds-btn-primary:focus-visible{outline:2px solid var(--accent,#c89933);outline-offset:2px}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary actions.",
+      "html": "<button class=\"ds-btn ds-btn-ghost\">See the details</button>",
+      "css": ".ds-btn{font:600 15px 'Chakra Petch','Segoe UI',sans-serif;letter-spacing:.03em;border:0;border-radius:10px;padding:9px 16px;cursor:pointer;transition:box-shadow .12s ease,filter .12s ease,transform .12s ease}.ds-btn-ghost{background:transparent;color:var(--fg,#2a1f2b);border:1px solid var(--line,#e3d8e1)}.ds-btn-ghost:hover{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent,#c89933) 30%,transparent)}.ds-btn-ghost:focus-visible{outline:2px solid var(--accent,#c89933);outline-offset:2px}"
+    },
+    {
+      "name": "Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "A choice in a list; selected when its input is checked.",
+      "html": "<label class=\"ds-chip\"><input type=\"checkbox\" checked> Vile Vial <span class=\"ds-meta\">+1.8%</span></label>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border:1px solid var(--line,#e3d8e1);border-radius:999px;background:var(--surface-2,#f1eaf0);font:14px 'IBM Plex Sans',sans-serif;cursor:pointer}.ds-chip input{accent-color:#c89933}.ds-chip:has(input:checked){border-color:var(--accent,#c89933);background:var(--accent-soft,#f6efd2)}.ds-meta{color:var(--muted,#6f5c6d);font-size:12px}.ds-chip:focus-within{outline:2px solid var(--accent,#c89933);outline-offset:2px}"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A block of the sheet, lightly raised over the glow.",
+      "html": "<div class=\"ds-card\"><h3>Your cooldowns</h3><p>Keep Ascendance for the second add wave.</p></div>",
+      "css": ".ds-card{background:color-mix(in srgb,var(--surface,#fff) 92%,transparent);backdrop-filter:blur(4px);border:1px solid var(--line,#e3d8e1);border-radius:10px;padding:16px 18px;box-shadow:0 1px 2px rgba(42,31,43,.06),0 4px 16px rgba(42,31,43,.06);font:15px/1.6 'IBM Plex Sans',sans-serif}.ds-card h3{font:600 16px 'Chakra Petch',sans-serif;margin:0 0 8px}"
+    },
+    {
+      "name": "Hero verdict",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The verdict at the top of a sheet, with the accent edge.",
+      "html": "<div class=\"ds-hero\"><div class=\"ds-verdict\">Swap to the single-target build: +2.4%</div><p>Above the noise (±0.3%).</p></div>",
+      "css": ".ds-hero{background:var(--surface,#fff);border:1px solid var(--line,#e3d8e1);border-left:5px solid var(--accent,#c89933);border-radius:10px;padding:18px 20px;font:15px/1.6 'IBM Plex Sans',sans-serif}.ds-verdict{font:700 20px 'Chakra Petch',sans-serif;margin-bottom:6px}"
+    },
+    {
+      "name": "Pill",
+      "kind": "chip",
+      "refersTo": "pill",
+      "description": "A small uppercase tag (the difficulty next to a boss name).",
+      "html": "<span class=\"ds-pill\">heroic</span> <span class=\"ds-pill ds-gold\">mythic</span>",
+      "css": ".ds-pill{display:inline-block;padding:2px 9px;border-radius:999px;font:600 11px 'Chakra Petch',sans-serif;letter-spacing:.05em;text-transform:uppercase;background:var(--surface-2,#f1eaf0);color:var(--muted,#6f5c6d);border:1px solid var(--line,#e3d8e1)}.ds-gold{background:var(--accent-soft,#f6efd2);color:var(--fg,#2a1f2b);border-color:var(--accent,#c89933)}"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Text fields and selects.",
+      "html": "<input class=\"ds-input\" placeholder=\"Paste your /simc export\">",
+      "css": ".ds-input{font:15px 'IBM Plex Sans',sans-serif;color:var(--fg,#2a1f2b);background:var(--surface-2,#f1eaf0);border:1px solid var(--line,#e3d8e1);border-radius:8px;padding:8px 10px}.ds-input:focus{outline:2px solid var(--accent,#c89933);outline-offset:1px}"
+    },
+    {
+      "name": "Header",
+      "kind": "nav",
+      "refersTo": "button-primary",
+      "description": "The grape band with the wordmark and the gold stripe.",
+      "html": "<header class=\"ds-top\"><span class=\"ds-brand\">prep-a-<b>fight</b></span><nav><a class=\"on\">Home</a><a>Tools</a></nav></header>",
+      "css": ".ds-top{position:relative;display:flex;align-items:center;gap:16px;padding:12px 16px 15px;color:#fff;background:linear-gradient(90deg,#5c415d,#694966 55%,#74526c)}.ds-top::after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,#dbd053,#c89933)}.ds-brand{font:700 17px 'Chakra Petch',sans-serif}.ds-brand b{color:#dbd053}.ds-top nav{margin-left:auto;display:flex;gap:4px}.ds-top nav a{padding:6px 12px;border-radius:8px;color:#f3e9f2;font:14px 'IBM Plex Sans',sans-serif;cursor:pointer}.ds-top nav a.on,.ds-top nav a:hover{background:rgba(255,255,255,.14)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Night Before the Pull",
+    "overview": "The app is opened in the calm before a raid night: a few minutes with a boss sheet, then the pull. The system carries that hour. Deep grape and plum night tones hold the structure, a soft violet glow sits behind the page, and gold is kept for what matters on this boss: the key number, the selected choice, the line to remember. The dark theme is the signature look; the light theme gets the same care and the same hierarchy, never an inversion.\n\nIt is calm and reassuring rather than loud. A casual raider should feel the page is on their side: plain sentences first, the details folded, nothing that shouts. The game is present in the details, not in costume: the display face has a slight angular, HUD-like cut, difficulty uses the game's rarity colors and shapes, and the whole app takes the class color of the active character.\n\nDensity is moderate: one column of readable prose (68 to 80 characters) with data blocks that align on tabular figures.",
+    "keyCharacteristics": [
+      "Night tones for structure, gold for emphasis, the class color as the active character's signature.",
+      "Sentences before numbers; tables and raw data are folded details.",
+      "Surfaces sit lightly above a glowing ground (soft shadow, slight blur).",
+      "Gently rounded, pill-shaped controls; one filled button per screen.",
+      "Every color that carries meaning also carries a label or a shape."
+    ],
+    "rules": [
+      {
+        "name": "The Gold Is Rare Rule",
+        "section": "colors",
+        "body": "Gold marks the one thing to see on a block: a key number, a selection, a focus. It is never body text on a light background (too little contrast)."
+      },
+      {
+        "name": "The Class Signs Rule",
+        "section": "colors",
+        "body": "The class color stands for the active character and nothing else; it never encodes data."
+      },
+      {
+        "name": "The Sentence First Rule",
+        "section": "typography",
+        "body": "A block opens with what to do, written as a sentence; the numbers follow and support it."
+      },
+      {
+        "name": "The Objects Only Rule",
+        "section": "elevation",
+        "body": "A shadow marks an object (a card, a tile); sections, lists and text never get one."
+      }
+    ],
+    "dos": [
+      "**Do** take every color from the tokens, in both themes, and the accent from the active character's class when there is one.",
+      "**Do** open each block with a sentence and fold the tables in `details`.",
+      "**Do** pair every color that means something with a word or a shape (difficulty, gain or loss, state).",
+      "**Do** use tabular figures for every number that lines up.",
+      "**Do** respect reduced motion: transitions off, the minute view as plain sections."
+    ],
+    "donts": [
+      "**Don't** set body text in gold on a light background.",
+      "**Don't** use the class color or the rarity colors for anything but the character and the difficulty.",
+      "**Don't** put more than one filled button on a screen.",
+      "**Don't** give a shadow to anything but a card or a tile.",
+      "**Don't** add a style block in a module for something the theme already defines."
+    ]
+  }
+}

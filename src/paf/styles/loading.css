@@ -1,0 +1,32 @@
+#paf-load .pl-bar{position:fixed;left:0;top:0;height:3px;width:0;z-index:100;background:var(--accent);opacity:0;
+  transition:opacity .2s}
+#paf-load.on .pl-bar{opacity:1;animation:pl-grow 8s cubic-bezier(.1,.7,.2,1) forwards}
+@keyframes pl-grow{from{width:0}to{width:92%}}
+#paf-load .pl-card{position:fixed;left:50%;top:84px;transform:translateX(-50%);z-index:100;display:none;gap:14px;
+  align-items:center;max-width:min(520px,calc(100vw - 32px));padding:14px 18px;border-radius:14px;
+  background:var(--surface);border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.25)}
+#paf-load.card .pl-card{display:flex;animation:pl-in .25s ease}
+@keyframes pl-in{from{opacity:0;transform:translate(-50%,-6px)}to{opacity:1;transform:translateX(-50%)}}
+#paf-load .pl-card b{display:block;font-size:16px}
+#paf-load .pl-slow,#paf-load .pl-slower{display:none;font-size:14px;color:var(--muted);margin-top:3px}
+#paf-load.slow .pl-slow{display:block} #paf-load.slower .pl-slow{display:none} #paf-load.slower .pl-slower{display:block}
+.pl-spin{flex:none;width:22px;height:22px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);
+  animation:pl-turn .8s linear infinite}
+@keyframes pl-turn{to{transform:rotate(360deg)}}
+.busy .btn.go::after,.btn.go.busy::after{content:"";display:inline-block;width:14px;height:14px;margin-left:10px;
+  vertical-align:-2px;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;
+  animation:pl-turn .8s linear infinite}
+/* a prep running in the background */
+.job-banner{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:0 0 18px;padding:10px 14px;border-radius:12px;
+  background:color-mix(in srgb,var(--accent) 10%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);
+  color:var(--fg);text-decoration:none}
+.job-banner .jb-txt{flex:1;min-width:200px;font-size:15px}
+.job-banner .jb-bar{flex:1 1 160px;height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.job-banner .jb-bar span{display:block;height:100%;background:var(--accent);transition:width .6s ease}
+.job-banner b.jb-pct{font:600 15px var(--font-data)}
+.job-banner .jb-go{font-weight:600;color:var(--accent);white-space:nowrap}
+.jb-bar.big{display:block;height:10px;border-radius:5px;background:var(--line);overflow:hidden;margin:12px 0 0;max-width:620px}
+.jb-bar.big span{display:block;height:100%;background:var(--accent);transition:width .6s ease}
+.leave{margin:14px 0 6px;padding:12px 16px;border-radius:12px;border-left:4px solid var(--pos);
+  background:color-mix(in srgb,var(--pos) 10%,var(--surface));font-size:15.5px;line-height:1.5;max-width:720px}
+@media (prefers-reduced-motion:reduce){#paf-load.on .pl-bar{animation:none;width:60%}.pl-spin,.busy .btn.go::after{animation:none}}

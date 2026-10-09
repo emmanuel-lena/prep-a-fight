@@ -1,0 +1,18 @@
+.est{display:flex;flex-direction:column;gap:4px;max-width:640px;margin:0 0 18px;padding:12px 16px;border-radius:12px;
+  border:1px solid var(--line);border-left:4px solid var(--pos);background:var(--surface)}
+.est.collect{border-left-color:var(--warn)} .est b{font-size:15px} .est span{color:var(--muted);font-size:14.5px}
+.est-again{color:var(--muted);font-size:14px;margin:12px 0 0}
+.story{margin:10px 0 30px;max-width:640px}
+.story h2{font:600 26px/1.2 'Fraunces',Georgia,serif;margin:0 0 16px;text-transform:none;letter-spacing:0;color:var(--fg)}
+.goals{display:grid;gap:10px}
+.goal{display:block;cursor:pointer}
+.goal input{position:absolute;opacity:0;pointer-events:none}
+.goal>span{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border:1.5px solid var(--line);border-radius:12px;
+  transition:border-color .15s,background .15s}
+.goal b{font-size:17px} .goal small{color:var(--muted);font-size:14.5px;line-height:1.45}
+.goal input:checked+span{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.goal input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.recap{list-style:none;padding:0;margin:0 0 14px;display:grid;gap:8px;font-size:17px}
+.recap li::before{content:"\2713";color:var(--pos);font-weight:700;margin-right:10px}
+.recap li[hidden]{display:none}
+.what-sim{margin:6px 0 0} .what-sim label{display:block;margin:6px 0}

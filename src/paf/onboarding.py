@@ -7,7 +7,7 @@ step; without JavaScript the forms still work as plain posts.
 
 from __future__ import annotations
 
-from paf import settings
+from paf import settings, theme
 
 STEPS = ("welcome", "key", "character", "raid", "done")
 
@@ -147,34 +147,7 @@ def page_body() -> str:
 </div>"""
 
 
-CSS = """
-.ob{max-width:620px;margin:20px auto;position:relative}
-.ob-dots{display:flex;gap:8px;list-style:none;padding:0;margin:0 0 26px}
-.ob-dots li{width:34px;height:5px;border-radius:3px;background:var(--line);transition:background .3s}
-.ob-dots li.on{background:var(--accent)}
-.ob-step{display:none}
-.ob-step.on{display:block;animation:ob-in .45s cubic-bezier(.2,.8,.2,1)}
-.ob-step.back.on{animation-name:ob-back}
-@keyframes ob-in{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
-@keyframes ob-back{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
-.ob h1{font:600 32px/1.15 'Fraunces',Georgia,serif;margin:0 0 14px}
-.ob p,.ob li{font-size:16.5px;line-height:1.55}
-.ob-points{padding-left:20px;display:grid;gap:8px;margin:0 0 16px}
-.ob-actions{display:flex;gap:10px;align-items:center;margin-top:18px;flex-wrap:wrap}
-.ob .btn.go{font-size:17px;padding:11px 24px;border-radius:12px}
-.ob form input,.ob form select{font-size:16px;padding:10px 12px}
-.ob form .row{display:flex;gap:8px;flex-wrap:wrap} .ob form .row input{flex:1;min-width:140px}
-.ob form>input{display:block;width:100%;margin:0 0 8px;box-sizing:border-box}
-.ob textarea{width:100%;min-height:160px;box-sizing:border-box}
-.ob-err{color:var(--neg);min-height:1.2em;margin:8px 0 0}
-.ob-tabs{display:flex;gap:6px;margin:0 0 14px}
-.ob-tabs button{border:1.5px solid var(--line);background:none;color:var(--fg);border-radius:999px;padding:8px 16px;
-  cursor:pointer;font:inherit;font-weight:600}
-.ob-tabs button.on{background:var(--accent);border-color:var(--accent);color:var(--bg)}
-.ob .busy{opacity:.6;pointer-events:none}
-.ob-summary{font-size:18px}
-@media (prefers-reduced-motion:reduce){.ob-step.on{animation:none}}
-"""
+CSS = theme.style("onboarding")
 
 JS = """<script>
 (function(){

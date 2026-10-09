@@ -6,7 +6,7 @@ from __future__ import annotations
 import html
 import re
 
-from paf import icons
+from paf import icons, theme
 from paf.mechanics import Section, dedupe, encounter_sections, walk
 
 e = html.escape
@@ -136,15 +136,4 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
     return "".join(cards)
 
 
-CSS = """
-.guide ul{margin:6px 0 10px;padding-left:20px} .guide li{margin:4px 0}
-.stage summary{list-style:none;cursor:pointer} .stage summary h3{display:inline;font-size:16px}
-.stage summary::before{content:"\\25B8  ";color:var(--muted)} .stage[open] summary::before{content:"\\25BE  "}
-.fold>summary{list-style:none;cursor:pointer} .fold>summary::-webkit-details-marker{display:none}
-.fold:not([open])>summary span{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.fold:not([open])>summary::after{content:"\\2026 \\203A";color:var(--accent)}
-.unit .clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.ab{padding:8px 0;border-top:1px solid var(--line)} .ab .pill{font-size:11px;padding:1px 7px;margin-left:4px}
-.unit{padding:10px 0 2px;font-weight:700;color:var(--muted);text-transform:uppercase;font-size:12px;
-  letter-spacing:.04em}
-"""
+CSS = theme.style("bossguide")

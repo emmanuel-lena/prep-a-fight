@@ -21,6 +21,7 @@ import statistics as st
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from paf import theme
 from paf.corpus.analyze import kills_filter
 from paf.raidneed import HEALERS
 
@@ -215,7 +216,6 @@ def what_happened(rc, bosses: set[str], shares: dict[str, float]) -> list[Played
 def render(p: Plan, boss: str, difficulty: str, report: str, fight: str, played: list[Played] | None = None) -> str:
     import html
 
-    from paf import theme
 
     e = html.escape
 
@@ -269,8 +269,7 @@ as in the top raids. Estimated from each player's DPS in the log and the top 100
 {rows}</table></div>
 <details class="card"><summary>How it is computed</summary><p class="small muted">{e(__doc__ or '')}</p></details>
 </section>"""
-    css = (".tabs{display:flex;gap:6px;margin:14px 0}.tabs a{padding:7px 14px;border-radius:8px;border:1px solid "
-           "var(--line)}.tabs a.on{background:var(--accent-soft);border-color:var(--accent)}")
+    css = (theme.style("raidplan"))
     js = TAB_JS if happened else ""
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"<title>{e(boss)} raid plan</title>{theme.HEAD}<style>{theme.CSS}{css}</style></head><body>"

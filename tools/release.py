@@ -108,11 +108,23 @@ def wait_and_publish(tag: str, notes: str, timeout: float = 1200) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("version")
-    ap.add_argument("--message", required=True, help="file with the commit message (attribution lines included)")
+    ap.add_argument("--message", help="file with the commit message (attribution lines included)")
     ap.add_argument("--notes", required=True, help="release notes for the players")
     ap.add_argument("--dry-run", action="store_true", help="run the checks only")
+    ap.add_argument("--resume", action="store_true",
+                    help="the commit and tag of this version are pushed but its publication stopped (a build that "
+                         "failed for a network error and was run again): wait for the build and publish only")
     a = ap.parse_args()
     try:
+        if a.resume:  # nothing is committed, tagged or pushed: the release of this version, already pushed
+            if current_version() != a.version:
+                raise Stop(f"the working copy is at {current_version()}, not {a.version}")
+            if not run("git", "ls-remote", "--tags", "origin", f"v{a.version}", quiet=True).stdout.strip():
+                raise Stop(f"the tag v{a.version} is not on origin: nothing to resume")
+            wait_and_publish(f"v{a.version}", a.notes)
+            return 0
+        if not a.message:
+            raise Stop("--message is needed")
         old, new = current_version(), a.version
         if parse(new) <= parse(old):
             raise Stop(f"{new} is not above the current version {old}")

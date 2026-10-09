@@ -1,0 +1,12 @@
+.kpi .v{font-size:32px;font-weight:700;letter-spacing:.01em}
+.kpi .l{font-weight:600;letter-spacing:.08em}
+.pill{font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:600}
+.btn,button{letter-spacing:.03em;transition:transform .12s ease,box-shadow .12s ease,filter .12s ease}
+.btn:hover,button:hover{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 30%,transparent)}
+.btn:active,button:active{transform:translateY(1px)}
+.tile{transition:border-color .15s ease,transform .15s ease}
+a.tile:hover{transform:translateY(-2px)}
+.card,.tile{background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(4px)}
+.lead{max-width:68ch}
+p,li{max-width:80ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}

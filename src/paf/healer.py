@@ -19,6 +19,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from html import escape as e
 
+from paf import theme
+
 GRAPH = """query($c:String!,$f:[Int]!,$a:Float,$b:Float){ reportData { report(code:$c) {
   graph(fightIDs:$f, dataType:DamageTaken, hostilityType:Friendlies, startTime:$a, endTime:$b) } } }"""
 BOUNDS = """query($c:String!,$f:[Int]!){ reportData { report(code:$c) { fights(fightIDs:$f) { startTime endTime } } } }"""
@@ -206,17 +208,7 @@ def _mmss(t: float) -> str:
     return f"{int(t // 60)}:{int(t % 60):02d}"
 
 
-CSS = """<style>
-.hp-sec{margin:26px 0} .hp-sec h2{font:600 22px 'Fraunces',Georgia,serif;margin:0 0 10px;text-transform:none;letter-spacing:0}
-.rd{width:100%;height:auto;display:block} .rd polyline{fill:none;stroke:var(--neg);stroke-width:2.5}
-.rd .ax{stroke:var(--line)} .rd .ph{stroke:var(--accent);stroke-dasharray:4 4;opacity:.6}
-.rd .tk,.rd .ml{fill:var(--muted);font-size:11px} .rd .mk{fill:var(--warn)}
-.hl2{list-style:none;margin:0;padding:0;display:grid;gap:8px}
-.hl2 li{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;padding:10px 12px;border:1px solid var(--line);
-  border-radius:10px;background:var(--surface)} .hl2 small{color:var(--muted)} .hl2 .when{display:flex;flex-wrap:wrap;gap:6px;width:100%}
-.hl2 .chip{padding:3px 9px;border-radius:999px;border:1px solid var(--line);font-size:13px}
-.hl2 .copy{margin-left:auto}
-</style>"""
+CSS = "<style>" + theme.style("healer") + "</style>"
 JS = ("<script>document.addEventListener('click',function(e){var b=e.target.closest('[data-copy]');if(!b)return;"
       "navigator.clipboard.writeText(b.dataset.copy).then(function(){b.textContent='Copied'},function(){})})"
       "</script>")
