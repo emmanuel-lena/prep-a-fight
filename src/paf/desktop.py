@@ -121,6 +121,12 @@ def _after_reset() -> None:
             print("New week: preparing the raid again", flush=True)
     except Exception as ex:  # noqa: BLE001 - never in the way of the app's start
         print(f"no weekly refresh: {ex}", flush=True)
+    try:  # the last raid of the ticked characters (paf.lastraid)
+        from paf import lastraid
+
+        lastraid.start()
+    except Exception as ex:  # noqa: BLE001
+        print(f"no last raid: {ex}", flush=True)
 
 
 def main() -> int:

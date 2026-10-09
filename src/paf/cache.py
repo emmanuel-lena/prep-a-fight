@@ -45,16 +45,27 @@ def prune(path: Path, limit: int) -> int:
     return freed
 
 
-KEEP_RUNS = 5  # sim folders of the last preps, for debugging; nothing reads them afterwards
+KEEP_RUNS = 5  # sim folders of the last preps, for debugging
+KEEP_RESULTS_DAYS = 120  # a tool's result (result.json, its page reads it) outlives its run folder this long
 
 
 def prune_runs(root: Path, keep: int = KEEP_RUNS) -> int:
-    """Delete all but the newest ``keep`` run folders (each prep leaves ~30 MB of simc inputs and outputs)."""
+    """Delete all but the newest ``keep`` run folders (each prep leaves ~30 MB of simc inputs and outputs). A folder
+    with a tool's result keeps only that result (the tool's page shows it), for KEEP_RESULTS_DAYS."""
+    import time
+
     if not root.is_dir():
         return 0
     runs = sorted((d for d in root.iterdir() if d.is_dir()), key=lambda d: d.stat().st_mtime, reverse=True)
     freed = 0
     for d in runs[keep:]:
+        result = d / "result.json"
+        if result.is_file() and time.time() - result.stat().st_mtime < KEEP_RESULTS_DAYS * 86400:
+            for p in d.iterdir():
+                if p != result:
+                    freed += size(p) if p.is_dir() else p.stat().st_size
+                    shutil.rmtree(p, ignore_errors=True) if p.is_dir() else p.unlink(missing_ok=True)
+            continue
         freed += size(d)
         shutil.rmtree(d, ignore_errors=True)
     return freed

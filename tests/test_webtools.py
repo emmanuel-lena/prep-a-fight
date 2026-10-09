@@ -8,7 +8,7 @@ class Enc:
 def test_every_command_has_a_form_but_the_app_ones():
     names = set(webtools.subparsers())
     listed = {n for _, ns in webtools.GROUPS for n in ns}
-    assert names - listed == {"serve", "profile", "config", "raidqueue"}  # the app itself, home, settings, its queue
+    assert names - listed == {"serve", "profile", "config", "raidqueue", "lastraid", "raidlead"}  # the app
     page = webtools.tool_page("raidplan", [Enc()])
     assert "<select name='boss'>" in page and "name='swap_specs'" in page and "name='raid'" in page
     assert webtools.tool_page("serve", []) is None

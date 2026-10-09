@@ -14,13 +14,15 @@ The highlights put first what moved the most: a change smaller than the noise of
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 
 from paf import tracker, wipe
 
 FIGHTS = """query($c:String!){ reportData { report(code:$c) {
   masterData { actors(type:"Player") { id name icon } }
-  fights(killType: Encounters) { id encounterID difficulty kill startTime endTime bossPercentage } } } }"""
+  fights(killType: Encounters) { id encounterID difficulty kill startTime endTime bossPercentage friendlyPlayers }
+  } } }"""
 SOURCE_TABLE = """query($c:String!,$f:[Int]!,$s:Int!,$d:TableDataType!){ reportData { report(code:$c) {
   table(fightIDs:$f, dataType:$d, sourceID:$s) } } }"""
 ALL_DAMAGE = """query($c:String!,$f:[Int]!){ reportData { report(code:$c) {
@@ -73,7 +75,10 @@ def pulls(client, code: str, encounter_id: int, difficulty: int) -> tuple[list[d
     rep = client.query(FIGHTS, {"c": code}, cache_ttl=3600)["reportData"]["report"]
     fights = [f for f in rep["fights"] or [] if f["encounterID"] == encounter_id and f["difficulty"] == difficulty
               and f["endTime"] - f["startTime"] >= tracker.MIN_PULL * 1000]
-    return fights, {a["name"]: a for a in rep["masterData"]["actors"] or []}
+    # two players of the same name in a log (another realm): the one in the pulls of this boss
+    present = Counter(p for f in fights for p in f.get("friendlyPlayers") or [])
+    actors = sorted(rep["masterData"]["actors"] or [], key=lambda a: present.get(a["id"], 0))
+    return fights, {a["name"]: a for a in actors}
 
 
 def default_pair(fights: list[dict]) -> tuple[dict, dict] | None:

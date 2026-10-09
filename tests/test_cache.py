@@ -35,8 +35,12 @@ def test_prune_runs_keeps_the_newest(tmp_path):
         d = tmp_path / f"run{i}"
         (d / "x").mkdir(parents=True)
         os.utime(d, (1000 + i, 1000 + i))
+    tool = tmp_path / "run1"
+    (tool / "result.json").write_text("{}", encoding="utf-8")  # a tool's result: its page reads it
+    os.utime(tool, (1001, 1001))
     cache.prune_runs(tmp_path, keep=3)
-    assert sorted(p.name for p in tmp_path.iterdir()) == ["run5", "run6", "run7"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["run1", "run5", "run6", "run7"]
+    assert [p.name for p in tool.iterdir()] == ["result.json"]
 
 
 def test_find_simc_takes_the_newest_install_and_drops_the_others(tmp_path, monkeypatch):

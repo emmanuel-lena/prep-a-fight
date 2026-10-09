@@ -37,6 +37,8 @@ SETTINGS: dict[str, Setting] = {
                                   "collection", ("on", "off")),
     "refresh_after_reset": Setting("on", "after the weekly reset, prepare again by itself the bosses \"Prepare the "
                                          "whole raid\" prepared last week", ("on", "off")),
+    "auto_logs": Setting("active", "the characters whose last raid log the app reads when it starts (\"active\": "
+                                   "the active one; else their names, comma-separated; empty: none)"),
     "onboarded": Setting("off", "the first-run steps were done or skipped (off: show them again)", ("on", "off")),
 }
 

@@ -41,8 +41,8 @@ def page(title: str, body: str, refresh: int | None = None, nav: str = "", job: 
         running = loading.banners(skip=job)
     except Exception:  # noqa: BLE001 - a banner never breaks a page
         running = ""
-    nav = nav or ('<a href="/">Home</a><a href="/characters">Characters</a><a href="/tools">Tools</a>'
-                  '<a href="/settings">Settings</a><a href="/feedback">Feedback</a>')
+    nav = nav or ('<a href="/">Home</a><a href="/characters">Characters</a><a href="/raidlead">Raid lead</a>'
+                  '<a href="/tools">Tools</a><a href="/settings">Settings</a><a href="/feedback">Feedback</a>')
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}{loading.CSS}</style>{_class_style()}</head><body>"
             f"{theme.topbar(nav + lang_switch(), back=True, who=character_menu())}{loading.LOADER}"
@@ -609,10 +609,15 @@ ADD_FORM = ('<form method="post" action="/profile" class="add-form"><p class="sm
 
 def characters_page() -> str:
     """All your characters: play one, update its export, remove it; and add a new one."""
-    from paf import characters, icons
+    from paf import characters, icons, lastraid
 
+    auto = lastraid.ticked()
     cards = ""
     for c in characters.all_characters():
+        logs = (f'<form method="post" action="/character/autologs" class="cc-logs"><input type="hidden" name="slug" '
+                f'value="{e(c.slug)}"><input type="hidden" name="on" value="{"0" if c.slug in auto else "1"}">'
+                f'<label><input type="checkbox"{" checked" if c.slug in auto else ""} onchange="this.form.submit()"> '
+                f'Read my last raid when the app starts</label></form>')
         ic = icons.img(icons.CLASS_ICON.format(cls=c.class_name.lower()), "large", "cc-ic")
         badge = ('<span class="pill">from a log: no bags</span>' if c.imported else
                  f'<span class="pill">{c.bags} items in bags</span>')
@@ -628,7 +633,7 @@ def characters_page() -> str:
                   f'<form method="post" action="/character/remove"><input type="hidden" name="slug" value="{e(c.slug)}">'
                   f'<button class="btn danger">Yes, remove it</button></form>'
                   '<button type="button" class="btn ghost" onclick="this.closest(\'details\').open=false">Keep it'
-                  f'</button></div></details></div></div>')
+                  f'</button></div></details></div>{logs}</div>')
     empty = "" if cards else "<p class='muted'>No character yet: add your first one below.</p>"
     return (f"<h1>Your characters</h1><p class='lead'>One /simc export per character: switch in one click, paste "
             f"again after a gear change.</p><div class='ccards'>{cards}</div>{empty}"
@@ -845,6 +850,13 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
     ic = icons.img(icons.CLASS_ICON.format(cls=loaded.class_name.lower()), "large", "me-ic")
     items = prepared()
     board = raid_board(encs, loaded.class_name, loaded.spec)
+    try:
+        from paf import characters, lastraid
+
+        last = lastraid.card(characters.current_slug())
+        last = last + lastraid.CARD_JS if last else ""
+    except Exception:  # noqa: BLE001 - the home always shows
+        last = ""
     mine = (f'<details class="home-more"><summary>Every prep sheet ({len(items)})</summary>{boss_cards(items)}'
             f'</details>' if items else "")
     g = settings.get("guild")
@@ -855,7 +867,7 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
 <select name="boss" aria-label="Boss" class="big">{options}</select>
 <div class="segs" role="radiogroup" aria-label="Difficulty">{diffs}</div>
 <button class="btn go">Let's go &rarr;</button></form></section>
-{board}{mine}
+{last}{board}{mine}
 <details class="home-more"><summary>Change your character, your raid or your Warcraft Logs key</summary>
 <div class="card step"><div class="num">1</div><div class="body"><h3>Your character</h3>{character}</div></div>
 {guild}{creds}</details>"""
@@ -1377,6 +1389,15 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(b"", 404, "image/png")
             elif url.path == "/raid/prepare":
                 self._send(raid_prepare_page(q.get("difficulty", settings.get("difficulty"))))
+            elif url.path == "/raidlead":
+                from paf import raidlead
+
+                diff = q.get("difficulty") or raidlead.load().get("difficulty") or settings.get("difficulty")
+                self._send(page("Raid lead", raidlead.page_body(diff if diff in settings.DIFFICULTIES else "heroic")))
+            elif url.path == "/lastraid/card":
+                from paf import characters, lastraid
+
+                self._send(lastraid.card(characters.current_slug()).encode(), ctype="text/html; charset=utf-8")
             elif url.path == "/raid/strip":
                 self._send(queue_strip(settings.get("difficulty")).encode(), ctype="text/html; charset=utf-8")
             elif url.path == "/boss":
@@ -1589,6 +1610,31 @@ class Handler(BaseHTTPRequestHandler):
                     ready = fresh_bosses(encs, difficulty, settings.get("class"), settings.get("spec"))
                     raidqueue.start(raidqueue.build(encs, difficulty, characters.current_slug(), ready))
                 self._redirect("/#raidq")
+            elif self.path == "/raidlead/read":
+                from paf import raidlead
+
+                diff = (form.get("difficulty") or [settings.get("difficulty")])[0]
+                raidlead.start(diff if diff in settings.DIFFICULTIES else "heroic")
+                self._redirect("/raidlead")
+            elif self.path == "/raidlead/bench":
+                from paf import raidlead
+
+                raidlead.toggle_bench((form.get("name") or [""])[0])
+                self._redirect("/raidlead")
+            elif self.path == "/lastraid/again":
+                from paf import characters, lastraid
+
+                lastraid.again(characters.current_slug())
+                self._redirect("/#lastraid")
+            elif self.path == "/character/autologs":
+                from paf import lastraid
+
+                slug = (form.get("slug") or [""])[0]
+                if slug:
+                    lastraid.tick(slug, (form.get("on") or ["0"])[0] == "1")
+                    if (form.get("on") or ["0"])[0] == "1":
+                        lastraid.start()
+                self._redirect("/characters")
             elif self.path == "/raid/stop":
                 from paf import raidqueue
 

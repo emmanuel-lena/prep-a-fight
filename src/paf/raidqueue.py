@@ -21,7 +21,6 @@ import os
 import subprocess
 import sys
 import time
-import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -178,36 +177,19 @@ def _pending(boss: int, difficulty: str) -> int:
 def _run_item(q: dict, item: dict, log=print) -> str:
     """Run one prep as a job of the app; 'done', 'failed' or 'stopped' (the queue was stopped meanwhile)."""
     from paf.corpus.template import report_key
-    from paf.web import _env, _python
+    from paf.jobrun import run_job
 
     args = ["prep", str(item["boss"]), "--difficulty", q["difficulty"], "--queued"]
     if item["pass"] == "full":
         args.append("--refine")
-    jid = uuid.uuid4().hex[:8]
-    folder = data_dir() / "web"
     result = data_dir() / "reports" / f"prep-{report_key(item['name'], q['difficulty'])}.html"
-    meta = {"args": args, "result": str(result), "status": "running", "started": time.time(), "pid": None}
-    flags = {"creationflags": 0x08000000} if sys.platform == "win32" else {}  # CREATE_NO_WINDOW
-    with (folder / f"job-{jid}.log").open("w", encoding="utf-8", errors="replace") as out:
-        proc = subprocess.Popen([_python(), "-m", "paf", *args], stdout=out, stderr=subprocess.STDOUT,
-                                env={**_env(), "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}, **flags)
-        meta["pid"] = proc.pid
-        (folder / f"job-{jid}.json").write_text(json.dumps(meta), encoding="utf-8")
+
+    def started(jid: str) -> None:
         item["job"] = jid
         _keep(q)
-        while proc.poll() is None:
-            time.sleep(2)
-            now = load() or {}
-            if now.get("stop"):
-                proc.terminate()
-                proc.wait()
-                meta["status"] = "stopped"
-                (folder / f"job-{jid}.json").write_text(json.dumps(meta), encoding="utf-8")
-                return "stopped"
-    meta["status"] = "done" if proc.returncode == 0 else f"failed (exit {proc.returncode})"
-    (folder / f"job-{jid}.json").write_text(json.dumps(meta), encoding="utf-8")
-    log(f"{item['name']} ({item['pass']}): {meta['status']}")
-    return "done" if proc.returncode == 0 else "failed"
+
+    _jid, outcome = run_job(args, result, lambda: bool((load() or {}).get("stop")), started, log)
+    return outcome
 
 
 def _next(q: dict) -> dict | None:

@@ -99,6 +99,15 @@ prepared this week are kept) and says when it will be ready. Go and do something
 stop it, an icon in the notification area shows where it is and a notification says when your raid is ready. After
 the weekly reset, the app prepares the same bosses again by itself (setting `refresh_after_reset`).
 
+**The week after**: when the app starts, it finds your character's last raid log on Warcraft Logs (no link to paste)
+and reads it in the background: the night pull by pull, your rotation on the bosses you killed, why the others did
+not die and your worst pull against your best. The home page opens on *Your last raid*: two or three things to clean
+per boss. Tick the characters it reads on the Characters page.
+
+**Raid lead**: from your raid's last log, the roles on every prepared boss: who hits which add, who changes talents
+(boss or padding side, from the top players of each spec), which spec change is worth it; bench players in a click,
+copy the whole thing for Discord or as an MRT note.
+
 Or in one command:
 
 ```sh

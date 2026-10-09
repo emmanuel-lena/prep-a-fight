@@ -812,6 +812,21 @@ def _prep_healer(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_lastraid(args: argparse.Namespace) -> int:
+    """Read the last log of the characters ticked "read my logs at launch" (paf.lastraid; started by the app)."""
+    from paf import lastraid
+
+    return lastraid.run()
+
+
+def cmd_raidlead(args: argparse.Namespace) -> int:
+    """Read the raid's roster and its specs' talent rankings for the raid lead page (paf.raidlead; started by the
+    app)."""
+    from paf import raidlead
+
+    return raidlead.run()
+
+
 def cmd_raidqueue(args: argparse.Namespace) -> int:
     """Prepare every boss of the raid queue, one after the other (paf.raidqueue; started by the app)."""
     from paf import raidqueue
@@ -2455,6 +2470,10 @@ def build_parser() -> argparse.ArgumentParser:
     pr2.set_defaults(func=cmd_prep)
     rq = sub.add_parser("raidqueue", help="prepare the queued bosses one after the other (the app starts it)")
     rq.set_defaults(func=cmd_raidqueue)
+    lr = sub.add_parser("lastraid", help="read your characters' last raid log: what to clean (the app starts it)")
+    lr.set_defaults(func=cmd_lastraid)
+    rl = sub.add_parser("raidlead", help="read your raid's roster for the raid lead page (the app starts it)")
+    rl.set_defaults(func=cmd_raidlead)
     return p
 
 

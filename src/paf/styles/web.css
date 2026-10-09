@@ -123,3 +123,40 @@ ol.steps{list-style:none;margin:0;padding:0} .st{padding:7px 0;border-bottom:1px
   border:1px solid var(--line);border-left:4px solid var(--accent);background:var(--surface)}
 .rq-when b{font:600 20px var(--font-display)} .rq-when span{color:var(--muted)}
 .rb-d.wait small{color:var(--muted)}
+/* "Your last raid" (paf.lastraid) */
+.lr{margin:8px 0 26px}
+.lr h2{margin-top:10px} .lr-sub{color:var(--muted);margin:-6px 0 12px;font-size:14px}
+.lr-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.lr-boss{background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);border-left:4px solid var(--warn);
+  border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px;min-width:0}
+.lr-boss.kill{border-left-color:var(--pos)}
+.lr-boss header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}
+.lr-boss header b{font:600 16px var(--font-display)} .lr-state{color:var(--muted);font-size:13px;flex-basis:100%}
+.lr-boss ul{margin:0;padding-left:18px;display:grid;gap:6px} .lr-boss li{font-size:14.5px}
+.lr-links{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13.5px;margin-top:auto}
+.lr-wait{display:flex;align-items:center;gap:10px;color:var(--muted)}
+.lr-again{margin-top:12px}
+.lr-wide{margin:0 0 12px;padding:12px 16px;border-radius:var(--radius);border:1px solid var(--line);border-left:4px solid var(--accent);
+  background:var(--surface)} .lr-wide ul{margin:6px 0 0;padding-left:18px;display:grid;gap:4px}
+.cc-logs{flex-basis:100%;margin:6px 0 0;font-size:14px;color:var(--muted)} .cc-logs label{display:inline-flex;gap:8px;align-items:center;margin:0}
+/* the raid lead (paf.raidlead) */
+.rl-wait,.rl-start{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0;padding:14px 18px;
+  border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.rl-start p{margin:0;flex:1;min-width:260px}
+.rl-roster{margin:18px 0}
+.rl-chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
+.rl-p{margin:0} .rl-p button{display:inline-flex;flex-direction:column;align-items:flex-start;gap:0;padding:5px 12px;
+  border-radius:12px;border:1px solid var(--line);background:var(--surface-2);color:var(--fg);font:inherit;letter-spacing:0;cursor:pointer}
+.rl-p button b{font:600 14px var(--font-body)} .rl-p button small{color:var(--muted);font-size:11.5px}
+.rl-p button:hover{border-color:var(--accent);box-shadow:none}
+.rl-p.off button{opacity:.45;text-decoration:line-through}
+.rl-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+.rl-boss{background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px 16px;box-shadow:var(--shadow);min-width:0}
+.rl-boss header{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.rl-boss header h3{margin:0;flex:1;min-width:160px}
+.rl-boss h4{margin:12px 0 4px;font:600 12px var(--font-display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.rl-boss ul{margin:0;padding-left:18px;display:grid;gap:5px} .rl-boss li{font-size:14.5px}
+.rl-boss li small{color:var(--muted)}
+.btn.copy{padding:5px 10px;font-size:12.5px}
+h2 .btn.copy{margin-left:8px;vertical-align:middle;text-transform:none;letter-spacing:0}
