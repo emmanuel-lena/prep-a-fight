@@ -973,7 +973,10 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
 <p>{e(d.character)} &middot; {e(d.spec)} &middot; {d.kills} ranked kills &middot; {datetime.now():%d %b %Y %H:%M}</p>
 </div>{briefing.ready_ring(briefing.ready_count(d))}</div><nav class="tabs" aria-label="Sections"><div class="in" role="tablist"><a role="tab" class="back-simple" href="#simple">&larr; Simple view</a>{''.join(f'<a role="tab" href="#{k}">{e(label)}</a>' for k, label in TABS
                                                          if tabs[k])}</div></nav></header>"""
-    panels = f'<section class="panel" id="simple">{simple.simple_html(d)}</section>' + "".join(
+    minutes = simple.minutes_html(d)
+    panels = (f'<section class="panel" id="simple">{simple.simple_html(d)}</section>'
+              + (f'<section class="panel" id="minutes"><h2>The fight, minute by minute</h2>{minutes}</section>'
+                 if minutes else "")) + "".join(
         f'<section class="panel" id="{k}">{"".join(v)}</section>' for k, v in tabs.items() if v)
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"<title>{e(d.boss)} prep</title><script>document.documentElement.classList.add('js')</script>"

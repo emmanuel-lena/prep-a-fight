@@ -357,9 +357,39 @@ def fight_html(d) -> str:
                       f"<span class='vp-time'>{_mmss(start)} &ndash; {_mmss(end)}</span></summary>"
                       f"<ol class='vt'>{lines}</ol></details>")
     return (f"<article class='card s-fight'><h2>The fight, step by step</h2>"
+            f"<p class='to-minutes'><a class='btn' href='#minutes'>Minute by minute &rarr;</a></p>"
             f"<p class='what'>Left: what the boss does. Right: what you do. Open a phase to see it.</p>"
             f"<div class='vt-head' aria-hidden='true'><span>The boss</span><span></span><span>You</span></div>"
             f"{''.join(blocks)}</article>")
+
+
+def minutes_html(d) -> str:
+    """The fight one minute per screen (issue #9): the boss's spells on the left, what you press on the right, the minute
+    and its phase on top; scrolling snaps to the next minute, a mini-map of the whole fight jumps to one, the arrow and
+    page keys move by a minute; with reduced motion, plain sections."""
+    dur = d.duration or (d.fight.duration if d.fight else 0)
+    rows = _rows(_events(d))
+    if not dur or not rows:
+        return ""
+    phases = sorted(d.phases, key=lambda p: p[1]) or [("The fight", 0.0)]
+    count = int(dur // 60) + 1
+    sections, minimap = [], []
+    for m in range(count):
+        start, end = m * 60, min(dur, (m + 1) * 60)
+        mine = [r for r in rows if (r[0] == PULL and m == 0) or (r[0] != PULL and start <= r[0] < end)]
+        phase = next((n for n, t in reversed(phases) if t <= start + 1), phases[0][0])
+        idx = next((i for i, (n, _t) in enumerate(phases) if n == phase), 0)
+        lines = "".join(f"<li><div class='l'>{''.join(left)}</div><time>{'Pull' if t == PULL else _mmss(t)}</time>"
+                        f"<div class='r'>{''.join(right)}</div></li>" for t, left, right in mine)
+        body = (f"<div class='vt-head' aria-hidden='true'><span>The boss</span><span></span><span>You</span></div>"
+                f"<ol class='vt'>{lines}</ol>" if lines else
+                "<p class='mn-quiet'>A quiet minute: keep up your rotation.</p>")
+        sections.append(f"<section class='mn' id='m{m}' data-m='{m}'><div class='mn-in'><header class='mn-head'>"
+                        f"<b>{_mmss(start)} &ndash; {_mmss(end)}</b><span>{e(phase)}</span></header>{body}</div></section>")
+        minimap.append(f"<a href='#m{m}' class='ph{idx % 4}' data-m='{m}' title='{_mmss(start)} {e(phase)}'>"
+                       f"<span>{m}</span><i style='height:{min(100, len(mine) * 18)}%'></i></a>")
+    return (f"<div class='mins-wrap'><nav class='mmap' aria-label='The fight, minute by minute'>{''.join(minimap)}</nav>"
+            f"<div class='mins' tabindex='0'>{''.join(sections)}</div></div>")
 
 
 def simple_html(d) -> str:
@@ -369,6 +399,28 @@ def simple_html(d) -> str:
 
 
 CSS = """
+/* the fight minute by minute (paf.simple.minutes_html) */
+.mins-wrap{display:grid;grid-template-columns:56px minmax(0,1fr);gap:16px;max-width:1080px}
+.mins{height:calc(100vh - 170px);overflow-y:auto;scroll-snap-type:y mandatory;scroll-behavior:smooth;outline:none;
+  border-radius:16px;border:1px solid var(--line);background:var(--surface)}
+.mn{min-height:100%;scroll-snap-align:start;display:flex;padding:28px 30px;box-sizing:border-box}
+.mn-in{width:100%;opacity:.25;transform:translateY(28px) scale(.98);transition:opacity .45s ease,transform .45s ease}
+.mn.on .mn-in{opacity:1;transform:none}
+.mn-head{display:flex;align-items:baseline;gap:14px;margin:0 0 18px;padding:0 0 12px;border-bottom:1px solid var(--line)}
+.mn-head b{font:700 34px/1 var(--font-data);letter-spacing:-.02em} .mn-head span{color:var(--muted);font-size:16px}
+.mn-quiet{color:var(--muted);font-size:17px}
+.mmap{display:flex;flex-direction:column;gap:4px;position:sticky;top:90px;height:max-content}
+.mmap a{position:relative;display:flex;align-items:center;justify-content:center;height:30px;border-radius:8px;
+  border:1px solid var(--line);color:var(--muted);font:600 12px var(--font-data);text-decoration:none;overflow:hidden}
+.mmap a span{position:relative;z-index:1} .mmap a i{position:absolute;left:0;bottom:0;width:4px;background:var(--accent)}
+.mmap a.ph1{background:color-mix(in srgb,var(--accent) 6%,transparent)} .mmap a.ph2{background:color-mix(in srgb,var(--warn) 8%,transparent)}
+.mmap a.ph3{background:color-mix(in srgb,var(--pos) 7%,transparent)}
+.mmap a.on{border-color:var(--accent);color:var(--fg);box-shadow:0 0 0 1px var(--accent)}
+.to-minutes{margin:0 0 12px}
+@media (prefers-reduced-motion:reduce){.mins{height:auto;overflow:visible;scroll-snap-type:none}
+  .mn{min-height:0} .mn-in{opacity:1;transform:none;transition:none}}
+@media (max-width:640px){.mins-wrap{grid-template-columns:1fr}.mmap{flex-direction:row;flex-wrap:wrap;position:static}
+  .mmap a{width:34px}.mn{padding:18px 14px}}
 /* the simple view (paf.simple) */
 body.simple-on .tabs{display:none}
 .simple{max-width:980px;font-size:17px}
@@ -467,6 +519,19 @@ a.tal:hover{background:var(--surface-2)}
 """
 
 JS = """<script>
+(function(){var box=document.querySelector('.mins');if(!box)return;var secs=[].slice.call(box.querySelectorAll('.mn'));
+var links=[].slice.call(document.querySelectorAll('.mmap a'));
+function mark(m){secs.forEach(function(x){x.classList.toggle('on',x.dataset.m===m)});
+links.forEach(function(a){a.classList.toggle('on',a.dataset.m===m)})}
+if('IntersectionObserver' in window){var io=new IntersectionObserver(function(es){es.forEach(function(en){
+if(en.isIntersecting&&en.intersectionRatio>0.55)mark(en.target.dataset.m)})},{root:box,threshold:[0.55]});
+secs.forEach(function(x){io.observe(x)})}else{secs.forEach(function(x){x.classList.add('on')})}
+links.forEach(function(a){a.addEventListener('click',function(ev){ev.preventDefault();var t=document.getElementById('m'+a.dataset.m);
+if(t)box.scrollTo({top:t.offsetTop-box.offsetTop,behavior:'smooth'})})});
+box.addEventListener('keydown',function(ev){var cur=secs.findIndex(function(x){return x.classList.contains('on')});
+var n=({ArrowDown:1,PageDown:1,ArrowUp:-1,PageUp:-1})[ev.key];if(!n)return;ev.preventDefault();
+var t=secs[Math.max(0,Math.min(secs.length-1,(cur<0?0:cur)+n))];box.scrollTo({top:t.offsetTop-box.offsetTop,behavior:'smooth'})});
+if(secs[0])mark('0')})();
 (function(){
 // the note menu: closes after a copy, or on a click elsewhere
 document.addEventListener('click', function(ev){

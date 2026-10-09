@@ -97,3 +97,17 @@ def test_opener_and_precast_are_shown():
     view = simple.fight_html(d)
     assert "<time>Pull</time>" in view and "Before the pull:" in view
     assert view.index("<time>Pull</time>") < view.index("Ascendance")
+
+
+
+def test_the_fight_minute_by_minute():
+    from paf import simple
+    from paf.prep_report import PrepData
+
+    d = PrepData("Boss", "mythic", "Elemental", "X", duration=150)
+    d.phases = [("Stage One", 0.0), ("Intermission", 70.0)]
+    d.boss_casts = [("Big Slam", [10.0, 80.0])]
+    html = simple.minutes_html(d)
+    assert html.count("class='mn'") == 3  # 0:00-1:00, 1:00-2:00, 2:00-2:30
+    assert "Big Slam" in html and "Intermission" in html and "A quiet minute" in html
+    assert html.count("<a href='#m") == 3  # the mini-map
