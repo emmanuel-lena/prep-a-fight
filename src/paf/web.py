@@ -883,6 +883,14 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
         guide = (f"<h2>The boss in 60 seconds</h2>{bossguide.summary_html(sections, 'damage')}"
                  f"<details class='card'><summary>Every ability, phase by phase (Encounter Journal)</summary>"
                  f"{bossguide.abilities_html(sections, mechanics=mechs, icon_map=gicons)}</details>")
+    try:  # where the data will come from, and how long: from what will really happen (paf.estimate)
+        from paf import estimate
+
+        est = estimate.plan(con, enc.id, diff, settings.get("class"), spec, WCLClient())
+    except Exception:  # noqa: BLE001 - an estimate never breaks the page
+        est = None
+    est_html = (f"<div class='est {e(est.source)}'><b>{'Ready fast' if est.source != 'collect' else 'First prep'}"
+                f"</b><span>{e(est.sentence)}</span></div>") if est else ""
     raid_now = current_raid(enc, difficulty)
     g = settings.get("guild")
     raid_said = f"the latest public log of {g}" if g else ""
@@ -890,7 +898,7 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
     back = "<button type='button' class='btn ghost prev'>&larr; Back</button>"
     body = f"""<p class="small"><a href="/">&larr; Home</a></p>
 <h1>{e(enc.name)} <span class="pill gold">{e(DIFF_LABELS.get(difficulty, difficulty))}</span></h1>
-<p class="lead">{kills} ranked kills in your corpus.{last}</p>
+<p class="lead">{last.strip() or ""}</p>{est_html}
 <form method="post" action="/prep" class="ob story" data-boss="{enc.id}-{e(difficulty)}">
 <input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
 <ol class="ob-dots" aria-hidden="true"><li></li><li></li><li></li><li></li></ol>
@@ -924,6 +932,7 @@ placeholder="Link to one of your raid's logs: https://www.warcraftlogs.com/repor
 <label><input type="checkbox" name="gear" checked> Best gear from your bags, and what this boss drops for you</label>
 <label><input type="checkbox" name="optimize" checked> Ideal cooldown plan per objective
 <span class="muted small">(the slowest part: 20 to 40 min)</span></label></details>
+<p class="est-again">{e(est.sentence) if est else ""}</p>
 <div class="ob-actions">{back}<button class="btn go">Prepare this fight &rarr;</button></div>
 <p class="small muted">Runs on your computer; you can follow it live.</p></section>
 </form>
@@ -941,6 +950,10 @@ def _story_css() -> str:
     from paf.onboarding import CSS as ONBOARDING_CSS
 
     return "<style>" + ONBOARDING_CSS + """
+.est{display:flex;flex-direction:column;gap:4px;max-width:640px;margin:0 0 18px;padding:12px 16px;border-radius:12px;
+  border:1px solid var(--line);border-left:4px solid var(--pos);background:var(--surface)}
+.est.collect{border-left-color:var(--warn)} .est b{font-size:15px} .est span{color:var(--muted);font-size:14.5px}
+.est-again{color:var(--muted);font-size:14px;margin:12px 0 0}
 .story{margin:10px 0 30px;max-width:640px}
 .story h2{font:600 26px/1.2 'Fraunces',Georgia,serif;margin:0 0 16px;text-transform:none;letter-spacing:0;color:var(--fg)}
 .goals{display:grid;gap:10px}

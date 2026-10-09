@@ -26,6 +26,8 @@ from paf.raidneed import AddType
 from paf.talent_sim import Build
 
 VERSION = 1
+MIN_KILLS = 100  # fewer: the add waves may split (measured at 84 kills); a pack under it is neither shared nor used
+GROWN = 50  # the local corpus has this many more kills than the pack: the pack is made again from it
 # weekly reset per region, in UTC (weekday: Monday = 0). To check against Blizzard's announcements: EU Wednesday
 # morning, NA Tuesday, Asia Thursday morning local time (Wednesday evening UTC).
 RESETS = {"eu": (2, 4), "us": (1, 15), "kr": (2, 23), "tw": (2, 23), "cn": (2, 23)}
@@ -204,8 +206,13 @@ def _request(url: str, data: bytes | None = None, method: str = "GET"):
     return urllib.request.urlopen(req, timeout=30)
 
 
+def usable(p: PackData) -> bool:
+    """Made by this version of the packs, from enough kills to trust its add waves."""
+    return p.version == VERSION and p.kills >= MIN_KILLS
+
+
 def fetch_shared(encounter_id: int, difficulty: int, class_name: str, spec: str) -> PackData | None:
-    """The shared pack of this spec, boss and difficulty, if the relay has one (saved locally too)."""
+    """The shared pack of this spec, boss and difficulty, if the relay has one we can trust (saved locally too)."""
     import urllib.error
 
     base = relay()
@@ -218,6 +225,8 @@ def fetch_shared(encounter_id: int, difficulty: int, class_name: str, spec: str)
         return None
     except (OSError, ValueError, KeyError, TypeError):
         return None
+    if not usable(p):
+        return None
     save(p)
     return p
 
@@ -229,6 +238,8 @@ def publish(p: PackData) -> str:
     base = relay()
     if not base:
         return "not shared (no relay in this build)"
+    if not usable(p):
+        return f"not shared (made from {p.kills} kills, {MIN_KILLS} needed)"
     try:
         with _request(f"{base}/packs/{key(p.encounter_id, p.difficulty, p.class_name, p.spec)}",
                       to_json(p).encode("utf-8"), "PUT"):

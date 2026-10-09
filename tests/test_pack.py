@@ -94,3 +94,14 @@ def test_shared_packs_through_the_relay(tmp_path, monkeypatch):
     assert got.kills == 199 and pack.load(3470, 5, "Shaman", "Elemental") is not None  # kept locally too
     monkeypatch.setenv("PAF_FEEDBACK_URL", "https://discord.com/api/webhooks/1/x")
     assert pack.relay() == "" and "no relay" in pack.publish(_pack())
+
+
+
+def test_a_pack_from_too_few_kills_or_an_old_version_is_not_used():
+    p = _pack()
+    p.kills = pack.MIN_KILLS
+    assert pack.usable(p)
+    p.kills = pack.MIN_KILLS - 1
+    assert not pack.usable(p)
+    p.kills, p.version = pack.MIN_KILLS, pack.VERSION - 1
+    assert not pack.usable(p)

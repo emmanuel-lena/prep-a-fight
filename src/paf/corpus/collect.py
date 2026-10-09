@@ -393,10 +393,11 @@ def backfill_npc_actors(client: WCLClient, con: sqlite3.Connection, encounter_id
 
 
 def collect(client: WCLClient, con: sqlite3.Connection, enc: Encounter, difficulty: int, *,
-            points_per_hour: float = 1500, retry_errors: bool = False,
+            points_per_hour: float = 1500, retry_errors: bool = False, limit: int | None = None,
             log: Callable[[str], None] = lambda s: print(s, flush=True),
             sleep: Callable[[float], None] = time.sleep) -> dict[str, int]:
-    """Fetch every pending kill of this encounter/difficulty. Resumable."""
+    """Fetch every pending kill of this encounter/difficulty (the best ranked first), or the first `limit` of them.
+    Resumable."""
     statuses = ("pending", "error") if retry_errors else ("pending",)
     todo = con.execute(
         "SELECT f.report, f.fight_id, r.name, r.class, r.spec, r.dps "
@@ -404,6 +405,8 @@ def collect(client: WCLClient, con: sqlite3.Connection, enc: Encounter, difficul
         f"WHERE f.encounter_id=? AND f.difficulty=? AND f.status IN ({','.join('?' * len(statuses))}) "
         f"ORDER BY r.rank_pos",
         (enc.id, difficulty, *statuses)).fetchall()
+    if limit is not None:
+        todo = todo[:max(0, limit)]
     stats = {"done": 0, "error": 0, "todo": len(todo)}
     for i, row in enumerate(todo, 1):
         if i == 1 or i % 10 == 0:

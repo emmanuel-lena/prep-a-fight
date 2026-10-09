@@ -132,6 +132,44 @@ def _encounter_and_difficulty(args: argparse.Namespace):
     return client, enc, diff_name, settings.DIFFICULTIES[diff_name]
 
 
+FIRST_SHEET = 100  # kills a first prep waits for (measured: the fight as with 200, talent rates within 3 points)
+
+
+def _complete_corpus_later(con, enc, diff: int, args: argparse.Namespace) -> None:
+    """The kills of the corpus still pending after a prep: fetched by a background `paf corpus` (one per boss and
+    difficulty), with the quota share of the background collection; the next prep uses them."""
+    import os
+    import subprocess
+    import sys
+
+    from paf.config import data_dir
+
+    pending = con.execute("SELECT COUNT(*) FROM fight WHERE encounter_id=? AND difficulty=? AND status='pending'",
+                          (enc.id, diff)).fetchone()[0]
+    if not pending:
+        return
+    folder = data_dir() / "web"
+    folder.mkdir(parents=True, exist_ok=True)
+    lock = folder / f"corpus-{enc.id}-{diff}.pid"
+    try:
+        from paf.web import pid_alive
+
+        if lock.is_file() and pid_alive(int(lock.read_text().strip() or 0)):
+            print(f"  {pending} more kills are already downloading in the background.")
+            return
+    except (ValueError, OSError):
+        pass
+    cmd = [sys.executable, "-m", "paf", "corpus", str(enc.id)] + (
+        ["--difficulty", args.difficulty] if args.difficulty else [])
+    flags = 0x00000008 | 0x08000000 if sys.platform == "win32" else 0  # DETACHED_PROCESS, CREATE_NO_WINDOW
+    with (folder / f"corpus-{enc.id}-{diff}.log").open("a", encoding="utf-8") as out:
+        proc = subprocess.Popen(cmd, stdout=out, stderr=subprocess.STDOUT, creationflags=flags,
+                                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+                                **({} if sys.platform == "win32" else {"start_new_session": True}))
+    lock.write_text(str(proc.pid))
+    print(f"  {pending} more kills download in the background: prepare again later for the full corpus.")
+
+
 def cmd_corpus(args: argparse.Namespace) -> int:
     from paf import settings
     from paf.corpus import db
@@ -169,8 +207,10 @@ def cmd_corpus(args: argparse.Namespace) -> int:
         con.commit()
     from paf import settings as _settings
 
-    stats = collect(client, con, enc, diff, retry_errors=args.retry,
-                    points_per_hour=_settings.get("corpus_points"))
+    # a prep the player waits for takes the whole quota; the background collection leaves the rest to the app
+    full = getattr(args, "full_quota", False)
+    stats = collect(client, con, enc, diff, retry_errors=args.retry, limit=getattr(args, "limit", None),
+                    points_per_hour=3600 if full else _settings.get("corpus_points"))
     total = con.execute("SELECT COUNT(*) FROM fight WHERE encounter_id=? AND difficulty=? AND status='done'",
                         (enc.id, diff)).fetchone()[0]
     print(f"Done: {stats['done']} fetched, {stats['error']} skipped; {total} kills in the corpus ({db.db_path()})")
@@ -704,6 +744,12 @@ def cmd_prep(args: argparse.Namespace) -> int:
         print(f"Prep pack from {pk.created[:16].replace('T', ' ')} UTC: made before this week's reset, rebuilding it "
               f"from the logs.")
         pk = None
+    if pk is not None:  # the corpus grew since (the background download after a first prep): a finer pack from it
+        local = con.execute("SELECT COUNT(*) FROM fight WHERE encounter_id=? AND difficulty=? AND status='done' "
+                            "AND COALESCE(cohort, '') != 'focus'", (enc.id, diff)).fetchone()[0]
+        if local >= pk.kills + pack.GROWN:
+            print(f"Your corpus has {local} kills, the prep pack {pk.kills}: making it again from the corpus.")
+            pk = None
     if pk is not None:  # what the logs give, already computed: no corpus, no validation sims
         step(f"Using the prep pack ({pk.kills} top kills, {pk.created[:10]})")
         boss = pk.boss
@@ -715,9 +761,12 @@ def cmd_prep(args: argparse.Namespace) -> int:
                            "AND COALESCE(cohort, '') != 'focus'",
                            (enc.id, diff)).fetchone()[0]
         if done < 20 or args.refresh:
+            # the sheet from the first FIRST_SHEET kills (paf.corpus: the fight is as precise as with 200, the
+            # talents within 3 points), the whole quota; the rest of the corpus comes in the background afterwards
             step("Collecting the corpus from Warcraft Logs")
             cmd_corpus(argparse.Namespace(boss=args.boss, difficulty=args.difficulty, kills=None, ilvl=None,
-                                          list_only=False, retry=False, refetch=False))
+                                          list_only=False, retry=False, refetch=False, full_quota=True,
+                                          limit=max(0, FIRST_SHEET - done)))
         mech_missing = con.execute(
             "SELECT COUNT(*) FROM fight f LEFT JOIN mech_status m USING(report, fight_id) "
             "WHERE f.encounter_id=? AND f.difficulty=? AND f.status='done' AND m.report IS NULL "
@@ -1106,6 +1155,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
     out.with_suffix(".json").write_text(json.dumps(summary), encoding="utf-8")  # headline for the app's home
     step("Done")
     clock.save()
+    if pk is None:
+        _complete_corpus_later(con, enc, diff, args)
     from paf.prep_report import headline
 
     for line in headline(d):

@@ -21,8 +21,9 @@ PREP_STEPS = (
     ("Using the prep pack", "Reuse a shared prep pack",
      "Another player already prepared this boss with your spec today: what the logs give is reused, no download.", 0),
     ("Collecting the corpus", "Download the top players' kills",
-     "About 200 kills of the best players of your spec, from Warcraft Logs. Your key allows 3600 points an hour, so "
-     "the download is paced; it happens once per boss and is then shared with the other players.", 20),
+     "The first 100 kills of the best players of your spec, from Warcraft Logs (the rest comes in the background "
+     "after the prep). Your key allows 3600 points an hour, so the download is paced; it happens once per boss and "
+     "is then shared with the other players.", 12),
     ("Collecting who handles", "Who handles each mechanic",
      "Who gets the debuffs and who interrupts, in each of these kills.", 4),
     ("Analyzing the corpus", "Rebuild the typical fight",
