@@ -146,7 +146,8 @@ def banner(jid: str, job: dict) -> str:
     log = job["log"].read_text(encoding="utf-8", errors="replace") if job["log"].is_file() else ""
     pct, left = percent(log, time.time() - job["started"])
     eta = "almost done" if left < 1.5 else f"about {round(left)} min left"
-    return (f"<a class='job-banner' data-job='{e(jid)}' href='/job/{e(jid)}'><span class='jb-txt'>Preparing "
+    verb = "Full analysis of" if "--refine" in (job.get("args") or []) else "Preparing"
+    return (f"<a class='job-banner' data-job='{e(jid)}' href='/job/{e(jid)}'><span class='jb-txt'>{verb} "
             f"<b>{e(_boss_name(job['args']))}</b>: <b class='jb-pct'>{pct}%</b> &middot; {eta}</span>"
             f"<span class='jb-bar'><span style='width:{pct}%'></span></span><span class='jb-go'>See &rarr;</span></a>")
 

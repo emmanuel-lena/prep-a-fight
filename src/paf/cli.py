@@ -135,12 +135,15 @@ def _encounter_and_difficulty(args: argparse.Namespace):
 FIRST_SHEET = 100  # kills a first prep waits for (measured: the fight as with 200, talent rates within 3 points)
 
 
-def _complete_corpus_later(con, enc, diff: int, args: argparse.Namespace) -> None:
-    """The kills of the corpus still pending after a prep: fetched by a background `paf corpus` (one per boss and
-    difficulty), with the quota share of the background collection; the next prep uses them."""
+def _refine_later(con, enc, diff: int, sheet) -> None:
+    """After a first prep from part of the corpus: a second pass of the same prep (`--refine`), detached, that
+    downloads the rest of the corpus and makes the sheet again from all of it. It is a job of the app (its banner
+    shows its progress; the sheet's page reloads when it is done); one per boss and difficulty."""
+    import json
     import os
     import subprocess
     import sys
+    import uuid
 
     from paf.config import data_dir
 
@@ -150,24 +153,26 @@ def _complete_corpus_later(con, enc, diff: int, args: argparse.Namespace) -> Non
         return
     folder = data_dir() / "web"
     folder.mkdir(parents=True, exist_ok=True)
-    lock = folder / f"corpus-{enc.id}-{diff}.pid"
-    try:
-        from paf.web import pid_alive
+    from paf.web import pid_alive
 
-        if lock.is_file() and pid_alive(int(lock.read_text().strip() or 0)):
-            print(f"  {pending} more kills are already downloading in the background.")
+    for meta in folder.glob("job-*.json"):  # already refining this boss
+        try:
+            m = json.loads(meta.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if "--refine" in m.get("args", []) and m.get("result") == str(sheet) and m.get("pid") and pid_alive(m["pid"]):
             return
-    except (ValueError, OSError):
-        pass
-    cmd = [sys.executable, "-m", "paf", "corpus", str(enc.id)] + (
-        ["--difficulty", args.difficulty] if args.difficulty else [])
+    args = [x for x in sys.argv[1:] if x not in ("--refresh", "--open")] + ["--refine"]
+    jid = uuid.uuid4().hex[:8]
     flags = 0x00000008 | 0x08000000 if sys.platform == "win32" else 0  # DETACHED_PROCESS, CREATE_NO_WINDOW
-    with (folder / f"corpus-{enc.id}-{diff}.log").open("a", encoding="utf-8") as out:
-        proc = subprocess.Popen(cmd, stdout=out, stderr=subprocess.STDOUT, creationflags=flags,
-                                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+    with (folder / f"job-{jid}.log").open("w", encoding="utf-8") as out:
+        proc = subprocess.Popen([sys.executable, "-m", "paf", *args], stdout=out, stderr=subprocess.STDOUT,
+                                creationflags=flags, env={**os.environ, "PYTHONIOENCODING": "utf-8",
+                                                          "PYTHONUNBUFFERED": "1"},
                                 **({} if sys.platform == "win32" else {"start_new_session": True}))
-    lock.write_text(str(proc.pid))
-    print(f"  {pending} more kills download in the background: prepare again later for the full corpus.")
+    (folder / f"job-{jid}.json").write_text(json.dumps({"args": args, "result": str(sheet), "status": "running",
+                                                        "started": time.time(), "pid": proc.pid}), encoding="utf-8")
+    print(f"  {pending} more kills: the full analysis runs in the background; the sheet refreshes when it is done.")
 
 
 def cmd_corpus(args: argparse.Namespace) -> int:
@@ -734,8 +739,10 @@ def cmd_prep(args: argparse.Namespace) -> int:
     from paf import pack
 
     cls = settings.get("class")
-    pk = None if args.refresh else pack.load(enc.id, diff, cls, spec)
-    if not args.refresh and (pk is None or pack.is_stale(pk.created)):
+    partial = None  # a first pass from part of the corpus: (kills used, kills found)
+    fresh = args.refresh or args.refine  # the second pass makes the pack again from the whole corpus
+    pk = None if fresh else pack.load(enc.id, diff, cls, spec)
+    if not fresh and (pk is None or pack.is_stale(pk.created)):
         shared = pack.fetch_shared(enc.id, diff, cls, spec)  # another player of the app may have made a fresh one
         if shared is not None and (pk is None or shared.created > pk.created):
             pk = shared
@@ -760,13 +767,13 @@ def cmd_prep(args: argparse.Namespace) -> int:
         done = con.execute("SELECT COUNT(*) FROM fight WHERE encounter_id=? AND difficulty=? AND status='done' "
                            "AND COALESCE(cohort, '') != 'focus'",
                            (enc.id, diff)).fetchone()[0]
-        if done < 20 or args.refresh:
+        if done < 20 or args.refresh or args.refine:
             # the sheet from the first FIRST_SHEET kills (paf.corpus: the fight is as precise as with 200, the
             # talents within 3 points), the whole quota; the rest of the corpus comes in the background afterwards
             step("Collecting the corpus from Warcraft Logs")
             cmd_corpus(argparse.Namespace(boss=args.boss, difficulty=args.difficulty, kills=None, ilvl=None,
                                           list_only=False, retry=False, refetch=False, full_quota=True,
-                                          limit=max(0, FIRST_SHEET - done)))
+                                          limit=None if args.refine else max(0, FIRST_SHEET - done)))
         mech_missing = con.execute(
             "SELECT COUNT(*) FROM fight f LEFT JOIN mech_status m USING(report, fight_id) "
             "WHERE f.encounter_id=? AND f.difficulty=? AND f.status='done' AND m.report IS NULL "
@@ -778,6 +785,11 @@ def cmd_prep(args: argparse.Namespace) -> int:
             step(f"Collecting who handles each mechanic ({mech_missing} kills)")
             fetch_mechanics(client, con, enc.id, diff, [])
 
+        if not args.refine:  # a first pass from part of the ranked kills: the sheet says so
+            used, pending = (con.execute(f"SELECT COUNT(*) FROM fight WHERE encounter_id=? AND difficulty=? "
+                                         f"AND status='{st}'", (enc.id, diff)).fetchone()[0]
+                             for st in ("done", "pending"))
+            partial = (used, used + pending) if pending else None
         step("Analyzing the corpus")
         boss = main_boss(con, enc.id, diff, enc.name)
         rep = analyze(con, enc.id, diff, boss, spec)
@@ -796,6 +808,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
     refresh_notes(template_path(enc.name, diff_name), raw)
     fight = with_notes(raw, template_path(enc.name, diff_name), verbose=True)
     d = PrepData(enc.name, diff_name, spec, profile.name or origin, kills=kills, duration=fight.duration)
+    d.partial = partial
     from paf.characters import is_imported
 
     d.imported = is_imported(profile_text)  # found on Warcraft Logs: no bags, the sheet asks for the /simc export
@@ -1155,8 +1168,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
     out.with_suffix(".json").write_text(json.dumps(summary), encoding="utf-8")  # headline for the app's home
     step("Done")
     clock.save()
-    if pk is None:
-        _complete_corpus_later(con, enc, diff, args)
+    if pk is None and not args.refine:
+        _refine_later(con, enc, diff, out)
     from paf.prep_report import headline
 
     for line in headline(d):
@@ -2303,6 +2316,7 @@ def build_parser() -> argparse.ArgumentParser:
                      help="skip the validation on the top players' characters (no movement calibration)")
     pr2.add_argument("--refresh", action="store_true", help="collect new kills first")
     pr2.add_argument("--open", action="store_true", help="open the sheet in the browser")
+    pr2.add_argument("--refine", action="store_true", help=argparse.SUPPRESS)  # the second pass, run by the first
     pr2.set_defaults(func=cmd_prep)
     return p
 

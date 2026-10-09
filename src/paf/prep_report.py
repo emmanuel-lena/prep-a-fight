@@ -92,6 +92,7 @@ class PrepData:
     movement: object | None = None  # paf.movement.Movement: move for the strategy, stand still otherwise
     review: object | None = None  # paf.review.Review: your own log next to the top players' (casting, moving)
     raid_tools: dict = field(default_factory=dict)  # comp / wipe / night: paf.workshop_views data
+    partial: tuple[int, int] | None = None  # a first pass: (kills used, kills found); the full pass follows
     imported: bool = False  # the character was read from a log (no bags): no gear nor loot until /simc
     class_name: str = ""  # e.g. "shaman" (class icon in the header)
     guide_summary: str = ""  # html: the boss in 60 seconds (Encounter Journal, your role)
@@ -289,6 +290,9 @@ CSS = theme.CSS + bossguide.CSS + """
 .kpis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin:18px 0 6px}
 .kpi.good .v{color:var(--pos)} .kpi.warn .v{color:var(--warn)}
 .warn{color:var(--warn)}
+.partial{display:flex;flex-direction:column;gap:4px;margin:0 0 16px;padding:12px 16px;border-radius:12px;
+  border:1px solid var(--line);border-left:4px solid var(--warn);background:var(--surface)}
+.partial span{color:var(--muted);font-size:14px}
 /* header and tabs */
 .sheet-hero{background:var(--header);color:#fff}
 .sheet-hero .in{max-width:1040px;margin:0 auto;padding:16px 16px 10px;display:flex;gap:14px;align-items:center}
@@ -714,6 +718,12 @@ def render(d: PrepData) -> str:
     # overview: a raid briefing (paf.briefing); before it, the simple view (paf.simple)
     from paf import briefing, simple
 
+    if getattr(d, "partial", None):
+        used, found = d.partial
+        tabs["overview"].append(
+            f"<div class='partial'><b>First analysis, from {used} of the {found} top kills</b><span>Measured on our "
+            "corpora: the fight is within about 2% of the full corpus and the talent pick rates within about 3 points. "
+            "The full analysis runs in the background: this sheet refreshes by itself when it is done.</span></div>")
     tabs["overview"].append(briefing.lede_html(d) + briefing.confidence_pill(d))
     if d.kills and d.kills < THIN_CORPUS:
         tabs["overview"].append(

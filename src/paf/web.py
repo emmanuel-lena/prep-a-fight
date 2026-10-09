@@ -535,9 +535,22 @@ def view_page(key: str, tab: str) -> bytes:
            + (f'<a href="/share/{e(key)}">Share</a>' if "prep" in item["files"] else "")
            + f'<a href="{PUBLIC_BASE}{src}" target="_blank">Open alone</a>')
     css = "body{display:flex;flex-direction:column;height:100vh}iframe{border:0;width:100%;flex:1;display:block}"
+    watch = ""
+    try:  # the full pass of this sheet running: the page reloads when it is done
+        from paf import loading
+
+        refining = next((jid for jid, job in loading.running_preps() if "--refine" in (job["args"] or [])
+                         and job["result"] and Path(job["result"]).stem == f"prep-{key}"), None)
+    except Exception:  # noqa: BLE001
+        refining = None
+    if refining:
+        nav += f'<a href="/job/{e(refining)}">Full analysis running&hellip;</a>'
+        watch = ("<script>setInterval(function(){fetch('/job/" + refining + "?part=live').then(function(r){"
+                 "return r.text()}).then(function(t){if(t.indexOf('data-reload')>=0)location.reload()})"
+                 ".catch(function(){})},15000)</script>")
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"<title>{e(item['name'])}</title>{theme.HEAD}<style>{CSS}{css}</style></head><body>{theme.topbar(nav + lang_switch())}"
-            f'<iframe src="{src}" title="{e(item["name"])}"></iframe></body></html>').encode()
+            f'<iframe src="{src}" title="{e(item["name"])}"></iframe>{watch}</body></html>').encode()
 
 
 def _boss_link(item: dict) -> str:
