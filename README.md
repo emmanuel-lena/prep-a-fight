@@ -94,6 +94,11 @@ paf serve                    # opens http://127.0.0.1:8765: paste your /simc, pi
                              # assignments (kick, soak...), run: the prep sheet opens when it is ready
 ```
 
+**The whole raid in one press**: on the home page, *Prepare the whole raid* queues every boss (the ones already
+prepared this week are kept) and says when it will be ready. Go and do something else: closing the app does not
+stop it, an icon in the notification area shows where it is and a notification says when your raid is ready. After
+the weekly reset, the app prepares the same bosses again by itself (setting `refresh_after_reset`).
+
 Or in one command:
 
 ```sh

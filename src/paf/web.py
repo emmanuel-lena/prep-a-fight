@@ -638,6 +638,130 @@ def characters_page() -> str:
 DIFF_SHAPES = (("normal", "tri"), ("heroic", "sq"), ("mythic", "penta"))  # WoW's green, blue, purple
 
 
+def journal_order(encs) -> list:
+    """The bosses in the Encounter Journal's order (the raid's order); as given when the Journal cannot be had."""
+    try:
+        from paf.bossimg import journal
+
+        _portraits, order = journal()
+    except Exception:  # noqa: BLE001 - offline
+        order = {}
+    return sorted(encs, key=lambda x: order.get(x.id, (1 << 30, 0)))
+
+
+def fresh_bosses(encs, difficulty: str, class_name: str, spec: str) -> set[int]:
+    """The bosses with a prep sheet of this week (made after the last reset) at this difficulty for this spec."""
+    from datetime import UTC, datetime
+
+    from paf import pack
+    from paf.corpus.template import _slug
+
+    mine = f"{spec}-{class_name}".lower().replace(" ", "-")
+    done = {x["key"]: x for x in prepared()}
+    out = set()
+    for x in encs:
+        item = done.get(f"{_slug(x.name)}-{difficulty}-{mine}")
+        if item and "prep" in item["files"] and not pack.is_stale(
+                datetime.fromtimestamp(item["mtime"], UTC).isoformat()):
+            out.add(x.id)
+    return out
+
+
+def queue_strip(difficulty: str) -> str:
+    """Above the raid board (issue #21): "Prepare the whole raid", or where the queue is; it updates itself."""
+    from paf import characters, raidqueue
+
+    q = raidqueue.load()
+    if raidqueue.active(q):
+        ready, total, now = raidqueue.progress(q)
+        pct = round(100 * ready / total) if total else 0
+        word = "boss" if total == 1 else "bosses"
+        head = (f"Preparing your raid: <b>{ready} of {total}</b> {word} ready" if ready < total else
+                f"Your raid is ready: <b>{total} {word}</b>")
+        doing = ""
+        if now:
+            doing = (f"Full analysis of {e(now['name'])} in the background: the sheet updates by itself"
+                     if now["pass"] == "full" else f"Now: {e(now['name'])}")
+        return (f"<div class='rq on' id='raidq' role='status' data-ready='{ready}'><div class='rq-txt'>"
+                f"<span class='rq-head'>{head}</span><span class='rq-now'>{doing}</span>"
+                "<small>You can close the app: it keeps going from the notification area and tells you when your "
+                f"raid is ready.</small></div><span class='rq-bar' aria-hidden='true'><span style='width:{pct}%'>"
+                "</span></span><form method='post' action='/raid/stop'><button class='btn ghost'>Stop</button>"
+                "</form></div>")
+    note = ""
+    if q and q.get("character") == characters.current_slug() and any(i["status"] == "waiting" for i in q["items"]):
+        note = ("<small>Paused when you switched characters: prepare again to go on.</small>"
+                if q.get("paused") == "character" else
+                "<small>Stopped: prepare again to go on, the bosses already prepared stay.</small>")
+    return (f"<div class='rq' id='raidq'><div class='rq-txt'><span class='rq-head'>Prepare the whole raid in one "
+            f"go</span><span class='rq-now'>Every boss, one after the other, while you do something else.</span>"
+            f"{note}</div><a class='btn' href='/raid/prepare?difficulty={e(difficulty)}'>Prepare the whole raid</a>"
+            "</div>")
+
+
+QUEUE_JS = """<script>(function(){var s=document.getElementById('raidq');if(!s||!s.classList.contains('on'))return;
+setInterval(function(){fetch('/raid/strip').then(function(r){return r.text()}).then(function(h){
+var t=document.createElement('div');t.innerHTML=h;var n=t.firstElementChild;if(!n)return;
+if(n.dataset.ready!==s.dataset.ready||!n.classList.contains('on')){location.reload();return}
+s.replaceWith(n);s=n}).catch(function(){})},8000)})();</script>"""
+
+
+def raid_prepare_page(difficulty: str) -> bytes:
+    """Before the whole raid is queued: the bosses to prepare, those already prepared this week, how long until
+    every boss has its sheet (the quota shared), and the button."""
+    from datetime import datetime, timedelta
+
+    from paf import raidqueue
+    from paf.corpus import db
+    from paf.wcl import WCLClient
+
+    if difficulty not in settings.DIFFICULTIES:
+        difficulty = settings.get("difficulty")
+    encs = journal_order(_encounters())
+    if not encs:
+        return page("Prepare the whole raid", "<h1>Prepare the whole raid</h1><p class='lead'>The raid's bosses "
+                                              "come from Warcraft Logs: add your key in <a href='/settings'>Settings"
+                                              "</a> first.</p>")
+    if raidqueue.active(raidqueue.load()):
+        return page("Prepare the whole raid", "<h1>Your raid is being prepared</h1><p class='lead'>Follow it on the "
+                                              "<a href='/#raidq'>home page</a>, or stop it there to start another "
+                                              "one.</p>")
+    cls, spec = settings.get("class"), settings.get("spec")
+    ready = fresh_bosses(encs, difficulty, cls, spec)
+    todo = [x for x in encs if x.id not in ready]
+    diffs = "".join(f'<label class="seg"><input type="radio" name="difficulty" value="{d}"{" checked" if d == difficulty else ""} '
+                    f'onchange="this.form.submit()"><span>{e(DIFF_LABELS.get(d, d))}</span></label>'
+                    for d in settings.DIFFICULTIES if d != "lfr")
+    rows = "".join(f"<li class='{'ok' if x.id in ready else 'todo'}'><b>{e(x.name)}</b>"
+                   f"<span>{'prepared this week' if x.id in ready else 'to prepare'}</span></li>" for x in encs)
+    if not todo:
+        plan = "<p class='lead'>Every boss is prepared for this week at this difficulty.</p><p><a class='btn' href='/'>Back home</a></p>"
+    else:
+        est = raidqueue.estimate(db.connect(), todo, settings.DIFFICULTIES[difficulty], cls, spec, WCLClient())
+        at = (datetime.now() + timedelta(minutes=est.minutes)).strftime("%H:%M")
+        where = []
+        if est.collect:
+            where.append(f"{est.collect} {'boss downloads' if est.collect == 1 else 'bosses download'} the top kills "
+                         f"from Warcraft Logs first")
+        if est.packs:
+            where.append(f"{est.packs} {'comes' if est.packs == 1 else 'come'} from a prep pack")
+        wait = f" It includes about {round(est.wait)} min waiting for your Warcraft Logs quota." if est.wait >= 1 else ""
+        plan = (f"<div class='rq-when'><b>Ready around {at}</b><span>About {max(1, round(est.minutes))} min for "
+                f"{len(todo)} {'boss' if len(todo) == 1 else 'bosses'}{': ' + ', '.join(where) if where else ''}."
+                f"{wait}</span></div>"
+                "<p>Go and do something else: you can close the app, it keeps going from the notification area and "
+                "tells you when your raid is ready. Then the full analysis of each boss goes on in the background "
+                "(it takes longer: the Warcraft Logs quota) and the sheets update by themselves.</p>"
+                f"<form method='post' action='/raid/prepare'><input type='hidden' name='difficulty' value='{e(difficulty)}'>"
+                f"<button class='btn big'>Prepare {len(todo)} {'boss' if len(todo) == 1 else 'bosses'}</button></form>")
+    body = (f"<h1>Prepare the whole raid</h1><p class='lead'>Every boss for {e(spec)} {e(cls)}, one after the other. "
+            f"The bosses already prepared this week are kept.</p><form method='get' action='/raid/prepare' "
+            f"class='segs' role='radiogroup' aria-label='Difficulty'>{diffs}</form>"
+            f"<ol class='rq-list'>{rows}</ol>{plan}")
+    return page("Prepare the whole raid", body)
+
+
+
 def raid_board(encs, class_name: str, spec: str) -> str:
     """The raid at a glance for the active character: a row of the bosses' portraits (grey while not prepared at any
     difficulty); hovering or tapping one opens, under it, its three difficulties, like a talent's tooltip: a green
@@ -659,6 +783,10 @@ def raid_board(encs, class_name: str, spec: str) -> str:
     encs = sorted(encs, key=lambda x: order.get(x.id, (1 << 30, 0)))  # the Encounter Journal's order
     mine = f"{spec}-{class_name}".lower().replace(" ", "-")
     done = {x["key"]: x for x in prepared()}
+    from paf import raidqueue
+
+    rq = raidqueue.load()
+    queued = {d: raidqueue.waiting(rq, d) for d, _shape in DIFF_SHAPES}
     running = {}
     for jid, job in loading.running_preps():
         args = job["args"]
@@ -683,6 +811,8 @@ def raid_board(encs, class_name: str, spec: str) -> str:
                 log = run[1]["log"].read_text(encoding="utf-8", errors="replace") if run[1]["log"].is_file() else ""
                 pct, _ = loading.percent(log, time.time() - run[1]["started"])
                 href, state, word = f"/job/{e(run[0])}", "run", f"{pct}%"
+            elif x.id in queued[diff]:
+                href, state, word = "#raidq", "wait", "queued"
             elif item and "prep" in item["files"]:
                 stale = pack.is_stale(datetime.fromtimestamp(item["mtime"], UTC).isoformat())
                 href, state, word = f"/view/{e(key)}", "old" if stale else "ok", "to redo" if stale else ago(item["mtime"])
@@ -695,7 +825,8 @@ def raid_board(encs, class_name: str, spec: str) -> str:
                   f"<span class='rb-n'>{i}</span></span><span class='rb-name'>{e(x.name)}</span>"
                   f"<div class='rb-pop' role='group' aria-label='{e(x.name)}'><b class='rb-title'>{e(x.name)}</b>"
                   f"<div class='rb-ds'>{states}</div></div></div>")
-    return (f"<h2 class='h-mine'>Your raid, boss by boss</h2><div class='rb-row'>{items}</div>"
+    return (f"<h2 class='h-mine'>Your raid, boss by boss</h2>{queue_strip(settings.get('difficulty'))}"
+            f"<div class='rb-row'>{items}</div>{QUEUE_JS}"
             "<p class='small muted rb-legend'><span>Point at a boss: its three difficulties, and a click to the "
             "sheet or the prep.</span> <span>A grey boss is not prepared for this week yet.</span></p>")
 
@@ -1244,6 +1375,10 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(img.read_bytes(), ctype="image/png")
                 else:
                     self._send(b"", 404, "image/png")
+            elif url.path == "/raid/prepare":
+                self._send(raid_prepare_page(q.get("difficulty", settings.get("difficulty"))))
+            elif url.path == "/raid/strip":
+                self._send(queue_strip(settings.get("difficulty")).encode(), ctype="text/html; charset=utf-8")
             elif url.path == "/boss":
                 self._send(boss_page(q.get("boss", ""), q.get("difficulty", settings.get("difficulty"))))
             elif url.path == "/tools":
@@ -1445,6 +1580,20 @@ class Handler(BaseHTTPRequestHandler):
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text(text, encoding="utf-8")
                 self._redirect(f"/boss?boss={boss_id}&difficulty={difficulty}")
+            elif self.path == "/raid/prepare":
+                from paf import characters, raidqueue
+
+                difficulty = (form.get("difficulty") or [settings.get("difficulty")])[0]
+                if difficulty in settings.DIFFICULTIES:
+                    encs = journal_order(_encounters())
+                    ready = fresh_bosses(encs, difficulty, settings.get("class"), settings.get("spec"))
+                    raidqueue.start(raidqueue.build(encs, difficulty, characters.current_slug(), ready))
+                self._redirect("/#raidq")
+            elif self.path == "/raid/stop":
+                from paf import raidqueue
+
+                raidqueue.stop()
+                self._redirect("/#raidq")
             elif self.path == "/prep":
                 from paf.corpus.template import report_key
                 from paf.encounters import raid_encounters

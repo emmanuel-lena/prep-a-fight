@@ -112,6 +112,17 @@ def _open(window, server_url: str) -> None:
     window.load_url(f"{inproc.BASE}/" if inside else server_url)
 
 
+def _after_reset() -> None:
+    """The week turned since "Prepare the whole raid" ended: the same bosses again (paf.raidqueue.after_reset)."""
+    try:
+        from paf import raidqueue, web
+
+        if raidqueue.after_reset(web.journal_order(web._encounters())):
+            print("New week: preparing the raid again", flush=True)
+    except Exception as ex:  # noqa: BLE001 - never in the way of the app's start
+        print(f"no weekly refresh: {ex}", flush=True)
+
+
 def main() -> int:
     moved = migrate_old_home()  # before anything opens a file in the data folder
     _quiet_streams()
@@ -126,6 +137,7 @@ def main() -> int:
     from paf.update import check_in_background
 
     check_in_background()
+    threading.Thread(target=_after_reset, daemon=True).start()
 
     server = web.Server(("127.0.0.1", 0), web.Handler)  # a free port: several copies never collide
     threading.Thread(target=server.serve_forever, daemon=True).start()

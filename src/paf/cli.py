@@ -812,6 +812,13 @@ def _prep_healer(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_raidqueue(args: argparse.Namespace) -> int:
+    """Prepare every boss of the raid queue, one after the other (paf.raidqueue; started by the app)."""
+    from paf import raidqueue
+
+    return raidqueue.run()
+
+
 def cmd_prep(args: argparse.Namespace) -> int:
     import statistics as st
     import webbrowser
@@ -1282,7 +1289,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
     out.with_suffix(".json").write_text(json.dumps(summary), encoding="utf-8")  # headline for the app's home
     step("Done")
     clock.save()
-    if pk is None and not args.refine:
+    if pk is None and not args.refine and not args.queued:  # a queue runs the full pass itself (paf.raidqueue)
         _refine_later(con, enc, diff, out)
     from paf.prep_report import headline
 
@@ -2444,7 +2451,10 @@ def build_parser() -> argparse.ArgumentParser:
     pr2.add_argument("--refresh", action="store_true", help="collect new kills first")
     pr2.add_argument("--open", action="store_true", help="open the sheet in the browser")
     pr2.add_argument("--refine", action="store_true", help=argparse.SUPPRESS)  # the second pass, run by the first
+    pr2.add_argument("--queued", action="store_true", help=argparse.SUPPRESS)  # run by the raid queue
     pr2.set_defaults(func=cmd_prep)
+    rq = sub.add_parser("raidqueue", help="prepare the queued bosses one after the other (the app starts it)")
+    rq.set_defaults(func=cmd_raidqueue)
     return p
 
 
