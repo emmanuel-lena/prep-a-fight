@@ -554,6 +554,14 @@ def rotation(d: dict) -> str:
             f"{' '.join(_mmss(t) for t in x['times'][:8])}</small></span><span class='l-val "
             f"{'neg' if x['casts'] < x['possible'] else 'pos'}'>{x['casts']}/{x['possible']}</span></li>"
             for x in cds) + "</ul>"
+    buffs = d.get("buffs", [])
+    if buffs:
+        out += ("<h3>Your buffs next to the top players'</h3><ul class='glist cov-list'>" + "".join(
+            f"<li><span class='l-name'><b>{e(b['name'])}</b><small><span>top players of your spec:</span> "
+            f"{b['tops']:.0%}</small></span><span class='cov'><span class='c-raid "
+            f"{'short' if b['player'] < b['tops'] else 'ok'}' style='width:{b['player'] * 100:.1f}%'></span>"
+            f"<span class='c-tops' style='left:{b['tops'] * 100:.1f}%' title='top players'></span></span>"
+            f"<span class='l-val'>{b['player']:.0%}</span></li>" for b in buffs[:8]) + "</ul>")
     waste = [w for w in d.get("waste", []) if w["capped"]]
     if waste:
         out += "<h3>Resource lost</h3><ul class='hl'>" + "".join(

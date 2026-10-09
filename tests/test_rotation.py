@@ -68,3 +68,25 @@ def test_the_raid_board(tmp_path, monkeypatch):
     assert html.count("rb-boss grey") == 1  # Vashnik: nothing prepared
     assert "/view/nek-zali-mythic-elemental-shaman" in html and "/boss?boss=2&amp;difficulty=heroic" in html
     assert "rb-frame tri" in html and "rb-frame sq" in html and "rb-frame penta" in html
+
+
+
+def test_buffs_next_to_the_top_players():
+    import sqlite3
+
+    from paf.corpus.db import SCHEMA
+
+    con = sqlite3.connect(":memory:")
+    con.executescript(SCHEMA)
+    con.execute("INSERT INTO ability VALUES(7, 'Master of the Elements')")
+    for k in range(4):  # 100 s kills, the buff up 60 s
+        con.execute("INSERT INTO fight(report, fight_id, encounter_id, difficulty, duration_s, status) "
+                    "VALUES(?, 1, 9, 5, 100, 'done')", (f"r{k}",))
+        con.execute("INSERT INTO player_buff VALUES(?, 1, 1, 7, 'applybuff', 10, 1)", (f"r{k}",))
+        con.execute("INSERT INTO player_buff VALUES(?, 1, 1, 7, 'removebuff', 70, 1)", (f"r{k}",))
+    tops = rotation.tops_buffs(con, 9, 5)
+    assert tops == {7: ("Master of the Elements", 0.6)}
+    rows = rotation.buff_rows({7: ("x", 0.3)}, tops)
+    assert [(b.name, b.player, b.tops) for b in rows] == [("Master of the Elements", 0.3, 0.6)]
+    r = rotation.Review("Me", "Elemental Shaman", "pull 1", 100.0, buffs=rows)
+    assert any("Master of the Elements: up 30%" in t for _, t in rotation.highlights(r))

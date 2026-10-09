@@ -1492,6 +1492,19 @@ def cmd_rotation(args: argparse.Namespace) -> int:
         r.contexts = rotation.contexts(log, windows, sims, spells)
     else:
         print("  no SimulationCraft comparison: the log lacks this player's gear or talents, or simc has no APL")
+    try:  # the buffs next to the top players' of the spec, when its corpus has this boss
+        from paf.corpus import db
+        from paf.pulldiff import _table
+
+        tops = rotation.tops_buffs(db.connect(db.db_path(cls, spec)), enc.id, diff)
+        if tops:
+            table = _table(client, code, fight["id"], actor["id"], "Buffs")
+            total = (table.get("totalTime") or 1)
+            mine = {a.get("guid"): (a.get("name", ""), (a.get("totalUptime") or 0) / total)
+                    for a in table.get("auras") or []}
+            r.buffs = rotation.buff_rows(mine, tops)
+    except Exception as ex:  # noqa: BLE001 - a part of the review: never fails it
+        print(f"  buffs next to the top players: skipped ({str(ex)[:100]})")
     for _, text in rotation.highlights(r):
         print("  " + text)
     root = simc.new_run_dir(label="rotation")

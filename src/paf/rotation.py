@@ -17,6 +17,8 @@ From one pull of the log (the player's casts with their main resource, their buf
   (4+). In each, the share of the player's casts that goes to each spell of the APL (a share: movement and
   mechanics lower every spell's casts per minute alike), next to SimulationCraft's: their own character (gear and
   talents of that pull, paf.validate.profile_from_log) with the default APL on 1, 3 and 5 targets.
+- buffs: the uptime of each of the player's buffs and procs next to the top players' of the spec on this boss (their
+  median, from the corpus's buff events), when the corpus of the spec has this boss; matched by spell id.
 Each finding comes with its numbers: a reading, not a verdict (a strategy, an assignment or a movement can explain a
 gap).
 """
@@ -109,6 +111,13 @@ class Context:
 
 
 @dataclass
+class BuffRow:
+    name: str
+    player: float  # uptime share of the pull
+    tops: float  # median of the top players of the spec on this boss
+
+
+@dataclass
 class Review:
     player: str
     spec: str
@@ -118,6 +127,7 @@ class Review:
     waste: list[WasteFinding] = field(default_factory=list)
     cooldowns: list[CooldownFinding] = field(default_factory=list)
     contexts: list[Context] = field(default_factory=list)
+    buffs: list[BuffRow] = field(default_factory=list)
 
 
 def _events(client, code: str, fight: dict, kind: str, **ids) -> list[dict]:
@@ -349,6 +359,49 @@ def contexts(log: Log, windows: list[int], sims: dict[str, dict[str, tuple[str, 
     return out
 
 
+BUFF_GAP = 0.10  # uptime points
+BUFF_PRESENT = 0.5  # a buff the top players have in at least this share of the kills (else a talent of some)
+
+
+def tops_buffs(con, encounter_id: int, difficulty: int) -> dict[int, tuple[str, float]]:
+    """Spell id -> (name, median uptime) of the buffs of the corpus's ranked players on this boss, for the buffs most
+    of them have (a buff from a talent few take is left out)."""
+    from paf.corpus.analyze import kills_filter
+
+    where, params = kills_filter(encounter_id, difficulty)
+    dur = {(r[0], r[1]): r[2] for r in con.execute(f"SELECT report, fight_id, duration_s FROM fight f WHERE {where}",
+                                                   params)}
+    names = {r[0]: r[1] for r in con.execute("SELECT id, name FROM ability")}
+    up: dict[int, dict[tuple[str, int], float]] = defaultdict(lambda: defaultdict(float))
+    since: dict[tuple[str, int, int], float] = {}
+    for rep, fid, ab, kind, t in con.execute(
+            f"SELECT b.report, b.fight_id, b.ability_id, b.type, b.t FROM player_buff b JOIN fight f "
+            f"USING(report, fight_id) WHERE {where} ORDER BY b.report, b.fight_id, b.t", params):
+        key = (rep, fid, ab)
+        if kind == "applybuff":
+            since[key] = t
+        elif kind == "removebuff" and key in since:
+            up[ab][(rep, fid)] += t - since.pop(key)
+    for (rep, fid, ab), t in since.items():  # still up at the end of the kill
+        up[ab][(rep, fid)] += max(0.0, dur.get((rep, fid), t) - t)
+    kills = len(dur) or 1
+    out = {}
+    for ab, per in up.items():
+        if len(per) / kills < BUFF_PRESENT:
+            continue
+        shares = [v / dur[k] for k, v in per.items() if dur.get(k)]
+        if shares:
+            out[ab] = (names.get(ab) or str(ab), st.median(shares))
+    return out
+
+
+def buff_rows(player: dict[int, tuple[str, float]], tops: dict[int, tuple[str, float]]) -> list[BuffRow]:
+    """The buffs whose uptime differs from the top players' (both ways), biggest gap first."""
+    rows = [BuffRow(tops[ab][0], player.get(ab, ("", 0.0))[1], tops[ab][1]) for ab in tops]
+    rows = [r for r in rows if abs(r.player - r.tops) >= BUFF_GAP and max(r.player, r.tops) >= 0.2]
+    return sorted(rows, key=lambda r: -abs(r.player - r.tops))
+
+
 def review(log: Log, player: str, spec: str, pull: str, base: dict[int, tuple[float, int]],
            durations: dict[int, float] | None = None, rotation: set[str] | None = None) -> Review:
     return Review(player, spec, pull, log.duration, dots(log, durations), waste(log),
@@ -386,6 +439,10 @@ def highlights(r: Review, limit: int = 5) -> list[tuple[float, str]]:
         if c.possible - c.casts >= 1 and c.casts < c.possible:
             out.append(((c.possible - c.casts) / c.possible * 0.5, f"{c.name}: {c.casts} casts, {c.possible} possible "
                                                                      f"in the pull."))
+    for b in r.buffs[:3]:
+        if b.player < b.tops - 0.15:
+            out.append(((b.tops - b.player) * 0.8, f"{b.name}: up {b.player:.0%} of the pull, {b.tops:.0%} for the top "
+                                                   f"players of your spec on this boss."))
     for w in r.waste:
         if w.casts and w.capped / w.casts >= CAPPED:
             out.append((w.capped / w.casts * 0.3, f"{w.builder} cast at full {w.resource} {w.capped} times out of "
@@ -400,4 +457,5 @@ def to_dict(r: Review) -> dict:
             "waste": [vars(w) for w in r.waste],
             "cooldowns": [vars(c) for c in r.cooldowns],
             "contexts": [{"key": c.key, "label": c.label, "seconds": c.seconds, "rows": [vars(x) for x in c.rows]}
-                         for c in r.contexts]}
+                         for c in r.contexts],
+            "buffs": [vars(b) for b in r.buffs]}
