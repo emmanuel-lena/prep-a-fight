@@ -460,9 +460,51 @@ def _boss_link(item: dict) -> str:
 
 
 def has_credentials() -> bool:
+    """An API key of the player's, or their Warcraft Logs login (paf.wcllogin)."""
     import os
 
-    return bool(os.environ.get("WCL_CLIENT_ID") and os.environ.get("WCL_CLIENT_SECRET"))
+    from paf import wcllogin
+
+    return bool(os.environ.get("WCL_CLIENT_ID") and os.environ.get("WCL_CLIENT_SECRET")) or wcllogin.logged_in()
+
+
+CONNECT_JS = """<script>
+(function(){
+document.querySelectorAll('.wcl-connect').forEach(function(box){
+  var b = box.querySelector('button'), say = box.querySelector('.wcl-say'), timer = null;
+  function poll(){ fetch('/wcl/status').then(function(r){ return r.json(); }).then(function(j){
+    if (j.status === 'ok') { clearInterval(timer); say.textContent = 'Connected.';
+      var ev = new CustomEvent('wcl-connected', {cancelable: true});
+      if (box.dispatchEvent(ev)) location.reload(); }
+    else if (j.status === 'error') { clearInterval(timer); timer = null; b.disabled = false; say.textContent = j.error || 'Not connected: try again.'; }
+  }).catch(function(){}); }
+  b.addEventListener('click', function(){
+    b.disabled = true; say.textContent = '';
+    fetch('/wcl/login', {method: 'POST'}).then(function(r){ return r.json(); }).then(function(j){
+      if (!j.ok) { b.disabled = false; say.textContent = j.error; return; }
+      say.innerHTML = 'Log in on the Warcraft Logs page that just opened in your browser, then come back here. '
+        + '<a target="_blank" rel="noopener">Open it again</a>';
+      say.querySelector('a').href = j.url;
+      if (!timer) timer = setInterval(poll, 1500);
+    }).catch(function(){  // the answer was lost, the login may have started: watch it anyway
+      b.disabled = false; if (!timer) timer = setInterval(poll, 1500); });
+  });
+});
+})();
+</script>"""
+
+
+def connect_block(lead: bool = True) -> str:
+    """"Connect with Warcraft Logs" (paf.wcllogin): one click in the player's browser instead of an API key.
+    Empty when this build has no public client."""
+    from paf import wcllogin
+
+    if not wcllogin.available():
+        return ""
+    text = ("<p>The app reads the top players' logs through <b>your</b> Warcraft Logs account: log in once, in "
+            "your browser. Free; the app only reads public logs, nothing is posted.</p>" if lead else "")
+    return (f"<div class='wcl-connect'>{text}<button type='button' class='btn go'>Connect with Warcraft Logs</button>"
+            f"<p class='wcl-say small muted' role='status'></p></div>{CONNECT_JS}")
 
 
 def simc_block() -> str:
@@ -479,9 +521,12 @@ def simc_block() -> str:
 
 
 def credentials_block(error: str = "") -> str:
+    from paf import wcllogin
+
     err = f'<p class="notice">{e(error)}</p>' if error else ""
     return f"""<div class="card step"><div class="num">0</div><div class="body">
-<h3>Connect to Warcraft Logs <span class="pill">once</span></h3>
+<h3>Connect to Warcraft Logs <span class="pill">once</span></h3>{connect_block()}
+{"<details><summary>Or use your own API key</summary>" if wcllogin.available() else ""}
 <p class="small">prep-a-fight reads the top players' logs with <b>your own</b> free Warcraft Logs API key (each player
 has an hourly quota, so the key is not shared).</p>
 <ol class="small">
@@ -492,7 +537,8 @@ unticked.</li>
 <li>Copy the <b>Client ID</b> and the <b>Client Secret</b> here.</li></ol>{err}
 <form method="post" action="/credentials" class="row"><input name="id" size="38" placeholder="Client ID" required>
 <input name="secret" size="38" type="password" placeholder="Client Secret" required><button>Save and test</button></form>
-<p class="tiny muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p></div></div>"""
+<p class="tiny muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p>
+{"</details>" if wcllogin.available() else ""}</div></div>"""
 
 
 def home(error: str = "") -> bytes:
@@ -913,8 +959,8 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
         assigns = ('<p class="muted small">The mechanics are collected during the first prep (about 2 quota points '
                    'per kill); you can tick yours afterwards.</p>')
     else:
-        assigns = ('<p class="muted small">No kill collected yet: the first prep collects ~200 ranked kills from '
-                   'Warcraft Logs (a few minutes to an hour depending on your API quota).</p>')
+        assigns = ('<p class="muted small">The mechanics come with the first prep&#39;s kills; you can tick yours on '
+                   'the next one.</p>')
     last = prepared_link(enc, difficulty)
     from paf import bossguide
     from paf.icons import icons_for
@@ -1373,6 +1419,12 @@ class Handler(BaseHTTPRequestHandler):
                 from paf import onboarding
 
                 self._send(page("Welcome", f"<style>{onboarding.CSS}</style>{onboarding.page_body()}{onboarding.JS}"))
+            elif url.path == "/wcl/status":
+                import json
+
+                from paf import wcllogin
+
+                self._send(json.dumps(wcllogin.status()).encode(), ctype="application/json")
             elif url.path in ("/onboard/skip", "/onboard/finish"):
                 from paf import onboarding
 
@@ -1468,6 +1520,20 @@ class Handler(BaseHTTPRequestHandler):
                 import json
 
                 self._send(json.dumps(out()).encode(), ctype="application/json")
+            elif self.path == "/wcl/login":  # the player's Warcraft Logs login (paf.wcllogin)
+                import json
+
+                from paf import wcllogin
+
+                try:
+                    self._send(json.dumps({"ok": True, "url": wcllogin.start()}).encode(), ctype="application/json")
+                except RuntimeError as ex:
+                    self._send(json.dumps({"ok": False, "error": str(ex)}).encode(), ctype="application/json")
+            elif self.path == "/wcl/logout":
+                from paf import wcllogin
+
+                wcllogin.logout()
+                self._redirect("/settings")
             elif self.path == "/profile":
                 from paf.profile import looks_like_export
 
@@ -1691,6 +1757,9 @@ class Server(ThreadingHTTPServer):
 
 def serve(port: int = 8765, open_browser: bool = True) -> None:
     load_dotenv()
+    from paf.simc_install import ensure_simc
+
+    ensure_simc()  # a new computer: SimulationCraft downloads while the player sets up (as in paf.desktop)
     server = Server(("127.0.0.1", port), Handler)
     url = f"http://127.0.0.1:{port}/"
     print(f"prep-a-fight is running on {url} (Ctrl+C to stop)")

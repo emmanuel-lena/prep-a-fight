@@ -16,7 +16,7 @@ your gear on a target dummy and hope it holds up on the real fight. prep-a-fight
 | Sims | Which of my items are best on *this* fight, not only on a target dummy? |
 | Prep | What is my plan for this boss, with my own assignments? |
 
-Everything runs on your own PC, with your own free Warcraft Logs API key. Nothing to pay, no account.
+Everything runs on your own PC, through your own free Warcraft Logs account. Nothing to pay, no new account.
 
 ### Where it fits
 
@@ -28,7 +28,8 @@ prep-a-fight is meant to sit **next to** the tools you already use, not replace 
   into gear and cooldown recommendations for your character.
 - It is built on **SimulationCraft**, the open-source engine behind most WoW sim tools.
 
-> Status: early development. First target: Elemental Shaman, one boss at a time. See [ROADMAP.md](ROADMAP.md).
+> Status: beta. Every DPS spec (Elemental Shaman is the most tested), healers and tanks (from the top players' logs).
+> See [ROADMAP.md](ROADMAP.md).
 
 ## Install (players, Windows)
 
@@ -36,8 +37,9 @@ prep-a-fight is meant to sit **next to** the tools you already use, not replace 
    app for your Windows user, with a Start menu entry, an optional desktop shortcut and an uninstaller.
 2. Open **prep-a-fight**: the app opens in its own window (close it to stop it). On first launch it downloads
    SimulationCraft (~115 MB) in the background.
-3. Connect your free Warcraft Logs API key (the page shows how to create it, 2 minutes), then paste your
-   `/simc` export and pick a boss.
+3. Click **Connect with Warcraft Logs** and log in, in your browser (the app reads public logs through your
+   account and its hourly quota; it never posts anything). Then paste your `/simc` export and pick a boss.
+   You can use your own API key instead (Settings).
 
 Windows may show "Windows protected your PC" (SmartScreen) the first time: the installer is not signed with a
 paid code-signing certificate yet. Click **More info**, then **Run anyway**. The installer is built from this
@@ -51,8 +53,66 @@ your preps, caches and SimulationCraft in its `data` subfolder (about 1-2 GB wit
 old sim folders and SimulationCraft versions are removed automatically). To uninstall: Windows Settings > Apps >
 prep-a-fight; it asks whether to delete that data too.
 
-A first prep collects ~200 ranked kills from Warcraft Logs (from a few minutes to an hour, depending on your
-API quota), then sims for 10 to 40 minutes on your CPU. Later preps of the same boss reuse everything.
+A first prep of a boss takes about 7 minutes: it reads the first 100 ranked kills from Warcraft Logs (or a prep pack
+another player shared this week), sims on your CPU, and the rest of the kills follow in the background. Later preps
+of the same boss reuse everything.
+
+## Using the app
+
+**Prepare a boss**: on the home page, pick a boss and a difficulty, tick your assignments (kick, soak...) and go: the
+estimate says where the data comes from and how long it takes, the prep sheet opens when it is ready.
+
+**The whole raid in one press**: on the home page, *Prepare the whole raid* queues every boss (the ones already
+prepared this week are kept) and says when it will be ready. Go and do something else: closing the app does not
+stop it, an icon in the notification area shows where it is and a notification says when your raid is ready. After
+the weekly reset, the app prepares the same bosses again by itself (setting `refresh_after_reset`).
+
+**The week after**: when the app starts, it finds your character's last raid log on Warcraft Logs (no link to paste)
+and reads it in the background: the night pull by pull, your rotation on the bosses you killed, why the others did
+not die and your worst pull against your best. The home page opens on *Your last raid*: two or three things to clean
+per boss. Tick the characters it reads on the Characters page.
+
+**Raid lead**: from your raid's last log, the roles on every prepared boss: who hits which add, who changes talents
+(boss or padding side, from the top players of each spec), which spec change is worth it; bench players in a click,
+copy the whole thing for Discord or as an MRT note.
+
+The prep sheet gives:
+- the fight: phases, add waves, lust, and the boss's mechanics;
+- your DPS on the rebuilt fight vs a Patchwerk;
+- a validation: the top players' own characters simmed on the rebuilt fight vs their real DPS;
+- the top players' talent builds simmed on your character;
+- the **ideal cooldown play-by-play for boss damage, total damage and damage to adds**, with an MRT note;
+- what the top players actually do with their cooldowns;
+- your best items and what the boss drops for you;
+- a short "what to remember" list at the top.
+
+### Boss notes: what the logs cannot tell
+
+Each rebuilt fight comes with `~/.paf/fights/<boss>-<difficulty>.notes.txt`, also editable in the web UI. It
+lists what was detected, with the evidence (a unit sharing the boss's health and the damage amp measured in the
+logs, possible amps on the boss...), and takes your corrections:
+
+```text
+amp Venomous Heart 2.0     # the real damage amp while the heart is up
+separate Some Shield       # an independent priority target, not the boss's health
+ignore Some Totem          # a mechanic, not a target
+```
+
+Plans that look too good (over 5%), that do not survive pessimistic variants of the fight (amp halved, adds dying
+faster, more movement) or that contradict what the top players do are flagged "to double-check" in the prep sheet.
+
+### How much to trust the numbers
+
+- Every delta comes with SimC's statistical error; smaller differences are noise.
+- A rebuilt fight is an approximation: add lifetimes and movement come from the top players' logs,
+  and SimC has no fine target priority. Good for choosing between builds, items and plans; not a
+  prediction of your exact DPS.
+- The validation on the prep sheet tells you how close the rebuilt fight is to reality: on Ula'tek heroic, the top 6
+  Elementals simmed with their own gear reach 97% of their real DPS once the movement is calibrated.
+- SimC does not know that a secondary target (a heart, a shield) must die fast: compare the simulated
+  plans with what the top players do (shown next to them).
+- Analyses of the corpus are correlations (what the top players do). SimC is used to check them on
+  your character.
 
 ## Install (developers)
 
@@ -74,6 +134,9 @@ Note: the SimulationCraft nightly host only serves plain HTTP, so the download i
 
 ### Warcraft Logs credentials
 
+The app's **Connect with Warcraft Logs** (OAuth with PKCE, `paf.wcllogin`) needs nothing here. From a terminal, or
+to use your own key:
+
 1. Create a client at <https://www.warcraftlogs.com/api/clients> (any redirect URL, e.g. `http://localhost`;
    leave "Public Client" unchecked).
 2. Put the credentials in a `.env` file at the project root (it is git-ignored):
@@ -85,47 +148,18 @@ WCL_CLIENT_SECRET=...
 
 3. Check everything with `paf doctor`.
 
-## Prepare a boss
+### The command line
 
-In your browser:
+The app runs its long work (preps, tools, the raid queue, the last raid) as `paf` commands in the background; the same commands work from a terminal, for development and scripting. They are not the players' interface: the app is.
 
-```sh
-paf serve                    # opens http://127.0.0.1:8765: paste your /simc, pick a boss, tick your
-                             # assignments (kick, soak...), run: the prep sheet opens when it is ready
-```
-
-**The whole raid in one press**: on the home page, *Prepare the whole raid* queues every boss (the ones already
-prepared this week are kept) and says when it will be ready. Go and do something else: closing the app does not
-stop it, an icon in the notification area shows where it is and a notification says when your raid is ready. After
-the weekly reset, the app prepares the same bosses again by itself (setting `refresh_after_reset`).
-
-**The week after**: when the app starts, it finds your character's last raid log on Warcraft Logs (no link to paste)
-and reads it in the background: the night pull by pull, your rotation on the bosses you killed, why the others did
-not die and your worst pull against your best. The home page opens on *Your last raid*: two or three things to clean
-per boss. Tick the characters it reads on the Characters page.
-
-**Raid lead**: from your raid's last log, the roles on every prepared boss: who hits which add, who changes talents
-(boss or padding side, from the top players of each spec), which spec change is worth it; bench players in a click,
-copy the whole thing for Discord or as an MRT note.
-
-Or in one command:
+In one command:
 
 ```sh
 paf profile                  # in game: /simc, Ctrl+A, Ctrl+C, then this (reads the clipboard)
 paf prep "Ula'tek" --open    # everything below, as a one-page HTML prep sheet
 ```
 
-The prep sheet gives:
-- the fight: phases, add waves, lust, and the boss's mechanics;
-- your DPS on the rebuilt fight vs a Patchwerk;
-- a validation: the top players' own characters simmed on the rebuilt fight vs their real DPS;
-- the top players' talent builds simmed on your character;
-- the **ideal cooldown play-by-play for boss damage, total damage and damage to adds**, with an MRT note;
-- what the top players actually do with their cooldowns;
-- your best items and what the boss drops for you;
-- a short "what to remember" list at the top.
-
-## Or step by step
+Step by step:
 
 ```sh
 paf profile                  # in game: /simc, Ctrl+A, Ctrl+C, then this (reads the clipboard)
@@ -138,7 +172,7 @@ paf talents "Ula'tek"        # the top players' builds simmed on your character
 paf cdplan "Ula'tek"         # cooldown plans compared on that fight
 ```
 
-## Commands
+Every command:
 
 | Command | What it does |
 |---|---|
@@ -163,34 +197,6 @@ paf cdplan "Ula'tek"         # cooldown plans compared on that fight
 | `paf optimize BOSS` | Ideal cooldown rules per objective (boss / total / adds): on cooldown, hold for adds, secondary targets, lust/PI...; play-by-play and MRT note |
 | `paf prep BOSS` | All of the above for one boss, as an HTML prep sheet |
 | `paf serve` | Local web UI for all of this |
-
-### Boss notes: what the logs cannot tell
-
-Each rebuilt fight comes with `~/.paf/fights/<boss>-<difficulty>.notes.txt`, also editable in the web UI. It
-lists what was detected, with the evidence (a unit sharing the boss's health and the damage amp measured in the
-logs, possible amps on the boss...), and takes your corrections:
-
-```text
-amp Venomous Heart 2.0     # the real damage amp while the heart is up
-separate Some Shield       # an independent priority target, not the boss's health
-ignore Some Totem          # a mechanic, not a target
-```
-
-Plans that look too good (over 5%), that do not survive pessimistic variants of the fight (amp halved, adds dying
-faster, more movement) or that contradict what the top players do are flagged "to double-check" in the prep sheet.
-
-### How much to trust the numbers
-
-- Every delta comes with SimC's statistical error; smaller differences are noise.
-- A rebuilt fight is an approximation: add lifetimes and movement come from the top players' logs,
-  and SimC has no fine target priority. Good for choosing between builds, items and plans; not a
-  prediction of your exact DPS.
-- `paf validate` tells you how close the rebuilt fight is to reality: on Ula'tek heroic, the top 6
-  Elementals simmed with their own gear reach 97% of their real DPS once the movement is calibrated.
-- SimC does not know that a secondary target (a heart, a shield) must die fast: compare the simulated
-  plans with what the top players do (shown next to them).
-- Analyses of the corpus are correlations (what the top players do). SimC is used to check them on
-  your character.
 
 ## License
 

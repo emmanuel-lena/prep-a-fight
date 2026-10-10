@@ -71,10 +71,14 @@ def _download(url: str, dest: Path) -> None:
         while chunk := resp.read(1 << 20):
             out.write(chunk)
             done += len(chunk)
+            _beat()
             if total:
                 print(f"\r  {done / total:6.1%}  {done >> 20} / {total >> 20} MiB", end="", flush=True)
     print()
     tmp.replace(dest)
+
+
+PARTIAL = ".partial"  # a version folder being extracted
 
 
 def simc_root() -> Path:
@@ -90,8 +94,9 @@ def find_simc(explicit: str | None = None) -> Path | None:
         candidates.append(Path(env))
     root = simc_root()
     if root.is_dir():  # the newest install first (version folders do not sort by name: they end in a commit hash)
-        newest = sorted(root.iterdir(), key=lambda d: d.stat().st_mtime, reverse=True)
-        candidates.extend(exe for d in newest if d.is_dir() for name in ("simc.exe", "simc")
+        newest = sorted((d for d in root.iterdir() if d.is_dir() and not d.name.endswith(PARTIAL)),
+                        key=lambda d: d.stat().st_mtime, reverse=True)
+        candidates.extend(exe for d in newest for name in ("simc.exe", "simc")
                           for exe in sorted(d.glob(f"**/{name}")))
     if which := shutil.which("simc"):
         candidates.append(Path(which))
@@ -117,8 +122,6 @@ def install_nightly(force: bool = False) -> Path:
             "Automatic install is Windows-only for now. On Linux/macOS use the official Docker image "
             "(simulationcraftorg/simc) or build simc, then pass --simc or set PAF_SIMC."
         )
-    import py7zr  # local import: only needed here
-
     build = latest_build(parse_nightly_index(_get(NIGHTLY_INDEX).decode("utf-8", "replace")), windows_arch())
     target = simc_root() / build.version
     existing = next(target.glob("**/simc.exe"), None) if target.is_dir() else None
@@ -126,8 +129,61 @@ def install_nightly(force: bool = False) -> Path:
         print(f"simc {build.version} already installed: {existing}")
         return existing
 
-    target.mkdir(parents=True, exist_ok=True)
-    archive = target / build.filename
+    simc_root().mkdir(parents=True, exist_ok=True)
+    lock = _lock_file()
+    lock.write_text(str(os.getpid()), encoding="utf-8")
+    try:
+        return _install(build, target, force)
+    finally:
+        lock.unlink(missing_ok=True)
+
+
+def _lock_file() -> Path:
+    """Present while a copy of the app downloads SimulationCraft (the app and a prep must not both download)."""
+    return simc_root() / ".installing"
+
+
+LOCK_STALE = 120.0  # seconds: a download touches its lock all along; an older one is from a download that died
+
+
+def _beat() -> None:
+    try:
+        _lock_file().touch(exist_ok=True)
+    except OSError:
+        pass
+
+
+def wait_for_simc(timeout: float = 1800.0) -> Path:
+    """simc for a sim about to start: the installed one, else the one the app is downloading (waited for), else
+    downloaded now. A first prep on a new computer can reach its sims before the app's download ends."""
+    import time
+
+    exe = find_simc()
+    if exe is not None:
+        return exe
+    lock, t0, said = _lock_file(), time.time(), False
+    while lock.is_file() and time.time() - lock.stat().st_mtime < LOCK_STALE and time.time() - t0 < timeout:
+        if not said:
+            print("Waiting for SimulationCraft to finish downloading (first launch)...", flush=True)
+            said = True
+        time.sleep(5)
+        exe = find_simc()
+        if exe is not None:
+            return exe
+    if sys.platform != "win32":
+        raise RuntimeError("simc not found: pass --simc or set PAF_SIMC")
+    print("SimulationCraft is not installed yet: downloading it (about 100 MB, once)...", flush=True)
+    return install_nightly()
+
+
+def _install(build: NightlyBuild, target: Path, force: bool) -> Path:
+    import py7zr  # local import: only needed here
+
+    # extracted aside, renamed when complete: find_simc() never picks a half-extracted simc
+    partial = target.with_name(target.name + PARTIAL)
+    shutil.rmtree(partial, ignore_errors=True)
+    partial.mkdir(parents=True)
+    archive = partial / build.filename
     print(f"Downloading {build.url}")
     _download(build.url, archive)
     print("Extracting... (a few minutes)", flush=True)
@@ -139,14 +195,20 @@ def install_nightly(force: bool = False) -> Path:
     def alive() -> None:  # a sign of life in the log: the app tells a long step from a stopped prep
         t0 = time.time()
         while not done.wait(30):
+            _beat()
             print(f"    still extracting ({int(time.time() - t0)} s)", flush=True)
     threading.Thread(target=alive, daemon=True).start()
     try:
         with py7zr.SevenZipFile(archive, "r") as z:
-            z.extractall(target)
+            z.extractall(partial)
     finally:
         done.set()
     archive.unlink()
+    if force:
+        shutil.rmtree(target, ignore_errors=True)
+    if target.is_dir() and not any(target.iterdir()):
+        target.rmdir()
+    partial.rename(target)
     exe = next(target.glob("**/simc.exe"), None)
     if exe is None:
         raise RuntimeError(f"simc.exe not found after extracting {build.filename}")

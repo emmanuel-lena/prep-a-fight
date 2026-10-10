@@ -20,6 +20,7 @@ Le prototype PowerShell (`Invoke-LocalTopGear.ps1`, Top Gear 3 passes) a été r
 - `ruff check .` et `pytest` doivent passer avant chaque commit ; CI GitHub Actions (ubuntu + windows).
 - **Releases : uniquement `python tools/release.py X.Y.Z --message <fichier> --notes "..."`** (checks, bump sans BOM, commit, tag, push, publication quand l'installeur est construit ; s'arrête à la première erreur, `--dry-run` pour les checks seuls ; si le build échoue pour une erreur réseau : `gh run rerun <id> --failed` puis `python tools/release.py X.Y.Z --resume --notes "..."`, jamais de publication à la main). Jamais de chaîne bash commit/tag/push à la main, jamais de `git checkout -- .` à l'aveugle (le 2026-10-07 un heredoc a coupé une chaîne `&&` : modifs effacées et tag poussé sur le mauvais commit). La mise à jour intégrée ne prend que `prep-a-fight-setup-<version>.exe`.
 - UI : produit et identité visuelle dans `PRODUCT.md` et `DESIGN.md` (plugin impeccable). Tout le CSS vit dans `src/paf/styles/*.css`, lu par `theme.style(nom)` ; aucun bloc de style dans les modules (testé).
+- Le CLI `paf` est le moteur interne de l'app (chaque job tourne en `python -m paf …` détaché) : pas une surface pour les joueurs (le README parle de l'app ; le CLI est documenté dans la partie développeurs). Pas d'option CLI destinée aux joueurs.
 - `.venv` local : `.venv/Scripts/python -m pip install -e .[dev]`.
 - simc installé par `paf setup` dans `~/.paf/simc/<version>/` (surcharges : `--simc`, `PAF_SIMC`, `PAF_HOME`). Le serveur des nightlies ne sert qu'en HTTP (certificat invalide en HTTPS).
 - Nombres passés à simc : format invariant (`.` décimal). Sorties de runs dans `runs/<horodatage>/`.
@@ -61,12 +62,14 @@ Le prototype PowerShell (`Invoke-LocalTopGear.ps1`, Top Gear 3 passes) a été r
 
 ## Environnement
 
-- Cette machine coupe 25 à 45 % des connexions HTTP locales (même avec un serveur stdlib minimal) : les tests web réessaient. À signaler si l'UI paraît instable.
+- Cette machine coupe 25 à 45 % des connexions HTTP locales : c'est **AdGuard** (filtrage WFP de 127.0.0.1, vérifié le 2026-10-10). Les tests web réessaient ; les scripts Playwright naviguent avec `wait_until="commit"` et réessaient. L'app de bureau sert ses pages dans le processus (`paf.local`), les joueurs ne sont pas touchés.
+- Test « machine vierge » : copier `build/app` dans le scratchpad et lancer `python -m paf serve` avec `PAF_HOME` sur son `data` et sans `WCL_*`. Ne pas surcharger `USERPROFILE` : le navigateur ouvert par l'app (connexion WCL) en hérite et plante.
 - Le vérificateur du mode auto plante parfois sur Bash : passer par l'outil PowerShell (`.venv\Scripts\...`).
 
 ## Warcraft Logs (S2)
 
 - API v2 GraphQL `https://www.warcraftlogs.com/api/v2/client`, OAuth2 client credentials (`https://www.warcraftlogs.com/oauth/token`, basic auth id:secret) — testé OK.
+- **Connexion du joueur** (`paf.wcllogin`) : client public de l'app (PKCE, sans secret), retour sur `http://127.0.0.1:47823/callback`, requêtes sur `/api/v2/user`. Mesuré le 2026-10-10 : jeton valable 360 j avec refresh token ; **le quota (3600 points/h) est compté par compte WCL** (la connexion et une clé du même compte partagent le compteur), donc chaque joueur a le sien.
 - Rankings : `worldData.encounter(id).characterRankings(className, specName, difficulty, metric)` (JSON scalaire non typé, parse défensif ; `page`, `partition`, `serverRegion`).
 - Report : `fights{ id startTime endTime encounterID kill phaseTransitions enemyNPCs friendlyPlayers }`, `masterData{ actors abilities }`, `events(... ){ data nextPageTimestamp }`. Filtrer côté serveur (`filterExpression`, `abilityID`) ; surveiller `rateLimitData`.
 - Identifier lust / PI / CD par table d'IDs versionnée (nom en secours : les noms dépendent de la langue du log).

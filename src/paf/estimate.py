@@ -37,8 +37,8 @@ class Estimate:
                 "pack_shared": "Uses the prep pack another player shared this week: nothing to download from "
                                "Warcraft Logs.",
                 "corpus": "Uses the kills already in your corpus.",
-                "collect": f"First prep of this boss for your spec: downloads {self.kills} top kills from Warcraft "
-                           f"Logs (the rest of the corpus comes in the background afterwards)."}[self.source]
+                "collect": f"Downloads the top {self.kills} kills of your spec from Warcraft Logs; more follow in "
+                           f"the background afterwards."}[self.source]
         wait = (f" Includes about {round(self.wait)} min waiting for your Warcraft Logs quota."
                 if self.wait >= 1 else "")
         return f"{what} About {max(1, round(self.minutes))} min.{wait}"

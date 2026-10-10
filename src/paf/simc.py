@@ -186,6 +186,13 @@ def run(input_text: str, run_dir: Path, *, target_error: float = 0.2, iterations
     work_threads: profileset_work_threads (2-4 measured ~30% faster than 1 on small sims).
     """
     exe = find_simc(simc)
+    if exe is None and simc is None:
+        from paf.simc_install import wait_for_simc
+
+        try:
+            exe = wait_for_simc()
+        except Exception as ex:  # noqa: BLE001 - said as a sim error
+            raise SimcError(f"SimulationCraft is not installed and could not be downloaded: {ex}") from ex
     if exe is None:
         raise SimcError("simc not found: run `paf setup`")
     run_dir.mkdir(parents=True, exist_ok=True)

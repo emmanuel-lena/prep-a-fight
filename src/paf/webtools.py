@@ -151,13 +151,23 @@ def settings_page(message: str = "") -> str:
     except Exception as ex:  # noqa: BLE001 - shown as is
         quota = f"<span class='neg'>{e(str(ex)[:160])}</span>"
     msg = f"<p class='notice small'>{e(message)}</p>" if message else ""
+    from paf import wcllogin
+    from paf.web import connect_block
+
     cid = os.environ.get("WCL_CLIENT_ID", "")
     current = (f"Current key: client <code>{e(cid[:8])}…</code>" if cid else
+               "Not used: the app goes through your Warcraft Logs login." if wcllogin.logged_in() else
                "<span class='neg'>No key yet.</span>")
+    if wcllogin.logged_in():
+        account = ("<p class='small'>Connected with your Warcraft Logs account.</p><form method='post' "
+                   "action='/wcl/logout'><button class='btn ghost'>Disconnect</button></form>")
+    else:
+        account = connect_block(lead=False)
+    account = (f"<h2>Warcraft Logs</h2><div class='card'>{account}</div>" if wcllogin.available() else "")
     return f"""<h1>Settings</h1>{msg}
 <form method="post" action="/settings" class="card"><table>{rows}</table>
 <div class="cta"><button class="btn">Save</button></div></form>
-<h2>Warcraft Logs key</h2><div class="card"><p class="small">{current} To use another one (a new client, or a
+{account}<h2>Warcraft Logs key</h2><div class="card"><p class="small">{current} To use another one (a new client, or a
 regenerated secret): create or open it on <a href="https://www.warcraftlogs.com/api/clients" target="_blank"
 rel="noopener">warcraftlogs.com/api/clients</a>, then paste both values.
 It is tested before it replaces the old one.</p>

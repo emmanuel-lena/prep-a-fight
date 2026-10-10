@@ -85,7 +85,8 @@ def finish() -> dict:
 
 
 def page_body() -> str:
-    from paf.web import has_credentials
+    from paf import wcllogin
+    from paf.web import connect_block, has_credentials
 
     regions = "".join(f"<option>{r}</option>" for r in settings.SETTINGS["guild_region"].choices)
     key_done = has_credentials()
@@ -103,7 +104,9 @@ def page_body() -> str:
 <a class="btn ghost" href="/onboard/skip">Skip all</a></div></section>
 
 <section class="ob-step" data-step="key">
-<h1>Your Warcraft Logs key</h1>
+<h1>{'Connect to Warcraft Logs' if wcllogin.available() else 'Your Warcraft Logs key'}</h1>
+{connect_block() + "<div class='ob-actions'>" + skip + "</div><details class='ob-own'><summary>Or use your own API key</summary>"
+ if wcllogin.available() else ""}
 <p>The app reads the top players' logs with <b>your own</b> free Warcraft Logs API key (each player has an hourly quota, so the key is not shared).</p>
 <ol class="small"><li>Log in on <a href="https://www.warcraftlogs.com/api/clients" target="_blank" rel="noopener">warcraftlogs.com/api/clients</a> and click <b>Create Client</b>.</li>
 <li>Name: anything (e.g. <code>prep-a-fight</code>). Redirect URL: <code>http://localhost</code>. Leave "Public Client" unticked.</li>
@@ -112,7 +115,8 @@ def page_body() -> str:
 <input name="id" placeholder="Client ID" required autocomplete="off"><input name="secret" placeholder="Client Secret" required autocomplete="off">
 <p class="ob-err" role="alert"></p>
 <div class="ob-actions"><button class="btn go">Save and test</button>{skip}</div></form>
-<p class="ob-ok-note muted small">{'A key is already saved: you can go on.' if key_done else ''}</p></section>
+{"</details>" if wcllogin.available() else ""}
+<p class="ob-ok-note muted small">{'Already connected: you can go on.' if key_done else ''}</p></section>
 
 <section class="ob-step" data-step="character">
 <h1>Your character</h1>
@@ -169,6 +173,8 @@ function summary(){
   el.textContent = s.length ? s.join(' \\u00b7 ') : el.dataset.text;
 }
 root.querySelectorAll('.next,.skip').forEach(function(b){ b.addEventListener('click', next); });
+root.querySelectorAll('.wcl-connect').forEach(function(c){ c.addEventListener('wcl-connected', function(ev){
+  ev.preventDefault(); done.key = true; next(); }); });
 root.querySelectorAll('.ob-tabs button').forEach(function(b){ b.addEventListener('click', function(){
   root.querySelectorAll('.ob-tabs button').forEach(function(x){ x.classList.toggle('on', x === b); });
   root.querySelectorAll('.ob-tab').forEach(function(f){ f.hidden = f.dataset.tab !== b.dataset.tab; }); }); });

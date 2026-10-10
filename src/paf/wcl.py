@@ -1,4 +1,5 @@
-"""Warcraft Logs API v2 client (GraphQL, OAuth2 client credentials).
+"""Warcraft Logs API v2 client (GraphQL): the player's own API key (OAuth2 client credentials), else their
+Warcraft Logs login (paf.wcllogin, the user endpoint).
 
 - The access token is cached on disk until shortly before it expires.
 - Responses can be cached on disk (reports never change once uploaded); the token is never part
@@ -24,6 +25,7 @@ from paf.config import data_dir
 
 TOKEN_URL = "https://www.warcraftlogs.com/oauth/token"
 API_URL = "https://www.warcraftlogs.com/api/v2/client"
+USER_API_URL = "https://www.warcraftlogs.com/api/v2/user"
 USER_AGENT = "prep-a-fight (+https://github.com/emmanuel-lena/prep-a-fight)"
 
 # transport(url, body, headers) -> (status, response bytes); replaced in tests
@@ -62,8 +64,16 @@ class WCLClient:
     ):
         self.client_id = client_id or os.environ.get("WCL_CLIENT_ID", "")
         self.client_secret = client_secret or os.environ.get("WCL_CLIENT_SECRET", "")
+        self.user = False  # queries go through the player's Warcraft Logs login (paf.wcllogin)
         if not (self.client_id and self.client_secret):
-            raise WCLError("WCL_CLIENT_ID / WCL_CLIENT_SECRET missing (see `paf doctor`)")
+            from paf import wcllogin
+
+            if client_id is None and wcllogin.logged_in():
+                self.user = True
+            else:
+                raise WCLError("Not connected to Warcraft Logs: connect in Settings (or set WCL_CLIENT_ID / "
+                               "WCL_CLIENT_SECRET, see `paf doctor`)")
+        self.api_url = USER_API_URL if self.user else API_URL
         self.cache_dir = cache_dir or data_dir() / "cache" / "wcl"
         self.transport = transport or _urllib_transport
         self.max_retries = max_retries
@@ -79,6 +89,10 @@ class WCLClient:
         return self.cache_dir.parent / f"wcl_token_{tag}.json"
 
     def token(self) -> str:
+        if self.user:
+            from paf import wcllogin
+
+            return wcllogin.token(self.transport)
         now = time.time()
         if self._token and now < self._token_expires:
             return self._token
@@ -135,12 +149,17 @@ class WCLClient:
         while attempt < self.max_retries:
             attempt += 1
             status, raw = self.transport(
-                API_URL, body,
+                self.api_url, body,
                 {"Authorization": f"Bearer {self.token()}", "Content-Type": "application/json"},
             )
             if status == 401 and attempt == 0:
-                self._token = None
-                self._token_file().unlink(missing_ok=True)
+                if self.user:
+                    from paf import wcllogin
+
+                    wcllogin.refresh(self.transport)
+                else:
+                    self._token = None
+                    self._token_file().unlink(missing_ok=True)
                 continue
             if status == 429 and attempt == self.max_retries and quota_waits < QUOTA_WAITS:
                 # the hourly quota is used up: wait for its reset instead of failing every query until then
@@ -175,7 +194,7 @@ class WCLClient:
         """Seconds until the hourly quota resets (asked directly: the query itself may be refused)."""
         q = json.dumps({"query": "{ rateLimitData { pointsResetIn } }"}).encode()
         try:
-            status, raw = self.transport(API_URL, q, {"Authorization": f"Bearer {self.token()}",
+            status, raw = self.transport(self.api_url, q, {"Authorization": f"Bearer {self.token()}",
                                                       "Content-Type": "application/json"})
             if status == 200:
                 left = float(json.loads(raw)["data"]["rateLimitData"]["pointsResetIn"])
