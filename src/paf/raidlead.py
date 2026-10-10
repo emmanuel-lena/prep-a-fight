@@ -328,7 +328,9 @@ def page_body(difficulty: str) -> str:
               if everything else "")
     miss = (f"<p class='small muted'>Not prepared yet, so no sheet: {e(', '.join(missing))}. "
             f"<a href='/raid/prepare?difficulty={e(difficulty)}'>Prepare the whole raid</a> first.</p>" if missing else "")
-    return head + roster + f"<h2>Boss by boss {allbtn}</h2>{miss}<div class='rl-grid'>{cards}</div>{COPY_JS}"
+    how = ("<p class='small muted'>A spec change shows from +5%: the median boss damage of each spec in the top kills "
+           "of that boss, a reading of the top raids, not a sim of your player.</p>")
+    return head + roster + f"<h2>Boss by boss {allbtn}</h2>{how}{miss}<div class='rl-grid'>{cards}</div>{COPY_JS}"
 
 
 COPY_JS = """<script>document.addEventListener('click',function(ev){var b=ev.target.closest('.copy');if(!b)return;

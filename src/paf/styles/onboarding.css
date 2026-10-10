@@ -7,7 +7,7 @@
 .ob-step.back.on{animation-name:ob-back}
 @keyframes ob-in{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
 @keyframes ob-back{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
-.ob h1{font:600 32px/1.15 'Fraunces',Georgia,serif;margin:0 0 14px}
+.ob h1{font:600 32px/1.15 var(--font-reading);margin:0 0 14px}
 .ob p,.ob li{font-size:16.5px;line-height:1.55}
 .ob-points{padding-left:20px;display:grid;gap:8px;margin:0 0 16px}
 .ob-actions{display:flex;gap:10px;align-items:center;margin-top:18px;flex-wrap:wrap}

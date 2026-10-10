@@ -66,10 +66,11 @@ def test_what_to_clean_from_the_results(monkeypatch):
 
 
 def test_a_point_on_most_bosses_is_said_once():
-    rite = "Halazzi's Rite: up 0% of the pull, 58% for the top players of your spec on this boss."
-    per_boss = [[rite, "Spiritwalker's Grace: 1 casts, 2 possible."], [rite], [rite, "Cleave: Chain Lightning low."]]
+    rite = "Halazzi's Rite: you never had it; the top players of your spec keep it up 58% of the fight."
+    grace = "Spiritwalker's Grace: you pressed it 1 time, it was ready 2 times in the pull."
+    per_boss = [[rite, grace], [rite], [rite, "Cleave: Chain Lightning low."]]
     assert lastraid.common(per_boss) == [
-        "Halazzi's Rite: up 0% of the pull, 58% for the top players of your spec (on 3 bosses)."]
+        "Halazzi's Rite: you never had it; the top players of your spec keep it up 58% of the fight (on 3 bosses)."]
     assert lastraid.common(per_boss[:2]) == []
 
 

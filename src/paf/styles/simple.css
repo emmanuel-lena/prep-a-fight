@@ -25,7 +25,7 @@ body.simple-on .tabs{display:none}
 .simple{max-width:980px;font-size:17px}
 .simple .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
 .simple .card{margin:0;padding:18px 20px}
-.simple h2{font:600 21px/1.2 'Fraunces',Georgia,serif;text-transform:none;letter-spacing:0;color:var(--fg);margin:0 0 12px}
+.simple h2{font:600 21px/1.2 var(--font-reading);text-transform:none;letter-spacing:0;color:var(--fg);margin:0 0 12px}
 .simple .cards ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
 .simple .cards li{display:flex;gap:12px;align-items:center}
 .simple .cards li>div{display:flex;flex-direction:column;gap:3px;min-width:0}
@@ -84,7 +84,7 @@ a.tal:hover{background:var(--surface-2)}
 .vp>summary::-webkit-details-marker{display:none}
 .vp>summary::before{content:"\203A";color:var(--accent);font-size:20px;display:inline-block;transition:transform .2s}
 .vp[open]>summary::before{transform:rotate(90deg)}
-.vp-name{font:600 18px/1.3 'Fraunces',Georgia,serif;color:var(--fg)}
+.vp-name{font:600 18px/1.3 var(--font-reading);color:var(--fg)}
 .vp-time{font:500 14px var(--font-data);color:var(--muted)}
 .vt{list-style:none;margin:0 0 14px;padding:0;position:relative}
 .vt::before{content:"";position:absolute;left:50%;top:0;bottom:0;border-left:2px solid var(--line)}
@@ -96,7 +96,7 @@ a.tal:hover{background:var(--surface-2)}
 .vt .it{display:inline-flex;align-items:center;gap:8px;font-size:15.5px;line-height:1.3}
 .vt .l .it{flex-direction:row-reverse}
 .vt .it img,.vt .it .ic-none{width:30px;height:30px;font-size:13px;border-radius:5px}
-.vt .it.do{font-weight:600;color:var(--accent)} .vt .pre{font-style:normal;color:var(--muted)}
+.vt .it.do{font-weight:600;color:var(--fg);text-decoration:underline 2px var(--accent);text-underline-offset:4px} .vt .pre{font-style:normal;color:var(--muted)}
 .copy-menu{position:relative;margin-top:16px}
 .copy-menu>summary{list-style:none;display:inline-flex;cursor:pointer}
 .copy-menu>summary::-webkit-details-marker{display:none}

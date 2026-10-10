@@ -1,4 +1,4 @@
-.hp-sec{margin:26px 0} .hp-sec h2{font:600 22px 'Fraunces',Georgia,serif;margin:0 0 10px;text-transform:none;letter-spacing:0}
+.hp-sec{margin:26px 0} .hp-sec h2{font:600 22px var(--font-reading);margin:0 0 10px;text-transform:none;letter-spacing:0}
 .rd{width:100%;height:auto;display:block} .rd polyline{fill:none;stroke:var(--neg);stroke-width:2.5}
 .rd .ax{stroke:var(--line)} .rd .ph{stroke:var(--accent);stroke-dasharray:4 4;opacity:.6}
 .rd .tk,.rd .ml{fill:var(--muted);font-size:11px} .rd .mk{fill:var(--warn)}

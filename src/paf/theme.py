@@ -29,7 +29,8 @@ CSS = TOKENS + BASE + POLISH
 # Google Fonts (the faces fall back to system ones offline)
 HEAD = ('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" '
         'href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?'
-        'family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600'
+        'family=Chakra+Petch:wght@500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400'
+        '&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600'
         '&display=swap">')
 
 
@@ -63,7 +64,7 @@ def class_accent(class_name: str) -> str:
     color = CLASS_COLORS.get((class_name or "").lower().replace(" ", ""))
     if not color:
         return ""
-    dark = ("--accent:color-mix(in srgb,var(--class) 82%,#fff);"
+    dark = ("--accent:color-mix(in srgb,var(--class) 70%,#fff);"
             "--accent-soft:color-mix(in srgb,var(--class) 22%,#181219)")
     return (f"<style>:root{{--class:{color};--accent:color-mix(in srgb,var(--class) 68%,#000);"
             "--accent-soft:color-mix(in srgb,var(--class) 16%,#fff);"

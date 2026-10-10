@@ -1,11 +1,12 @@
 *{box-sizing:border-box}
 html{color-scheme:light dark}
 body{margin:0;background:var(--glow),var(--bg);background-attachment:fixed;color:var(--fg);font:15px/1.6 var(--font-body)}
-h1,h2,h3,.brand,.btn,button,.kpi .v,.kpi .l,.tabs a,.sev,.pill,th,.step .num{font-family:var(--font-display)}
+h2,h3,.brand,.btn,button,.kpi .v,.kpi .l,.tabs a,.sev,.pill,th,.step .num{font-family:var(--font-display)}
+h1{font-family:var(--font-reading)}
 td.n,.gain,.kpi .v,code,pre{font-variant-numeric:tabular-nums}
 a{color:var(--link);text-decoration:none} a:hover{text-decoration:underline}
 main{max-width:1040px;margin:0 auto;padding:24px 16px 48px}
-h1{font-size:30px;line-height:1.15;margin:0 0 6px;letter-spacing:.005em;font-weight:700;text-wrap:balance}
+h1{font-size:30px;line-height:1.15;margin:0 0 6px;letter-spacing:0;font-weight:600;text-wrap:balance}
 h2{font-size:17px;margin:34px 0 12px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--muted);text-wrap:balance}
 h3{font-size:16px;margin:0 0 8px;font-weight:600;letter-spacing:.01em}
 p{margin:0 0 10px}
@@ -79,4 +80,5 @@ a.tile:hover{border-color:var(--accent);text-decoration:none}
 .chip .meta{color:var(--muted);font-size:12px}
 .notice{border-left:4px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:8px}
 a.wh{color:inherit;text-decoration:none;border-bottom:1px dotted var(--muted)}
-@media (max-width:640px){h1{font-size:22px} .kpi .v{font-size:22px}}
+@media (max-width:640px){h1{font-size:22px} .kpi .v{font-size:22px}
+  .topbar .nav{flex-wrap:nowrap;overflow-x:auto;margin-left:0;width:100%;scrollbar-width:none} .topbar .nav a{white-space:nowrap}}

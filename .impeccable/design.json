@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-09T23:02:22.172068+00:00",
+  "generatedAt": "2026-10-10T07:01:53.397109+00:00",
   "title": "Design System: prep-a-fight",
   "extensions": {
     "colorMeta": {
@@ -188,7 +188,11 @@
     "typographyMeta": {
       "display": {
         "displayName": "Display",
-        "purpose": "Page titles: the boss name with its difficulty pill."
+        "purpose": "Page titles in Fraunces: the boss name with its difficulty pill."
+      },
+      "reading": {
+        "displayName": "Reading",
+        "purpose": "Fraunces for what is read: the sheet sections, the lede, the tools answers."
       },
       "headline": {
         "displayName": "Headline",
@@ -337,7 +341,7 @@
       {
         "name": "The Class Signs Rule",
         "section": "colors",
-        "body": "The class color stands for the active character and nothing else; it never encodes data."
+        "body": "The class color stands for the active character and nothing else; it never encodes data, never marks a selection and never marks a state."
       },
       {
         "name": "The Sentence First Rule",
@@ -348,6 +352,11 @@
         "name": "The Objects Only Rule",
         "section": "elevation",
         "body": "A shadow marks an object (a card, a tile); sections, lists and text never get one."
+      },
+      {
+        "name": "The Thin Edge Rule",
+        "section": "elevation",
+        "body": "Borders are 1px. A thick colored edge on one side of a card is kept only on the verdict hero; a state is said in words (with a dot of its color), a callout gets a neutral fill."
       }
     ],
     "dos": [
@@ -355,14 +364,17 @@
       "**Do** open each block with a sentence and fold the tables in `details`.",
       "**Do** pair every color that means something with a word or a shape (difficulty, gain or loss, state).",
       "**Do** use tabular figures for every number that lines up.",
-      "**Do** respect reduced motion: transitions off, the minute view as plain sections."
+      "**Do** respect reduced motion: transitions off, the minute view as plain sections.",
+      "**Do** keep a visible focus ring on everything that takes focus (2px, offset 2px)."
     ],
     "donts": [
       "**Don't** set body text in gold on a light background.",
       "**Don't** use the class color or the rarity colors for anything but the character and the difficulty.",
       "**Don't** put more than one filled button on a screen.",
       "**Don't** give a shadow to anything but a card or a tile.",
-      "**Don't** add a style block in a module for something the theme already defines."
+      "**Don't** add a style block in a module for something the theme already defines.",
+      "**Don't** put a colored edge thicker than 1px on a card, a list item or a callout (the verdict hero excepted).",
+      "**Don't** fill a selected choice with the class color."
     ]
   }
 }

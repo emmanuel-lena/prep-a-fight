@@ -30,18 +30,25 @@ colors:
   rarity-green: "#1eff00"
   rarity-blue: "#0070dd"
   rarity-purple: "#a335ee"
+  wow-gold: "#ffd100"
+  wow-text: "#bdb6a8"
 typography:
   display:
-    fontFamily: "Chakra Petch, Bahnschrift, Segoe UI, system-ui, sans-serif"
+    fontFamily: "Fraunces, Georgia, Times New Roman, serif"
     fontSize: "30px"
-    fontWeight: 700
+    fontWeight: 600
     lineHeight: 1.15
-    letterSpacing: "0.005em"
+    letterSpacing: "0"
   headline:
     fontFamily: "Chakra Petch, Bahnschrift, Segoe UI, system-ui, sans-serif"
     fontSize: "17px"
     fontWeight: 600
     letterSpacing: "0.06em"
+  reading:
+    fontFamily: "Fraunces, Georgia, Times New Roman, serif"
+    fontSize: "22px"
+    fontWeight: 400
+    lineHeight: 1.5
   title:
     fontFamily: "Chakra Petch, Bahnschrift, Segoe UI, system-ui, sans-serif"
     fontSize: "16px"
@@ -146,6 +153,7 @@ A night palette of grapes and lavender with two golds, plus the game's own class
 
 ### Tertiary
 - **Rarity Green / Blue / Purple** (`rarity-green`, `rarity-blue`, `rarity-purple`): difficulty only (normal, heroic, mythic), always paired with a shape: triangle, square, pentagon.
+- **WoW tooltip gold and text** (`wow-gold`, `wow-text`): only inside the raid board's difficulty popup, which is drawn like a game tooltip.
 
 ### Neutral
 - **Plum paper / Night plum** (`bg-light` / `bg-dark`): the page ground, under the violet-and-gold glow.
@@ -157,18 +165,20 @@ A night palette of grapes and lavender with two golds, plus the game's own class
 ### Named Rules
 **The Gold Is Rare Rule.** Gold marks the one thing to see on a block: a key number, a selection, a focus. It is never body text on a light background (too little contrast).
 
-**The Class Signs Rule.** The class color stands for the active character and nothing else; it never encodes data.
+**The Class Signs Rule.** The class color stands for the active character and nothing else; it never encodes data, never marks a selection (a selected choice is a neutral fill, a strong border and a check) and never marks a state (a prepared boss rings in the positive color). Some class colors equal a rarity color (the Shaman's is the heroic blue): this rule keeps them apart.
 
 ## Typography
 
-**Display Font:** Chakra Petch (with Bahnschrift, Segoe UI)
+**Display / Reading Font:** Fraunces (with Georgia): page titles and the headings meant to be read (the prep sheet's sections, the tools' answers), the lede sentences.
+**Interface Font:** Chakra Petch (with Bahnschrift, Segoe UI): section labels, card titles, buttons, pills, tabs, table headers.
 **Body Font:** IBM Plex Sans (with Segoe UI, system-ui)
-**Label/Mono Font:** IBM Plex Mono (with Consolas)
+**Data Font:** IBM Plex Mono (with Consolas): timestamps and key figures.
 
-**Character:** A slightly angular display face for headings, buttons and labels, a sober humanist sans for reading, and a mono with tabular figures for the numbers. The game's edge, kept to the headings.
+**Character:** A warm optical serif for what you read (the briefing voice), a slightly angular face for what you operate (the game's edge), a sober sans for sentences, a mono with tabular figures for the numbers. All four load from Google Fonts on every page; the token `--font-reading` carries the serif.
 
 ### Hierarchy
-- **Display** (700, 30px, 1.15; 22px under 640px): the page title, usually the boss name with its difficulty pill.
+- **Display** (Fraunces 600, 30px, 1.15; 22px under 640px): the page title, usually the boss name with its difficulty pill.
+- **Reading** (Fraunces 400 to 600, 17 to 26px): the prep sheet's section headings and lede, the tools' answers, the onboarding.
 - **Headline** (600, 17px, uppercase, 0.06em, muted): section headings. Quiet signposts, not shouts.
 - **Title** (600, 16px): card and block titles.
 - **Body** (400, 15px, 1.6): sentences, held to 68ch for the lead and 80ch otherwise.
@@ -192,6 +202,8 @@ A light relief. The ground is lit by two soft radial glows (violet top left, gol
 
 ### Named Rules
 **The Objects Only Rule.** A shadow marks an object (a card, a tile); sections, lists and text never get one.
+
+**The Thin Edge Rule.** Borders are 1px. A thick colored edge on one side of a card is kept only on the verdict hero; a state is said in words (with a dot of its color), a callout gets a neutral fill.
 
 ## Shapes
 
@@ -240,6 +252,7 @@ Numbered steps in accent-ringed circles; KPI tiles with an uppercase label, a la
 - **Do** pair every color that means something with a word or a shape (difficulty, gain or loss, state).
 - **Do** use tabular figures for every number that lines up.
 - **Do** respect reduced motion: transitions off, the minute view as plain sections.
+- **Do** keep a visible focus ring on everything that takes focus (2px, offset 2px).
 
 ### Don't:
 - **Don't** set body text in gold on a light background.
@@ -247,3 +260,5 @@ Numbered steps in accent-ringed circles; KPI tiles with an uppercase label, a la
 - **Don't** put more than one filled button on a screen.
 - **Don't** give a shadow to anything but a card or a tile.
 - **Don't** add a style block in a module for something the theme already defines.
+- **Don't** put a colored edge thicker than 1px on a card, a list item or a callout (the verdict hero excepted).
+- **Don't** fill a selected choice with the class color.

@@ -41,7 +41,7 @@ def page(title: str, body: str, refresh: int | None = None, nav: str = "", job: 
         running = loading.banners(skip=job)
     except Exception:  # noqa: BLE001 - a banner never breaks a page
         running = ""
-    nav = nav or ('<a href="/">Home</a><a href="/characters">Characters</a><a href="/raidlead">Raid lead</a>'
+    nav = nav or ('<a href="/characters">Characters</a><a href="/raidlead">Raid lead</a>'
                   '<a href="/tools">Tools</a><a href="/settings">Settings</a><a href="/feedback">Feedback</a>')
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}{loading.CSS}</style>{_class_style()}</head><body>"
@@ -87,6 +87,8 @@ def lang_switch() -> str:
     from paf import i18n
 
     cur = i18n.language()
+    if cur == "en":  # English only until the 1.0: the switch shows for a player whose Windows is in another language
+        return ""
     options = "".join(f"<option value='{e(c)}'{' selected' if c == cur else ''}>{e(c.upper())}</option>"
                       for c in i18n.available())
     return (f"<form method='post' action='/language' class='lang' style='display:inline'>"
@@ -623,7 +625,7 @@ def characters_page() -> str:
                  f'<span class="pill">{c.bags} items in bags</span>')
         play = ('<span class="pill gold">active</span>' if c.current else
                 f'<form method="post" action="/character/select"><input type="hidden" name="slug" value="{e(c.slug)}">'
-                f'<button class="btn go">Play this character</button></form>')
+                f'<button class="btn ghost">Play this character</button></form>')
         cards += (f'<div class="ccard{" on" if c.current else ""}">{ic}<div class="cc-txt"><b>{e(c.name)}</b>'
                   f'<span>{e(c.spec.title())} {e(c.class_name.title())}</span><span>{badge} '
                   f'<span class="muted small">updated <span>{ago(c.mtime)}</span></span></span></div><div class="cc-act">{play}'
@@ -700,7 +702,7 @@ def queue_strip(difficulty: str) -> str:
                 "<small>Stopped: prepare again to go on, the bosses already prepared stay.</small>")
     return (f"<div class='rq' id='raidq'><div class='rq-txt'><span class='rq-head'>Prepare the whole raid in one "
             f"go</span><span class='rq-now'>Every boss, one after the other, while you do something else.</span>"
-            f"{note}</div><a class='btn' href='/raid/prepare?difficulty={e(difficulty)}'>Prepare the whole raid</a>"
+            f"{note}</div><a class='btn ghost' href='/raid/prepare?difficulty={e(difficulty)}'>Prepare the whole raid</a>"
             "</div>")
 
 
@@ -867,7 +869,7 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
 <select name="boss" aria-label="Boss" class="big">{options}</select>
 <div class="segs" role="radiogroup" aria-label="Difficulty">{diffs}</div>
 <button class="btn go">Let's go &rarr;</button></form></section>
-{last}{board}{mine}
+{board}{last}{mine}
 <details class="home-more"><summary>Change your character, your raid or your Warcraft Logs key</summary>
 <div class="card step"><div class="num">1</div><div class="body"><h3>Your character</h3>{character}</div></div>
 {guild}{creds}</details>"""

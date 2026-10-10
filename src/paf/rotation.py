@@ -427,8 +427,9 @@ def highlights(r: Review, limit: int = 5) -> list[tuple[float, str]]:
         for x in c.rows:
             if abs(x.player - x.sim) >= GAP:
                 more = "more" if x.player > x.sim else "less"
-                out.append((abs(x.player - x.sim) * weight * 2, f"{c.label}: {x.name} is {x.player:.0%} of your casts, "
-                                                                 f"{x.sim:.0%} in the rotation ({more} than it)."))
+                out.append((abs(x.player - x.sim) * weight * 2,
+                            f"{c.label}: you cast {x.name} {more} often than the default rotation ({x.player:.0%} of "
+                            f"your casts, against {x.sim:.0%})."))
     as_often = rotation_like(r)
     for d in r.dots:
         if d.refreshes and d.early / d.refreshes >= EARLY and _norm(d.name) not in as_often:
@@ -437,12 +438,15 @@ def highlights(r: Review, limit: int = 5) -> list[tuple[float, str]]:
                                                      f"under {PANDEMIC * d.duration:.1f} s)."))
     for c in r.cooldowns:
         if c.possible - c.casts >= 1 and c.casts < c.possible:
-            out.append(((c.possible - c.casts) / c.possible * 0.5, f"{c.name}: {c.casts} casts, {c.possible} possible "
-                                                                     f"in the pull."))
+            pressed = "you never pressed it" if not c.casts else \
+                f"you pressed it {c.casts} {'time' if c.casts == 1 else 'times'}"
+            out.append(((c.possible - c.casts) / c.possible * 0.5,
+                        f"{c.name}: {pressed}, it was ready {c.possible} times in the pull."))
     for b in r.buffs[:3]:
         if b.player < b.tops - 0.15:
-            out.append(((b.tops - b.player) * 0.8, f"{b.name}: up {b.player:.0%} of the pull, {b.tops:.0%} for the top "
-                                                   f"players of your spec on this boss."))
+            had = "you never had it" if b.player < 0.01 else f"you had it {b.player:.0%} of the pull"
+            out.append(((b.tops - b.player) * 0.8, f"{b.name}: {had}; the top players of your spec keep it up "
+                                                   f"{b.tops:.0%} of the fight."))
     for w in r.waste:
         if w.casts and w.capped / w.casts >= CAPPED:
             out.append((w.capped / w.casts * 0.3, f"{w.builder} cast at full {w.resource} {w.capped} times out of "

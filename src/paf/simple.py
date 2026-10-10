@@ -395,7 +395,7 @@ def minutes_html(d) -> str:
 def simple_html(d) -> str:
     cards = change_card(d) + press_card(d) + watch_card(d) + move_card(d) + review_card(d)
     return (f"<div class='simple'><div class='cards'>{cards}</div>{fight_html(d)}"
-            f"<p class='to-detail'><a class='btn' href='#overview'>See all the details &rarr;</a></p></div>")
+            f"<p class='to-detail'><a class='btn ghost' href='#overview'>See all the details &rarr;</a></p></div>")
 
 
 CSS = theme.style("simple")

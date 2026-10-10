@@ -89,4 +89,5 @@ def test_buffs_next_to_the_top_players():
     rows = rotation.buff_rows({7: ("x", 0.3)}, tops)
     assert [(b.name, b.player, b.tops) for b in rows] == [("Master of the Elements", 0.3, 0.6)]
     r = rotation.Review("Me", "Elemental Shaman", "pull 1", 100.0, buffs=rows)
-    assert any("Master of the Elements: up 30%" in t for _, t in rotation.highlights(r))
+    assert any(t == "Master of the Elements: you had it 30% of the pull; the top players of your spec keep it up 60% "
+               "of the fight." for _, t in rotation.highlights(r))

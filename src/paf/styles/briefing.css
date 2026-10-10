@@ -4,17 +4,17 @@
 .js .rv.in{opacity:1;transform:none}
 #overview>*:not(.tl-scroll){max-width:760px}
 .tl-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:thin} .tl{min-width:900px}
-#overview h2{font:600 26px/1.2 'Fraunces',Georgia,serif;letter-spacing:0;text-transform:none;color:var(--fg);
+#overview h2{font:600 26px/1.2 var(--font-reading);letter-spacing:0;text-transform:none;color:var(--fg);
   margin:44px 0 14px}
-.lede{font:400 22px/1.5 'Fraunces',Georgia,serif;margin:8px 0 6px;color:var(--fg)}
+.lede{font:400 22px/1.5 var(--font-reading);margin:8px 0 6px;color:var(--fg)}
 .trust{font-size:13.5px;color:var(--muted);margin:10px 0 0;padding-left:12px;border-left:2px solid var(--line)}
 .trust span{font-style:italic} .trust.high{border-color:var(--pos)} .trust.low{border-color:var(--neg)}
-.aside{font:italic 400 16px 'Fraunces',Georgia,serif;color:var(--muted);margin:-4px 0 10px}
+.aside{font:italic 400 16px var(--font-reading);color:var(--muted);margin:-4px 0 10px}
 /* what matters */
 .moves{list-style:none;margin:0;padding:0;counter-reset:m}
 .moves li{display:grid;grid-template-columns:44px 1fr auto;gap:14px;align-items:baseline;padding:16px 0;
   border-top:1px solid var(--line)} .moves li:last-child{border-bottom:1px solid var(--line)}
-.moves .n{font:400 40px/1 'Fraunces',Georgia,serif;color:var(--accent)}
+.moves .n{font:400 40px/1 var(--font-reading);color:var(--primary)}
 .moves summary,.moves .say{font-size:17px;line-height:1.45;cursor:pointer;margin:0;list-style:none}
 .moves summary::-webkit-details-marker{display:none}
 .moves summary::after{content:" \203A";color:var(--muted);display:inline-block;transition:transform .2s}
@@ -30,7 +30,7 @@
 .tl-phases{position:absolute;left:0;right:0;top:0;height:30px}
 .ph{position:absolute;top:16px;height:12px;border-top:1.5px solid var(--muted);border-left:1.5px solid var(--muted);
   border-right:1.5px solid var(--muted);border-radius:6px 6px 0 0;opacity:.8}
-.ph span{position:absolute;top:-17px;left:6px;font:italic 400 13px 'Fraunces',Georgia,serif;color:var(--muted);
+.ph span{position:absolute;top:-17px;left:6px;font:italic 400 13px var(--font-reading);color:var(--muted);
   white-space:nowrap;max-width:calc(100% - 8px);overflow:hidden;text-overflow:ellipsis}
 .tl-zone{display:none}
 .tl-axis{position:absolute;left:0;right:0;top:var(--axis);height:0;border-top:2px solid var(--fg)}
@@ -46,7 +46,7 @@
 .note .lab{position:relative;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-size:12.5px;
   height:22px;padding:0 7px 0 6px;border-radius:4px;background:var(--bg);border:1px solid transparent;
   transition:border-color .15s,background .15s}
-.note:hover,.note.on,.note:focus-visible{z-index:3} .note:focus-visible{outline:none}
+.note:hover,.note.on,.note:focus-visible{z-index:3} .note:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
 .note:hover .lab,.note.on .lab,.note:focus-visible .lab{border-color:currentColor;background:var(--surface)}
 .note:hover .pin,.note.on .pin{opacity:.9}
 .note.up{top:calc(34px + (var(--up) - 1 - var(--row)) * var(--lh) + 4px)}
@@ -60,7 +60,7 @@
 .tl-legend{position:absolute;right:0;bottom:0;display:flex;gap:14px}
 .lg::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:5px}
 .margin{min-height:48px;margin:10px 0 0;padding:10px 14px;border-left:3px solid var(--accent);background:var(--surface-2);
-  border-radius:0 8px 8px 0;font-size:15px} .margin .m-t{font:600 15px var(--font-data);color:var(--accent)}
+  border-radius:0 8px 8px 0;font-size:15px} .margin .m-t{font:600 15px var(--font-data);color:var(--fg)}
 .margin .m-text{color:var(--muted)}
 /* once the pull starts */
 .checks{list-style:none;margin:0;padding:0}
@@ -73,7 +73,7 @@
 .checks input:checked+.box::after{transform:rotate(45deg) scale(1)}
 .checks input:checked~.t{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
 .checks input:focus-visible+.box{outline:2px solid var(--accent);outline-offset:2px}
-.ready{margin-left:auto;display:flex;align-items:center;gap:8px;color:#fff}
+.ready{margin-left:auto;display:flex;align-items:center;gap:8px;color:#fff;text-decoration:none} .ready:hover{text-decoration:none}
 .ready svg{width:44px;height:44px;transform:rotate(-90deg)}
 .ready circle{fill:none;stroke-width:3.5} .ready .r-bg{stroke:rgba(255,255,255,.2)}
 .ready .r-fg{stroke:var(--sand);stroke-linecap:round;stroke-dasharray:119.4;stroke-dashoffset:119.4;
@@ -84,7 +84,7 @@
 .ready.pop{animation:pop .45s} @keyframes pop{40%{transform:scale(1.12)}}
 #overview .guide{border:0;background:none;box-shadow:none;padding:0}
 details.more{margin-top:40px;border-top:1px solid var(--line);padding-top:10px}
-details.more>summary{font:italic 400 17px 'Fraunces',Georgia,serif;color:var(--muted);padding:6px 0}
+details.more>summary{font:italic 400 17px var(--font-reading);color:var(--muted);padding:6px 0}
 @media (max-width:640px){.lede{font-size:19px}.moves li{grid-template-columns:30px 1fr auto;gap:10px}
   .moves .n{font-size:30px}}
 @media (prefers-reduced-motion:reduce){.js .rv{opacity:1;transform:none}.ready .r-fg{transition:none}}

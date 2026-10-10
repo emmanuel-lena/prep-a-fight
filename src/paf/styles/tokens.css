@@ -10,6 +10,8 @@
   --font-display:"Chakra Petch","Bahnschrift","Segoe UI",system-ui,sans-serif;
   --font-body:"IBM Plex Sans","Segoe UI",system-ui,-apple-system,sans-serif;
   --font-data:"IBM Plex Mono",Consolas,ui-monospace,monospace;
+  --font-reading:"Fraunces",Georgia,"Times New Roman",serif;
+  --wow-gold:#ffd100;--wow-text:#bdb6a8;
   --glow:radial-gradient(1100px 520px at 12% -8%,rgba(116,82,108,.16),transparent 70%),radial-gradient(900px 480px at 100% 0%,rgba(219,208,83,.08),transparent 70%);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){

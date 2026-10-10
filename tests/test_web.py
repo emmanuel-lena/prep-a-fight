@@ -270,7 +270,7 @@ def test_job_page_updates_itself(server):
 def test_language_switch_in_the_top_bar(server, monkeypatch):
     url, _ = server
     page = fetch(url + "/settings")
-    assert "action='/language'" in page and "value='fr'" in page
+    assert "action='/language'" not in page  # English only until the 1.0: no switch in the top bar in English
     fetch(url + "/language", urllib.parse.urlencode({"lang": "fr"}).encode())
     from paf import settings
 

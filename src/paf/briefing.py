@@ -240,7 +240,7 @@ def checklist_html(d) -> str:
         return ""
     lines = "".join(f"<li class='rv'><label><input type='checkbox'><span class='box' aria-hidden='true'></span>"
                     f"<span class='t'>{what}</span></label>{extra}</li>" for what, extra in items)
-    return f"<h2 class='rv'>Once the pull starts</h2><ul class='checks'>{lines}</ul>"
+    return f"<h2 class='rv' id='checks'>Once the pull starts</h2><ul class='checks'>{lines}</ul>"
 
 
 def ready_count(d) -> int:
@@ -250,9 +250,10 @@ def ready_count(d) -> int:
 def ready_ring(n: int) -> str:
     if not n:
         return ""
-    return (f"<div class='ready' title='Ready for the pull'><svg viewBox='0 0 44 44' aria-hidden='true'>"
+    return (f"<a class='ready' href='#checks' title='Tick the {n} points of &quot;Once the pull starts&quot; as you learn them'>"
+            f"<svg viewBox='0 0 44 44' aria-hidden='true'>"
             f"<circle cx='22' cy='22' r='19' class='r-bg'/><circle cx='22' cy='22' r='19' class='r-fg'/></svg>"
-            f"<div class='r-txt'><b class='r-n'>0/{n}</b><span>ready</span></div></div>")
+            f"<div class='r-txt'><b class='r-n'>0/{n}</b><span>checked</span></div></a>")
 
 
 def confidence_pill(d) -> str:

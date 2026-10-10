@@ -1,6 +1,6 @@
 .ws{max-width:1000px}
-.ws h1{font:600 34px/1.15 'Fraunces',Georgia,serif;margin:0 0 6px;letter-spacing:0;text-transform:none}
-.ws h2{font:600 22px/1.2 'Fraunces',Georgia,serif;text-transform:none;letter-spacing:0;color:var(--fg);margin:34px 0 14px}
+.ws h1{font:600 34px/1.15 var(--font-reading);margin:0 0 6px;letter-spacing:0;text-transform:none}
+.ws h2{font:600 22px/1.2 var(--font-reading);text-transform:none;letter-spacing:0;color:var(--fg);margin:34px 0 14px}
 .ws-head,.ws-tool{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
 .ws-head>div{flex:1;min-width:260px} .ws-tool>div{flex:1;min-width:240px}
 .ws-me{display:flex;gap:10px;align-items:center;padding:8px 14px 8px 8px;border-radius:14px;border:1px solid var(--line);
@@ -13,7 +13,7 @@
 .ws-card:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 8px 22px rgba(0,0,0,.12)}
 .ws-ic{width:52px;height:52px;border-radius:10px;margin:0;flex:none;box-shadow:0 2px 6px rgba(0,0,0,.25)}
 .ws-txt{display:flex;flex-direction:column;gap:6px;min-width:0}
-.ws-txt b{font:600 18px/1.25 'Fraunces',Georgia,serif}
+.ws-txt b{font:600 18px/1.25 var(--font-reading)}
 .ws-q{color:var(--muted);font-size:14.5px;line-height:1.45}
 .ws-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
 .ws-raw{margin-top:40px} .ws-raw>summary{cursor:pointer;color:var(--muted)}

@@ -14,3 +14,6 @@ CLAUDE.local.md
 dist/
 build/
 src/paf/feedback_url.txt
+
+# impeccable live mode (runtime)
+.impeccable/live/

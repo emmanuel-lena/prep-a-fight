@@ -1,9 +1,9 @@
 .est{display:flex;flex-direction:column;gap:4px;max-width:640px;margin:0 0 18px;padding:12px 16px;border-radius:12px;
-  border:1px solid var(--line);border-left:4px solid var(--pos);background:var(--surface)}
+  border:1px solid var(--line);background:var(--surface-2)}
 .est.collect{border-left-color:var(--warn)} .est b{font-size:15px} .est span{color:var(--muted);font-size:14.5px}
 .est-again{color:var(--muted);font-size:14px;margin:12px 0 0}
 .story{margin:10px 0 30px;max-width:640px}
-.story h2{font:600 26px/1.2 'Fraunces',Georgia,serif;margin:0 0 16px;text-transform:none;letter-spacing:0;color:var(--fg)}
+.story h2{font:600 26px/1.2 var(--font-reading);margin:0 0 16px;text-transform:none;letter-spacing:0;color:var(--fg)}
 .goals{display:grid;gap:10px}
 .goal{display:block;cursor:pointer}
 .goal input{position:absolute;opacity:0;pointer-events:none}

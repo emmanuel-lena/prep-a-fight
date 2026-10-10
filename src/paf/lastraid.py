@@ -281,7 +281,7 @@ def card(slug: str) -> str:
             f"<a href='{e(URL.format(cur['report']))}' target='_blank' rel='noopener'>the log</a></p>")
     if not cur["bosses"]:
         return f"<section class='lr' id='lastraid'>{head}<p>No boss of the current raid in this log.</p></section>"
-    rows = ""
+    rows, folded = "", ""
     said = {b["boss"]: sentences(b, cur["player"]) for b in cur["bosses"]}
     raid_wide = common(list(said.values()))
     skip = {_key(x) for x in raid_wide}
@@ -297,10 +297,18 @@ def card(slug: str) -> str:
         else:
             body = ("<ul>" + "".join(f"<li>{e(s)}</li>" for s in says) + "</ul>") if says else \
                 "<p class='muted small'>Nothing stands out.</p>"
-        rows += (f"<article class='lr-boss{' kill' if b['kill'] else ''}'><header><b>{e(b['name'])}</b>"
+        card_html = (f"<article class='lr-boss{' kill' if b['kill'] else ''}'><header><b>{e(b['name'])}</b>"
                  f"<span class='pill'>{e(b['difficulty'])}</span><span class='lr-state'>{state_txt}</span></header>"
                  f"{body}<nav class='lr-links'>{links}<a href='/boss?boss={b['boss']}&amp;difficulty={e(b['difficulty'])}'>"
                  f"The prep</a></nav></article>")
+        if b["kill"]:
+            folded += card_html
+        else:
+            rows += card_html
+    killed = sum(b["kill"] for b in cur["bosses"])
+    if folded:  # the bosses killed: one click away, the ones still to kill in view
+        folded = (f"<details class='lr-more'><summary>The {killed} "
+                  f"{'boss' if killed == 1 else 'bosses'} you killed</summary><div class='lr-grid'>{folded}</div></details>")
     progress = (f"<p class='lr-wait'><span class='pl-spin'></span> Reading your raid: {done} of {total} analyses"
                 f"&hellip;</p>" if not cur["finished"] else "")
     again_btn = ("" if not cur["finished"] or reading else
@@ -309,7 +317,7 @@ def card(slug: str) -> str:
     wide = ("<div class='lr-wide'><b>On the whole raid</b><ul>" + "".join(f"<li>{e(x)}</li>" for x in raid_wide)
             + "</ul></div>") if raid_wide else ""
     return (f"<section class='lr' id='lastraid'{' data-reading=1' if not cur['finished'] else ''}>{head}{progress}"
-            f"{wide}<div class='lr-grid'>{rows}</div>{again_btn}</section>")
+            f"{wide}{f'<div class=lr-grid>{rows}</div>' if rows else ''}{folded}{again_btn}</section>")
 
 
 CARD_JS = """<script>(function(){var s=document.getElementById('lastraid');if(!s||!s.dataset.reading)return;
