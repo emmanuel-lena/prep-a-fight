@@ -84,3 +84,36 @@ def test_the_home_card(home, monkeypatch):
     assert "Your last raid" in html and "killed in 3 pulls" in html and "Keep Ascendance for the adds." in html
     assert "/job/r1" in html and "/job/n1" in html and "Read the last log again" in html
     assert lastraid.card("nobody") == ""
+
+
+def test_a_log_without_a_boss_of_the_raid_is_skipped(home, monkeypatch):
+    from paf import jobrun, tracker
+
+    logs = {"dungeon": [{"encounterID": 99, "difficulty": 10, "kill": True}],
+            "raid": [{"encounterID": 1, "difficulty": 4, "kill": True}]}
+
+    class Client:
+        def query(self, q, v, cache_ttl=None):
+            return {"reportData": {"report": {"startTime": 0, "fights": logs[v["c"]]}}}
+
+    monkeypatch.setattr(lastraid, "who", lambda slug: ("Me", "Hyjal", "eu"))
+    monkeypatch.setattr(tracker, "character_reports", lambda *a: ["dungeon", "raid"])
+    monkeypatch.setattr(jobrun, "run_job", lambda args, log=None: ("j1", "done"))
+    state = {}
+    assert lastraid.read_one(Client(), "me-shaman", state, ENCS, log=lambda *a: None)
+    assert state["me-shaman"]["report"] == "raid" and state["me-shaman"]["bosses"][0]["name"] == "Ula'tek"
+
+
+def test_a_boss_in_two_difficulties_keeps_its_own_review(home, monkeypatch):
+    monkeypatch.setattr(lastraid, "_result", lambda jid: {"highlights": [f"Review {jid}."]})
+    bosses = [{"boss": 2, "name": "Nek'zali", "difficulty": d, "pulls": 1, "kill": True, "best": 0.0,
+               "jobs": {"rotation": d}} for d in ("heroic", "mythic")]
+    lastraid.save({"me": {"report": "abc", "player": "Me", "date": 1791500000, "pulls": 2, "night": "n1",
+                          "finished": 1791500100, "bosses": bosses}})
+    html = lastraid.card("me")
+    assert "Review heroic." in html and "Review mythic." in html
+
+
+def test_a_pull_comparison_says_best_pull_not_b():
+    assert lastraid._ab("Share of the raid's damage on Vashnik: 59% in B, 54% in A.") == (
+        "Share of the raid's damage on Vashnik: 59% in your best pull, 54% in the other one.")

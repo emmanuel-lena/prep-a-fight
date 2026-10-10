@@ -192,9 +192,10 @@ def highlights(a: Side, b: Side, boss: str) -> list[tuple[str, str]]:
     """What B did better (or worse) than A, biggest first: (kind, sentence) with kind good / bad."""
     out: list[tuple[float, str, str]] = []
     t = min(a.duration, b.duration)
-    la, lb = a.pull.left_at(t), b.pull.left_at(t)
-    out.append((abs(la - lb) * 4, "good" if lb < la else "bad",
-                f"At {int(t // 60)}:{int(t % 60):02d}, the boss had {lb:.0%} left in B against {la:.0%} in A."))
+    if a.pull.health and b.pull.health:  # the boss's health is known (the boss is prepared)
+        la, lb = a.pull.left_at(t), b.pull.left_at(t)
+        out.append((abs(la - lb) * 4, "good" if lb < la else "bad",
+                    f"At {int(t // 60)}:{int(t % 60):02d}, the boss had {lb:.0%} left in B against {la:.0%} in A."))
     da, db = sum(len(v) for v in a.deaths.values()), sum(len(v) for v in b.deaths.values())
     if da != db:
         out.append((abs(da - db) / 10, "good" if db < da else "bad", f"Deaths before the wipe: {db} in B, {da} in A."))

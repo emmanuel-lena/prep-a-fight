@@ -70,14 +70,20 @@ class PullRow:
     players: dict[str, PlayerPull] = field(default_factory=dict)
 
 
-def character_report(client, name: str, server: str, region: str) -> str | None:
-    """The latest log of a character (a live log too, while the raid uploads it), from Warcraft Logs."""
+def character_reports(client, name: str, server: str, region: str) -> list[str]:
+    """The recent logs of a character, newest first (a live log too, while the raid uploads it)."""
     from paf.character import CHARACTER_QUERY, server_slug
 
     ch = client.query(CHARACTER_QUERY, {"n": name, "s": server_slug(server), "r": (region or "eu").upper()},
                       cache_ttl=60)["characterData"]["character"]
     reports = sorted(((ch or {}).get("recentReports") or {}).get("data") or [], key=lambda r: -r["startTime"])
-    return reports[0]["code"] if reports else None
+    return [r["code"] for r in reports]
+
+
+def character_report(client, name: str, server: str, region: str) -> str | None:
+    """The latest log of a character, from Warcraft Logs."""
+    codes = character_reports(client, name, server, region)
+    return codes[0] if codes else None
 
 
 def night(client, code: str, encounter_id: int | None = None, live: bool = False

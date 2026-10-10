@@ -1,7 +1,8 @@
 """The week after (issue #22): when the app starts, it has already read your raid's last log and shows what to clean.
 
 - For every character ticked "read my logs at launch" (setting `auto_logs`: "active", the default, follows the active
-  character), the latest log of the character on Warcraft Logs (paf.tracker.character_report), no link to paste.
+  character), the character's latest log with a boss of the current raid (paf.tracker.character_reports), no
+  link to paste.
 - A background process (`paf lastraid`, detached) reads it: the night pull by pull (paf.tracker, in the process),
   then per boss of the current raid in the log, as jobs of the app (their pages are the tools' pages): a boss killed,
   the character's rotation review (paf.rotation); a boss not killed, why (paf.wipe, needs the boss prepared) and the
@@ -151,11 +152,14 @@ def read_one(client, slug: str, state: dict, encs, log=print) -> bool:
     name, server, region = who(slug)
     if not name or not server:
         return False
-    code = tracker.character_report(client, name, server, region)
+    code, rep, fights = None, {}, []
+    for c in tracker.character_reports(client, name, server, region):  # the latest log with a boss of the raid
+        r = client.query(FIGHTS, {"c": c}, cache_ttl=120)["reportData"]["report"] or {}
+        if bosses_of(r.get("fights") or [], encs):
+            code, rep, fights = c, r, r.get("fights") or []
+            break
     if not code:
         return False
-    rep = client.query(FIGHTS, {"c": code}, cache_ttl=120)["reportData"]["report"] or {}
-    fights = rep.get("fights") or []
     old = state.get(slug) or {}
     if old.get("report") == code and old.get("pulls") == len(fights) and old.get("finished"):
         return False
@@ -210,6 +214,18 @@ def _result(jid: str | None) -> dict | None:
     return results.read(rd) if rd else None
 
 
+def _failed(jid: str | None) -> bool:
+    try:
+        return bool(jid) and not json.loads((data_dir() / "web" / f"job-{jid}.json").read_text(
+            encoding="utf-8")).get("status", "").startswith(("done", "running"))
+    except (OSError, ValueError):
+        return False
+
+
+def _pulls(n: int) -> str:
+    return f"{n} pull{'s' if n != 1 else ''}"
+
+
 def _mmss(t: float) -> str:
     return "never" if t == float("inf") or t != t else f"{int(t // 60)}:{int(t % 60):02d}"
 
@@ -236,9 +252,16 @@ def sentences(b: dict, player: str) -> list[str]:
                        + (f", {me['lost_dead']:.1%} while dead" if me["lost_dead"] >= 0.005 else "")
                        + (f"; padding talents: {', '.join(me['pad_talents'])}" if me.get("pad_talents") else "") + ".")
     d = _result(b["jobs"].get("diff"))
-    if d:
-        out += [h["text"] for h in d.get("highlights", [])]
+    if d:  # B is the better pull of the two (paf.pulldiff.player_pair, default_pair)
+        out += [_ab(h["text"]) for h in d.get("highlights", [])]
     return out
+
+
+def _ab(text: str) -> str:
+    """A pull comparison's sentence for the home page, where "A" and "B" mean nothing."""
+    text = re.sub(r"\bin B\b", "in your best pull", text)
+    text = re.sub(r"\bin A\b", "in the other one", text)
+    return text
 
 
 def _key(sentence: str) -> str:
@@ -277,21 +300,23 @@ def card(slug: str) -> str:
     done = sum(len(b["jobs"]) for b in cur["bosses"])
     when = datetime.fromtimestamp(cur["date"]).strftime("%A %d %B") if cur.get("date") else ""
     night = f"<a href='/job/{e(cur['night'])}'>the night, pull by pull</a> &middot; " if cur.get("night") else ""
-    head = (f"<h2>Your last raid</h2><p class='lr-sub'>{e(when)} &middot; {cur['pulls']} pulls &middot; {night}"
+    head = (f"<h2>Your last raid</h2><p class='lr-sub'>{e(when)} &middot; {_pulls(cur['pulls'])} &middot; {night}"
             f"<a href='{e(URL.format(cur['report']))}' target='_blank' rel='noopener'>the log</a></p>")
     if not cur["bosses"]:
         return f"<section class='lr' id='lastraid'>{head}<p>No boss of the current raid in this log.</p></section>"
     rows, folded = "", ""
-    said = {b["boss"]: sentences(b, cur["player"]) for b in cur["bosses"]}
-    raid_wide = common(list(said.values()))
+    said = [sentences(b, cur["player"]) for b in cur["bosses"]]  # by position: a boss can come in two difficulties
+    raid_wide = common(said)
     skip = {_key(x) for x in raid_wide}
-    for b in cur["bosses"]:
+    for b, boss_says in zip(cur["bosses"], said, strict=True):
         state_txt = (f"killed in {b['pulls']} {'pull' if b['pulls'] == 1 else 'pulls'}" if b["kill"] else
-                     f"not killed: best pull at {b['best']:.0f}%, {b['pulls']} pulls")
-        says = [x for x in said[b["boss"]] if _key(x) not in skip][:3]
+                     f"not killed: best pull at {b['best']:.0f}%, {_pulls(b['pulls'])}")
+        says = [x for x in boss_says if _key(x) not in skip][:3]
         links = "".join(f"<a href='/job/{e(jid)}'>{label}</a>" for kind, label in
                         (("rotation", "Your rotation"), ("wipe", "Why it did not die"), ("diff", "Your best pull vs your worst"))
-                        if (jid := b["jobs"].get(kind)))
+                        if (jid := b["jobs"].get(kind)) and not _failed(jid))
+        if not b["kill"] and _failed(b["jobs"].get("wipe")):  # it needs the boss prepared (the top kills)
+            says = [*says, f"Prepare {b['name']} {b['difficulty']} to see why it did not die."][:3]
         if not says and not cur["finished"]:
             body = "<p class='lr-wait'><span class='pl-spin'></span> Reading&hellip;</p>"
         else:
