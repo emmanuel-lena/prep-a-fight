@@ -8,12 +8,14 @@ web
 
 ## Users
 
-Primary: the **casual heroic raider** of World of Warcraft. Raids two or three evenings a week, wants to know what to do on a boss in five minutes before the pull, and is put off by tables, jargon and walls of numbers. When needs conflict, design for this player first; the details stay one click away, folded.
+Every raider is meant to be served by the tool: the casual and the mythic / parse player, the raid leader, healers and tanks. We start with the **casual heroic and mythic raider** of World of Warcraft, who raids two or three evenings a week, wants to know what to do on a boss in five minutes before the pull, and is put off by tables, jargon and walls of numbers. When needs conflict, design for this player first; the details stay one click away, folded.
 
-Also served, never at the primary user's expense:
+Also served, built for as the tool grows:
 - the mythic / parse player, who reads logs and wants every number and option (in the detailed tabs and the tools);
 - the raid leader, who prepares the whole raid (who hits what, the best pull, the night's pulls, comps);
 - healers and tanks, whose preps come from the logs of the top players of their spec.
+
+Game knowledge from the raiding side is what catches the model's errors: every uncertain assumption is said, for it to be corrected.
 
 ## Product Purpose
 
@@ -66,6 +68,8 @@ The sims run on **the real fight rebuilt from the top players' logs**, not on a 
 4. **Local at the core**: the sims and the prep run on the player's computer; accounts, if they come, stay optional.
 5. **Generic, not hand-made per class**: one method for every spec, so every spec gets the same quality.
 6. **Press once, come back to it ready**: the app does the long work by itself and finds what it can (the character's logs, the raid's roster, the next boss) instead of asking.
+7. **The sim decides, never popularity**: what the top players do (their builds, gear, timings) is a candidate or a hypothesis; SimulationCraft on the real fight chooses, whatever the number of players behind it. Talents are searched over the whole tree, not copied from a build; the fight is simmed over the kill times raids actually have, not one duration.
+8. **Do what others do not**: no list of what the top players wear (Archon and murlok.io do it); your character, simmed on this fight, is the point.
 
 ## Accessibility & Inclusion
 

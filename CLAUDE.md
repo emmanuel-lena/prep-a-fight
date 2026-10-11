@@ -14,6 +14,10 @@ Outil local et open source (MIT) pour préparer un boss : timelines des meilleur
 
 Le prototype PowerShell (`Invoke-LocalTopGear.ps1`, Top Gear 3 passes) a été retiré ; il reste dans le premier commit (`git show 243c53f:Invoke-LocalTopGear.ps1`) comme référence pour R2. Le profil courant de l'utilisateur est dans `~/.paf/profiles/current.simc`.
 
+## Avant une nouvelle brique
+
+Relire ce qui a déjà été décidé : `git log` (les messages de commit portent le pourquoi), `ROADMAP.md`, `PRODUCT.md` (principes), `docs/research/`, et réutiliser les modules existants (`paf.talents`, `paf.validate`, `paf.talent_sim`…) au lieu de réinventer. Le 2026-10-11, `specgear` a choisi un build par popularité et reconstruit les talents à côté de `paf.talents` : deux principes ignorés.
+
 ## Conventions Python
 
 - Python ≥ 3.11, dépendances minimales (stdlib `urllib` tant que possible ; `py7zr` pour les .7z de simc).

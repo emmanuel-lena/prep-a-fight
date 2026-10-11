@@ -399,17 +399,16 @@ class Suggestion:
     icon: str = ""  # game icon file name
 
 
-MIN_BUILD_PLAYERS = 3  # a build played by fewer top players is shown, never recommended
 THIN_CORPUS = 50  # fewer ranked kills than this: say the data is thin
 
 
 def best_build(d: PrepData):
-    """The best talent build played by at least MIN_BUILD_PLAYERS top players (None if none)."""
+    """The best talent build in the sim, however many top players play it: the sim decides, not popularity
+    (None if none)."""
     if not d.talents or not d.talents.rows:
         return None
     fight = d.talents.fights[0]
-    ok = [r for r in d.talents.rows if r.build.count >= MIN_BUILD_PLAYERS]
-    return max(ok, key=lambda r: r.per_fight.get(fight, (-1e9, None))[0]) if ok else None
+    return max(d.talents.rows, key=lambda r: r.per_fight.get(fight, (-1e9, None))[0])
 
 
 def copy_button(text: str, label: str) -> str:
@@ -677,8 +676,7 @@ def render(d: PrepData) -> str:
     if d.kills and d.kills < THIN_CORPUS:
         tabs["overview"].append(
             f'<p class="notice small"><b>Thin data:</b> only {d.kills} ranked kills of your spec on this boss and '
-            f'difficulty. The timings of the fight and the habits of the top players are less reliable than usual; talent '
-            f'builds played by fewer than {MIN_BUILD_PLAYERS} of them are listed but never recommended.</p>')
+            f'difficulty. The timings of the fight and the habits of the top players are less reliable than usual.</p>')
     tabs["overview"].append(briefing.moves_html(d))
     tabs["overview"].append(briefing.fight_map_html(d))
     tabs["overview"].append(briefing.checklist_html(d))
