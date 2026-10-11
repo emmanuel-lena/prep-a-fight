@@ -16,7 +16,8 @@ e = html.escape
 GROUPS = (
     ("Prepare a boss", ("prep", "raid", "review", "comp", "wipe", "night", "diff", "rotation", "raidplan",
                         "timeline", "mechanics", "assigns")),
-    ("Sims on the fight", ("topgear", "droptimizer", "bonusroll", "talents", "optimize", "cdplan", "plan", "sim")),
+    ("Sims on the fight", ("topgear", "droptimizer", "bonusroll", "talents", "specgear", "optimize", "cdplan",
+                           "plan", "sim")),
     ("The fight model", ("corpus", "analyze", "template", "calibrate", "validate")),
     ("Maintenance", ("setup", "doctor")),
 )

@@ -86,6 +86,8 @@ The prep sheet gives:
 - the **ideal cooldown play-by-play for boss damage, total damage and damage to adds**, with an MRT note;
 - what the top players actually do with their cooldowns;
 - your best items and what the boss drops for you;
+- in Tools, which spec of your class does the most on this boss: your character simmed in each spec in the top
+  players' gear at the season's top item level, their gap in the logs, and your own kills;
 - a short "what to remember" list at the top.
 
 ### Boss notes: what the logs cannot tell

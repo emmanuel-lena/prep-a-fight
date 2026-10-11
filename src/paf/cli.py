@@ -490,6 +490,39 @@ def cmd_talents(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_specgear(args: argparse.Namespace) -> int:
+    from paf import results, settings, simc, specgear
+
+    profile_text, origin = _load_profile(args.profile)
+    client, enc, diff_name, diff = _encounter_and_difficulty(args)
+    cls, spec = settings.get("class"), settings.get("spec")
+    fights = _boss_fights(enc, diff_name)
+    main = next((k for k in fights if k != "patchwerk"), None)
+    if main is None:
+        print(f"No rebuilt fight for {enc.name} {diff_name}: prepare this boss first.")
+        return 1
+    print(f"{enc.name} {diff_name}: the damage specs of your class among the top players, and your character "
+          f"({origin}) in each, in their gear at item level {specgear.TOP_ILVL}")
+    run_dir = simc.new_run_dir(label="specgear")
+    r = specgear.compare(profile_text, client, enc, diff, diff_name, cls, spec, fights[main], run_dir,
+                         character=_active_character(), target_error=args.error)
+    print()
+    for x in r.rows:
+        sim = f"{x.sim:>10,.0f}" if x.sim else f"{'-':>10}"
+        print(f"{specgear.spec_label(x.spec):<16} top players {x.tops:>10,.0f} ({x.tops_lo:,.0f}-{x.tops_hi:,.0f})"
+              f"   you at {specgear.TOP_ILVL} {sim}")
+    if r.now:
+        print(f"{'You as you are':<16} {'':>34}   {r.now:>10,.0f}")
+    print()
+    for line in (specgear.verdict(r)[1], specgear.gear_sentence(r), specgear.kills_sentence(r), *r.notes):
+        if line:
+            print(line)
+    print("Boss damage per second; the top players' figure is the median of the top 100 (90% interval in brackets).")
+    results.write(run_dir, "specgear", specgear.to_json(r))
+    print(f"\nRuns: {run_dir}")
+    return 0
+
+
 def print_plans(pc) -> None:
     for act, times in pc.cd_times.items():
         print(f"  {act}: top players use it at {', '.join(_mmss(t) for t in times) or '(no common timing)'}")
@@ -2304,6 +2337,14 @@ def build_parser() -> argparse.ArgumentParser:
     ta.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
     ta.add_argument("--error", type=float, default=0.2)
     ta.set_defaults(func=cmd_talents)
+
+    sg = sub.add_parser("specgear", help="the damage specs of your class among the top players, and your character "
+                                         "simmed in each in their gear at the season's top item level")
+    sg.add_argument("boss")
+    sg.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    sg.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
+    sg.add_argument("--error", type=float, default=0.2)
+    sg.set_defaults(func=cmd_specgear)
 
     cp = sub.add_parser("cdplan", help="compare cooldown plans (default APL, on cooldown, hold for adds, "
                                        "top players' timings) on the boss fight")

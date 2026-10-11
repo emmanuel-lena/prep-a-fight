@@ -616,7 +616,51 @@ def bonusroll(d: dict) -> str:
             f"a roll gives one item of the boss's loot for your spec, any of them alike. Gains under "
             f"&plusmn;{2 * err:.2f}% are noise.</p>")
 
-VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review, "comp": comp, "wipe": wipe, "night": night, "diff": pulldiff, "rotation": rotation, "bonusroll": bonusroll}
+def specgear(d: dict) -> str:
+    """Which spec and which gear: the verdict, each spec on you in the top players' gear, your kills."""
+    rows = [r for r in d.get("rows", []) if r.get("sim")]
+    mine = next((r for r in rows if r["spec"] == d.get("mine")), None)
+    others = [r for r in rows if r is not mine]
+    best = max(others, key=lambda r: r["sim"], default=None)
+    big = _pct(100 * (best["sim"] / mine["sim"] - 1)) if d.get("verdict") == "go" and best and mine else ""
+    title, sentence = d.get("title") or "", d.get("sentence") or ""
+    if sentence.startswith(title + ": "):  # "Stay Subtlety: it sims..." under the title "Stay Subtlety"
+        sentence = sentence[len(title) + 2:]
+        sentence = sentence[:1].upper() + sentence[1:]
+    head = _verdict(d.get("verdict") or "ok", e(title), e(sentence), big)
+    ilvl = d.get("ilvl", 334)
+    lines = ""
+    if mine:
+        scale = max((abs(100 * (r["sim"] / mine["sim"] - 1)) for r in rows), default=1) or 1
+        for r in sorted(rows, key=lambda r: -r["sim"]):
+            gain = 100 * (r["sim"] / mine["sim"] - 1)
+            noise = 2 * ((r.get("error") or 0) ** 2 + (mine.get("error") or 0) ** 2) ** 0.5
+            tops = 100 * (r["tops"] / mine["tops"] - 1)
+            who = "your spec" if r is mine else f"the top players {_pct(tops, 0)} against the top {e(mine['label'])}"
+            lines += (f"<li><span class='l-name'><b>{e(r['label'])}</b><small>{r['sim']:,.0f} DPS on you &middot; "
+                      f"{who}</small></span>{_bar(gain, scale)}<span class='l-val "
+                      f"{'pos' if gain > noise else 'neg' if gain < -noise else ''}'>"
+                      f"{'&ndash;' if r is mine else _pct(gain)}</span></li>")
+    you = (f"<p>{e(d['gear_sentence'])}</p>" if d.get("gear_sentence") else "")
+    you += f"<p>{e(d['kills_sentence'])}</p>" if d.get("kills_sentence") else ""
+    sets = ""
+    for r in [x for x in (mine, best) if x]:
+        icons = _item_icons(r.get("items") or [])
+        cards = "".join(f"<li class='icard'>{_img(icons.get(i['item_id'], ''))}<span class='l-name'><b>"
+                        f"{e(i['name'] or '?')}</b><small><span>{e(SLOTS.get(i['slot'], i['slot']))}</span></small>"
+                        f"</span></li>" for i in r.get("items") or [])
+        sets += (f"<details class='more'><summary>The set of the top {e(r['label'])} players, at {ilvl}</summary>"
+                 f"<ul class='glist items'>{cards}</ul></details>")
+    notes = "".join(f"<p class='ws-fine'>{e(n)}</p>" for n in d.get("notes") or [])
+    return (f"{head}<h3>Each spec on you, in the top players' gear at {ilvl}</h3><ul class='glist'>{lines}</ul>"
+            f"<h3>You</h3>{you}{sets}{notes}"
+            f"<p class='ws-fine'>Boss damage per second on the fight rebuilt from the top kills. The top players' "
+            f"figure is the median of the top 100 of each spec. Your spec is simmed with your talents, another spec "
+            f"with the build SimulationCraft ships for it. Each spec's set is what its top {d.get('gear_tops', 20)} "
+            f"players wear most, slot by slot, at item level {ilvl}.</p>")
+
+
+VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review, "comp": comp, "wipe": wipe, "night": night, "diff": pulldiff, "rotation": rotation, "bonusroll": bonusroll, "specgear": specgear}
 
 
 def render(data: dict) -> str | None:
