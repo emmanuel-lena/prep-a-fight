@@ -15,6 +15,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from paf import talent_tree
+
 TOP_ILVL = 334  # the season's top item level (Myth 6/6)
 GEAR_TOPS = 20  # the top players whose gear makes the set of a spec
 MIN_TOPS = 10  # fewer ranked players than this: the spec is not compared
@@ -151,58 +153,6 @@ def bundled_talents(cls: str, spec: str, simc_path: str | None = None) -> str | 
         return None
     m = re.search(r"^talents=(\S+)", path.read_text(encoding="utf-8", errors="replace"), re.M)
     return m.group(1) if m else None
-
-
-def simc_token(name: str) -> str:
-    """A talent's name as SimulationCraft spells it: "Dragon-Bone Dice" -> dragonbone_dice."""
-    return re.sub(r"[^a-z0-9_]", "", name.lower().replace(" ", "_"))
-
-
-def parse_talent_query(text: str) -> dict[int, tuple[str, str]]:
-    """simc's `spell_query=talent.class=...` output -> {entry id: (name, tree)}; the entry id is what Warcraft Logs
-    reports as talentID."""
-    out = {}
-    for block in re.split(r"^(?=Name\s*:)", text, flags=re.M):
-        name = re.search(r"^Name\s*:\s*(.+?)\s*$", block, re.M)
-        entry = re.search(r"^Entry\s*:\s*(\d+)", block, re.M)
-        tree = re.search(r"^Tree\s*:\s*(\w+)", block, re.M)
-        if name and entry and tree:
-            out[int(entry.group(1))] = (name.group(1), tree.group(1))
-    return out
-
-
-def talent_trees(cls: str, simc_path: str | None = None) -> dict[int, tuple[str, str]]:
-    """Every talent of a class, from SimulationCraft's own data (so it matches the simc that sims it)."""
-    import subprocess
-
-    from paf.simc_install import find_simc
-
-    exe = find_simc(simc_path)
-    if exe is None:
-        return {}
-    token = cls.lower()  # DeathKnight -> deathknight, as simc names the class
-    try:
-        proc = subprocess.run([str(exe), f"spell_query=talent.class={token}"], capture_output=True, text=True,
-                              timeout=60, encoding="utf-8", errors="replace")
-    except (OSError, subprocess.SubprocessError):
-        return {}
-    return parse_talent_query(proc.stdout)
-
-
-def build_lines(build: tuple[tuple[int, int], ...], trees: dict[int, tuple[str, str]]) -> list[str] | None:
-    """A build of talent IDs (with their ranks) as simc options, tree by tree; None when a talent is unknown to
-    this simc (another patch): the caller falls back."""
-    by_tree: dict[str, list[str]] = {"class": [], "spec": [], "hero": []}
-    for talent, rank in build:
-        name, tree = trees.get(talent, ("", ""))
-        if tree == "selection":  # the hero tree's choice node: simc knows it from the hero talents
-            continue
-        if tree not in by_tree:
-            return None
-        by_tree[tree].append(f"{simc_token(name)}:{rank}")
-    if not by_tree["class"] or not by_tree["spec"]:
-        return None
-    return ["talents="] + [f"{t}_talents={'/'.join(v)}" for t, v in by_tree.items() if v]
 
 
 def common_build(rows: list[dict]) -> tuple[tuple[int, int], ...]:
@@ -377,7 +327,7 @@ def compare(profile: str, client, enc, difficulty: int, diff_name: str, cls: str
 
     res = Result(enc.name, diff_name, mine, [], metric=metric, run_dir=run_dir)
     own_talents = (re.search(r"^talents=(\S+)", profile, re.M) or [None, None])[1]
-    trees = talent_trees(cls)
+    tree = talent_tree.load(cls)
     for spec in DAMAGE_SPECS.get(cls, (mine,)):
         t = tops(client, enc.id, difficulty, cls, spec, metric)
         if t is None:
@@ -388,17 +338,17 @@ def compare(profile: str, client, enc, difficulty: int, diff_name: str, cls: str
                       items=[{"slot": SLOTS[i], "item_id": int(it["id"]), "name": it.get("name") or ""}
                              for i, it in enumerate(t.gear) if i in SLOTS and it.get("id")])
         res.rows.append(row)
-        # every build that can be the spec's best in SimulationCraft, in one run: the top players' (their export,
-        # rebuilt from the rankings), the one simc ships (its APL is written for it), and yours for your spec.
-        # The best is kept: simc can play a build of the top players far under what they do with it.
-        clear = ["class_talents=", "spec_talents=", "hero_talents="]
+        # the builds simmed, as import strings: the top players' (from the rankings), the one simc ships (its APL is
+        # written for it), and yours for your spec. The best in the sim is kept.
+        shipped = bundled_talents(cls, spec)
+        reference = own_talents if spec == mine and own_talents else shipped
         builds: dict[str, list[str]] = {}
-        if lines := build_lines(t.build, trees):
-            builds["tops"] = lines
-        if shipped := bundled_talents(cls, spec):
-            builds["simc"] = clear + [f"talents={shipped}"]
+        if tree is not None and reference and t.build:
+            builds["tops"] = tree.simc_lines(tree.from_ranks(list(t.build)), reference)
+        if shipped:
+            builds["simc"] = [f"talents={shipped}"]
         if spec == mine and own_talents:
-            builds["yours"] = clear + [f"talents={own_talents}"]
+            builds["yours"] = [f"talents={own_talents}"]
         if not builds:
             res.notes.append(f"{spec_label(spec)}: no talent build found for it, not simmed.")
             continue

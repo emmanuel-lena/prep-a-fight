@@ -73,6 +73,14 @@ def _tree_data() -> tuple[dict[int, int], dict[int, list[int]], dict[int, int], 
     return node_tree, node_entries, max_ranks, dict(tree_nodes)
 
 
+CHOICE_TYPES = {"2", "3"}  # TraitNode.Type: 2 a choice node, 3 the hero tree's choice
+
+
+@cache
+def _node_types() -> dict[int, str]:
+    return {int(r["ID"]): r.get("Type", "0") for r in table_rows("TraitNode") if r.get("ID", "").isdigit()}
+
+
 def tree_for_entries(entry_ids: list[int]) -> int | None:
     """The talent tree most of these entries belong to (entries come from Warcraft Logs rankings)."""
     node_tree, node_entries, _, _ = _tree_data()
@@ -113,6 +121,42 @@ def decode(loadout: str, tree_id: int) -> tuple[int, list[Choice]]:
         entry = entries[min(choice, len(entries) - 1)]
         out.append(Choice(node, entry, rank if rank is not None else max_ranks.get(entry, 1), not purchased))
     return spec_id, out
+
+
+def encode(spec_id: int, choices: list[Choice], tree_id: int, version: int = 2) -> str:
+    """The import string of these choices (the inverse of decode; the tree hash left at zero, as third parties do)."""
+    _, node_entries, max_ranks, tree_nodes = _tree_data()
+    nodes = tree_nodes.get(tree_id)
+    if not nodes:
+        raise TalentError(f"unknown talent tree {tree_id}")
+    by_node = {c.node_id: c for c in choices}
+    bits: list[int] = []
+
+    def put(v: int, n: int) -> None:
+        bits.extend((v >> i) & 1 for i in range(n))
+
+    put(version, 8)
+    put(spec_id, 16)
+    put(0, 128)
+    for node in nodes:
+        c = by_node.get(node)
+        put(1 if c else 0, 1)
+        if not c:
+            continue
+        put(0 if c.granted else 1, 1)
+        if c.granted:
+            continue
+        partial = c.rank < max_ranks.get(c.entry_id, 1)
+        put(1 if partial else 0, 1)
+        if partial:
+            put(c.rank, 6)
+        entries = node_entries.get(node) or []
+        choice = _node_types().get(node) in CHOICE_TYPES  # a node can list several entries without being a choice
+        put(1 if choice else 0, 1)
+        if choice:
+            put(entries.index(c.entry_id) if c.entry_id in entries else 0, 2)
+    bits += [0] * (-len(bits) % 6)
+    return "".join(ALPHABET[sum(bits[i + j] << j for j in range(6))] for i in range(0, len(bits), 6))
 
 
 def names_of(choices: list[Choice]) -> dict[int, str]:
