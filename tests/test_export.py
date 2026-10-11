@@ -11,3 +11,13 @@ def test_fight_export_for_raidbots():
     d = PrepData(boss="Boss", difficulty="mythic", spec="Elemental", character="X")
     d.export = {"": text}
     assert "raidbots.com/simbot/advanced" in export_html(d) and "Copy the fight" in export_html(d)
+
+
+def test_every_raid_event_goes_on_one_line_for_raidbots():
+    from paf.export import one_raid_events_line
+
+    lines = ["max_time=300", "raid_events=/adds,count=3,first=24", "raid_events+=/movement,first=34,duration=1",
+             "bloodlust_time=0"]
+    assert one_raid_events_line(lines) == ["max_time=300", "raid_events=/adds,count=3,first=24/movement,first=34,"
+                                           "duration=1", "bloodlust_time=0"]
+    assert one_raid_events_line(["max_time=300"]) == ["max_time=300"]

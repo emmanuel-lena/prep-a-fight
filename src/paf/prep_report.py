@@ -672,7 +672,7 @@ def render(d: PrepData) -> str:
             f"<div class='partial'><b>First analysis, from {used} of the {found} top kills</b><span>Measured on our "
             "corpora: the fight is within about 2% of the full corpus and the talent pick rates within about 3 points. "
             "The full analysis runs in the background: this sheet refreshes by itself when it is done.</span></div>")
-    tabs["overview"].append(briefing.lede_html(d) + briefing.confidence_pill(d))
+    tabs["overview"].append(briefing.lede_html(d) + briefing.aim_html(d) + briefing.confidence_pill(d))
     if d.kills and d.kills < THIN_CORPUS:
         tabs["overview"].append(
             f'<p class="notice small"><b>Thin data:</b> only {d.kills} ranked kills of your spec on this boss and '

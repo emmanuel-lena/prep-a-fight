@@ -88,3 +88,7 @@ details.more>summary{font:italic 400 17px var(--font-reading);color:var(--muted)
 @media (max-width:640px){.lede{font-size:19px}.moves li{grid-template-columns:30px 1fr auto;gap:10px}
   .moves .n{font-size:30px}}
 @media (prefers-reduced-motion:reduce){.js .rv{opacity:1;transform:none}.ready .r-fg{transition:none}}
+/* what to aim for: your number on this fight, a dummy, the best of your spec */
+.aim{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:14px 0}
+.aim .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.aim .kpi:first-child .v{color:var(--fg)}

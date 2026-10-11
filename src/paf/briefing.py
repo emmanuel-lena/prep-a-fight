@@ -256,6 +256,31 @@ def ready_ring(n: int) -> str:
             f"<div class='r-txt'><b class='r-n'>0/{n}</b><span>checked</span></div></a>")
 
 
+def _k(v: float) -> str:
+    return f"{v / 1000:,.0f}k" if v >= 10000 else f"{v:,.0f}"
+
+
+def aim_html(d) -> str:
+    """What to aim for, at a glance: your character simmed on this fight (boss damage first), the same on a training
+    dummy, and what the top players of your spec really do here."""
+    if not d.sim_dps:
+        return ""
+    you = d.sim_boss_dps or d.sim_dps
+    tiles = [("You can aim for", _k(you), (f"boss DPS, {_k(d.sim_dps)} in all" if d.sim_boss_dps else "DPS")
+              + " on this fight, played well")]
+    if d.patchwerk_dps:
+        tiles.append(("On a training dummy", _k(d.patchwerk_dps),
+                      f"DPS: this fight costs you {1 - d.sim_dps / d.patchwerk_dps:.0%}" if d.sim_dps < d.patchwerk_dps
+                      else "DPS: this fight gives you more than a dummy"))
+    p = getattr(d, "your_profile", None)
+    if p is not None and getattr(p, "boss_dps", None):
+        tiles.append((f"The best {e(d.spec)}", _k(p.boss_dps), f"boss DPS, {_k(p.dps)} in all (median of the top "
+                                                              f"100, their own gear)"))
+    cells = "".join(f"<div class='kpi'><div class='l'>{lab}</div><div class='v'>{val}</div><div class='s'>{sub}</div>"
+                    "</div>" for lab, val, sub in tiles)
+    return f"<div class='aim rv'>{cells}</div>"
+
+
 def confidence_pill(d) -> str:
     if not d.validation:
         return ""

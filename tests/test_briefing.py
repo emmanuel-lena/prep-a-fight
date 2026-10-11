@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from paf import briefing
 from paf.prep_report import PrepData
 
@@ -31,3 +33,16 @@ def test_lede_of_a_council_in_french(monkeypatch):
     assert "stay on the boss" not in lede
     monkeypatch.setenv("PAF_LANG", "fr")
     assert "Un conseil de 2 boss, dont 2 packés : les tops les cleavent et commencent par Trader." in translate(lede)
+
+
+def test_what_to_aim_for_comes_first_in_the_overview():
+    d = SimpleNamespace(sim_dps=250000.0, sim_boss_dps=180000.0, patchwerk_dps=300000.0, spec="Subtlety",
+                        your_profile=SimpleNamespace(dps=290000.0, boss_dps=231000.0))
+    html = briefing.aim_html(d)
+    assert "You can aim for" in html and "180k" in html and "250k in all" in html
+    assert "On a training dummy" in html and "this fight costs you 17%" in html
+    assert "The best Subtlety" in html and "231k" in html
+    assert briefing.aim_html(SimpleNamespace(sim_dps=None)) == ""
+    alone = briefing.aim_html(SimpleNamespace(sim_dps=200000.0, sim_boss_dps=None, patchwerk_dps=None, spec="Arms",
+                                              your_profile=None))
+    assert "200k" in alone and "The best" not in alone
