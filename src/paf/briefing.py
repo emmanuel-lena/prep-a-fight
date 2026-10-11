@@ -170,8 +170,8 @@ def fight_map_html(d) -> str:
     for t, count, life, name in d.waves:
         if count == 0:
             shade += (f"<div class='burst' style='left:{_pct(t, dur):.2f}%;width:{max(_pct(life, dur), .6):.2f}%'></div>")
-            above.append((t, "burst", name, f"The boss takes more damage for {life:.0f} s: your big cooldowns hit "
-                                             f"harder here.", "k-burst", ""))
+            above.append((t, "burst", name, f"The boss takes more damage for {life:.0f} s: a good moment for your "
+                                             f"big cooldowns, if they are ready.", "k-burst", ""))
         else:
             shade += (f"<div class='adds' style='left:{_pct(t, dur):.2f}%;width:{max(_pct(life, dur), .6):.2f}%'></div>")
             what = f"{count} × {_short(name)}" if count > 1 and name else (_short(name) if name else f"{count} adds")
@@ -181,7 +181,8 @@ def fight_map_html(d) -> str:
         above.append((f.start, f.name, f"Focus {f.name}", f"{f.support:.0%} of the top players' kills hit {f.name} here.",
                       "k-focus", ""))
     if d.lust is not None:
-        above.append((d.lust, "Bloodlust", "Bloodlust", "Bloodlust usually goes out here: line your cooldowns up.",
+        above.append((d.lust, "Bloodlust", "Bloodlust", "Bloodlust usually goes out here: worth having your cooldowns ready "
+                      "for it.",
                       "k-lust", ""))
     below: list[tuple[float, str, str, str, str, str]] = []
     want = wanted(d) or "boss"
@@ -196,7 +197,8 @@ def fight_map_html(d) -> str:
             label = " + ".join(names) if not (ic and set(names) <= seen) else ""  # a cooldown seen before: its icon
             seen.update(names)
             below.append((t, label, ", ".join(names),
-                          f"Press {', '.join(names)} (cooldown plan for {_goal(plan.objective)} damage).", "k-you", ic))
+                          f"A good moment for {', '.join(names)}: the sim does best pressing it here "
+                          f"({_goal(plan.objective)} damage). Your raid's calls come first.", "k-you", ic))
     if d.defensives:
         for m in d.defensives.moments:
             name = m.spells[0][0] if m.spells else "a defensive"
@@ -220,9 +222,9 @@ def fight_map_html(d) -> str:
 <div class='tl-phases'>{brackets}</div><div class='tl-zone up'></div>
 <div class='tl-axis'>{shade}<div class='tl-ticks'>{ticks}</div></div><div class='tl-zone down'></div>
 {notes}<div class='tl-legend small muted'><span class='lg k-adds'>adds</span><span class='lg k-burst'>burst window</span>{focus_legend}
-<span class='lg k-you'>your cooldowns</span><span class='lg k-def'>defensives</span></div></div></div>
+<span class='lg k-you'>suggested cooldowns</span><span class='lg k-def'>defensives</span></div></div></div>
 <p class='margin rv' aria-live='polite'><b class='m-t'></b> <span class='m-title'>Point at a note on the timeline</span>
-<span class='m-text'>: what comes then, and what you do.</span></p>"""
+<span class='m-text'>: what comes then, and what can help.</span></p>"""
 
 
 # --- once the pull starts --------------------------------------------------------------------------------------------
