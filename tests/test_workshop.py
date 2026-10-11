@@ -31,7 +31,8 @@ def test_result_views():
         {"label": "top build D", "players": 5, "gain": 1.46, "take": ["Jet Stream", "Earthquake"],
          "drop": ["Windveil", "Earthquake"], "code": "CYQ"},
         {"label": "top build A", "players": 6, "gain": -0.18, "take": [], "drop": [], "code": ""}]})
-    assert "Change 1 talent" in t and "data-copy='CYQ'" in t and "Jet Stream instead of Windveil" in t
+    assert "Change 1 talent" in t and "data-copy='CYQ'" in t
+    assert "<span>Windveil</span></span><span class='arr' aria-label='becomes'>&rarr;</span>" in t  # the swap shown
     assert "6 of the top players play exactly your build" in t  # build A: no change
     assert "Earthquake" not in t.split("glist")[0]  # on both sides: not a change
     keep = workshop_views.talents({"error": 0.5, "rows": [{"label": "A", "players": 3, "gain": 0.2, "take": [],

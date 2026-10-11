@@ -99,16 +99,6 @@ def _row_swaps(r: dict) -> list:
     return [[a, b] for a, b in zip_longest(drop, take)]
 
 
-def _build_name(r: dict) -> str:
-    """A build named by what it changes from yours: "Bait and Switch instead of Ethereal Cloak"."""
-    sw = _row_swaps(r)
-    if not sw:
-        return "Your build"
-    def one(a, b) -> str:
-        return f"{b[0]} instead of {a[0]}" if a and b else f"{b[0]}" if b else f"no {a[0]}"
-    return "; ".join(one(a, b) for a, b in sw[:2]) + (f"; {len(sw) - 2} more" if len(sw) > 2 else "")
-
-
 def talents(d: dict) -> str:
     err = d.get("error") or 0.2
     noise = 2 * 2 ** 0.5 * err  # the difference of two sims of this error, at two standard deviations
@@ -131,17 +121,14 @@ def talents(d: dict) -> str:
     else:
         head = _verdict("ok", "Keep your talents", f"No build of the top players does better with your character "
                                                    f"on this fight.{same}")
-    scale = max((abs(r["gain"]) for r in others), default=1) or 1
     lines = ""
     for r in sorted(others, key=lambda r: -r["gain"]):
         cls = "pos" if r["gain"] > noise else "neg" if r["gain"] < -noise else ""
-        lines += (f"<li><details class='bd'><summary><span class='l-name'><b>{e(_build_name(r))}</b><small>played by "
-                  f"{r['players']} top players</small></span>{_bar(r['gain'], scale) if cls else '<span></span>'}"
-                  f"<span class='l-val {cls}'>{_pct(r['gain'], 1) if cls else 'same'}</span></summary>"
-                  f"{_swaps(_row_swaps(r), icons)}<div class='v-act'>{copy(r, 'Copy these talents')}</div>"
-                  f"</details></li>")
+        lines += (f"<li class='bd'><div class='bd-swaps'>{_swaps(_row_swaps(r), icons)}<small>played by "
+                  f"{r['players']} top players</small></div><div class='bd-side'><span class='l-val {cls}'>"
+                  f"{_pct(r['gain'], 1) if cls else 'same'}</span>{copy(r, 'Copy')}</div></li>")
     return (f"{head}<h3>The top players' other builds, on you</h3><ul class='glist builds'>{lines}</ul>"
-            f"<p class='ws-fine'>Each build is named by what it changes from yours (open one to see every talent); "
+            f"<p class='ws-fine'>Each build shown by what it changes from yours; "
             f"simmed on your character on {e(d.get('boss', 'the boss'))}. Differences under &plusmn;{noise:.1f}% "
             f"are noise and shown as \"same\".</p>")
 

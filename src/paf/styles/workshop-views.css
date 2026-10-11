@@ -121,13 +121,14 @@ table.night td.pos{color:var(--pos)} table.night td.neg{color:var(--neg)}
 @media (max-width:640px){.glist li{grid-template-columns:minmax(0,1fr) 70px}.glist li .gbar{display:none}
   .glist.items li{grid-template-columns:40px minmax(0,1fr) 70px}.verdict{flex-wrap:wrap}}
 /* talents: a build named by what it changes, its swaps with icons */
-.glist.builds li{display:block;padding:0}
-.glist.builds details>summary{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(80px,1fr) 78px;gap:14px;
-  align-items:center;padding:9px 10px;border-radius:10px;cursor:pointer;list-style:none}
-.glist.builds details>summary::-webkit-details-marker{display:none}
-.glist.builds details>summary:hover{background:var(--surface-2)}
-.glist.builds details[open]{background:var(--surface-2);border-radius:10px;padding-bottom:10px}
-.glist.builds .swaps,.glist.builds .v-act{margin:4px 10px 0}
+.glist.builds{gap:6px}
+.glist.builds li.bd{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 16px;align-items:center;
+  padding:10px 12px;border:1px solid var(--line);border-radius:10px}
+.glist.builds li.bd:hover{background:none}
+.bd-swaps .swaps{margin:0}
+.bd-swaps small{display:block;margin:4px 6px 0;color:var(--muted);font-size:13px}
+.bd-side{display:flex;gap:12px;align-items:center}
+@media (max-width:640px){.glist.builds li.bd{grid-template-columns:minmax(0,1fr)} .bd-side{justify-content:space-between}}
 .swaps{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px;max-width:640px}
 .swaps .sw{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:6px;align-items:center}
 .tal{display:inline-flex;gap:7px;align-items:center;min-width:0;color:var(--fg);text-decoration:none;font-size:14px;
