@@ -2,7 +2,7 @@
 .js .rv{opacity:0;transform:translateY(8px)}
 .rv{transition:opacity .6s ease,transform .6s ease}
 .js .rv.in{opacity:1;transform:none}
-#overview>*:not(.tl-scroll){max-width:760px}
+#overview>*:not(.tl-scroll){max-width:1000px} #overview>.lede{max-width:68ch} /* rows use the width, a sentence stays readable */
 .tl-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:thin} .tl{min-width:900px}
 #overview h2{font:600 26px/1.2 var(--font-reading);letter-spacing:0;text-transform:none;color:var(--fg);
   margin:44px 0 14px}

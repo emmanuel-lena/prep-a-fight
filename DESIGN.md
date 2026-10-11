@@ -190,7 +190,7 @@ A night palette of grapes and lavender with two golds, plus the game's own class
 
 ## Layout
 
-A single centered column (max 1040px, 16px side gutters, 24px top and 48px bottom) under a full-width header. Blocks flow vertically with 10 to 14px between cards and 34px above a section heading. Tiles use an auto-filling grid (cells of 220px minimum, 12px gap); controls sit in wrapping rows with 8 to 10px gaps. Under 640px the title shrinks, labels in the header collapse to icons and grids fall to one column. Wide tables scroll inside their own container, never the page.
+A centered page (max 1400px, 16px side gutters, 24px top and 48px bottom) under a full-width header. Reading text keeps its measure (68ch for a lead, 80ch for paragraphs and plain lists); rows, cards and grids use the width, and from 1100px pages put two columns side by side where one would leave half the page empty (home: prepare a boss | your character; boss page: the steps | the boss in 60 seconds; settings: your settings | Warcraft Logs and status). Blocks flow vertically with 10 to 14px between cards and 34px above a section heading. Tiles use an auto-filling grid (cells of 220px minimum, 12px gap); controls sit in wrapping rows with 8 to 10px gaps. From 641 to 1000px the header keeps one line (Back and Home as icons, the character as its portrait). Under 640px the title shrinks, labels in the header collapse to icons, grids fall to one column, and the sheet's overview shows the fight top to bottom instead of the timeline. Wide tables scroll inside their own container, never the page.
 
 ## Elevation & Depth
 

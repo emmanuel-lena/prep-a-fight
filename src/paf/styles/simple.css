@@ -1,5 +1,5 @@
 /* the fight minute by minute (paf.simple.minutes_html) */
-.mins-wrap{display:grid;grid-template-columns:56px minmax(0,1fr);gap:16px;max-width:1080px}
+.mins-wrap{display:grid;grid-template-columns:56px minmax(0,1fr);gap:16px;max-width:1400px}
 .mins{height:calc(100vh - 170px);overflow-y:auto;scroll-snap-type:y mandatory;scroll-behavior:smooth;outline:none;
   border-radius:16px;border:1px solid var(--line);background:var(--surface)}
 .mn{min-height:100%;scroll-snap-align:start;display:flex;padding:28px 30px;box-sizing:border-box}
@@ -22,7 +22,7 @@
   .mmap a{width:34px}.mn{padding:18px 14px}}
 /* the simple view (paf.simple) */
 body.simple-on .tabs{display:none}
-.simple{max-width:980px;font-size:17px}
+.simple{max-width:1400px;font-size:17px}
 .simple .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;align-items:start}
 @media (min-width:900px){.simple .cards .s-change{grid-column:span 2}} /* the talent swaps need the width */
 .simple .card{margin:0;padding:18px 20px}

@@ -8,11 +8,11 @@
 .partial span{color:var(--muted);font-size:14px}
 /* header and tabs */
 .sheet-hero{background:var(--header);color:#fff}
-.sheet-hero .in{max-width:1040px;margin:0 auto;padding:16px 16px 10px;display:flex;gap:14px;align-items:center}
+.sheet-hero .in{max-width:1400px;margin:0 auto;padding:16px 16px 10px;display:flex;gap:14px;align-items:center}
 .sheet-hero h1{color:#fff;margin:0 0 2px} .sheet-hero p{margin:0;color:#eadfe9;font-size:13px}
 .hero-ic{width:48px;height:48px;border-radius:10px;border:2px solid var(--sand);flex:none}
 .tabs{background:rgba(0,0,0,.18);border-bottom:3px solid transparent;border-image:var(--stripe) 1}
-.tabs .in{max-width:1040px;margin:0 auto;padding:0 10px;display:flex;gap:2px;overflow-x:auto}
+.tabs .in{max-width:1400px;margin:0 auto;padding:0 10px;display:flex;gap:2px;overflow-x:auto}
 .tabs a{color:#eadfe9;padding:10px 14px;font-weight:600;font-size:14px;white-space:nowrap;border-bottom:3px solid transparent;
   margin-bottom:-3px}
 .tabs a:hover{color:#fff;text-decoration:none} .tabs a.on{color:var(--sand);border-bottom-color:var(--sand)}

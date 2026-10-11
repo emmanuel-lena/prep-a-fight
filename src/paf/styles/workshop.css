@@ -1,4 +1,4 @@
-.ws{max-width:1000px}
+.ws{max-width:1400px}
 .ws h1{font:600 34px/1.15 var(--font-reading);margin:0 0 6px;letter-spacing:0;text-transform:none}
 .ws h2{font:600 22px/1.2 var(--font-reading);text-transform:none;letter-spacing:0;color:var(--fg);margin:34px 0 14px}
 .ws-head,.ws-tool{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}

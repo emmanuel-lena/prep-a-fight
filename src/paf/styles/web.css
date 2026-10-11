@@ -180,3 +180,13 @@ h2 .btn.copy{margin-left:8px;vertical-align:middle;text-transform:none;letter-sp
 @media (max-width:640px){.set-row{grid-template-columns:minmax(0,1fr)} .set-check{grid-template-columns:minmax(0,1fr) auto}}
 .measure{max-width:72ch}
 @media (max-width:640px){.who-menu{left:auto;right:0}} /* the switcher sits right on a phone */
+/* wide windows (1400 px pages): side by side where a column would leave half the width empty */
+.set-cols>div>h2:first-child{margin-top:10px}
+.boss-cols .boss-guide>h2:first-child{margin-top:10px}
+@media (min-width:1100px){
+  .set-cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:28px;align-items:start}
+  .boss-cols{display:grid;grid-template-columns:minmax(0,640px) minmax(0,1fr);gap:36px;align-items:start}
+  .boss-cols .story{margin-top:0}
+  .home-hero{grid-template-columns:minmax(0,620px) minmax(0,1fr);grid-template-areas:"start me" "start chars";
+    column-gap:40px;align-items:start}
+  .home-hero .start{grid-area:start;max-width:none} .home-hero .me{grid-area:me} .home-hero .chars{grid-area:chars}}

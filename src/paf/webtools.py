@@ -227,9 +227,9 @@ def settings_page(message: str = "") -> str:
     else:
         account = connect_block(lead=False)
     account = (f"<h2>Warcraft Logs</h2><div class='card'>{account}</div>" if wcllogin.available() else "")
-    return f"""<h1>Settings</h1>{msg}
+    return f"""<h1>Settings</h1>{msg}<div class="set-cols"><div>
 <form method="post" action="/settings" class="card settings">{settings_form()}
-<div class="cta"><button class="btn">Save</button></div></form>
+<div class="cta"><button class="btn">Save</button></div></form></div><div>
 {account}<h2>Warcraft Logs key</h2><div class="card"><p class="small measure">{current} To use another one (a new
 client, or a regenerated secret): create or open it on <a href="https://www.warcraftlogs.com/api/clients"
 target="_blank" rel="noopener">warcraftlogs.com/api/clients</a>, then paste both values.
@@ -251,4 +251,4 @@ autocomplete="off">
 <tr><td>Caches (sims, logs)</td><td class="small">{size(cache_root()) / 1e6:,.0f} MB
 (cap {settings.get('cache_max_mb')} MB)</td></tr>
 <tr><td>Data folder</td><td class="small">{e(str(data_dir()))}</td></tr>
-<tr><td>Checked</td><td class="small">{time.strftime('%d %b %H:%M')}</td></tr></table></div>"""
+<tr><td>Checked</td><td class="small">{time.strftime('%d %b %H:%M')}</td></tr></table></div></div></div>"""
