@@ -41,7 +41,7 @@ def test_your_character_in_another_spec_keeps_who_you_are():
                'professions=alchemy=100\nspec=elemental\ntalents=OLD\nhead=,id=1\n')
     gear = [{} for _ in range(17)]
     gear[15] = item(9)
-    text = specgear.character_in(profile, "Enhancement", "NEW", gear)
+    text = specgear.character_in(profile, "Enhancement", ["talents=NEW"], gear)
     assert text.startswith('shaman="Zapper"\nlevel=90\nrace=orc\nregion=eu\nserver=hyjal\nprofessions=alchemy=100\n')
     assert "spec=enhancement\ntalents=NEW\nmain_hand=,id=9,ilevel=334" in text
     assert "id=1" not in text and "OLD" not in text and "role=" not in text
@@ -99,9 +99,8 @@ def test_the_tops_median_comes_with_its_noise():
 
 def test_the_result_page_and_the_tool():
     r = result(100.0, 106.0, other_tops=104.0)
-    r.rows[0].items = [{"slot": "head", "item_id": 1, "name": "Crown"}]
     html = workshop_views.render({"kind": "specgear", **specgear.to_json(r)})
-    assert "Play Enhancement" in html and "Each spec on you" in html and "Crown" in html
+    assert "Play Enhancement" in html and "Each spec on you" in html and "the best of three builds" in html
     assert "specgear" in workshop.BY_CMD
     args = workshop.args("specgear", {"boss": ["3492"], "difficulty": ["heroic"]})
     assert args[:2] == ["specgear", "3492"] and "--difficulty" in args
@@ -113,3 +112,44 @@ def test_a_spec_without_enough_tops_is_left_out():
             return {"worldData": {"encounter": {"characterRankings": {"rankings": [{"amount": 1, "gear": []}] * 3}}}}
 
     assert specgear.tops(Client(), 1, 4, "Shaman", "Enhancement") is None
+
+
+QUERY = """SimulationCraft 1210-01
+Name         : Fast Action
+Entry        : 112530
+Tree         : spec (2)
+
+Name         : Dragon-Bone Dice
+Entry        : 112539
+Tree         : spec (2)
+
+Name         : Blind
+Entry        : 101001
+Tree         : class (1)
+
+Name         : Coup de Grace
+Entry        : 117001
+Tree         : hero (3)
+
+Name         : Trickster
+Entry        : 123372
+Tree         : selection (4)
+"""
+
+
+def test_the_top_players_build_goes_to_simc_tree_by_tree_by_name():
+    trees = specgear.parse_talent_query(QUERY)
+    assert trees[112539] == ("Dragon-Bone Dice", "spec") and len(trees) == 5
+    build = ((101001, 1), (112530, 1), (112539, 2), (117001, 1), (123372, 1))
+    assert specgear.build_lines(build, trees) == [
+        "talents=", "class_talents=blind:1", "spec_talents=fast_action:1/dragonbone_dice:2",
+        "hero_talents=coup_de_grace:1"]  # the hero choice node is known to simc from the hero talents
+    assert specgear.build_lines(((999, 1),) + build, trees) is None  # unknown to this simc: fall back
+
+
+def test_the_build_is_the_one_most_top_players_play():
+    a = [{"talentID": 1, "points": 1}, {"talentID": 2, "points": 2}]
+    b = [{"talentID": 1, "points": 1}, {"talentID": 3, "points": 1}]
+    rows = [{"talents": b}, {"talents": list(reversed(a))}, {"talents": a}, {"talents": []}]
+    assert specgear.common_build(rows) == ((1, 1), (2, 2))
+    assert specgear.common_build([{"talents": []}]) == ()

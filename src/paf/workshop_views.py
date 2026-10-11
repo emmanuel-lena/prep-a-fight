@@ -643,21 +643,14 @@ def specgear(d: dict) -> str:
                       f"{'&ndash;' if r is mine else _pct(gain)}</span></li>")
     you = (f"<p>{e(d['gear_sentence'])}</p>" if d.get("gear_sentence") else "")
     you += f"<p>{e(d['kills_sentence'])}</p>" if d.get("kills_sentence") else ""
-    sets = ""
-    for r in [x for x in (mine, best) if x]:
-        icons = _item_icons(r.get("items") or [])
-        cards = "".join(f"<li class='icard'>{_img(icons.get(i['item_id'], ''))}<span class='l-name'><b>"
-                        f"{e(i['name'] or '?')}</b><small><span>{e(SLOTS.get(i['slot'], i['slot']))}</span></small>"
-                        f"</span></li>" for i in r.get("items") or [])
-        sets += (f"<details class='more'><summary>The set of the top {e(r['label'])} players, at {ilvl}</summary>"
-                 f"<ul class='glist items'>{cards}</ul></details>")
     notes = "".join(f"<p class='ws-fine'>{e(n)}</p>" for n in d.get("notes") or [])
     return (f"{head}<h3>Each spec on you, in the top players' gear at {ilvl}</h3><ul class='glist'>{lines}</ul>"
-            f"<h3>You</h3>{you}{sets}{notes}"
+            f"<h3>You</h3>{you}{notes}"
             f"<p class='ws-fine'>Boss damage per second on the fight rebuilt from the top kills. The top players' "
-            f"figure is the median of the top 100 of each spec. Your spec is simmed with your talents, another spec "
-            f"with the build SimulationCraft ships for it. Each spec's set is what its top {d.get('gear_tops', 20)} "
-            f"players wear most, slot by slot, at item level {ilvl}.</p>")
+            f"figure is the median of the top 100 of each spec. Each spec is simmed in the set its top "
+            f"{d.get('gear_tops', 20)} players wear most, slot by slot, at item level {ilvl}, with the best of three "
+            f"builds in the sim: the one its top players play most, the one SimulationCraft ships, and yours for "
+            f"your spec.</p>")
 
 
 VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review, "comp": comp, "wipe": wipe, "night": night, "diff": pulldiff, "rotation": rotation, "bonusroll": bonusroll, "specgear": specgear}

@@ -50,6 +50,7 @@ class Tops:
     spec: str  # Warcraft Logs name: "Enhancement"
     amounts: list[float]  # their DPS (the ranking's metric), best first
     gear: list[dict] = field(default_factory=list)  # the set they wear most, WCL items by slot index
+    build: tuple[tuple[int, int], ...] = ()  # the talent build they play most: (talentID, rank)
 
     @property
     def median(self) -> float:
@@ -121,8 +122,8 @@ ITEM_LINE = re.compile(r"^(head|neck|shoulders?|back|chest|shirt|tabard|wrists?|
                        r"trinket[12]|main_hand|off_hand)=")
 
 
-def character_in(profile: str, spec: str, talents: str, gear: list[dict]) -> str:
-    """Your character (name, race, level, server) as a spec, with these talents, in this gear."""
+def character_in(profile: str, spec: str, talents: list[str], gear: list[dict]) -> str:
+    """Your character (name, race, level, server) as a spec, with these talent lines, in this gear."""
     lines, out = profile.splitlines(), []
     for line in lines:
         s = line.strip()
@@ -136,7 +137,7 @@ def character_in(profile: str, spec: str, talents: str, gear: list[dict]) -> str
             out.append(s)
     if not out:
         raise ValueError("no character in this profile")
-    out += [f"spec={simc_spec(spec)}", f"talents={talents}", *gear_lines(gear)]
+    out += [f"spec={simc_spec(spec)}", *talents, *gear_lines(gear)]
     return "\n".join(out) + "\n"
 
 
@@ -152,6 +153,66 @@ def bundled_talents(cls: str, spec: str, simc_path: str | None = None) -> str | 
     return m.group(1) if m else None
 
 
+def simc_token(name: str) -> str:
+    """A talent's name as SimulationCraft spells it: "Dragon-Bone Dice" -> dragonbone_dice."""
+    return re.sub(r"[^a-z0-9_]", "", name.lower().replace(" ", "_"))
+
+
+def parse_talent_query(text: str) -> dict[int, tuple[str, str]]:
+    """simc's `spell_query=talent.class=...` output -> {entry id: (name, tree)}; the entry id is what Warcraft Logs
+    reports as talentID."""
+    out = {}
+    for block in re.split(r"^(?=Name\s*:)", text, flags=re.M):
+        name = re.search(r"^Name\s*:\s*(.+?)\s*$", block, re.M)
+        entry = re.search(r"^Entry\s*:\s*(\d+)", block, re.M)
+        tree = re.search(r"^Tree\s*:\s*(\w+)", block, re.M)
+        if name and entry and tree:
+            out[int(entry.group(1))] = (name.group(1), tree.group(1))
+    return out
+
+
+def talent_trees(cls: str, simc_path: str | None = None) -> dict[int, tuple[str, str]]:
+    """Every talent of a class, from SimulationCraft's own data (so it matches the simc that sims it)."""
+    import subprocess
+
+    from paf.simc_install import find_simc
+
+    exe = find_simc(simc_path)
+    if exe is None:
+        return {}
+    token = cls.lower()  # DeathKnight -> deathknight, as simc names the class
+    try:
+        proc = subprocess.run([str(exe), f"spell_query=talent.class={token}"], capture_output=True, text=True,
+                              timeout=60, encoding="utf-8", errors="replace")
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    return parse_talent_query(proc.stdout)
+
+
+def build_lines(build: tuple[tuple[int, int], ...], trees: dict[int, tuple[str, str]]) -> list[str] | None:
+    """A build of talent IDs (with their ranks) as simc options, tree by tree; None when a talent is unknown to
+    this simc (another patch): the caller falls back."""
+    by_tree: dict[str, list[str]] = {"class": [], "spec": [], "hero": []}
+    for talent, rank in build:
+        name, tree = trees.get(talent, ("", ""))
+        if tree == "selection":  # the hero tree's choice node: simc knows it from the hero talents
+            continue
+        if tree not in by_tree:
+            return None
+        by_tree[tree].append(f"{simc_token(name)}:{rank}")
+    if not by_tree["class"] or not by_tree["spec"]:
+        return None
+    return ["talents="] + [f"{t}_talents={'/'.join(v)}" for t, v in by_tree.items() if v]
+
+
+def common_build(rows: list[dict]) -> tuple[tuple[int, int], ...]:
+    """The build the most top players play, talent for talent (a tie goes to the best ranked)."""
+    builds = Counter(tuple(sorted((int(t["talentID"]), int(t.get("points") or 1)) for t in r.get("talents") or []
+                                  if t.get("talentID"))) for r in rows)
+    builds.pop((), None)
+    return builds.most_common(1)[0][0] if builds else ()
+
+
 def tops(client, encounter_id: int, difficulty: int, cls: str, spec: str, metric: str = "bossdps") -> Tops | None:
     """The top 100 of a spec on a boss (cached 6 h, shared with the raid lead's spec profiles)."""
     from paf.raidneed import RANKING_QUERY
@@ -163,7 +224,8 @@ def tops(client, encounter_id: int, difficulty: int, cls: str, spec: str, metric
     if len(rows) < MIN_TOPS:
         return None
     rows.sort(key=lambda r: -r["amount"])
-    return Tops(spec, [r["amount"] for r in rows], common_set(rows[:GEAR_TOPS]))
+    top = rows[:GEAR_TOPS]
+    return Tops(spec, [r["amount"] for r in rows], common_set(top), common_build(top))
 
 
 CHARACTER_RANKINGS = """query($n:String!, $s:String!, $r:String!, $e:Int!, $d:Int!, $m:CharacterRankingMetricType!) {
@@ -212,6 +274,8 @@ class SpecRow:
     error: float = 0.0  # the sim's standard error, in % of its mean
     gear: list[str] = field(default_factory=list)  # the set, as simc lines (for the result page)
     items: list[dict] = field(default_factory=list)  # the set's items: slot, item_id, name
+    talents: str = ""  # the build kept (the best in the sim): "tops", "yours" or "simc" (the profile simc ships)
+    builds: dict[str, float] = field(default_factory=dict)  # every build simmed: its DPS (the ranking's metric)
 
 
 @dataclass
@@ -222,6 +286,7 @@ class Result:
     rows: list[SpecRow]
     now: float | None = None  # your character as you are, same fight
     now_error: float = 0.0
+    own_talents_sim: float | None = None  # your spec in the top players' set with your own talents
     kills: MyKills | None = None
     metric: str = "bossdps"
     run_dir: Path | None = None
@@ -267,16 +332,25 @@ def verdict(r: Result) -> tuple[str, str]:
 
 
 def gear_sentence(r: Result) -> str:
+    """What the top players' set at TOP_ILVL is worth to your spec, and what their talents add on top."""
     mine = r.row(r.mine)
     if mine is None or not mine.sim or not r.now:
         return ""
-    gap = 100 * (mine.sim / r.now - 1)
-    noise = _noise(mine.error, r.now_error)
-    if abs(gap) <= noise:
-        return (f"The top players' gear at {TOP_ILVL} sims like yours on this fight ({gap:+.1f}%, noise "
-                f"±{noise:.1f}%).")
-    return (f"The top players' gear at {TOP_ILVL} is worth {gap:+.1f}% to your {spec_label(r.mine)} on this fight "
-            f"(noise ±{noise:.1f}%).")
+    me = spec_label(r.mine)
+    gear_sim = r.own_talents_sim or (mine.sim if mine.talents != "tops" else None)
+    out = ""
+    if gear_sim:
+        gap, noise = 100 * (gear_sim / r.now - 1), _noise(mine.error, r.now_error)
+        out = (f"The top players' gear at {TOP_ILVL} sims like yours on this fight ({gap:+.1f}%, noise ±{noise:.1f}%)."
+               if abs(gap) <= noise else
+               f"The top players' gear at {TOP_ILVL} is worth {gap:+.1f}% to your {me} on this fight (noise "
+               f"±{noise:.1f}%).")
+    if r.own_talents_sim and mine.talents != "yours":
+        gap, noise = 100 * (mine.sim / r.own_talents_sim - 1), _noise(mine.error, mine.error)
+        whose = "the top players' talents" if mine.talents == "tops" else "the build SimulationCraft ships"
+        if gap > noise:
+            out += f" With {whose}, {gap:+.1f}% more."
+    return out
 
 
 def kills_sentence(r: Result) -> str:
@@ -303,6 +377,7 @@ def compare(profile: str, client, enc, difficulty: int, diff_name: str, cls: str
 
     res = Result(enc.name, diff_name, mine, [], metric=metric, run_dir=run_dir)
     own_talents = (re.search(r"^talents=(\S+)", profile, re.M) or [None, None])[1]
+    trees = talent_trees(cls)
     for spec in DAMAGE_SPECS.get(cls, (mine,)):
         t = tops(client, enc.id, difficulty, cls, spec, metric)
         if t is None:
@@ -313,15 +388,43 @@ def compare(profile: str, client, enc, difficulty: int, diff_name: str, cls: str
                       items=[{"slot": SLOTS[i], "item_id": int(it["id"]), "name": it.get("name") or ""}
                              for i, it in enumerate(t.gear) if i in SLOTS and it.get("id")])
         res.rows.append(row)
-        talents = own_talents if spec == mine else bundled_talents(cls, spec)
-        if not talents:
+        # every build that can be the spec's best in SimulationCraft, in one run: the top players' (their export,
+        # rebuilt from the rankings), the one simc ships (its APL is written for it), and yours for your spec.
+        # The best is kept: simc can play a build of the top players far under what they do with it.
+        clear = ["class_talents=", "spec_talents=", "hero_talents="]
+        builds: dict[str, list[str]] = {}
+        if lines := build_lines(t.build, trees):
+            builds["tops"] = lines
+        if shipped := bundled_talents(cls, spec):
+            builds["simc"] = clear + [f"talents={shipped}"]
+        if spec == mine and own_talents:
+            builds["yours"] = clear + [f"talents={own_talents}"]
+        if not builds:
             res.notes.append(f"{spec_label(spec)}: no talent build found for it, not simmed.")
             continue
         log(f"  {spec_label(spec)} in the top players' gear at {TOP_ILVL}...")
-        sim = simc.run(simc.build_input(character_in(profile, spec, talents, t.gear), fight_lines),
-                       run_dir / simc_spec(spec), target_error=target_error)
-        m = sim.baseline.get("prioritydps") or sim.baseline["dps"]
-        row.sim, row.error = m.mean, 100 * sim.baseline["dps"].error / sim.baseline["dps"].mean
+        first, *others = builds
+        try:
+            sim = simc.run(simc.build_input(character_in(profile, spec, builds[first], t.gear), fight_lines,
+                                            {k: builds[k] for k in others}),
+                           run_dir / simc_spec(spec), target_error=target_error)
+        except simc.SimcError as ex:
+            res.notes.append(f"{spec_label(spec)} could not be simmed ({str(ex)[-120:]}).")
+            continue
+        err = 100 * sim.baseline["dps"].error / sim.baseline["dps"].mean
+        got = {first: (sim.baseline.get("prioritydps") or sim.baseline["dps"]).mean}
+        for ps in sim.profilesets:
+            got[ps.name] = (ps.metrics.get("prioritydps") or ps.dps).mean
+        best = max(got, key=got.get)
+        row.sim, row.error, row.talents = got[best], err, best
+        row.builds = got
+        if "yours" in got:
+            res.own_talents_sim = got["yours"]
+        if "tops" in got and got["tops"] < 0.9 * got[best]:
+            other = "the build it ships" if best == "simc" else "your build"
+            res.notes.append(f"{spec_label(spec)}: SimulationCraft plays the top players' build "
+                             f"{100 * (1 - got['tops'] / got[best]):.0f}% under {other} (they do {t.median:,.0f} "
+                             f"with it): {other} is the one simmed.")
     log("  your character as you are...")
     sim = simc.run(simc.build_input(profile, fight_lines), run_dir / "now", target_error=target_error)
     m = sim.baseline.get("prioritydps") or sim.baseline["dps"]
