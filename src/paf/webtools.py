@@ -61,7 +61,8 @@ def advanced_fields(name: str, encounters: list, skip: set[str]) -> str:
     if sp is None:
         return ""
     return "".join(_field(a, encounters) for a in sp._actions  # noqa: SLF001
-                   if a.dest not in SKIP_OPTIONS and a.dest not in skip and a.dest != "open")
+                   if a.dest not in SKIP_OPTIONS and a.dest not in skip and a.dest != "open"
+                   and a.help != argparse.SUPPRESS)  # hidden options (set by the app itself) stay hidden
 
 
 def _field(a: argparse.Action, encounters: list) -> str:
@@ -89,7 +90,8 @@ def tool_page(name: str, encounters: list) -> str | None:
     sp = subparsers().get(name)
     if sp is None or name in ("serve", "profile", "config"):
         return None
-    fields = "".join(_field(a, encounters) for a in sp._actions if a.dest not in SKIP_OPTIONS)  # noqa: SLF001
+    fields = "".join(_field(a, encounters) for a in sp._actions if a.dest not in SKIP_OPTIONS  # noqa: SLF001
+                     and a.help != argparse.SUPPRESS)
     return (f"<p class='small'><a href='/tools'>&larr; Tools</a></p><h1>{e(name)}</h1>"
             f"<p class='lead'>{e(_help(name))}</p><form method='post' action='/tool/{e(name)}' class='card'>"
             f"{fields}<div class='cta'><button class='btn big'>Run</button>"
@@ -120,25 +122,81 @@ def new_reports(since: float) -> list[str]:
         if reports.is_dir() else []
 
 
+# The settings form, for a player: (group, folded, [(key, label, help)]). The keys and their terse help stay those of
+# `paf config` (paf.settings); a key missing here goes to the folded group.
+SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
+    ("Your raid", False, [
+        ("difficulty", "Difficulty", "The difficulty a new prep starts on."),
+        ("guild", "Guild", "Its latest log gives your raid's composition (who hits the adds, pad or not)."),
+        ("guild_server", "Guild's server", "For example Kazzak."),
+        ("guild_region", "Guild's region", ""),
+    ]),
+    ("The app", False, [
+        ("language", "Language", "Of the app and the prep sheets."),
+        ("refresh_after_reset", "Prepare again after the weekly reset",
+         "The bosses \"Prepare the whole raid\" prepared last week, by themselves."),
+        ("share_packs", "Share the prep packs you compute",
+         "Fight data only, no names: the next player of your spec skips the log download."),
+        ("check_updates", "Look for new versions", "Every 10 minutes, on GitHub."),
+    ]),
+    ("Advanced: the logs read, the quota, the caches", True, [
+        ("corpus_size", "Kills read per boss", "The top kills a prep reads, then keeps reading in the background."),
+        ("corpus_points", "Quota for background reading",
+         "Warcraft Logs points per hour (of 3600) the reading in the background may use; a prep you wait for "
+         "uses the whole quota."),
+        ("region", "Rankings from one region only", "EU, US, KR, TW or CN; empty for all regions."),
+        ("auto_logs", "Last raids read at start",
+         "\"active\" for the active character, else names separated by commas, empty for none (also set per "
+         "character in Characters)."),
+        ("class", "Class", "Follows the active character."),
+        ("spec", "Spec", "Follows the active character."),
+        ("cache_max_mb", "Disk cache cap (MB)", "Sim results and Warcraft Logs answers; the oldest go first."),
+        ("onboarded", "First-run steps done", "Off: the welcome steps show again."),
+    ]),
+]
+
+
+def _setting_control(key: str) -> str:
+    s, cur = settings.SETTINGS[key], settings.get(key)
+    if key == "language":  # the languages the app has a catalog for
+        from paf.i18n import available
+
+        return f"<select name='{e(key)}' id='s-{e(key)}'>" + "".join(
+            f"<option value='{e(c)}'{' selected' if c == cur else ''}>{e(n)}</option>"
+            for c, n in {"auto": "Windows' language", **available()}.items()) + "</select>"
+    if s.choices == ("on", "off"):  # the hidden "off" goes first: a checked box sends "on" after it (the last wins)
+        return (f"<input type='hidden' name='{e(key)}' value='off'><input type='checkbox' name='{e(key)}' "
+                f"id='s-{e(key)}' value='on'{' checked' if cur == 'on' else ''}>")
+    if s.choices:
+        return f"<select name='{e(key)}' id='s-{e(key)}'>" + "".join(
+            f"<option value='{e(c)}'{' selected' if c == cur else ''}>"
+            f"{e(c.upper() if len(c) <= 3 else c.capitalize())}</option>"  # EU, LFR, Heroic
+            for c in s.choices) + "</select>"
+    kind = " inputmode='numeric'" if s.kind is int else ""
+    return f"<input name='{e(key)}' id='s-{e(key)}' value='{e(str(cur))}'{kind}>"
+
+
+def settings_form() -> str:
+    """The settings, grouped and in words, with one Save."""
+    listed = {k for _g, _f, rows in SETTINGS_FORM for k, _l, _h in rows}
+    groups = [(g, folded, [r for r in rows if r[0] in settings.SETTINGS]) for g, folded, rows in SETTINGS_FORM]
+    groups[-1][2].extend((k, k.replace("_", " ").capitalize(), s.help) for k, s in settings.SETTINGS.items()
+                         if k not in listed)
+    out = ""
+    for group, folded, rows in groups:
+        fields = "".join(
+            f"<div class='set-row{' set-check' if settings.SETTINGS[k].choices == ('on', 'off') else ''}'>"
+            f"<label for='s-{e(k)}'>{e(label)}</label>{_setting_control(k)}"
+            f"{f'<p class=set-help>{e(help_)}</p>' if help_ else ''}</div>" for k, label, help_ in rows)
+        out += (f"<details class='set-group'><summary>{e(group)}</summary>{fields}</details>" if folded else
+                f"<fieldset class='set-group'><legend>{e(group)}</legend>{fields}</fieldset>")
+    return out
+
+
 def settings_page(message: str = "") -> str:
     from paf.cache import cache_root, size
     from paf.simc_install import find_simc
 
-    rows = ""
-    for key, s in settings.SETTINGS.items():
-        cur = settings.get(key)
-        if key == "language":  # the languages the app has a catalog for
-            from paf.i18n import available
-
-            ctrl = f"<select name='{e(key)}'>" + "".join(
-                f"<option value='{e(c)}'{' selected' if c == cur else ''}>{e(n)}</option>"
-                for c, n in {"auto": "auto (Windows)", **available()}.items()) + "</select>"
-        elif s.choices:
-            ctrl = f"<select name='{e(key)}'>" + "".join(
-                f"<option{' selected' if c == cur else ''}>{e(c)}</option>" for c in s.choices) + "</select>"
-        else:
-            ctrl = f"<input name='{e(key)}' value='{e(str(cur))}'>"
-        rows += f"<tr><td><b>{e(key)}</b><div class='tiny muted'>{e(s.help)}</div></td><td>{ctrl}</td></tr>"
     exe = find_simc(None)
     simc = e(str(exe)) if exe else "<span class='neg'>not installed</span>"
     quota = ""
@@ -150,7 +208,7 @@ def settings_page(message: str = "") -> str:
                  f"(reset in {int(rl['pointsResetIn']) // 60} min)")
     except Exception as ex:  # noqa: BLE001 - shown as is
         quota = f"<span class='neg'>{e(str(ex)[:160])}</span>"
-    msg = f"<p class='notice small'>{e(message)}</p>" if message else ""
+    msg = f"<p class='notice small' role='status'>{e(message)}</p>" if message else ""
     from paf import wcllogin
     from paf.web import connect_block
 
@@ -161,20 +219,25 @@ def settings_page(message: str = "") -> str:
     if wcllogin.logged_in():
         account = ("<p class='small'>Connected with your Warcraft Logs account.</p><form method='post' "
                    "action='/wcl/logout'><button class='btn ghost'>Disconnect</button></form>")
+    elif cid:  # the key works already: connecting is an option, not the page's action
+        account = ("<p class='small'>The app reads the logs with your own API key (below). You can connect with "
+                   "your Warcraft Logs account instead: one login in your browser, no key to keep.</p>"
+                   + connect_block(lead=False, ghost=True))
     else:
         account = connect_block(lead=False)
     account = (f"<h2>Warcraft Logs</h2><div class='card'>{account}</div>" if wcllogin.available() else "")
     return f"""<h1>Settings</h1>{msg}
-<form method="post" action="/settings" class="card"><table>{rows}</table>
+<form method="post" action="/settings" class="card settings">{settings_form()}
 <div class="cta"><button class="btn">Save</button></div></form>
-{account}<h2>Warcraft Logs key</h2><div class="card"><p class="small">{current} To use another one (a new client, or a
-regenerated secret): create or open it on <a href="https://www.warcraftlogs.com/api/clients" target="_blank"
-rel="noopener">warcraftlogs.com/api/clients</a>, then paste both values.
+{account}<h2>Warcraft Logs key</h2><div class="card"><p class="small measure">{current} To use another one (a new
+client, or a regenerated secret): create or open it on <a href="https://www.warcraftlogs.com/api/clients"
+target="_blank" rel="noopener">warcraftlogs.com/api/clients</a>, then paste both values.
 It is tested before it replaces the old one.</p>
 <form method="post" action="/credentials" class="row"><input type="hidden" name="back" value="settings">
-<input name="id" size="38" placeholder="Client ID" required>
-<input name="secret" size="38" type="password" placeholder="Client Secret" required autocomplete="off">
-<button>Save and test</button></form>
+<input name="id" size="38" placeholder="Client ID" aria-label="Client ID" required>
+<input name="secret" size="38" type="password" placeholder="Client Secret" aria-label="Client Secret" required
+autocomplete="off">
+<button class="btn ghost">Save and test</button></form>
 <p class="tiny muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p></div>
 <h2>Status</h2><div class="card"><table>
 <tr><td>SimulationCraft</td><td class="small">{simc}

@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from html import escape as e
 
 from paf import theme
+from paf.theme import diff_pill
 
 GRAPH = """query($c:String!,$f:[Int]!,$a:Float,$b:Float){ reportData { report(code:$c) {
   graph(fightIDs:$f, dataType:DamageTaken, hostilityType:Friendlies, startTime:$a, endTime:$b) } } }"""
@@ -274,7 +275,7 @@ def render(h: HealerPrep) -> str:
     mom, cds = moments_html(h.moments, "raid damage"), cooldowns_html(h.cooldowns)
     builds, trk = builds_html(h.builds), trinkets_html(h.trinkets)
     jr = "".join(f"<li>{e(x)}</li>" for x in h.journal)
-    body = f"""<h1>{e(h.boss)} <span class="pill gold">{e(h.difficulty)}</span></h1>
+    body = f"""<h1>{e(h.boss)} {diff_pill(h.difficulty)}</h1>
 <p class="lead">{e(h.spec)}: the healer's prep, from {h.kills} kills of the top healers of your spec. A {_mmss(h.duration)}
 fight.</p>
 <section class="hp-sec"><h2>The raid damage, and its big moments</h2>{svg}

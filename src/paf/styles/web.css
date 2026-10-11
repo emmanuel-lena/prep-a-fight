@@ -8,6 +8,7 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .home-hero .me b{display:block;font-size:20px} .home-hero .me span{color:var(--muted)}
 .start{display:grid;gap:14px;max-width:560px}
 .start h1{margin:4px 0 0;font:600 30px/1.15 var(--font-reading)}
+.start-say{margin:-6px 0 0;color:var(--muted)} .start-say b{color:var(--fg)}
 .start select.big{font-size:18px;padding:12px 14px;border-radius:10px}
 .segs{display:flex;gap:8px;flex-wrap:wrap}
 .seg input{position:absolute;opacity:0;pointer-events:none}
@@ -22,6 +23,8 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .chars .ch button{display:flex;gap:8px;align-items:center;padding:5px 12px 5px 5px;border-radius:999px;cursor:pointer;
   border:1px solid var(--line);background:none;color:var(--fg);font:inherit;font-weight:600}
 .chars .ch button:hover{border-color:var(--accent)}
+.chars .ch button span{display:flex;flex-direction:column;line-height:1.15;text-align:left}
+.chars .ch button small{font-size:11px;font-weight:400;color:var(--muted)}
 .chars .ch-ic{width:26px;height:26px;border-radius:50%;margin:0}
 .ch-new{display:inline-flex;align-items:center;padding:6px 14px;border-radius:999px;border:1.5px dashed var(--accent);
   color:var(--accent);font-weight:600;text-decoration:none} .ch-new:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
@@ -164,3 +167,15 @@ ol.steps{list-style:none;margin:0;padding:0} .st{padding:7px 0;border-bottom:1px
 .rl-boss li small{color:var(--muted)}
 .btn.copy{padding:5px 10px;font-size:12.5px}
 h2 .btn.copy{margin-left:8px;vertical-align:middle;text-transform:none;letter-spacing:0}
+/* settings: groups in words, one Save */
+.settings .set-group{border:0;margin:0 0 18px;padding:0;min-width:0}
+.settings .set-group>legend,.settings .set-group>summary{font-family:var(--font-display);font-weight:600;font-size:15px;
+  color:var(--fg);padding:0;margin:0 0 4px}
+.settings details.set-group>summary{cursor:pointer}
+.set-row{display:grid;grid-template-columns:minmax(160px,260px) minmax(0,1fr);gap:2px 18px;align-items:center;
+  padding:10px 0;border-top:1px solid var(--line)}
+.set-row label{margin:0;font-weight:600}
+.set-row input:not([type=checkbox]),.set-row select{width:min(100%,320px)}
+.set-help{grid-column:1/-1;margin:0;font-size:13px;color:var(--muted);max-width:72ch}
+@media (max-width:640px){.set-row{grid-template-columns:minmax(0,1fr)} .set-check{grid-template-columns:minmax(0,1fr) auto}}
+.measure{max-width:72ch}

@@ -149,7 +149,7 @@ A night palette of grapes and lavender with two golds, plus the game's own class
 - **Golden Sand** (`golden-sand`): the dark theme's accent and links, the active tab, the "fight" in the wordmark.
 
 ### Secondary
-- **Class color** (runtime `--class`, from the game's class colors): when a character is active, it replaces the accent (darkened to 68% on light, lightened to 82% on dark so it reads on both) and the header's stripe. It names who is being prepared.
+- **Class color** (runtime `--class`, from the game's class colors): when a character is active, it replaces the accent (darkened on light, at most to 68%, and lightened on dark, at most to 70%, each as far as needed for text in it to reach 4.6:1 on Surface 2: computed per class by `theme.class_accent`, so the rogue's yellow and the priest's white darken more than the shaman's blue) and the header's stripe. It names who is being prepared.
 
 ### Tertiary
 - **Rarity Green / Blue / Purple** (`rarity-green`, `rarity-blue`, `rarity-purple`): difficulty only (normal, heroic, mythic), always paired with a shape: triangle, square, pentagon.
@@ -220,7 +220,14 @@ Clear and reassuring; one filled button per screen.
 
 ### Chips
 - **Style:** pills on Surface 2 with a line border, 14px text, an optional muted meta.
-- **State:** selected (a checked input inside) turns the border to the accent and the fill to Accent Soft.
+- **State:** selected (a checked input inside) turns the border to Ink and the fill to Surface 2: a neutral selection, never the accent (the Class Signs Rule). The goal cards of the boss page add a check at the top right.
+- **Check rows:** a checkbox before a sentence is a plain row (`.check-row`, 72ch), never a chip: a chip holds a word.
+
+### Difficulty pills
+- **Style:** a pill with the difficulty's word and its rarity shape before it (a green triangle, a blue square, a purple pentagon), Ink text; `theme.diff_pill`. Never gold: gold is a selection.
+
+### Settings form
+- **Style:** groups in words (Your raid, The app, then an Advanced fold for the engine, the quota and the caches); each row a human label, its control, and one muted line of help under it (72ch); on/off settings are checkboxes; one filled Save.
 
 ### Cards / Containers
 - **Corner Style:** 10px.

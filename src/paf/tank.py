@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from html import escape as e
 
 from paf.healer import RAID_KILLS, SPIKE, SPIKE_GAP, STEP, Cooldown, Moment, _mmss
+from paf.theme import diff_pill
 
 GRAPH = """query($c:String!,$f:[Int]!,$s:Int!,$a:Float,$b:Float){ reportData { report(code:$c) {
   graph(fightIDs:$f, dataType:DamageTaken, sourceID:$s, startTime:$a, endTime:$b) } } }"""
@@ -178,7 +179,7 @@ def render(p: TankPrep) -> str:
     mit = "".join(f"<li><b>{e(n)}</b><small>up {u:.0%} of the fight for the top tanks</small></li>"
                   for n, u in p.mitigation)
     jr = "".join(f"<li>{e(x)}</li>" for x in p.journal)
-    body = f"""<h1>{e(p.boss)} <span class="pill gold">{e(p.difficulty)}</span></h1>
+    body = f"""<h1>{e(p.boss)} {diff_pill(p.difficulty)}</h1>
 <p class="lead">{e(p.spec)}: the tank's prep, from {p.kills} kills of the top tanks of your spec. A {_mmss(p.duration)}
 fight.</p>
 <section class="hp-sec"><h2>What hits you, and when</h2>{svg}

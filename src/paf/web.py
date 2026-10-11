@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, urlparse
 from paf import settings, theme
 from paf.config import data_dir, load_dotenv
 from paf.progress import PREP_STEPS, prep_progress  # noqa: F401 - PREP_STEPS: re-exported
+from paf.theme import diff_pill
 
 e = html.escape
 
@@ -403,7 +404,7 @@ def prepared_block() -> str:
         return ""
     tiles = "".join(
         f'<a class="tile boss-tile" href="/view/{e(x["key"])}"><div class="name">{e(x["name"])}</div>'
-        f'<span class="pill gold">{e(x["difficulty"] or "?")}</span> '
+        f'{diff_pill(x["difficulty"])} '
         + (f'<span class="pill">{e(x["spec"])}</span> ' if x["spec"] else "")
         + f'<span class="pill">{"prep sheet + timelines" if len(x["files"]) == 2 else "prep sheet only" if "prep" in x["files"] else "timelines only"}</span>'
         + (f'<div class="top"><b class="pos">{x["headline"]["gain"]:+.1f}%</b> {e(x["headline"]["what"])}</div>'
@@ -438,7 +439,7 @@ def boss_cards(items: list[dict], limit: int = 6) -> str:
         cls = (x.get("spec") or "").split(" ")[-1].lower()
         ic = icons.img(icons.CLASS_ICON.format(cls=cls), "medium", "bc-ic") if cls else ""
         return (f'<a class="bcard" href="/view/{e(x["key"])}">{ic}<span class="bc-txt"><b>{e(x["name"])}</b>'
-                f'<span class="bc-meta"><span class="pill gold">{e(DIFF_LABELS.get(x["difficulty"], x["difficulty"] or "?"))}</span>'
+                f'<span class="bc-meta">{diff_pill(x["difficulty"])}'
                 f' {e(x["spec"] or "")}</span></span><span class="bc-when">{ago(x["mtime"])}</span></a>')
     head = "".join(card(x) for x in items[:limit])
     rest = items[limit:]
@@ -536,7 +537,7 @@ document.querySelectorAll('.wcl-connect').forEach(function(box){
 </script>"""
 
 
-def connect_block(lead: bool = True) -> str:
+def connect_block(lead: bool = True, ghost: bool = False) -> str:
     """"Connect with Warcraft Logs" (paf.wcllogin): one click in the player's browser instead of an API key.
     Empty when this build has no public client."""
     from paf import wcllogin
@@ -545,7 +546,8 @@ def connect_block(lead: bool = True) -> str:
         return ""
     text = ("<p>The app reads the top players' logs through <b>your</b> Warcraft Logs account: log in once, in "
             "your browser. Free; the app only reads public logs, nothing is posted.</p>" if lead else "")
-    return (f"<div class='wcl-connect'>{text}<button type='button' class='btn go'>Connect with Warcraft Logs</button>"
+    cls = "btn ghost" if ghost else "btn go"
+    return (f"<div class='wcl-connect'>{text}<button type='button' class='{cls}'>Connect with Warcraft Logs</button>"
             f"<p class='wcl-say small muted' role='status'></p></div>{CONNECT_JS}")
 
 
@@ -620,15 +622,17 @@ placeholder="In game: type /simc, then Ctrl+A, Ctrl+C, and paste here"></textare
     regions = "".join(f'<option{" selected" if r == gr else ""}>{r}</option>'
                       for r in settings.SETTINGS["guild_region"].choices)
     guild_state = f'<span class="pill gold">{e(g)}</span>' if g else '<span class="pill">optional</span>'
-    guild = f"""<div class="card step"><div class="num">3</div><div class="body">
+    guild_step = f"""<div class="card step"><div class="num">{{n}}</div><div class="body">
 <h3>Your raid {guild_state}</h3>
 <p class="small muted">Your guild's latest public log gives your raid's composition and DPS: the prep then tells you
 whether the others cover the adds (stay on the boss) or you should pad them.</p>
 <form method="post" action="/guild" class="row"><input name="guild" placeholder="Guild name" value="{e(g)}">
 <input name="server" placeholder="Server" value="{e(gs)}"><select name="region" aria-label="Region">{regions}</select>
 <button class="btn ghost">Save</button></form></div></div>"""
+    guild = guild_step.replace("{n}", "3")  # after 1 your character, 2 the boss
     if loaded is not None and encs and has_credentials() and not error:  # ready: one big thing to do
-        return page("prep-a-fight", simple_home(loaded, encs, character, guild, creds))
+        # in the home's fold the boss is not a step: your character (1), your raid (2)
+        return page("prep-a-fight", simple_home(loaded, encs, character, guild_step.replace("{n}", "2"), creds))
     body = f"""<h1>Prepare a boss fight</h1>
 <p class="lead">The top players' logs, your character and SimulationCraft: your plan for this fight.</p>
 {prepared_block()}
@@ -685,7 +689,8 @@ def characters_strip() -> str:
     chips = "".join(
         f'<form method="post" action="/character/select" class="ch"><input type="hidden" name="slug" value="{e(c.slug)}">'
         f'<button title="{e(c.spec.title())} {e(c.class_name.title())}">'
-        f'{icons.img(icons.CLASS_ICON.format(cls=c.class_name.lower()), "medium", "ch-ic")}<span>{e(c.name)}</span>'
+        f'{icons.img(icons.CLASS_ICON.format(cls=c.class_name.lower()), "medium", "ch-ic")}<span>{e(c.name)}'
+        f'<small>{e(c.spec.title())}</small></span>'
         f'</button></form>' for c in others)
     add = '<a class="ch-new" href="/characters#add">+ Add a character</a>'
     return f'<div class="chars">{chips}{add}</div>'
@@ -922,8 +927,8 @@ def raid_board(encs, class_name: str, spec: str) -> str:
                   f"<div class='rb-ds'>{states}</div></div></div>")
     return (f"<h2 class='h-mine'>Your raid, boss by boss</h2>{queue_strip(settings.get('difficulty'))}"
             f"<div class='rb-row'>{items}</div>{QUEUE_JS}"
-            "<p class='small muted rb-legend'><span>Point at a boss: its three difficulties, and a click to the "
-            "sheet or the prep.</span> <span>A grey boss is not prepared for this week yet.</span></p>")
+            "<p class='small muted rb-legend'><span>Point at or tap a boss: its three difficulties, and a click to "
+            "the sheet or the prep.</span> <span>A grey boss is not prepared for this week yet.</span></p>")
 
 
 def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
@@ -934,7 +939,19 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
         names.boss_names(i18n.wow_locale())
 
     diff = settings.get("difficulty")
-    options = "".join(f'<option value="{x.id}">{e(x.name)}</option>' for x in encs)
+    encs = journal_order(encs)  # the list in the raid's order, like the board
+    ready = fresh_bosses(encs, diff, loaded.class_name, loaded.spec)
+    nxt = next((x for x in encs if x.id not in ready), None)  # the list opens on the first boss still to prepare
+    options = "".join(f'<option value="{x.id}"{" selected" if nxt and x.id == nxt.id else ""}>{e(x.name)}</option>'
+                      for x in encs)
+    where = e(DIFF_LABELS.get(diff, diff))
+    if not encs or not ready:
+        week = ""
+    elif nxt is None:
+        week = f'<p class="start-say">Every boss is ready this week in {where}.</p>'
+    else:
+        week = (f'<p class="start-say">{len(ready)} of {len(encs)} bosses ready this week in {where}. '
+                f'Next: <b>{e(nxt.name)}</b>.</p>')
     diffs = "".join(f'<label class="seg"><input type="radio" name="difficulty" value="{d}"{" checked" if d == diff else ""}>'
                     f'<span>{e(DIFF_LABELS.get(d, d))}</span></label>' for d in settings.DIFFICULTIES if d != "lfr")
     ic = icons.img(icons.CLASS_ICON.format(cls=loaded.class_name.lower()), "large", "me-ic")
@@ -953,7 +970,7 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
     return f"""<section class="home-hero"><div class="me">{ic}<div><b>{e(loaded.name)}</b>
 <span>{e(loaded.spec.title())} {e(loaded.class_name.title())}{(" &middot; " + e(g)) if g else ""}</span></div></div>
 {characters_strip()}
-<form method="get" action="/boss" class="start"><h1>Prepare a boss</h1>
+<form method="get" action="/boss" class="start"><h1>Prepare a boss</h1>{week}
 <select name="boss" aria-label="Boss" class="big">{options}</select>
 <div class="segs" role="radiogroup" aria-label="Difficulty">{diffs}</div>
 <button class="btn go">Let's go &rarr;</button></form></section>
@@ -1037,7 +1054,7 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
     nxt = "<button type='button' class='btn go next'>Next &rarr;</button>"
     back = "<button type='button' class='btn ghost prev'>&larr; Back</button>"
     body = f"""<p class="small"><a href="/">&larr; Home</a></p>
-<h1>{e(enc.name)} <span class="pill gold">{e(DIFF_LABELS.get(difficulty, difficulty))}</span></h1>
+<h1>{e(enc.name)} {diff_pill(difficulty)}</h1>
 <p class="lead">{last.strip() or ""}</p>{est_html}
 <form method="post" action="/prep" class="ob story" data-boss="{enc.id}-{e(difficulty)}">
 <input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
@@ -1257,11 +1274,11 @@ def feedback_page(jid: str = "", note: str = "") -> str:
 <form method="post" action="/feedback" class="card"><input type="hidden" name="job" value="{e(jid)}">
 <label>Your message <textarea name="message" required placeholder="What you did, what you expected, what you got.
 Your spec and the boss help."></textarea></label>
-<label class="chip"><input type="checkbox" name="log" checked> Attach the {"log of this prep" if jid else "app's log"}
-(below; your Warcraft Logs key, user folder and email addresses are removed)</label>
-<label class="chip"><input type="checkbox" name="perf" checked> Attach performance measures: your computer's CPU,
+<label class="check-row"><input type="checkbox" name="log" checked><span> Attach the {"log of this prep" if jid else "app's log"}
+(below; your Warcraft Logs key, user folder and email addresses are removed)</span></label>
+<label class="check-row"><input type="checkbox" name="perf" checked><span> Attach performance measures: your computer's CPU,
 cores and memory, and how long each step took (nothing personal: no name, no log, no folder). They help make the app
-faster on every computer.</label>
+faster on every computer.</span></label>
 <div class="cta"><button class="btn">Send</button></div></form>
 <details class="card"><summary>Exactly what is sent</summary><pre class="log">{e(preview[-20000:])}</pre></details>'''
 
@@ -1665,8 +1682,8 @@ class Handler(BaseHTTPRequestHandler):
                 errors = []
                 for key in settings.SETTINGS:
                     if key in form:
-                        try:
-                            settings.set_value(key, form[key][0])
+                        try:  # the last value: a checkbox sends "on" after its hidden "off"
+                            settings.set_value(key, form[key][-1])
                         except (KeyError, ValueError) as ex:
                             errors.append(f"{key}: {ex}")
                 self._send(page("Settings", settings_page("; ".join(errors) if errors else "Saved.")))

@@ -58,16 +58,57 @@ CLASS_COLORS = {"deathknight": "#C41E3A", "demonhunter": "#A330C9", "druid": "#F
                 "rogue": "#FFF468", "shaman": "#0070DD", "warlock": "#8788EE", "warrior": "#C69B6D"}
 
 
+def _luminance(rgb: tuple[float, ...]) -> float:
+    def ch(c: float) -> float:
+        c /= 255
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    r, g, b = map(ch, rgb)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _rgb(hex_color: str) -> tuple[int, int, int]:
+    return int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
+
+
+def _keep(color: str, toward: str, ground: str, cap: float, target: float = 4.6) -> int:
+    """The share of the class color (in %, at most `cap`) mixed with `toward` that still reads as text on `ground`
+    (WCAG contrast `target`): a bright class (priest, rogue, monk) is darkened more than a deep one."""
+    c, t, g = _rgb(color), _rgb(toward), _luminance(_rgb(ground))
+    for keep in range(round(cap * 100), -1, -1):
+        mixed = _luminance(tuple(a * keep / 100 + b * (1 - keep / 100) for a, b in zip(c, t, strict=True)))
+        hi, lo = max(mixed, g), min(mixed, g)
+        if (hi + 0.05) / (lo + 0.05) >= target:
+            return keep
+    return 0
+
+
 def class_accent(class_name: str) -> str:
     """A <style> giving the app the color of the class: darkened on the light theme, lightened a little on the dark
-    one, so every class reads on both. '' for an unknown class."""
+    one, each as much as needed for text in the accent to pass WCAG AA on the pages' darkest (lightest) surface.
+    '' for an unknown class."""
     color = CLASS_COLORS.get((class_name or "").lower().replace(" ", ""))
     if not color:
         return ""
-    dark = ("--accent:color-mix(in srgb,var(--class) 70%,#fff);"
+    light = _keep(color, "#000000", "#f1eaf0", 0.68)  # --surface-2 of the light theme
+    dark_keep = _keep(color, "#ffffff", "#2b212c", 0.70)  # --surface-2 of the dark theme
+    dark = (f"--accent:color-mix(in srgb,var(--class) {dark_keep}%,#fff);"
             "--accent-soft:color-mix(in srgb,var(--class) 22%,#181219)")
-    return (f"<style>:root{{--class:{color};--accent:color-mix(in srgb,var(--class) 68%,#000);"
+    return (f"<style>:root{{--class:{color};--accent:color-mix(in srgb,var(--class) {light}%,#000);"
             "--accent-soft:color-mix(in srgb,var(--class) 16%,#fff);"
             "--stripe:linear-gradient(90deg,var(--class),color-mix(in srgb,var(--class) 55%,#000))}"
             f"@media (prefers-color-scheme:dark){{:root:not([data-theme=\"light\"]){{{dark}}}}}"
             f":root[data-theme=\"dark\"]{{{dark}}}</style>")
+
+
+DIFFICULTY_NAMES = {"lfr": "LFR", "normal": "Normal", "heroic": "Heroic", "mythic": "Mythic"}
+
+
+def diff_pill(difficulty: str | None) -> str:
+    """A difficulty's pill: its word and its rarity shape (a green triangle, a blue square, a purple pentagon), never
+    the gold of a selection. Takes the key ("heroic") or the label ("Heroic")."""
+    import html
+
+    key = (difficulty or "").strip().lower()
+    word = DIFFICULTY_NAMES.get(key, difficulty or "?")
+    shape = f" {key}" if key in ("normal", "heroic", "mythic") else ""
+    return f'<span class="pill diff{shape}">{html.escape(word)}</span>'

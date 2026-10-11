@@ -92,7 +92,7 @@ def page_body() -> str:
     key_done = has_credentials()
     skip = "<button type='button' class='btn ghost skip'>Skip</button>"
     return f"""<div class="ob" data-key="{'1' if key_done else ''}">
-<ol class="ob-dots" aria-hidden="true">{''.join('<li></li>' for _ in STEPS)}</ol>
+<ol class="ob-dots" aria-hidden="true">{''.join('<li></li>' for _ in STEPS[1:])}</ol>
 
 <section class="ob-step" data-step="welcome">
 <h1>Your boss, prepared in a few minutes</h1>
@@ -162,7 +162,7 @@ function store(i){ try { localStorage.setItem('paf-onboard', names[i]); } catch 
 function show(i, back){
   at = Math.max(0, Math.min(steps.length - 1, i));
   steps.forEach(function(s, j){ s.classList.toggle('on', j === at); s.classList.toggle('back', !!back); });
-  dots.forEach(function(d, j){ d.classList.toggle('on', j <= at); });
+  dots.forEach(function(d, j){ d.classList.toggle('on', j < at); });  // the welcome is not a step
   store(at); var f = steps[at].querySelector('input,textarea,button'); if (f) f.focus({preventScroll: true});
   if (names[at] === 'done') summary();
 }

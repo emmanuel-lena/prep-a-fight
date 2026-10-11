@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from paf import theme
 from paf.corpus.analyze import kills_filter
 from paf.raidneed import HEALERS
+from paf.theme import diff_pill
 
 TAB_JS = """<script>(function(){var ids=[...document.querySelectorAll('.panel')].map(function(p){return p.id});
 function show(id){if(ids.indexOf(id)<0)id=ids[0];document.querySelectorAll('.panel').forEach(
@@ -253,7 +254,7 @@ the same spec do on this boss. The raid did <b>{k(add_total)}</b> DPS on the add
 <th>Top players</th><th></th></tr>{rows_h}</table></div></section>"""
     tabs = ("<nav class='tabs'><a href='#pull'>What happened</a><a href='#plan'>Best comp for this boss</a></nav>"
             if happened else "")
-    body = f"""<h1>{e(boss)} <span class="pill gold">{e(difficulty)}</span>: your raid</h1>
+    body = f"""<h1>{e(boss)} {diff_pill(difficulty)}: your raid</h1>
 <p class="lead">From your raid's log {e(report)} ({e(fight)}).</p>{tabs}{happened}
 <section class="panel" id="plan"><h2>Best comp for this boss</h2>
 <p class="small">Who should play what, and who pads the adds, for the most boss damage while the adds still die as fast

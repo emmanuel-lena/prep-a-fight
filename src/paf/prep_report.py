@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from paf import bossguide, icons, theme
+from paf.theme import diff_pill
 from paf.wowhead import SCRIPT as WH_SCRIPT
 from paf.wowhead import link, linkify
 
@@ -917,7 +918,7 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
 
     cls_icon = icons.img(icons.CLASS_ICON.format(cls=d.class_name.lower()), "large", "hero-ic") if d.class_name else ""
     header = f"""<header class="sheet-hero"><div class="in">{cls_icon}<div class="txt">
-<h1>{e(d.boss)} <span class="pill gold">{e(d.difficulty)}</span></h1>
+<h1>{e(d.boss)} {diff_pill(d.difficulty)}</h1>
 <p>{e(d.character)} &middot; {e(d.spec)} &middot; {d.kills} ranked kills &middot; {datetime.now():%d %b %Y %H:%M}</p>
 </div>{briefing.ready_ring(briefing.ready_count(d))}</div><nav class="tabs" aria-label="Sections"><div class="in" role="tablist"><a role="tab" class="back-simple" href="#simple">&larr; Simple view</a>{''.join(f'<a role="tab" href="#{k}">{e(label)}</a>' for k, label in TABS
                                                          if tabs[k])}</div></nav></header>"""

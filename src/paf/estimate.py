@@ -36,7 +36,7 @@ class Estimate:
         what = {"pack_local": "Uses the prep pack already on your computer: nothing to download.",
                 "pack_shared": "Uses the prep pack another player shared this week: nothing to download from "
                                "Warcraft Logs.",
-                "corpus": "Uses the kills already in your corpus.",
+                "corpus": "Uses the top kills already downloaded on your computer: nothing to download.",
                 "collect": f"Downloads the top {self.kills} kills of your spec from Warcraft Logs; more follow in "
                            f"the background afterwards."}[self.source]
         wait = (f" Includes about {round(self.wait)} min waiting for your Warcraft Logs quota."
