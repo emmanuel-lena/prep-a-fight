@@ -57,12 +57,12 @@ def test_performance_measures_are_attached_without_personal_data(tmp_path, monke
     from paf import feedback
 
     monkeypatch.setenv("PAF_HOME", str(tmp_path))
-    log = ("== Collecting the corpus  [+0s]\n  Ixuu-Archimonde 200 kills of report abcDEF123\n"
+    log = ("== Collecting the corpus  [+0s]\n  Zapper-Draenor 200 kills of report abcDEF123\n"
            "  Warcraft Logs quota used up for this hour\n== Analyzing the corpus of 187 kills  [+1200s]\n"
            "== Done  [+1260s]\n")
     perf = feedback.performance(log)
     assert "logical cores" in perf and "Collecting the corpus: 1200 s" in perf and "1 quota waits" in perf
     assert "Analyzing the corpus of # kills: 60 s" in perf  # numbers in step names masked
-    assert "Ixuu" not in perf and "abcDEF123" not in perf  # only step lines: no name, no report
+    assert "Zapper" not in perf and "abcDEF123" not in perf  # only step lines: no name, no report
     _, body = feedback.report("slow", "", "", perf)
     assert "--- performance ---" in body

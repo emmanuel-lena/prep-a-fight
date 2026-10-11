@@ -3,6 +3,7 @@
 import re
 
 NAME = "Français"
+COMPLETE = False  # English until the 1.0: French only when the player picks it (Settings, top bar)
 
 PHRASES: dict[str, str] = {
     # navigation, app
@@ -374,7 +375,7 @@ PHRASES: dict[str, str] = {
     "Copy the note": "Copier la note", "MRT note": "Note MRT",
     "NSRT reminders": "Rappels NSRT", "Method Raid Tools: paste it in your note": "Method Raid Tools : colle-la dans ta note",
     "Northern Sky Raid Tools: your personal reminders": "Northern Sky Raid Tools : tes rappels perso",
-    "Moving or standing still": "Bouger ou rester planté", "Move: it is the strategy": "Bouge : c'est la strat",
+    "Moving or standing still": "Bouger ou rester planté", "Move with the raid": "Bouge avec le raid",
     # the first run (paf.onboarding)
     "Welcome": "Bienvenue", "Your boss, prepared in a few minutes": "Ton boss, préparé en quelques minutes",
     "What the best players do": "Ce que font les meilleurs", "on this boss, read from their logs.": "sur ce boss, lu dans leurs logs.",
@@ -898,7 +899,7 @@ PATTERNS: list[tuple[str, str]] = [
     (r"You move more than them in (.+?) \((\d+)% of the phase, (?:top players|tops) (\d+)%\): outside the strategy's moments, stand still\.",
      r"Tu bouges plus qu'eux en \1 (\2 % de la phase, les tops \3 %) : hors des moments de la strat, reste planté."),
     (r"You do not move more than the (?:top players|tops)\.", r"Tu ne bouges pas plus que les tops."),
-    (r"Move when the strategy says so: (\d+) moments where most top players move \((\d+) s in all\), marked in the fight below\.",
+    (r"Move when the strategy says so: (\d+) moments? where most top players move \((\d+) s in all\), marked in the fight below\.",
      r"Bouge quand la strat le demande : \1 moments où la plupart des tops bougent (\2 s en tout), marqués dans le combat ci-dessous."),
     (r"The rest of the time, stand still and cast: 10 s of movement without casting costs you about ([\d.]+)% of your DPS\.",
      r"Le reste du temps, reste planté et caste : 10 s de déplacement sans caster te coûtent environ \1 % de DPS."),
@@ -951,7 +952,7 @@ for _spec, _spec_fr in SPECS.items():
         for _cls_name in {_cls, {"DeathKnight": "Death Knight", "DemonHunter": "Demon Hunter"}.get(_cls, _cls)}:
             PHRASES.setdefault(f"{_spec} {_cls_name}", f"{_cls_fr} {_spec_fr}")
             PHRASES.setdefault(f"{_spec.lower()} {_cls_name.lower()}", f"{_cls_fr} {_spec_fr}")
-    # a spec alone inside a sentence: "les meilleurs Elemental", "Ixuu · Elemental · 199 kills"
+    # a spec alone inside a sentence: "les meilleurs Elemental", "Zapper · Elemental · 199 kills"
     PATTERNS.append((rf"\b(meilleurs|tops|Les meilleurs) {re.escape(_spec)}\b", rf"\1 {_spec_fr}"))
     PATTERNS.append((rf"(&middot;|·) {re.escape(_spec)} (&middot;|·)", rf"\1 {_spec_fr} \2"))
 # "Play your cooldowns" is a phrase of its own: translated before the sentence's pattern

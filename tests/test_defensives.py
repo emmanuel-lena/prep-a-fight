@@ -18,7 +18,7 @@ def test_notes_and_sheet():
     d = _defs()
     assert defensives.mrt_lines(d) == ["{time:2:17} Defensive: Cloak of Shadows / Feint - Soul Transfer"]
     phases = [("Stage One", 0.0), ("Intermission", 158.0)]
-    assert defensives.nsrt_lines(d, 3470, phases, "Ixuu") == ["time:137.0;ph:1;tag:Ixuu;spellid:31224;dur:5"]
+    assert defensives.nsrt_lines(d, 3470, phases, "Zapper") == ["time:137.0;ph:1;tag:Zapper;spellid:31224;dur:5"]
     p = PrepData(boss="B", difficulty="mythic", spec="Assassination", character="X")
     p.defensives = d
     html = defensives_html(p)

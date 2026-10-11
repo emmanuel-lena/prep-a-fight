@@ -23,6 +23,8 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 LicenseFile=..\LICENSE
+; what the app sends and where, shown before installing (also PRIVACY.md in the repository)
+InfoBeforeFile=..\PRIVACY.md
 SetupIconFile=..\src\paf\assets\prep-a-fight.ico
 UninstallDisplayIcon={app}\prep-a-fight.ico
 UninstallDisplayName=prep-a-fight

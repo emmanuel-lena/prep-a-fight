@@ -208,8 +208,9 @@ def move_card(d) -> str:
         return ""
     lines = []
     if m.windows:
-        lines.append(("Movement", f"Move when the strategy says so: {len(m.windows)} moments where most top players "
-                                 f"move ({m.covered:.0f} s in all), marked in the fight below.", ""))
+        n = len(m.windows)
+        lines.append(("Movement", f"Move when the strategy says so: {n} {'moment' if n == 1 else 'moments'} where "
+                                 f"most top players move ({m.covered:.0f} s in all), marked in the fight below.", ""))
     if m.cost_10s:
         lines.append(("", f"The rest of the time, stand still and cast: 10 s of movement without casting costs you "
                           f"about {m.cost_10s:.1f}% of your DPS.", "cost"))
@@ -323,7 +324,7 @@ def _events(d) -> list[tuple[float, str, str]]:
             out.append((m.time, "r", _item(d, m.spells[0][0], f"Defensive: {m.spells[0][0]}")))
     for w in (d.movement.windows if d.movement else []):  # the strategy makes everyone move: so do you
         out.append((w.start, "l", _item(d, "Movement", f"Everyone moves ({w.duration:.0f} s)")))
-        out.append((w.start, "r", _do("Move: it is the strategy")))
+        out.append((w.start, "r", _do("Move with the raid")))
         for s, _share in w.spells[:1]:
             out.append((w.start, "r", _item(d, s, s)))
     return sorted(out, key=lambda x: x[0])

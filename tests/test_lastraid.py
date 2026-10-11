@@ -96,7 +96,7 @@ def test_a_log_without_a_boss_of_the_raid_is_skipped(home, monkeypatch):
         def query(self, q, v, cache_ttl=None):
             return {"reportData": {"report": {"startTime": 0, "fights": logs[v["c"]]}}}
 
-    monkeypatch.setattr(lastraid, "who", lambda slug: ("Me", "Hyjal", "eu"))
+    monkeypatch.setattr(lastraid, "who", lambda slug: ("Me", "Draenor", "eu"))
     monkeypatch.setattr(tracker, "character_reports", lambda *a: ["dungeon", "raid"])
     monkeypatch.setattr(jobrun, "run_job", lambda args, log=None: ("j1", "done"))
     state = {}

@@ -74,13 +74,9 @@ def plan(con, encounter_id: int, difficulty: int, class_name: str, spec: str, cl
         return Estimate("corpus", sims, sims=sims)
     kills = max(0, FIRST_SHEET - done)
     points = kills * (POINTS_PER_KILL + MECH_POINTS_PER_KILL)
-    left, reset = QUOTA, 60.0
-    if client is not None:
-        try:
-            rl = client.rate_limit()
-            left, reset = max(0.0, rl["limitPerHour"] - rl["pointsSpentThisHour"]), rl["pointsResetIn"] / 60
-        except Exception:  # noqa: BLE001 - unknown quota: a fresh hour
-            pass
+    from paf.wcl import quota_left
+
+    left, reset = quota_left(client)  # never waits: a page shows this estimate
     wait = 0.0
     if points > left:  # past what is left this hour: the reset, then whole hours
         extra = points - left

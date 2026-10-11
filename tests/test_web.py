@@ -268,9 +268,14 @@ def test_job_page_updates_itself(server):
 
 
 def test_language_switch_in_the_top_bar(server, monkeypatch):
+    from paf import i18n
+
     url, _ = server
+    monkeypatch.setattr(i18n, "system_language", lambda: "en")
     page = fetch(url + "/settings")
     assert "action='/language'" not in page  # English only until the 1.0: no switch in the top bar in English
+    monkeypatch.setattr(i18n, "system_language", lambda: "fr")  # a French Windows: English, with the switch
+    assert "action='/language'" in fetch(url + "/settings")
     fetch(url + "/language", urllib.parse.urlencode({"lang": "fr"}).encode())
     from paf import settings
 
@@ -287,7 +292,7 @@ def test_simple_home_once_set_up(tmp_path, monkeypatch):
     monkeypatch.setenv("WCL_CLIENT_SECRET", "secret")
     monkeypatch.setattr(web, "_encounters", lambda: [SimpleNamespace(id=3470, name="Nek'zali the Soulcoiler")])
     (tmp_path / "profiles").mkdir(parents=True)
-    (tmp_path / "profiles" / "current.simc").write_text('shaman="Ixuu"\nspec=elemental\nhead=,id=1\n')
+    (tmp_path / "profiles" / "current.simc").write_text('shaman="Zapper"\nspec=elemental\nhead=,id=1\n')
     rep = tmp_path / "reports"
     rep.mkdir()
     (rep / "prep-the-altar-heroic-elemental-shaman.html").write_text("<title>The Altar prep</title>")

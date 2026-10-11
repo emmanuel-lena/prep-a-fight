@@ -5,6 +5,12 @@ import pytest
 from paf.wcl import API_URL, TOKEN_URL, WCLClient, WCLError
 
 
+@pytest.fixture(autouse=True)
+def own_data_dir(tmp_path, monkeypatch):
+    """The client writes the quota it reads in the data folder: never the real one."""
+    monkeypatch.setenv("PAF_HOME", str(tmp_path / "home"))
+
+
 class FakeWCL:
     """Minimal fake of the token endpoint and the GraphQL endpoint."""
 
@@ -97,8 +103,75 @@ def test_a_used_up_quota_is_waited_for(tmp_path, capsys):
     assert 605 in waits and "quota used up" in capsys.readouterr().out
 
 
-def test_a_quota_that_never_comes_back_still_fails(tmp_path):
-    fake = FakeWCL([(429, {})] * 40)
-    c = WCLClient("id", "secret", cache_dir=tmp_path / "wcl", transport=fake, sleep=lambda s: None)
+def test_a_quota_that_never_comes_back_still_fails(tmp_path, capsys):
+    from paf.wcl import QUOTA_FALLBACK_WAIT, QUOTA_WAITS
+
+    fake = FakeWCL([(429, {})] * 400)
+    waits = []
+    c = WCLClient("id", "secret", cache_dir=tmp_path / "wcl", transport=fake, sleep=waits.append)
     with pytest.raises(WCLError, match="429"):
         c.query("{ ok }")
+    assert waits.count(QUOTA_FALLBACK_WAIT) == QUOTA_WAITS and QUOTA_WAITS * QUOTA_FALLBACK_WAIT >= 3600
+    assert capsys.readouterr().out.count("quota used up") == 1  # said once, not at every short wait
+
+
+def test_a_used_up_quota_waits_until_the_reset_read_earlier(tmp_path, capsys):
+    # the reset time was read a while ago; once the quota is used up, asking it again is refused too
+    fake = FakeWCL([(200, {"data": {"rateLimitData": {"limitPerHour": 3600, "pointsSpentThisHour": 3500,
+                                                      "pointsResetIn": 1500}}})]
+                   + [(429, {})] * 6 + [(200, {"data": {"ok": 1}})])
+    waits = []
+    c = WCLClient("id", "secret", cache_dir=tmp_path / "wcl", transport=fake, sleep=waits.append)
+    c.rate_limit()
+    assert c.query("{ ok }") == {"ok": 1}
+    quota_wait = [w for w in waits if w > 60]
+    assert quota_wait and 1450 <= quota_wait[0] <= 1510  # the remaining 25 min, not the fallback 15
+
+
+def test_a_page_never_waits_for_the_quota(tmp_path, monkeypatch):
+    from paf import wcl
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    monkeypatch.setitem(wcl.INTERACTIVE, "on", True)
+    waits = []
+    c = WCLClient("id", "secret", cache_dir=tmp_path / "wcl", transport=FakeWCL([(429, {})]), sleep=waits.append)
+    with pytest.raises(WCLError, match="quota is used up"):
+        c.query("{ ok }")
+    assert waits == []  # said at once, no sleep
+
+
+def test_a_refused_query_answers_from_its_old_cache(tmp_path):
+    fake = FakeWCL([(200, {"data": {"zones": [1]}}), (429, {})] + [(429, {})] * 200)
+    c = WCLClient("id", "secret", cache_dir=tmp_path / "wcl", transport=fake, sleep=lambda s: None,
+                  wait_for_quota=False)
+    assert c.query("{ zones }", cache_ttl=1) == {"zones": [1]}
+    import os
+    import time
+
+    for f in (tmp_path / "wcl").glob("*.json"):  # the cached answer is now stale
+        os.utime(f, (time.time() - 3600, time.time() - 3600))
+    assert c.query("{ zones }", cache_ttl=1) == {"zones": [1]}
+
+
+def test_the_reset_read_by_a_prep_is_said_by_a_page(tmp_path, monkeypatch):
+    from paf import wcl
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    prep = WCLClient("id", "secret", cache_dir=tmp_path / "wcl", transport=FakeWCL(
+        [(200, {"data": {"rateLimitData": {"limitPerHour": 3600, "pointsSpentThisHour": 3600,
+                                           "pointsResetIn": 1200}}})]), sleep=lambda s: None)
+    prep.rate_limit()
+    assert "comes back around" in wcl.quota_sentence()
+
+
+def test_an_estimate_knows_the_quota_is_used_up_without_waiting(tmp_path, monkeypatch):
+    from paf import wcl
+
+    monkeypatch.setitem(wcl.INTERACTIVE, "on", True)
+    prep = WCLClient("id", "secret", cache_dir=tmp_path / "wcl", sleep=lambda s: None, wait_for_quota=True,
+                     transport=FakeWCL([(200, {"data": {"rateLimitData": {
+                         "limitPerHour": 3600, "pointsSpentThisHour": 3000, "pointsResetIn": 1200}}})]))
+    prep.rate_limit()  # a prep read it 10 kills ago
+    page = WCLClient("id", "secret", cache_dir=tmp_path / "wcl2", transport=FakeWCL([(429, {})]))
+    left, reset = wcl.quota_left(page)
+    assert left == 0.0 and 19 <= reset <= 20  # used up now, back in the 20 minutes the prep read

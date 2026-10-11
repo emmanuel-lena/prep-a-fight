@@ -25,7 +25,7 @@ def test_movement_card_and_rows():
     d.fight = Fight("B", 300)
     d.movement = movement.Movement([movement.Window(43, 26, [("Spiritwalker's Grace", 0.67)])], 1.72, 0.23, 0.49)
     card = simple.move_card(d)
-    assert "1 moments where most top players move (26 s in all)" in card and "about 1.7% of your DPS" in card
+    assert "1 moment where most top players move (26 s in all)" in card and "about 1.7% of your DPS" in card
     assert "lose only about 0.4% per 10 s" in card and "Spiritwalker&#x27;s Grace" in card
     view = simple.fight_html(d)
-    assert "Everyone moves (26 s)" in view and "Move: it is the strategy" in view and "ability_rogue_sprint" in view
+    assert "Everyone moves (26 s)" in view and "Move with the raid" in view and "ability_rogue_sprint" in view

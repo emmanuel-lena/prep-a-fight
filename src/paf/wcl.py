@@ -48,8 +48,55 @@ def _urllib_transport(url: str, body: bytes, headers: dict[str, str]) -> tuple[i
         return 599, str(e).encode()
 
 
-QUOTA_WAITS = 2  # a query waits at most this many quota resets before failing
-QUOTA_FALLBACK_WAIT = 900.0  # seconds to wait when the reset time cannot be read
+def _quota_file() -> Path:
+    return data_dir() / "cache" / "wcl_quota.json"
+
+
+def last_quota() -> dict | None:
+    """The quota as last read by any process of the app (spent, limit, reset_at, read_at), or None."""
+    try:
+        return json.loads(_quota_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def quota_sentence() -> str:
+    """The quota used up, said for a page: until when, when a process of the app read it."""
+    from datetime import datetime
+
+    reset_at = (last_quota() or {}).get("reset_at")
+    if reset_at and reset_at > time.time():
+        return (f"Your Warcraft Logs quota is used up for this hour: it comes back around "
+                f"{datetime.fromtimestamp(reset_at):%H:%M}.")
+    return "Your Warcraft Logs quota is used up for this hour: it comes back within the hour."
+
+
+def quota_left(client=None) -> tuple[float, float]:
+    """(points left, minutes to the reset) without ever waiting: asked when a client is given, else (or when Warcraft
+    Logs refuses) the last read of any process of the app; a fresh hour when nothing is known."""
+    if client is not None:
+        try:
+            rl = client.rate_limit()
+            return max(0.0, rl["limitPerHour"] - rl["pointsSpentThisHour"]), rl["pointsResetIn"] / 60
+        except WCLError as ex:
+            used_up = "quota is used up" in str(ex)
+        except Exception:  # noqa: BLE001 - offline: what was last read
+            used_up = False
+    else:
+        used_up = False
+    q = last_quota() or {}
+    reset_at = q.get("reset_at") or 0.0
+    if reset_at > time.time():
+        left = 0.0 if used_up else max(0.0, float(q.get("limit", 3600)) - float(q.get("spent", 0)))
+        return left, (reset_at - time.time()) / 60
+    return (0.0, 60.0) if used_up else (3600.0, 60.0)
+
+
+QUOTA_WAITS = 25  # a query waits at most this many times for the quota (25 short waits cover more than an hour)
+# The app's own process (its pages, the desktop window) never waits for Warcraft Logs: a page must answer. The work
+# that can wait (preps, tools, the raid queue, the last raid) runs in processes of its own, where this stays off.
+INTERACTIVE = {"on": False}
+QUOTA_FALLBACK_WAIT = 180.0  # seconds before asking again when the reset time is unknown (short: no wasted minutes)
 
 
 class WCLClient:
@@ -59,8 +106,9 @@ class WCLClient:
         client_secret: str | None = None,
         cache_dir: Path | None = None,
         transport: Transport | None = None,
-        max_retries: int = 4,
+        max_retries: int | None = None,
         sleep: Callable[[float], None] = time.sleep,
+        wait_for_quota: bool | None = None,
     ):
         self.client_id = client_id or os.environ.get("WCL_CLIENT_ID", "")
         self.client_secret = client_secret or os.environ.get("WCL_CLIENT_SECRET", "")
@@ -76,10 +124,12 @@ class WCLClient:
         self.api_url = USER_API_URL if self.user else API_URL
         self.cache_dir = cache_dir or data_dir() / "cache" / "wcl"
         self.transport = transport or _urllib_transport
-        self.max_retries = max_retries
+        self.wait_for_quota = not INTERACTIVE["on"] if wait_for_quota is None else wait_for_quota
+        self.max_retries = max_retries if max_retries is not None else 4 if self.wait_for_quota else 1
         self.sleep = sleep
         self._token: str | None = None
         self._token_expires = 0.0
+        self._reset_at: float | None = None  # when the hourly quota resets, as last read (rate_limit)
 
     # --- auth ---------------------------------------------------------------------------------
 
@@ -141,6 +191,14 @@ class WCLClient:
             age = time.time() - cache_file.stat().st_mtime
             if cache_ttl == 0 or age < cache_ttl:
                 return json.loads(cache_file.read_text(encoding="utf-8"))
+        try:
+            return self._ask(query, variables, cache_file)
+        except WCLError:
+            if cache_file and cache_file.is_file():  # Warcraft Logs refused: the last answer, however old
+                return json.loads(cache_file.read_text(encoding="utf-8"))
+            raise
+
+    def _ask(self, query: str, variables: dict[str, Any], cache_file: Path | None) -> dict[str, Any]:
 
         body = json.dumps({"query": query, "variables": variables}).encode()
         delay = 2.0
@@ -161,11 +219,16 @@ class WCLClient:
                     self._token = None
                     self._token_file().unlink(missing_ok=True)
                 continue
+            if status == 429 and not self.wait_for_quota:  # a page: say it, never wait
+                raise WCLError(quota_sentence())
             if status == 429 and attempt == self.max_retries and quota_waits < QUOTA_WAITS:
                 # the hourly quota is used up: wait for its reset instead of failing every query until then
                 wait = self._quota_reset()
-                print(f"  Warcraft Logs quota used up for this hour: waiting {max(1, round(wait / 60))} min for "
-                      f"its reset, then the prep goes on by itself...", flush=True)
+                if quota_waits == 0:  # said once: the short waits that may follow are the same wait
+                    when = (f"about {max(1, round(wait / 60))} min" if wait != QUOTA_FALLBACK_WAIT else
+                            "it is checked every few minutes")
+                    print(f"  Warcraft Logs quota used up for this hour: waiting for its reset ({when}), then the "
+                          f"prep goes on by itself...", flush=True)
                 self.sleep(wait)
                 quota_waits += 1
                 attempt, delay = -1, 2.0
@@ -191,21 +254,35 @@ class WCLClient:
         return data
 
     def _quota_reset(self) -> float:
-        """Seconds until the hourly quota resets (asked directly: the query itself may be refused)."""
+        """Seconds until the hourly quota resets: asked directly, else from the last time it was read (a used-up
+        quota refuses that question too), else a quarter of an hour."""
         q = json.dumps({"query": "{ rateLimitData { pointsResetIn } }"}).encode()
         try:
             status, raw = self.transport(self.api_url, q, {"Authorization": f"Bearer {self.token()}",
                                                       "Content-Type": "application/json"})
             if status == 200:
                 left = float(json.loads(raw)["data"]["rateLimitData"]["pointsResetIn"])
+                self._reset_at = time.time() + left
                 return min(3600.0, max(30.0, left + 5))
         except (ValueError, KeyError, TypeError, OSError):
             pass
+        reset_at = self._reset_at or (last_quota() or {}).get("reset_at")
+        if reset_at is not None and reset_at > time.time():
+            return min(3600.0, max(30.0, reset_at - time.time() + 5))
         return QUOTA_FALLBACK_WAIT
 
     def rate_limit(self) -> dict[str, Any]:
         q = "{ rateLimitData { limitPerHour pointsSpentThisHour pointsResetIn } }"
-        return self.query(q)["rateLimitData"]
+        rl = self.query(q)["rateLimitData"]
+        try:
+            self._reset_at = time.time() + float(rl["pointsResetIn"])
+            _quota_file().parent.mkdir(parents=True, exist_ok=True)
+            _quota_file().write_text(json.dumps({"spent": rl["pointsSpentThisHour"], "limit": rl["limitPerHour"],
+                                                 "reset_at": self._reset_at, "read_at": time.time()}),
+                                     encoding="utf-8")
+        except (KeyError, TypeError, ValueError, OSError):
+            pass
+        return rl
 
     # --- report events ------------------------------------------------------------------------
 

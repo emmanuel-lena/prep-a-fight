@@ -25,7 +25,9 @@ def test_languages(monkeypatch):
     monkeypatch.setattr(i18n.settings, "get", lambda k: "auto")
     monkeypatch.setattr(i18n, "system_language", lambda: "de")  # no German catalog yet: English
     assert i18n.language() == "en"
-    monkeypatch.setattr(i18n, "system_language", lambda: "fr")
+    monkeypatch.setattr(i18n, "system_language", lambda: "fr")  # French is partial until the 1.0: English
+    assert i18n.language() == "en"
+    monkeypatch.setattr(i18n, "complete", lambda code: True)  # once complete, Windows' language
     assert i18n.language() == "fr"
 
 

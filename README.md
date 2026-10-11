@@ -48,14 +48,16 @@ repository by `tools/build-installer.ps1` (Inno Setup and python.org's embeddabl
 Beta testers: something broke or looks wrong? Open an issue with the **Beta report** form (it says which log to
 attach).
 
-To update, run the new installer over the old one. Everything stays in the folder you chose: the app in it,
+The app tells you when a new version is out and installs it in one click (or run the new installer over the
+old one). Everything stays in the folder you chose: the app in it,
 your preps, caches and SimulationCraft in its `data` subfolder (about 1-2 GB with the caches, capped in Settings;
 old sim folders and SimulationCraft versions are removed automatically). To uninstall: Windows Settings > Apps >
 prep-a-fight; it asks whether to delete that data too.
 
-A first prep of a boss takes about 7 minutes: it reads the first 100 ranked kills from Warcraft Logs (or a prep pack
-another player shared this week), sims on your CPU, and the rest of the kills follow in the background. Later preps
-of the same boss reuse everything.
+A first prep of a boss takes 10 to 15 minutes (measured: 14 min on a new computer, everything checked): it reads
+the first 100 ranked kills from Warcraft Logs (about 2 minutes, or nothing when another player shared a prep pack
+this week), then sims on your CPU; the rest of the kills follow in the background. Later preps of the same boss
+reuse everything. Press **Prepare the whole raid** and every boss is ready when you come back.
 
 ## Using the app
 
@@ -113,6 +115,36 @@ faster, more movement) or that contradict what the top players do are flagged "t
   plans with what the top players do (shown next to them).
 - Analyses of the corpus are correlations (what the top players do). SimC is used to check them on
   your character.
+
+## Questions
+
+**Is it safe to install?** The code is open (MIT) and the installer is built from this repository by GitHub
+Actions (`.github/workflows`), from python.org's own Python and Inno Setup. Windows SmartScreen warns about it
+because it is not signed with a paid certificate yet, not because anything was found in it.
+
+**What does "Connect with Warcraft Logs" let the app do?** Read public logs through the Warcraft Logs API, with
+your account's hourly quota (3,600 points; a first prep uses about 1,200). It cannot post or change anything. The
+login stays on your computer (in the app's `data` folder); **Disconnect** in Settings forgets it.
+
+**Does it send anything about me?** No account, no analytics, no tracking. It reads from Warcraft Logs, game
+data and icon sites, and GitHub for updates. It sends two things: the prep packs (numbers computed from the top
+players' public logs, no name, nothing about your character), which Settings can turn off, and a bug report, only
+when you send one. The full list, host by host: [PRIVACY.md](PRIVACY.md), also shown by the installer.
+
+**Why not just Raidbots?** Keep using it: it sims standard fight styles with no install. prep-a-fight answers a
+different question: what works on *this* boss, rebuilt from the top kills (its add waves, its movement, its
+Bloodlust), with your own assignments, plus what the best players of your spec do and when.
+
+**Does it slow my PC down?** While it sims, yes: SimulationCraft uses the processor. Start a prep, or the whole
+raid, and do something else: Windows tells you when a sheet is ready (the whole raid goes on from the notification
+area, even with the app closed).
+
+**Mac or Linux?** The installer is Windows only. The code runs anywhere Python and SimulationCraft run (see the
+developers' part below).
+
+**Which specs?** Every DPS spec is simmed; healers and tanks get the top players' timings, talents and
+trinkets (SimulationCraft does not sim healing or survival). The Elemental Shaman is the most tested: if your
+spec's sheet looks wrong, a report helps a lot.
 
 ## Install (developers)
 

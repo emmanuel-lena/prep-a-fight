@@ -78,7 +78,7 @@ def test_spec_names_inside_french_sentences(monkeypatch):
     from paf.i18n import translate
 
     monkeypatch.setenv("PAF_LANG", "fr")
-    assert "Ixuu &middot; Élémentaire &middot;" in translate("<p>Ixuu &middot; Elemental &middot; 199 ranked kills</p>")
+    assert "Zap &middot; Élémentaire &middot;" in translate("<p>Zap &middot; Elemental &middot; 199 ranked kills</p>")
     assert translate("<summary>Play your cooldowns for total (pad) damage.</summary>") == \
         "<summary>Joue tes CD pour les dégâts totaux (pad).</summary>"
 

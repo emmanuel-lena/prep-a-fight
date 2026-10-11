@@ -98,6 +98,8 @@ def test_a_sim_waits_for_the_simc_the_app_is_downloading(home, monkeypatch):
         exe.write_text("")
 
     monkeypatch.setattr("time.sleep", sleep)
+    monkeypatch.delenv("PAF_SIMC", raising=False)  # a simc of the machine (PAF_SIMC, PATH) would answer first
+    monkeypatch.setattr(simc_install.shutil, "which", lambda name: None)
     monkeypatch.setattr(simc_install, "install_nightly", lambda: pytest.fail("downloaded twice"))
     assert simc_install.wait_for_simc() == exe and ticks
 

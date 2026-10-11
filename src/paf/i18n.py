@@ -48,8 +48,15 @@ def system_language() -> str:
     return code if code in WOW_LOCALES else "en"
 
 
+def complete(code: str) -> bool:
+    """Whether a catalog covers the whole app (its COMPLETE flag). Until the 1.0 the app is written in English
+    first: a partial catalog is used only when the player picks it, never by default."""
+    return code == "en" or bool(getattr(_module(code), "COMPLETE", False))
+
+
 def language() -> str:
-    """The language of the pages: PAF_LANG, the setting, else Windows' language when the app has it, else English."""
+    """The language of the pages: PAF_LANG, the setting, else Windows' language when its catalog is complete, else
+    English (a half-translated page reads worse than an English one)."""
     import os
 
     chosen = os.environ.get("PAF_LANG") or settings.get("language")
@@ -57,7 +64,7 @@ def language() -> str:
     if chosen in langs:
         return chosen
     sys_lang = system_language()
-    return sys_lang if sys_lang in langs else "en"
+    return sys_lang if sys_lang in langs and complete(sys_lang) else "en"
 
 
 def wow_locale(lang: str | None = None) -> str:

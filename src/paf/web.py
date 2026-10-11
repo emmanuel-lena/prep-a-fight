@@ -86,9 +86,9 @@ def lang_switch() -> str:
     """The language of the app, in the top bar: changing it reloads the page."""
     from paf import i18n
 
-    cur = i18n.language()
-    if cur == "en":  # English only until the 1.0: the switch shows for a player whose Windows is in another language
-        return ""
+    cur, windows = i18n.language(), i18n.system_language()
+    if cur == "en" and (windows == "en" or windows not in i18n.available()):  # English only until the 1.0: the
+        return ""  # switch shows for a player whose Windows is in a language the app has (partly) translated
     options = "".join(f"<option value='{e(c)}'{' selected' if c == cur else ''}>{e(c.upper())}</option>"
                       for c in i18n.available())
     return (f"<form method='post' action='/language' class='lang' style='display:inline'>"
@@ -172,6 +172,25 @@ def update_banner() -> str:
             f"</span>{action}</div>")
 
 
+def busy() -> str:
+    """What runs in the background that an update would kill (its processes use the installed Python): '' when
+    nothing does."""
+    from paf import lastraid, raidlead, raidqueue
+
+    if any(j.get("status") == "running" for j in JOBS.jobs.values()):
+        return "A prep is running"
+    checks = (("Your raid is being prepared", lambda: raidqueue.active(raidqueue.load())),
+              ("Your last raid is being read", lastraid.runner_alive),
+              ("Your raid's roles are being read", raidlead.runner_alive))
+    for what, running in checks:
+        try:
+            if running():
+                return what
+        except Exception:  # noqa: BLE001 - a state file that cannot be read never blocks an update
+            pass
+    return ""
+
+
 def run_update() -> str:
     """Download the new installer, start it over this install and close the app (the installer reopens it)."""
     from paf import update
@@ -179,8 +198,9 @@ def run_update() -> str:
     rel, folder = update.STATE.get("release"), update.install_dir()
     if rel is None or folder is None:
         return "<h1>Nothing to update</h1><p><a href='/'>Back home</a></p>"
-    if any(j.get("status") == "running" for j in JOBS.jobs.values()):
-        return ("<h1>A prep is running</h1><p class='lead'>Updating would stop it. Update when it is done (the banner "
+    working = busy()
+    if working:
+        return (f"<h1>{e(working)}</h1><p class='lead'>Updating would stop it. Update when it is done (the banner "
                 "stays).</p><p><a href='/'>Back home</a></p>")
     try:
         setup = update.download(rel)
@@ -191,6 +211,26 @@ def run_update() -> str:
     threading.Timer(1.5, lambda: (QUIT["hook"] or (lambda: os._exit(0)))()).start()
     return (f"<h1>Updating to {e(rel.version)}&hellip;</h1><p class='lead'>The app closes now and reopens by itself "
             f"in a few seconds. Your preps and settings are kept.</p>")
+
+
+# the desktop app (paf.desktop) turns it on: a prep that ends while its window is behind others says so
+NOTIFY = {"on": False, "title": "prep-a-fight"}
+
+
+def _notify_done(args: list[str], status: str) -> None:
+    """A Windows notification when a prep ends and the player is elsewhere (paf.tray): go cook, come back."""
+    from paf import tray
+
+    try:
+        if tray.in_front(NOTIFY["title"]):
+            return
+        name = next((x.name for x in _encounters() if len(args) > 1 and str(x.id) == args[1]), "Your boss")
+        if status == "done":
+            tray.notify_once(f"{name} is ready", "Your prep sheet is waiting.", NOTIFY["title"])
+        else:
+            tray.notify_once(f"The {name} prep stopped", "Open prep-a-fight to see why.", NOTIFY["title"])
+    except Exception:  # noqa: BLE001 - a notification never breaks a job
+        pass
 
 
 class Jobs:
@@ -217,6 +257,8 @@ class Jobs:
                 code = proc.wait()
             job["status"] = "done" if code == 0 else f"failed (exit {code})"
             self._save(jid, job)
+            if NOTIFY["on"] and args[:1] == ["prep"]:
+                _notify_done(args, job["status"])
 
         threading.Thread(target=run, daemon=True).start()
         return jid
@@ -1757,6 +1799,9 @@ class Server(ThreadingHTTPServer):
 
 def serve(port: int = 8765, open_browser: bool = True) -> None:
     load_dotenv()
+    from paf import wcl
+
+    wcl.INTERACTIVE["on"] = True  # pages never wait for Warcraft Logs' quota (paf.wcl)
     from paf.simc_install import ensure_simc
 
     ensure_simc()  # a new computer: SimulationCraft downloads while the player sets up (as in paf.desktop)

@@ -70,6 +70,7 @@ class Tray:
         user32.AppendMenuW.argtypes = [w.HMENU, w.UINT, ctypes.c_size_t, w.LPCWSTR]
         user32.CreatePopupMenu.restype = w.HMENU
         user32.PostMessageW.argtypes = [w.HWND, w.UINT, w.WPARAM, w.LPARAM]
+        kernel32.GetModuleHandleW.restype = w.HMODULE  # a 64-bit handle (the default int cut it to 32 bits)
 
         class WNDCLASSW(ctypes.Structure):
             _fields_ = [("style", w.UINT), ("lpfnWndProc", proc_type), ("cbClsExtra", ctypes.c_int),
@@ -177,3 +178,37 @@ def bring_to_front(title: str) -> bool:
     user32.ShowWindow(ctypes.c_void_p(hwnd), 9)  # SW_RESTORE
     user32.SetForegroundWindow(ctypes.c_void_p(hwnd))
     return True
+
+
+def in_front(title: str) -> bool:
+    """Whether the window in front is the app's (by its title)."""
+    if sys.platform != "win32":
+        return False
+    import ctypes
+
+    user32 = ctypes.windll.user32
+    user32.GetForegroundWindow.restype = ctypes.c_void_p
+    hwnd = user32.GetForegroundWindow()
+    if not hwnd:
+        return False
+    buf = ctypes.create_unicode_buffer(256)
+    user32.GetWindowTextW(ctypes.c_void_p(hwnd), buf, 256)
+    return buf.value == title
+
+
+def notify_once(title: str, text: str, app_title: str, linger: float = 60.0) -> None:
+    """A notification from an icon shown for `linger` seconds (a prep done while the app's window was behind
+    others); a click on it brings the app's window to the front."""
+    if sys.platform != "win32":
+        return
+    from pathlib import Path
+
+    def show() -> None:
+        bring_to_front(app_title)
+
+    icon = Tray("prep-a-fight", str(Path(__file__).parent / "assets" / "prep-a-fight.ico"),
+                [("Open prep-a-fight", show)], show)
+    icon.notify(title, text)
+    timer = threading.Timer(linger, icon.close)
+    timer.daemon = True
+    timer.start()

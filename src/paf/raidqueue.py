@@ -137,13 +137,9 @@ def estimate(con, encs, difficulty: int, class_name: str, spec: str, client=None
 
     plans = [est.plan(con, x.id, difficulty, class_name, spec) for x in encs]
     points = sum(p.kills * (est.POINTS_PER_KILL + est.MECH_POINTS_PER_KILL) for p in plans)
-    left, reset = est.QUOTA, 60.0
-    if client is not None and points:
-        try:
-            rl = client.rate_limit()
-            left, reset = max(0.0, rl["limitPerHour"] - rl["pointsSpentThisHour"]), rl["pointsResetIn"] / 60
-        except Exception:  # noqa: BLE001 - unknown quota: a fresh hour
-            pass
+    from paf.wcl import quota_left
+
+    left, reset = quota_left(client) if points else (est.QUOTA, 60.0)  # never waits: a page shows it
     wait = 0.0
     if points > left:
         wait = reset + 60.0 * max(0.0, (points - left) / est.QUOTA - 1)
@@ -264,6 +260,22 @@ def run(log=print) -> int:
         time.sleep(1)  # the last notification shows before the icon goes
         tray.close()
     return 0
+
+
+def resume() -> bool:
+    """At the app's start: a queue that the computer's shutdown (or a crash) cut off goes on by itself, the boss it
+    was on redone; one the player stopped, paused or that ended stays as it is. True when it went on."""
+    from paf import characters
+
+    q = load()
+    if not q or runner_alive(q) or q.get("finished") or q.get("stop") or q.get("paused"):
+        return False
+    if q.get("character") != characters.current_slug():
+        return False
+    if not any(i["status"] in ("waiting", "running") for i in q["items"]):
+        return False
+    spawn_runner()
+    return True
 
 
 def after_reset(encs) -> bool:

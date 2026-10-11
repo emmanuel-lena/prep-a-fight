@@ -21,7 +21,7 @@ def home(tmp_path, monkeypatch):
 
 
 def test_a_queue_skips_the_bosses_prepared_this_week(home):
-    q = raidqueue.build(ENCS, "heroic", "eduxi-shaman", {2})
+    q = raidqueue.build(ENCS, "heroic", "zapper-shaman", {2})
     assert [i["status"] for i in q["items"]] == ["waiting", "ready", "waiting"]
     raidqueue.save(q)
     assert raidqueue.load()["items"][1]["name"] == "Nek'zali"
@@ -85,3 +85,30 @@ def test_start_refuses_while_a_queue_runs(home, monkeypatch):
     assert raidqueue.start(raidqueue.build(ENCS, "mythic", "x", set())) is False and not started
     monkeypatch.setattr("paf.web.pid_alive", lambda pid: False)
     assert raidqueue.start(raidqueue.build(ENCS, "mythic", "x", set())) is True and started
+
+
+def test_no_update_while_the_raid_is_being_prepared(tmp_path, monkeypatch):
+    from paf import lastraid, raidlead, raidqueue, web
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    monkeypatch.setattr(lastraid, "runner_alive", lambda *a: False)
+    monkeypatch.setattr(raidlead, "runner_alive", lambda *a: False)
+    monkeypatch.setattr(raidqueue, "active", lambda q: False)
+    assert web.busy() == ""
+    monkeypatch.setattr(raidqueue, "active", lambda q: True)
+    assert web.busy() == "Your raid is being prepared"
+
+
+def test_a_queue_cut_off_by_a_shutdown_goes_on_at_launch(home, monkeypatch):
+    from paf import characters
+
+    monkeypatch.setattr(characters, "current_slug", lambda: "zapper-shaman")
+    started = []
+    monkeypatch.setattr(raidqueue, "spawn_runner", lambda: started.append(1))
+    q = raidqueue.build(ENCS, "heroic", "zapper-shaman", set())
+    q["items"][0]["status"], q["items"][1]["status"], q["pid"] = "done", "running", 999999  # its runner is gone
+    raidqueue.save(q)
+    assert raidqueue.resume() and started
+    q["stop"] = True  # stopped by the player: stays stopped
+    raidqueue.save(q)
+    assert not raidqueue.resume() and len(started) == 1

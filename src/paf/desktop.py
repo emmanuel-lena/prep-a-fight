@@ -117,7 +117,9 @@ def _after_reset() -> None:
     try:
         from paf import raidqueue, web
 
-        if raidqueue.after_reset(web.journal_order(web._encounters())):
+        if raidqueue.resume():  # cut off by the computer's shutdown: it goes on
+            print("Preparing the raid again where it was cut off", flush=True)
+        elif raidqueue.after_reset(web.journal_order(web._encounters())):
             print("New week: preparing the raid again", flush=True)
     except Exception as ex:  # noqa: BLE001 - never in the way of the app's start
         print(f"no weekly refresh: {ex}", flush=True)
@@ -136,7 +138,9 @@ def main() -> int:
         print(f"Moved from ~/.paf to {data_dir()}: {', '.join(moved)}")
     load_dotenv()
     _own_taskbar_icon()
-    from paf import web
+    from paf import wcl, web
+
+    wcl.INTERACTIVE["on"] = True  # the window never waits for Warcraft Logs' quota: the work does, in its processes
     from paf.simc_install import ensure_simc
 
     ensure_simc()  # first launch of an installed copy: SimulationCraft downloads while the player sets up
@@ -169,6 +173,7 @@ def main() -> int:
     window = webview.create_window(TITLE, html=startup_page(), width=1320, height=920, min_size=(900, 600),
                                    background_color="#181219")
     web.QUIT["hook"] = window.destroy  # an update is being installed: close, the installer reopens the app
+    web.NOTIFY.update(on=True, title=TITLE)  # a prep done while the window is behind others: a notification
     webview.start(_open, (window, url), icon=str(ICON) if ICON.is_file() else None)
     server.shutdown()
     server.server_close()
