@@ -73,10 +73,10 @@
 .checks input:checked+.box::after{transform:rotate(45deg) scale(1)}
 .checks input:checked~.t{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
 .checks input:focus-visible+.box{outline:2px solid var(--accent);outline-offset:2px}
-.ready{margin-left:auto;display:flex;align-items:center;gap:8px;color:#fff;text-decoration:none} .ready:hover{text-decoration:none}
+.ready{margin-left:auto;display:flex;align-items:center;gap:8px;color:var(--fg);text-decoration:none} .ready:hover{text-decoration:none}
 .ready svg{width:44px;height:44px;transform:rotate(-90deg)}
-.ready circle{fill:none;stroke-width:3.5} .ready .r-bg{stroke:rgba(255,255,255,.2)}
-.ready .r-fg{stroke:var(--sand);stroke-linecap:round;stroke-dasharray:119.4;stroke-dashoffset:119.4;
+.ready circle{fill:none;stroke-width:3.5} .ready .r-bg{stroke:var(--line)}
+.ready .r-fg{stroke:var(--accent);stroke-linecap:round;stroke-dasharray:119.4;stroke-dashoffset:119.4;
   transition:stroke-dashoffset .6s ease}
 .ready .r-txt{display:flex;flex-direction:column;line-height:1.1}
 .ready .r-n{font:600 17px var(--font-data)} .ready span{font-size:11px;opacity:.8}

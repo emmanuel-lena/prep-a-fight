@@ -242,7 +242,8 @@ Clear and reassuring; one filled button per screen.
 - **Focus:** 2px accent outline, offset 1px.
 
 ### Navigation
-- **Header:** a grape gradient band with a 3px gold (or class color) stripe at the bottom; the wordmark "prep-a-**fight**" with "fight" in Golden Sand; Back and Home as translucent white pills; the active character's menu; nav links as 8px-rounded items that fill with white at 14% when active or hovered.
+- **Side bar** (`theme.sidebar`, the app's pages and the sheet viewer): a 232px column on the page's ground (Surface at 70% over Plum, a 1px Line on its right), the wordmark on top (it is Home), a Back arrow, the app's places as icon + label rows (one-stroke 20px icons; the current place on Surface 2 with a 2px accent underline), what the page adds (a sheet: its boss and links), and the active character's menu at the bottom, opening upwards. Under 1100px a 68px rail of icons; under 640px a bar at the bottom of the screen. The standalone reports (shared sheets) keep a plain band with the wordmark.
+- **Sheet band:** the boss (icon, title, difficulty pill), its tabs and the readiness ring on one band on the page's ground; the active tab in Ink with an accent underline.
 - **Tabs (prep sheet):** a darker band under the header, 14px semibold labels, the active tab in Golden Sand with a 3px underline.
 
 ### Raid board (signature)

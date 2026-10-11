@@ -52,6 +52,46 @@ def topbar(right: str = "", home: str = "/", back: bool = False, who: str = "") 
             f'prep-a-<b>fight</b></a>{who}<div class="nav">{right}</div></div></header>')
 
 
+def _svg(path: str) -> str:
+    return (f"<svg viewBox='0 0 24 24' width='20' height='20' aria-hidden='true'><path d='{path}' fill='none' "
+            f"stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>")
+
+
+# the app's places, each with a drawn icon (one stroke, one weight)
+PLACES = (
+    ("/", "Home", "M3 11.5 12 4l9 7.5M6 10v9.5h4.5V15h3v4.5H18V10"),
+    ("/tools", "Tools", "M14.5 6.5a4 4 0 0 0-5.3 5.3L4 17l3 3 5.2-5.2a4 4 0 0 0 5.3-5.3l-2.6 2.6-2.4-.6-.6-2.4z"),
+    ("/raidlead", "Raid lead", "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.5 20a5.5 5.5 0 0 1 11 0M16 11a3 3 0 1 0 0-6"
+                               "M18 20a5.5 5.5 0 0 0-3-4.9"),
+    ("/characters", "Characters", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20.5a7.5 7.5 0 0 1 15 0"),
+    ("/settings", "Settings", "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7 7 0 0 1-2 1.2L14.8"
+                              " 21h-4l-.3-2a7 7 0 0 1-2-1.2l-1.9.7-2-3.4 1.6-1.2a7 7 0 0 1 0-2.4L4.6 9.3l2-3.4 1.9.7a7 7"
+                              " 0 0 1 2-1.2L10.8 3h4l.3 2a7 7 0 0 1 2 1.2l1.9-.7 2 3.4-1.6 1.2a7 7 0 0 1 0 2.4z"),
+    ("/feedback", "Feedback", "M4 5h16v11H9l-5 4z"),
+)
+BACK_ICON = ("<button type='button' class='side-back' hidden aria-label='Go back' title='Go back' "
+             "onclick='history.back()'>" + _svg("M15 5l-7 7 7 7") + "<span>Back</span></button>"
+             "<script>(function(){var b=document.currentScript.previousElementSibling;"
+             "if(history.length>1&&location.pathname!=='/')b.hidden=false;})();</script>")
+# the place the page belongs to, lit in the side bar
+SIDE_JS = ("<script>(function(){var p=location.pathname,best=null;document.querySelectorAll('.side-nav a').forEach("
+           "function(a){var h=a.getAttribute('href');if(p===h||(h!=='/'&&p.indexOf(h)===0)){best=a}});"
+           "if(!best&&(p.indexOf('/view/')===0||p.indexOf('/boss')===0||p.indexOf('/job/')===0))"
+           "best=document.querySelector(\".side-nav a[href='/']\");if(best){best.classList.add('on');"
+           "best.setAttribute('aria-current','page')}})();</script>")
+
+
+def sidebar(extra: str = "", who: str = "", foot: str = "") -> str:
+    """The app's side bar (DESIGN.md): the brand (home), Back (the desktop window has no browser buttons), the app's
+    places, `extra` (what this page adds: a sheet's boss and links), and at the bottom `foot` and the character
+    menu `who`. A rail of icons on a narrow window, a bar at the bottom on a phone."""
+    links = "".join(f"<a href='{h}' title='{label}'>{_svg(d)}<span>{label}</span></a>" for h, label, d in PLACES)
+    return (f"<aside class='side'><div class='side-top'><a class='brand' href='/'>prep-a-<b>fight</b></a>"
+            f"{BACK_ICON}</div><nav class='side-nav' aria-label='The app'>{links}</nav>"
+            + (f"<div class='side-extra'>{extra}</div>" if extra else "")
+            + f"<div class='side-foot'>{foot}{who}</div></aside>{SIDE_JS}")
+
+
 # the game's class colors: the app takes the active character's (accent, its soft background, the header's stripe)
 CLASS_COLORS = {"deathknight": "#C41E3A", "demonhunter": "#A330C9", "druid": "#FF7C0A", "evoker": "#33937F",
                 "hunter": "#AAD372", "mage": "#3FC7EB", "monk": "#00FF98", "paladin": "#F48CBA", "priest": "#FFFFFF",

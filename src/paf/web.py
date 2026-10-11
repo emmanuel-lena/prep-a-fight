@@ -42,11 +42,10 @@ def page(title: str, body: str, refresh: int | None = None, nav: str = "", job: 
         running = loading.banners(skip=job)
     except Exception:  # noqa: BLE001 - a banner never breaks a page
         running = ""
-    nav = nav or ('<a href="/characters">Characters</a><a href="/raidlead">Raid lead</a>'
-                  '<a href="/tools">Tools</a><a href="/settings">Settings</a><a href="/feedback">Feedback</a>')
-    return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
-            f"{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}{loading.CSS}</style>{_class_style()}</head><body>"
-            f"{theme.topbar(nav + lang_switch(), back=True, who=character_menu())}{loading.LOADER}"
+    return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, '
+            f'initial-scale=1">{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}{loading.CSS}</style>'
+            f"{_class_style()}</head><body class='has-side'>"
+            f"{theme.sidebar(nav, who=character_menu(), foot=lang_switch())}{loading.LOADER}"
             f"<main>{update_banner()}{running}{body}</main>{loading.JS}</body></html>").encode()
 
 
@@ -467,7 +466,8 @@ def view_page(key: str, tab: str) -> bytes:
                      for x in prepared())
     src = f'/report/{e(item["files"][tab])}'
     boss_link = _boss_link(item)
-    nav = (f'<select onchange="location=this.value" aria-label="Boss">{others}</select>{tabs}'
+    nav = (f'<label class="side-lab">This boss</label><select onchange="location=this.value" aria-label="Boss">'
+           f'{others}</select><div class="side-links">{tabs}'
            + (f'<a href="{e(boss_link)}">Edit &amp; re-run</a>' if boss_link else "")
            + (f'<a href="/share/{e(key)}">Share</a>' if "prep" in item["files"] else "")
            + f'<a href="{PUBLIC_BASE}{src}" target="_blank">Open alone</a>')
@@ -486,7 +486,8 @@ def view_page(key: str, tab: str) -> bytes:
                  "return r.text()}).then(function(t){if(t.indexOf('data-reload')>=0)location.reload()})"
                  ".catch(function(){})},15000)</script>")
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
-            f"<title>{e(item['name'])}</title>{theme.HEAD}<style>{CSS}{css}</style></head><body>{theme.topbar(nav + lang_switch())}"
+            f"<title>{e(item['name'])}</title>{theme.HEAD}<style>{CSS}{css}</style>{_class_style()}</head>"
+            f"<body class='has-side'>{theme.sidebar(nav + '</div>', who=character_menu(), foot=lang_switch())}"
             f'<iframe src="{src}" title="{e(item["name"])}"></iframe>{watch}</body></html>').encode()
 
 

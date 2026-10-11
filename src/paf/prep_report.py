@@ -922,8 +922,8 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
     header = f"""<header class="sheet-hero"><div class="in">{cls_icon}<div class="txt">
 <h1>{e(d.boss)} {diff_pill(d.difficulty)}</h1>
 <p>{e(d.character)} &middot; {e(d.spec)} &middot; {d.kills} ranked kills &middot; {datetime.now():%d %b %Y %H:%M}</p>
-</div>{briefing.ready_ring(briefing.ready_count(d))}</div><nav class="tabs" aria-label="Sections"><div class="in" role="tablist"><a role="tab" class="back-simple" href="#simple">&larr; Simple view</a>{''.join(f'<a role="tab" href="#{k}">{e(label)}</a>' for k, label in TABS
-                                                         if tabs[k])}</div></nav></header>"""
+</div><nav class="tabs" aria-label="Sections"><div class="tabs-in" role="tablist"><a role="tab" class="back-simple" href="#simple">&larr; Simple view</a>{''.join(f'<a role="tab" href="#{k}">{e(label)}</a>' for k, label in TABS
+                                                         if tabs[k])}</div></nav>{briefing.ready_ring(briefing.ready_count(d))}</div></header>"""
     minutes = simple.minutes_html(d)
     panels = (f'<section class="panel" id="simple">{simple.simple_html(d)}</section>'
               + (f'<section class="panel" id="minutes"><h2>The fight, minute by minute</h2>{minutes}</section>'
