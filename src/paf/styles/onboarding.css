@@ -20,7 +20,7 @@
 .ob-tabs{display:flex;gap:6px;margin:0 0 14px}
 .ob-tabs button{border:1.5px solid var(--line);background:none;color:var(--fg);border-radius:999px;padding:8px 16px;
   cursor:pointer;font:inherit;font-weight:600}
-.ob-tabs button.on{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.ob-tabs button.on{background:var(--surface-2);border-color:var(--fg);color:var(--fg)} /* a neutral selection */
 .ob .busy{opacity:.6;pointer-events:none}
 .ob-summary{font-size:18px}
 @media (prefers-reduced-motion:reduce){.ob-step.on{animation:none}}

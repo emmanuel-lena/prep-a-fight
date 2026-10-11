@@ -23,7 +23,8 @@
 /* the simple view (paf.simple) */
 body.simple-on .tabs{display:none}
 .simple{max-width:980px;font-size:17px}
-.simple .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.simple .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;align-items:start}
+@media (min-width:900px){.simple .cards .s-change{grid-column:span 2}} /* the talent swaps need the width */
 .simple .card{margin:0;padding:18px 20px}
 .simple h2{font:600 21px/1.2 var(--font-reading);text-transform:none;letter-spacing:0;color:var(--fg);margin:0 0 12px}
 .simple .cards ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
@@ -36,7 +37,7 @@ body.simple-on .tabs{display:none}
 .simple .pics{display:flex;gap:4px;flex:none}
 .simple .pics img{width:32px;height:32px}
 .simple .ok{width:40px;height:40px;flex:none;display:grid;place-items:center;border-radius:50%;background:var(--pos);
-  color:#fff;font-size:22px}
+  color:var(--on-status);font-size:22px}
 .simple .what{color:var(--muted);font-size:15px;line-height:1.45;margin:0}
 .simple .sz{font-size:14px;font-weight:600} .simple .sz.big{color:var(--pos)} .simple .sz.some{color:var(--fg)}
 .simple .sz.tiny{color:var(--muted)}
@@ -46,7 +47,7 @@ body.simple-on .tabs{display:none}
 .simple .s-press .what{margin:-6px 0 12px}
 .simple .cards li.sw-list{display:block}
 .swaps{list-style:none;margin:0;padding:0;display:grid;gap:6px}
-.swaps .sw{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:6px;align-items:center}
+.simple .cards li.sw,.swaps .sw{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:6px;align-items:center}
 .tal{display:inline-flex;gap:7px;align-items:center;min-width:0;color:var(--fg);text-decoration:none;font-size:14px;
   line-height:1.25;padding:3px 6px 3px 3px;border-radius:8px}
 a.tal:hover{background:var(--surface-2)}

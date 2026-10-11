@@ -291,7 +291,7 @@ def comp(d: dict) -> str:
         return icons.img(icons.CLASS_ICON.format(cls=spec.split(" ")[-1].lower()), size, "it-ic")
 
     def names(lst: list) -> str:
-        return "".join(f"<span class='who'>{ic(p['spec'])}<b>{e(p['name'])}</b></span>" for p in lst)
+        return "".join(f"<span class='who-chip'>{ic(p['spec'])}<b>{e(p['name'])}</b></span>" for p in lst)
 
     assigned = [t for t in targets if t["players"]]
     if not targets:
@@ -459,7 +459,7 @@ def night(d: dict) -> str:
     for r in pulls:
         dead = sorted(((min(p["deaths"]), n, p["bare"]) for n, p in r["players"].items() if p["deaths"]))
         end = "Kill" if r["kill"] else f"{(r['left'] or 0):.0%}"
-        who = "".join(f"<span class='who {'bare' if b else ''}'>{ic(n)}<b>{e(n)}</b> {_mmss(t)}</span>"
+        who = "".join(f"<span class='who-chip {'bare' if b else ''}'>{ic(n)}<b>{e(n)}</b> {_mmss(t)}</span>"
                       for t, n, b in dead[:12])
         detail += (f"<li><div class='j-head'><b>{e(r['boss'])}</b><small><span class='num'>{_mmss(r['duration'])}</span>"
                    f" &middot; {end}</small></div><div class='whos'>{who}</div></li>")

@@ -79,7 +79,7 @@ a.tile:hover{border-color:var(--accent);text-decoration:none}
 .chip:has(input:checked){border-color:var(--fg);background:var(--surface-2)} /* neutral: the Class Signs Rule */
 .chip input{accent-color:var(--bronze)}
 .chip .meta{color:var(--muted);font-size:12px}
-.notice{border-left:4px solid var(--warn);background:var(--surface-2);padding:10px 14px;border-radius:8px}
+.notice{border:1px solid color-mix(in srgb,var(--warn) 45%,var(--line));background:color-mix(in srgb,var(--warn) 8%,var(--surface-2));padding:10px 14px;border-radius:8px}
 a.wh{color:inherit;text-decoration:none;border-bottom:1px dotted var(--muted)}
 @media (max-width:640px){h1{font-size:22px} .kpi .v{font-size:22px}
   .topbar .nav{flex-wrap:nowrap;overflow-x:auto;margin-left:0;width:100%;scrollbar-width:none;
@@ -94,3 +94,8 @@ a.wh{color:inherit;text-decoration:none;border-bottom:1px dotted var(--muted)}
 /* a checkbox with a sentence: a plain row (a chip is for a short word) */
 .check-row{display:flex;gap:10px;align-items:flex-start;margin:10px 0;max-width:72ch;cursor:pointer}
 .check-row input{margin-top:4px;flex:none}
+.key-in{width:min(100%,24rem)} /* an API key field: wide on a desktop, never past a phone */
+th.n{text-align:right} /* a number column's header above its numbers */
+@media (pointer:coarse){.topbar .nav a,.nav-back,details>summary,.btn,button{min-height:44px}
+  .topbar .nav a,.nav-back{display:inline-flex;align-items:center} details>summary{padding-block:10px}}
+table.fit{width:auto;min-width:min(100%,520px)} /* a short table: its columns close together */

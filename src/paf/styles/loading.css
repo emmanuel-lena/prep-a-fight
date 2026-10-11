@@ -27,6 +27,6 @@
 .job-banner .jb-go{font-weight:600;color:var(--accent);white-space:nowrap}
 .jb-bar.big{display:block;height:10px;border-radius:5px;background:var(--line);overflow:hidden;margin:12px 0 0;max-width:620px}
 .jb-bar.big span{display:block;height:100%;background:var(--accent);transition:width .6s ease}
-.leave{margin:14px 0 6px;padding:12px 16px;border-radius:12px;border-left:4px solid var(--pos);
+.leave{margin:14px 0 6px;padding:12px 16px;border-radius:12px;border:1px solid color-mix(in srgb,var(--pos) 45%,var(--line));
   background:color-mix(in srgb,var(--pos) 10%,var(--surface));font-size:15.5px;line-height:1.5;max-width:720px}
 @media (prefers-reduced-motion:reduce){#paf-load.on .pl-bar{animation:none;width:60%}.pl-spin,.busy .btn.go::after{animation:none}}

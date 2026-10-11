@@ -41,7 +41,7 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .who summary span,.who-menu button span{display:flex;flex-direction:column;line-height:1.15;text-align:left}
 .who summary b{font-size:13.5px} .who summary small{font-size:11px;opacity:.8}
 .who-caret{font-size:11px;opacity:.8}
-.who-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:60;min-width:230px;padding:6px;border-radius:12px;
+.who-menu{position:absolute;top:calc(100% + 6px);left:0;max-width:calc(100vw - 32px);z-index:60;min-width:230px;padding:6px;border-radius:12px;
   background:var(--surface);border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.45);display:grid;gap:2px}
 .who-menu form{margin:0} .who-menu button{display:flex;gap:10px;align-items:center;width:100%;padding:6px 8px;border:0;
   border-radius:8px;background:none;color:var(--fg);font:inherit;cursor:pointer}
@@ -70,7 +70,7 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .rb-pop{position:absolute;top:calc(100% - 4px);left:50%;transform:translateX(-50%);z-index:20;display:none;width:max-content;
   padding:12px 14px;border-radius:12px;background:#0b0a10;border:1px solid #5d5a52;box-shadow:0 10px 30px rgba(0,0,0,.5);color:#fff}
 .rb-boss:hover .rb-pop,.rb-boss:focus-within .rb-pop{display:block}
-.rb-row>.rb-boss:nth-child(-n+2) .rb-pop{left:0;transform:none} .rb-row>.rb-boss:nth-last-child(-n+2) .rb-pop{left:auto;right:0;transform:none}
+.rb-pop{max-width:calc(100vw - 24px)} .rb-ds{flex-wrap:wrap;justify-content:center} /* kept on screen by RB_JS */
 .rb-title{display:block;font:600 15px var(--font-reading);color:var(--wow-gold);margin:0 0 10px}
 .rb-ds{display:flex;gap:14px}
 .rb-d{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:78px;color:#fff;text-decoration:none}
@@ -179,3 +179,4 @@ h2 .btn.copy{margin-left:8px;vertical-align:middle;text-transform:none;letter-sp
 .set-help{grid-column:1/-1;margin:0;font-size:13px;color:var(--muted);max-width:72ch}
 @media (max-width:640px){.set-row{grid-template-columns:minmax(0,1fr)} .set-check{grid-template-columns:minmax(0,1fr) auto}}
 .measure{max-width:72ch}
+@media (max-width:640px){.who-menu{left:auto;right:0}} /* the switcher sits right on a phone */

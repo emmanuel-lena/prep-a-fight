@@ -55,11 +55,11 @@
 .note.down .pin{bottom:22px;height:calc(30px + var(--row) * var(--lh) - 22px + 22px)}
 .note.down .pin{top:calc(-30px - var(--row) * var(--lh));height:calc(30px + var(--row) * var(--lh))}
 .note.flip{transform:translateX(calc(-100% + 1px))} .note.flip .pin{left:auto;right:0}
-.k-adds{color:var(--pos)} .k-burst{color:var(--warn)} .k-lust{color:var(--neg)} .k-you{color:var(--accent)} .k-def{color:#4f8fd0} .k-focus{color:#9a6fc4}
+.k-adds{color:var(--pos)} .k-burst{color:var(--warn)} .k-lust{color:var(--neg)} .k-you{color:var(--accent)} .k-def{color:var(--k-def)} .k-focus{color:var(--k-focus)}
 .note .nt-ic{width:16px;height:16px;border-radius:3px;margin:0;vertical-align:0}
 .tl-legend{position:absolute;right:0;bottom:0;display:flex;gap:14px}
 .lg::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:5px}
-.margin{min-height:48px;margin:10px 0 0;padding:10px 14px;border-left:3px solid var(--accent);background:var(--surface-2);
+.margin{min-height:48px;margin:10px 0 0;padding:10px 14px;border:1px solid var(--line);background:var(--surface-2);
   border-radius:0 8px 8px 0;font-size:15px} .margin .m-t{font:600 15px var(--font-data);color:var(--fg)}
 .margin .m-text{color:var(--muted)}
 /* once the pull starts */

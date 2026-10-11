@@ -235,8 +235,8 @@ client, or a regenerated secret): create or open it on <a href="https://www.warc
 target="_blank" rel="noopener">warcraftlogs.com/api/clients</a>, then paste both values.
 It is tested before it replaces the old one.</p>
 <form method="post" action="/credentials" class="row"><input type="hidden" name="back" value="settings">
-<input name="id" size="38" placeholder="Client ID" aria-label="Client ID" required>
-<input name="secret" size="38" type="password" placeholder="Client Secret" aria-label="Client Secret" required
+<input name="id" class="key-in" placeholder="Client ID" aria-label="Client ID" required>
+<input name="secret" class="key-in" type="password" placeholder="Client Secret" aria-label="Client Secret" required
 autocomplete="off">
 <button class="btn ghost">Save and test</button></form>
 <p class="tiny muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p></div>

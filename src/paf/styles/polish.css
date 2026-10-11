@@ -8,5 +8,6 @@
 a.tile:hover{transform:translateY(-2px)}
 .card,.tile{background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(4px)}
 .lead{max-width:68ch}
-p,li{max-width:80ch}
+p,ul:not([class])>li,ol:not([class])>li{max-width:80ch} /* reading text only: a list styled as rows or cards uses its width */
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:640px){.kpi .v{font-size:24px}} /* after the size above: base.css's phone size never won */

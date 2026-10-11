@@ -65,7 +65,7 @@ def summary_html(sections: list[Section], role: str = "damage", full_link: str =
                    + "".join(f"<li>{e(b)}</li>" for b in bullets(c.text)) + "</ul></details>")
     if full_link:
         out.append(f'<p class="small"><a href="{e(full_link)}">Every ability, phase by phase &rarr;</a></p>')
-    return f'<div class="card guide">{"".join(out)}</div>'
+    return f'<div class="guide">{"".join(out)}</div>'
 
 
 def describe(spell_id: int, locale: str = "") -> str:

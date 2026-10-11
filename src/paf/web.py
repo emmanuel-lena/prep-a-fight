@@ -579,8 +579,9 @@ and click <b>Create Client</b>.</li>
 <li>Name: anything (e.g. <code>prep-a-fight</code>). Redirect URL: <code>http://localhost</code>. Leave "Public Client"
 unticked.</li>
 <li>Copy the <b>Client ID</b> and the <b>Client Secret</b> here.</li></ol>{err}
-<form method="post" action="/credentials" class="row"><input name="id" size="38" placeholder="Client ID" required>
-<input name="secret" size="38" type="password" placeholder="Client Secret" required><button>Save and test</button></form>
+<form method="post" action="/credentials" class="row"><input name="id" class="key-in" placeholder="Client ID" aria-label="Client ID"
+required><input name="secret" class="key-in" type="password" placeholder="Client Secret" aria-label="Client Secret" required>
+<button>Save and test</button></form>
 <p class="tiny muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p>
 {"</details>" if wcllogin.available() else ""}</div></div>"""
 
@@ -862,6 +863,14 @@ def raid_prepare_page(difficulty: str) -> bytes:
 
 
 
+# a boss's popup stays on screen whatever row the boss is on (the raid board wraps on narrow windows and phones)
+RB_JS = """<script>document.querySelectorAll('.rb-boss').forEach(function(b){function fit(){var p=b.querySelector('.rb-pop');
+if(!p)return;p.style.marginLeft='0px';var r=p.getBoundingClientRect(),w=document.documentElement.clientWidth,m=12,dx=0;
+if(r.left<m)dx=m-r.left;else if(r.right>w-m)dx=w-m-r.right;p.style.marginLeft=dx+'px'}
+function soon(){requestAnimationFrame(fit)}b.addEventListener('pointerenter',soon);b.addEventListener('focusin',soon)});
+</script>"""
+
+
 def raid_board(encs, class_name: str, spec: str) -> str:
     """The raid at a glance for the active character: a row of the bosses' portraits (grey while not prepared at any
     difficulty); hovering or tapping one opens, under it, its three difficulties, like a talent's tooltip: a green
@@ -926,7 +935,7 @@ def raid_board(encs, class_name: str, spec: str) -> str:
                   f"<div class='rb-pop' role='group' aria-label='{e(x.name)}'><b class='rb-title'>{e(x.name)}</b>"
                   f"<div class='rb-ds'>{states}</div></div></div>")
     return (f"<h2 class='h-mine'>Your raid, boss by boss</h2>{queue_strip(settings.get('difficulty'))}"
-            f"<div class='rb-row'>{items}</div>{QUEUE_JS}"
+            f"<div class='rb-row'>{items}</div>{QUEUE_JS}{RB_JS}"
             "<p class='small muted rb-legend'><span>Point at or tap a boss: its three difficulties, and a click to "
             "the sheet or the prep.</span> <span>A grey boss is not prepared for this week yet.</span></p>")
 
