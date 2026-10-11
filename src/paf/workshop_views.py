@@ -56,30 +56,94 @@ def _verdict(kind: str, title: str, text: str = "", big: str = "") -> str:
             + "</div>")
 
 
+def _spell_icons(swaps: list) -> dict[str, str]:
+    from paf.icons import icons_for
+
+    refs = {t[0]: f"spell={t[1]}" for pair in swaps for t in pair if t and t[1]}
+    try:
+        return icons_for(refs)
+    except Exception:  # noqa: BLE001 - offline: names without icons
+        return {}
+
+
+def _talent(t, icons: dict[str, str]) -> str:
+    """A talent with its icon and its Wowhead tooltip; a dash when the other side has none."""
+    if not t:
+        return "<span class='tal none'>&mdash;</span>"
+    name, sid = t
+    pic = _img(icons.get(name, "")) if icons.get(name) else "<span class='tal-ic none'></span>"
+    if not sid:
+        return f"<span class='tal'>{pic}<span>{e(name)}</span></span>"
+    from paf.wowhead import url
+
+    href, data = url(f"spell={sid}")
+    return (f"<a class='tal' href='{e(href)}' data-wowhead='{e(data)}' data-wh-icon-added='true' target='_blank' "
+            f"rel='noopener'>{pic}<span>{e(name)}</span></a>")
+
+
+def _swaps(swaps: list, icons: dict[str, str]) -> str:
+    return "<ul class='swaps'>" + "".join(
+        f"<li class='sw'>{_talent(a, icons)}<span class='arr' aria-label='becomes'>&rarr;</span>{_talent(b, icons)}</li>"
+        for a, b in swaps) + "</ul>"
+
+
+def _row_swaps(r: dict) -> list:
+    """The build's swaps; from its taken / dropped names for a result written before they were saved."""
+    if "swaps" in r:
+        return r["swaps"] or []
+    from itertools import zip_longest
+
+    both = set(r.get("take") or []) & set(r.get("drop") or [])  # a name on two nodes: not a change
+    drop = [[x, 0] for x in r.get("drop") or [] if x not in both]
+    take = [[x, 0] for x in r.get("take") or [] if x not in both]
+    return [[a, b] for a, b in zip_longest(drop, take)]
+
+
+def _build_name(r: dict) -> str:
+    """A build named by what it changes from yours: "Bait and Switch instead of Ethereal Cloak"."""
+    sw = _row_swaps(r)
+    if not sw:
+        return "Your build"
+    def one(a, b) -> str:
+        return f"{b[0]} instead of {a[0]}" if a and b else f"{b[0]}" if b else f"no {a[0]}"
+    return "; ".join(one(a, b) for a, b in sw[:2]) + (f"; {len(sw) - 2} more" if len(sw) > 2 else "")
+
+
 def talents(d: dict) -> str:
     err = d.get("error") or 0.2
+    noise = 2 * 2 ** 0.5 * err  # the difference of two sims of this error, at two standard deviations
     rows = [r for r in d.get("rows", []) if r.get("gain") is not None]
-    best = max(rows, key=lambda r: r["gain"], default=None)
-    if best and best["gain"] > 2 * err:
-        both = set(best["take"]) & set(best["drop"])  # a name on two talent nodes: not a change worth saying
-        chips = ("".join(f"<span class='chip add'>+ {e(x)}</span>" for x in best["take"] if x not in both)
-                 + "".join(f"<span class='chip drop'>&minus; {e(x)}</span>" for x in best["drop"] if x not in both))
-        copy = (f"<button type='button' class='btn go' data-copy='{e(best['code'])}'>Copy the talents</button>"
-                if best.get("code") else "")
-        head = _verdict("go", f"Switch to <span>{e(best['label'])}</span>",
-                        f"Played by {best['players']} top players. What changes:", _pct(best["gain"], 2))
-        head += f"<div class='chips'>{chips}</div><div class='v-act'>{copy}</div>"
+    icons = _spell_icons([p for r in rows for p in _row_swaps(r)])
+    yours = next((r for r in rows if not _row_swaps(r)), None)
+    others = [r for r in rows if r is not yours]
+    best = max(others, key=lambda r: r["gain"], default=None)
+
+    def copy(r: dict, label: str, cls: str = "btn ghost") -> str:
+        return (f"<button type='button' class='{cls}' data-copy='{e(r['code'])}'>{label}</button>"
+                if r.get("code") else "")
+    same = f" {yours['players']} of the top players play exactly your build." if yours else ""
+    if best and best["gain"] > noise:
+        n = len(_row_swaps(best))
+        head = _verdict("go", f"Change {n} talent{'s' if n != 1 else ''}",
+                        f"Played by {best['players']} of the top players: {_pct(best['gain'], 1)} on you on this "
+                        f"fight.{same}", _pct(best["gain"], 1))
+        head += _swaps(_row_swaps(best), icons) + f"<div class='v-act'>{copy(best, 'Copy the talents', 'btn go')}</div>"
     else:
-        head = _verdict("ok", "Keep your talents", "No build of the top players does better with your character on "
-                              "this fight (the differences are within the error).")
-    scale = max((abs(r["gain"]) for r in rows), default=1) or 1
-    lines = "".join(
-        f"<li><span class='l-name'><b>{e(r['label'])}</b><small>{r['players']} top players</small></span>"
-        f"{_bar(r['gain'], scale)}<span class='l-val {'pos' if r['gain'] > 2 * err else 'neg' if r['gain'] < -2 * err else ''}'>"
-        f"{_pct(r['gain'], 2)}</span></li>" for r in sorted(rows, key=lambda r: -r["gain"]))
-    return (f"{head}<h3>Every build, on your character</h3><ul class='glist'>{lines}</ul>"
-            f"<p class='ws-fine'>Compared with your current build, on {e(d.get('boss', 'the boss'))}. Differences under "
-            f"&plusmn;{2 * err:.2f}% are noise.</p>")
+        head = _verdict("ok", "Keep your talents", f"No build of the top players does better with your character "
+                                                   f"on this fight.{same}")
+    scale = max((abs(r["gain"]) for r in others), default=1) or 1
+    lines = ""
+    for r in sorted(others, key=lambda r: -r["gain"]):
+        cls = "pos" if r["gain"] > noise else "neg" if r["gain"] < -noise else ""
+        lines += (f"<li><details class='bd'><summary><span class='l-name'><b>{e(_build_name(r))}</b><small>played by "
+                  f"{r['players']} top players</small></span>{_bar(r['gain'], scale) if cls else '<span></span>'}"
+                  f"<span class='l-val {cls}'>{_pct(r['gain'], 1) if cls else 'same'}</span></summary>"
+                  f"{_swaps(_row_swaps(r), icons)}<div class='v-act'>{copy(r, 'Copy these talents')}</div>"
+                  f"</details></li>")
+    return (f"{head}<h3>The top players' other builds, on you</h3><ul class='glist builds'>{lines}</ul>"
+            f"<p class='ws-fine'>Each build is named by what it changes from yours (open one to see every talent); "
+            f"simmed on your character on {e(d.get('boss', 'the boss'))}. Differences under &plusmn;{noise:.1f}% "
+            f"are noise and shown as \"same\".</p>")
 
 
 def loot(d: dict) -> str:

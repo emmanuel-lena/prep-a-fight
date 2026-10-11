@@ -120,3 +120,21 @@ table.night td.pos{color:var(--pos)} table.night td.neg{color:var(--neg)}
 @media (max-width:640px){.plist .pl{grid-template-columns:36px minmax(0,1fr)}.plist .p-say{grid-column:1/-1}}
 @media (max-width:640px){.glist li{grid-template-columns:minmax(0,1fr) 70px}.glist li .gbar{display:none}
   .glist.items li{grid-template-columns:40px minmax(0,1fr) 70px}.verdict{flex-wrap:wrap}}
+/* talents: a build named by what it changes, its swaps with icons */
+.glist.builds li{display:block;padding:0}
+.glist.builds details>summary{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(80px,1fr) 78px;gap:14px;
+  align-items:center;padding:9px 10px;border-radius:10px;cursor:pointer;list-style:none}
+.glist.builds details>summary::-webkit-details-marker{display:none}
+.glist.builds details>summary:hover{background:var(--surface-2)}
+.glist.builds details[open]{background:var(--surface-2);border-radius:10px;padding-bottom:10px}
+.glist.builds .swaps,.glist.builds .v-act{margin:4px 10px 0}
+.swaps{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px;max-width:640px}
+.swaps .sw{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:6px;align-items:center}
+.tal{display:inline-flex;gap:7px;align-items:center;min-width:0;color:var(--fg);text-decoration:none;font-size:14px;
+  padding:3px 6px;border-radius:8px}
+a.tal:hover{background:var(--surface);text-decoration:none}
+.tal span{overflow:hidden;text-overflow:ellipsis}
+.tal img,.tal-ic.none{width:28px;height:28px;border-radius:6px;flex:none;margin:0}
+.sw .tal:first-child{opacity:.75} .sw .tal:first-child span{text-decoration:line-through;text-decoration-color:var(--neg)}
+.sw .arr{color:var(--pos);font-weight:700;text-align:center}
+.tal.none{color:var(--muted);justify-content:center}

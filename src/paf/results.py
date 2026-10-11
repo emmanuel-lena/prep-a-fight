@@ -35,7 +35,9 @@ def talents(tc, boss: str, difficulty: str) -> dict:
         tot, bossd = r.per_fight.get(main, (None, None))
         rows.append({"label": r.build.label, "players": r.build.count, "rank": r.build.median_rank, "gain": tot,
                      "boss_gain": bossd, "dummy": (r.per_fight.get("patchwerk") or (None,))[0],
-                     "take": list(r.add), "drop": list(r.drop), "code": r.build.code or ""})
+                     "take": list(r.add), "drop": list(r.drop), "code": r.build.code or "",
+                     # your talent -> the build's, paired, each [name, spell id] or None (paf.talent_sim.swaps)
+                     "swaps": [[list(a) if a else None, list(b) if b else None] for a, b in r.swaps]})
     return {"boss": boss, "difficulty": difficulty, "error": tc.error, "rows": rows}
 
 

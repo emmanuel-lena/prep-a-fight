@@ -81,6 +81,38 @@ def _node_types() -> dict[int, str]:
     return {int(r["ID"]): r.get("Type", "0") for r in table_rows("TraitNode") if r.get("ID", "").isdigit()}
 
 
+@cache
+def _node_subtrees() -> dict[int, int]:
+    """node -> its hero tree (0 outside the hero trees)."""
+    return {int(r["ID"]): int(r.get("TraitSubTreeID") or 0) for r in table_rows("TraitNode")
+            if r.get("ID", "").isdigit()}
+
+
+def comparable(entries: set[int]) -> set[int]:
+    """Entries brought to one per node, so two builds compare node by node: a talent with one entry per rank
+    (Ancient Arts: 3 entries) is one talent; only a choice node keeps which of its talents is taken."""
+    _, node_entries, _, _ = _tree_data()
+    entry_node = {e: n for n, es in node_entries.items() for e in es}
+    types = _node_types()
+    out = set()
+    for e in entries:
+        node = entry_node.get(e)
+        if node is None or types.get(node) in CHOICE_TYPES:
+            out.add(e)
+        else:
+            out.add(node_entries[node][0])
+    return out
+
+
+def taken(choices: list[Choice]) -> set[int]:
+    """The entries of a decoded build as the rankings list them: an import string also carries the free root of
+    the hero tree not taken (Unseen Blade for a Deathstalker), which is no talent of the build."""
+    subtrees = _node_subtrees()
+    chosen = {subtrees.get(c.node_id, 0) for c in choices if not c.granted} - {0}
+    return {c.entry_id for c in choices
+            if not (c.granted and subtrees.get(c.node_id, 0) and subtrees.get(c.node_id, 0) not in chosen)}
+
+
 def tree_for_entries(entry_ids: list[int]) -> int | None:
     """The talent tree most of these entries belong to (entries come from Warcraft Logs rankings)."""
     node_tree, node_entries, _, _ = _tree_data()

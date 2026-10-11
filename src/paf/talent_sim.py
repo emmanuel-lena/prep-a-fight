@@ -11,7 +11,7 @@ from pathlib import Path
 
 from paf import simc
 from paf.corpus.analyze import kills_filter
-from paf.talents import decode, tree_for_entries
+from paf.talents import comparable, decode, taken, tree_for_entries
 from paf.wcl import WCLClient
 
 IMPORT_CODE_QUERY = """
@@ -112,7 +112,7 @@ def my_talent_entries(profile_text: str, sample_entries: list[int]) -> set[int]:
     if tree is None:
         return set()
     _, choices = decode(code, tree)
-    return {c.entry_id for c in choices}
+    return taken(choices)
 
 
 def choice_rates(builds_all: dict[frozenset[int], int]) -> dict[int, float]:
@@ -220,7 +220,9 @@ def compare(profile_text: str, builds: list[Build], fights: dict[str, list[str]]
             if ps:
                 has_boss = "prioritydps" in ps.metrics and "prioritydps" in res.baseline
                 per[fname] = (res.delta_pct(ps, "dps"), res.delta_pct(ps, "prioritydps") if has_boss else None)
-        add, drop = build_diff(mine, set(b.key), names) if mine else ([], [])
-        rows.append(TalentRow(b, per, add, drop, swaps(mine, set(b.key), entries) if mine and entries else []))
+        theirs = comparable(set(b.key))  # node by node (a talent of 3 ranks lists 3 entries)
+        add, drop = build_diff(comparable(mine), theirs, names) if mine else ([], [])
+        rows.append(TalentRow(b, per, add, drop,
+                              swaps(comparable(mine), theirs, entries) if mine and entries else []))
     err = max(r.baseline["dps"].error / r.baseline["dps"].mean * 100 for r in results.values())
     return TalentComparison(list(fights), rows, err, run_dir)
