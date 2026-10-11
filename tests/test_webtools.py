@@ -10,13 +10,13 @@ def test_every_command_has_a_form_but_the_app_ones():
     listed = {n for _, ns in webtools.GROUPS for n in ns}
     assert names - listed == {"serve", "profile", "config", "raidqueue", "lastraid", "raidlead"}  # the app
     page = webtools.tool_page("raidplan", [Enc()])
-    assert "<select name='boss'>" in page and "name='swap_specs'" in page and "name='raid'" in page
+    assert "<select name='boss'>" in page and "name='raid'" in page and "swap_specs" not in page
     assert webtools.tool_page("serve", []) is None
 
 
 def test_tool_args_from_a_form():
-    form = {"boss": ["3492"], "difficulty": ["mythic"], "swap_specs": ["on"], "raid": [""], "options": [""]}
-    assert webtools.tool_args("raidplan", form) == ["raidplan", "3492", "--difficulty", "mythic", "--swap-specs"]
+    form = {"boss": ["3492"], "difficulty": ["mythic"], "raid": [""]}
+    assert webtools.tool_args("raidplan", form) == ["raidplan", "3492", "--difficulty", "mythic"]
     assert webtools.tool_args("nope", {}) is None
 
 

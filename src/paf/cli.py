@@ -1398,7 +1398,7 @@ def cmd_review(args: argparse.Namespace) -> int:
 
 def cmd_comp(args: argparse.Namespace) -> int:
     """Who hits what in your raid: the targets the top raids cannot skip, and who takes them (paf.comp)."""
-    from paf import comp, raidplan, raidreview, results, settings, simc
+    from paf import comp, raidreview, results, settings, simc
     from paf.corpus import db
     from paf.raidneed import guild_report, raid_from_report
 
@@ -1422,8 +1422,6 @@ def cmd_comp(args: argparse.Namespace) -> int:
         return 1
     refs = comp.references(con, enc.id, diff, targets)
     rows = comp.assign(rc, refs)
-    bosses = {boss} | {r.name for r in refs if r.second_boss}
-    swap_list = comp.swaps(rc, comp.boss_dps(con, enc.id, diff, bosses), raidplan.class_specs(con, enc.id, diff))
     print(f"{enc.name} {diff_name}, your raid's pull ({rc.fight}): who hits what")
     for a in rows:
         kind = ("second boss" if a.second_boss else
@@ -1437,10 +1435,8 @@ def cmd_comp(args: argparse.Namespace) -> int:
             print("    missed it: " + ", ".join(f"{n} {x:.0%} (their spec {h:.0%})" for n, _, x, h in a.missed))
     if not rows:
         print("  Nothing but the boss: no add to assign.")
-    for x in swap_list:
-        print(f"  {x.name}: {x.better} does {x.gain:+.0%} boss damage vs {x.current} on this boss")
     root = simc.new_run_dir(label="comp")
-    results.write(root, "comp", comp.to_dict(boss, rc.fight, rows, swap_list))
+    results.write(root, "comp", comp.to_dict(boss, rc.fight, rows))
     print(f"Runs: {root}")
     return 0
 
@@ -1832,18 +1828,8 @@ def cmd_raidplan(args: argparse.Namespace) -> int:
         print("Give a log of your raid (--raid <link>) or set your guild (`paf config guild ...`).")
         return 1
     rc = raidneed.raid_from_report(client, url, enc.id, diff)
-    by_class = raidplan.class_specs(con, enc.id, diff)
-    extra: dict[str, list[str]] = {}
-    for part in (args.options or "").split(";"):
-        name, _, specs = part.partition(":")
-        if name.strip():
-            extra[name.strip().lower()] = [s.strip() for s in specs.split(",") if s.strip()]
-    members = []
-    for name, spec, dps in rc.players:
-        opts = [spec] + extra.get(name.lower(), [])
-        if args.swap_specs and spec not in raidneed.HEALERS and spec not in raidplan.TANKS:
-            opts += by_class.get(spec.rpartition(" ")[2], [])
-        members.append(raidplan.Member(name, spec, dps, list(dict.fromkeys(opts))))
+    # everyone on the spec they play: the plan never asks a player to change spec
+    members = [raidplan.Member(name, spec, dps, [spec]) for name, spec, dps in rc.players]
     print(f"{len(members)} players from log {rc.report} ({rc.fight}); reading the top 100 of "
           f"{len({s for m in members for s in m.options})} specs...", flush=True)
     profiles = raidneed.spec_profiles(client, enc.id, diff, [s for m in members for s in m.options])
@@ -1892,7 +1878,7 @@ def _raid_tools(client, con, enc, diff: int, url: str) -> dict:
     log (paf.wipe), this boss's pulls of the night (paf.tracker). Each one on its own: a failure only skips it."""
     import statistics as st
 
-    from paf import comp, raidplan, raidreview, tracker, wipe
+    from paf import comp, raidreview, tracker, wipe
     from paf.raidneed import raid_from_report, report_code
 
     out: dict = {}
@@ -1904,10 +1890,7 @@ def _raid_tools(client, con, enc, diff: int, url: str) -> dict:
             rc = raid_from_report(client, url, enc.id, diff)
             if rc.same_boss:
                 refs = comp.references(con, enc.id, diff, targets)
-                bosses = {boss} | {r.name for r in refs if r.second_boss}
-                swaps = comp.swaps(rc, comp.boss_dps(con, enc.id, diff, bosses),
-                                   raidplan.class_specs(con, enc.id, diff))
-                out["comp"] = comp.to_dict(boss, rc.fight, comp.assign(rc, refs), swaps)
+                out["comp"] = comp.to_dict(boss, rc.fight, comp.assign(rc, refs))
         except Exception as ex:  # noqa: BLE001 - an extra of the prep: never fails it
             print(f"  who hits what: skipped ({str(ex)[:100]})")
         try:
@@ -2406,13 +2389,10 @@ def build_parser() -> argparse.ArgumentParser:
     asg.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
     asg.set_defaults(func=cmd_assigns)
 
-    rp = sub.add_parser("raidplan", help="the raid's comp: which spec each player brings and who pads the adds")
+    rp = sub.add_parser("raidplan", help="the raid's plan: who pads the adds and who stays on the boss")
     rp.add_argument("boss")
     rp.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
     rp.add_argument("--raid", help="link to one of your raid's logs (default: the boss plan's or your guild's)")
-    rp.add_argument("--swap-specs", action="store_true",
-                    help="let every damage dealer switch to another damage spec of their class")
-    rp.add_argument("--options", help='other specs players can play: "Name: Fire Mage, Frost Mage; Name2: ..."')
     rp.set_defaults(func=cmd_raidplan)
 
     cp = sub.add_parser("comp", help="who hits what in your raid: the adds the top raids cannot skip and who takes "

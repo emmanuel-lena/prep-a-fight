@@ -33,7 +33,6 @@ MISSED = 0.5  # on a whole-raid target, a player under this much of their spec's
 MIN_HABIT = 0.04
 MIN_ON = 3  # kills where a spec was assigned to a target, to know its DPS there
 SHOWN = 4  # specs shown per target
-SWAP_GAIN = 0.05  # a spec change is shown when the other spec of the class does this much more boss damage
 
 
 @dataclass
@@ -165,14 +164,6 @@ def assign(rc, refs: list[TargetRef]) -> list[Assigned]:
     return out
 
 
-@dataclass
-class Swap:
-    name: str
-    current: str
-    better: str
-    gain: float  # the better spec's boss DPS / the current spec's, minus 1 (medians of the top kills' players)
-
-
 def boss_dps(con: sqlite3.Connection, encounter_id: int, difficulty: int, bosses: set[str]) -> dict[str, float]:
     """Spec -> median DPS of its players on the boss (and a second boss) in the top kills, the ranked player of the
     corpus's spec left out."""
@@ -197,23 +188,9 @@ def boss_dps(con: sqlite3.Connection, encounter_id: int, difficulty: int, bosses
     return {s: st.median(v) for s, v in per.items() if len(v) >= MIN_SAMPLES}
 
 
-def swaps(rc, dps: dict[str, float], class_specs: dict[str, list[str]]) -> list[Swap]:
-    """The players of your pull whose class has a spec doing clearly more boss damage on this boss."""
-    out = []
-    for name, spec, _ in rc.players:
-        if spec not in dps or not dps[spec]:
-            continue
-        others = [s for s in class_specs.get(spec.rpartition(" ")[2], []) if s != spec and s in dps]
-        best = max(others, key=lambda s: dps[s], default=None)
-        if best and dps[best] / dps[spec] - 1 >= SWAP_GAIN:
-            out.append(Swap(name, spec, best, dps[best] / dps[spec] - 1))
-    return sorted(out, key=lambda x: -x.gain)
-
-
-def to_dict(boss: str, fight: str, rows: list[Assigned], swap_list: list[Swap] | None = None) -> dict:
+def to_dict(boss: str, fight: str, rows: list[Assigned]) -> dict:
+    # no spec change is ever suggested to a player: the app helps each one improve, it does not point at others
     return {"boss": boss, "fight": fight,
-            "swaps": [{"name": x.name, "current": x.current, "better": x.better, "gain": x.gain}
-                      for x in swap_list or []],
             "targets": [
         {"name": a.target, "whole_raid": a.whole_raid, "second_boss": a.second_boss, "players": a.players,
          "tops": a.tops_share, "main": a.main_share, "raid": a.raid_share,

@@ -227,10 +227,9 @@ def render(p: Plan, boss: str, difficulty: str, report: str, fight: str, played:
     rows = ""
     for c in sorted(p.choices, key=lambda c: (order[c.member.role], not c.pad, -c.boss)):
         m = c.member
-        swap = "" if c.spec == m.current else f" <span class='pill gold'>swap from {e(m.current)}</span>"
         role = ({"tank": "tank", "healer": "healer"}[m.role] if m.role != "damage"
                 else "<b>pad the adds</b>" if c.pad else "stay on the boss")
-        rows += (f"<tr><td>{e(m.name)}</td><td>{e(c.spec)}{swap}</td><td>{role}</td>"
+        rows += (f"<tr><td>{e(m.name)}</td><td>{e(c.spec)}</td><td>{role}</td>"
                  f"<td class='n'>{k(c.boss)}</td><td class='n'>{k(c.adds)}</td></tr>")
     gain = (p.boss / p.current_boss - 1) * 100 if p.current_boss else 0.0
     cover = p.adds / p.required if p.required else 0.0

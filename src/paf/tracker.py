@@ -1,11 +1,11 @@
 """Your raid night, pull by pull: who died, who used a healthstone or a health potion (and who died without), who
 pressed a damage potion. For the raid leader.
 
-From one log: the deaths of each pull and the casts of the consumables, recognized by their name in the log (English
-or French: Healthstone, Pierre de soins, Health/Healing Potion, Potion de soins...); the other potions but mana
-potions are damage potions. The potion counters of Warcraft Logs' player details stay at 0 in this expansion: the
-casts are read instead. A potion pressed before the pull is not a cast of the pull: it is missed. The deaths of
-the wipe itself (from the death that leaves half the raid dead) are left out.
+From one log: the deaths of each pull and the casts of the consumables, recognized by the spell their use casts
+(CONSUMABLES, from the game data), else for a healthstone or a health potion by its name (English or French). The
+potion counters of Warcraft Logs' player details stay at 0 in this expansion: the casts are read instead. A potion
+pressed before the pull is not a cast of the pull: it is missed. The deaths of the wipe itself (from the death that
+leaves half the raid dead) are left out.
 
 The log: the one given, else the latest log of your active character (a live log too, while your raid uploads it),
 else your guild's latest. Live, the pulls are read again every 90 s until 30 min pass without a new one.
@@ -27,20 +27,34 @@ CASTS = """query($c:String!,$f:[Int]!,$x:String!,$s:Float){ reportData { report(
   { data nextPageTimestamp } } } }"""
 
 
-def kind(name: str) -> str | None:
-    """'healthstone' | 'health' (a health potion) | 'damage' (a damage potion) | None."""
+# The consumables by the spell their use casts (what a log records), current expansion, from the game data (item ->
+# ItemXItemEffect -> ItemEffect.SpellID); every rank and the Fleeting versions cast the same spell. A damage potion
+# counts only from this table: the potions' names do not say it ("Light's Potential" has no "potion" in it).
+CONSUMABLES = {
+    1236616: "damage",  # Light's Potential (items 241308/9, Fleeting 245897/8)
+    1236994: "damage",  # Potion of Recklessness (241288/9, Fleeting 245902/3)
+    1238009: "health",  # Invigorating Healing Potion
+    1234768: "health",  # Silvermoon Health Potion
+    1295247: "health",  # Concentrated Silvermoon Health Potion
+    1262857: "health",  # Potent Healing Potion
+    6262: "healthstone", 452930: "healthstone",  # Healthstone, Demonic Healthstone
+}
+
+
+def kind(name: str, spell_id: int = 0) -> str | None:
+    """'healthstone' | 'health' (a health potion) | 'damage' (a damage potion) | None. By the spell id first
+    (CONSUMABLES); by the name only for a healthstone or a health potion the table does not know yet (another
+    patch, a log in French)."""
+    if spell_id in CONSUMABLES:
+        return CONSUMABLES[spell_id]
     n = name.lower()
     if n.startswith(("create ", "soulburn", "créer", "brûlure")):
         return None
     if "healthstone" in n or "pierre de soins" in n or "pierre de vie" in n:
         return "healthstone"
-    if "potion" not in n:
-        return None
-    if any(w in n for w in ("health", "healing", "soins", "santé", "vie")):
+    if "potion" in n and any(w in n for w in ("health", "healing", "soins", "santé")):
         return "health"
-    if "mana" in n:
-        return None
-    return "damage"
+    return None
 
 
 @dataclass
@@ -91,7 +105,8 @@ def night(client, code: str, encounter_id: int | None = None, live: bool = False
     """The pulls of the log (of one boss when encounter_id is given), and player name -> icon ("Class-Spec")."""
     # a live log grows: its pulls are read again every minute (a finished pull's events never change: cached)
     rep = client.query(ABILITIES, {"c": code}, cache_ttl=60 if live else 3600)["reportData"]["report"]
-    kinds = {a["gameID"]: k for a in rep["masterData"]["abilities"] or [] if (k := kind(a.get("name") or ""))}
+    kinds = {a["gameID"]: k for a in rep["masterData"]["abilities"] or []
+             if (k := kind(a.get("name") or "", int(a.get("gameID") or 0)))}
     actors = {a["id"]: a for a in rep["masterData"]["actors"] or []}
     icons = {a["name"]: a.get("icon", "") for a in actors.values()}
     expr = f"ability.id in ({', '.join(str(i) for i in sorted(kinds))})" if kinds else ""

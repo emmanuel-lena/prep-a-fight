@@ -24,15 +24,13 @@ def test_the_text_for_discord_and_mrt():
         {"name": "Drowned Add", "whole_raid": False, "second_boss": False, "players": ["Rogue", "Hunter"], "best": []},
         {"name": "Tentacle", "whole_raid": True, "second_boss": False, "players": [], "best": []}],
         "builds": [{"name": "Nolow", "spec": "Affliction Warlock", "side": "boss", "take": ["Malefic Grasp"],
-                    "drop": ["Seed of Corruption"]}],
-        "swaps": [{"name": "Dk", "current": "Unholy Death Knight", "better": "Frost Death Knight", "gain": 0.06}]}
+                    "drop": ["Seed of Corruption"]}]}
     discord = raidlead.text(sh, "heroic")
     assert discord.splitlines() == [
         "**Nek'zali (heroic)**", "Drowned Add: Rogue, Hunter", "Tentacle: everyone",
-        "Nolow (boss talents): take Malefic Grasp / drop Seed of Corruption",
-        "Dk: Frost Death Knight does +6% boss damage vs Unholy Death Knight"]
+        "Nolow (boss talents): take Malefic Grasp / drop Seed of Corruption"]
     assert raidlead.text(sh, "heroic", mrt=True).startswith("Nek'zali (heroic)\n")
-    empty = {"boss": "Ula'tek", "targets": [], "builds": [], "swaps": []}
+    empty = {"boss": "Ula'tek", "targets": [], "builds": []}
     assert raidlead.text(empty, "mythic").endswith("Everyone on the boss, no change.")
 
 

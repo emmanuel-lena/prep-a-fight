@@ -64,14 +64,12 @@ def test_the_page():
     assert "Who hits what in your raid" in page and "Put them on it" in page and "Hardly hit it" in page
 
 
-def test_a_spec_change_for_boss_damage():
+def test_the_spec_damage_of_the_tops_never_turns_into_a_spec_change():
     dps = comp.boss_dps(corpus(), 9, 5, {"Boss"})
     assert round(dps["Fire Mage"]) == 10  # 1000 in 100 s: the ranked Fire Mage's 2000 left out
-    out = comp.swaps(pull(), {"Fire Mage": 10.0, "Arcane Mage": 12.0}, {"Mage": ["Arcane Mage", "Fire Mage"]})
-    assert [(x.name, x.better, round(x.gain, 2)) for x in out] == [("Fire", "Arcane Mage", 0.2)]
-    page = workshop_views.render({"kind": "comp", **comp.to_dict("Boss", "", rows(), out)})
-    assert "Change spec for more boss damage" in page
-
+    assert not hasattr(comp, "swaps")  # the app never tells a player to change spec
+    page = workshop_views.render({"kind": "comp", **comp.to_dict("Boss", "", rows())})
+    assert "Change spec" not in page and "swaps" not in comp.to_dict("Boss", "", rows())
 
 def test_the_best_pull_without_the_deaths():
     from paf import wipe
@@ -87,7 +85,10 @@ def test_the_night_tracker():
 
     assert tracker.kind("Healthstone") == "healthstone" and tracker.kind("Pierre de soins") == "healthstone"
     assert tracker.kind("Silvermoon Health Potion") == "health" and tracker.kind("Potion de soins") == "health"
-    assert tracker.kind("Potion of Recklessness") == "damage" and tracker.kind("Lightfused Mana Potion") is None
+    assert tracker.kind("Potion of Recklessness", 1236994) == "damage"
+    assert tracker.kind("Lightfused Mana Potion") is None
+    assert tracker.kind("Light's Potential", 1236616) == "damage"  # no "potion" in its name: known by its spell
+    assert tracker.kind("Potion of Zealotry") is None  # an unknown potion is not counted as a damage potion
     assert tracker.kind("Create Healthstone") is None
     p = tracker.PlayerPull(deaths=[100.0], healthstone=[120.0])
     assert p.died_bare  # the healthstone came after the death

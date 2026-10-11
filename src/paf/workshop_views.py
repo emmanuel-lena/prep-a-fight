@@ -332,16 +332,7 @@ def comp(d: dict) -> str:
             block += (f"<p class='lab warn'>Hardly hit it in your pull</p><div class='whos'>{names(t['missed'])}</div>")
         cards += (f"<div class='job'><div class='j-head'><b>{e(t['name'])}</b><small>{kind}</small></div>{say}{block}"
                   "</div>")
-    swaps = d.get("swaps") or []
-    swap_html = ""
-    if swaps:
-        swap_html = ("<h3>Change spec for more boss damage</h3><ul class='glist items three'>" + "".join(
-            f"<li>{ic(x['better'], 'large')}<span class='l-name'><b>{e(x['name'])}</b><small><span class='was'>"
-            f"{e(x['current'])}</span> &rarr; {e(x['better'])}</small></span><span class='l-val pos'>"
-            f"{_pct(x['gain'] * 100, 0)}</span></li>" for x in swaps) + "</ul><p class='ws-fine'>Optional: the boss "
-            "damage of the other spec's players in the top kills of this boss, vs the current spec's (medians). "
-            "It does not know each player's gear or practice on the other spec.</p>")
-    return (f"{head}<div class='jobs wide'>{cards}</div>{swap_html}<p class='ws-fine'>DPS on the target of each spec's players in "
+    return (f"{head}<div class='jobs wide'>{cards}</div><p class='ws-fine'>DPS on the target of each spec's players in "
             "the top kills of this boss (those assigned to it for an assigned target; on both bosses for a second "
             "boss). It compares specs, not your players' skill, and does not know your strategy.</p>")
 

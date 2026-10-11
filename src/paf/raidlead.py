@@ -8,7 +8,6 @@
   - builds: the talents the top players of each spec take for boss damage and for total damage (the top 100 by boss
     DPS against the top 100 by DPS, paf.wipe.talent_split): a player on an add takes the padding side, a player on
     the boss the boss side, and the page says who should change what;
-  - the spec changes worth it for boss damage (paf.comp.swaps).
 - A text to paste in Discord and an MRT note, one line per target and per player to change.
 - A background process (`paf raidlead`) reads the roster and the talent rankings (the slow part: two rankings per
   spec and boss, cached); the rest is computed when the page shows.
@@ -194,8 +193,8 @@ def builds(state: dict, enc_id: int, diff: int, roles: dict[str, str], names: di
 
 
 def sheet(state: dict, enc, diff: int) -> dict | None:
-    """One boss for the roster (the benched players out): who hits what, builds, spec changes."""
-    from paf import comp, raidplan, raidreview
+    """One boss for the roster (the benched players out): who hits what, builds."""
+    from paf import comp, raidreview
     from paf.corpus import db
     from paf.corpus.analyze import main_boss
     from paf.raidneed import RaidComp
@@ -214,8 +213,6 @@ def sheet(state: dict, enc, diff: int) -> dict | None:
     for a in rows:
         for n, _s in a.proposed:
             roles[n] = "pad"
-    bosses = {boss} | {r.name for r in refs if r.second_boss}
-    swaps = comp.swaps(rc, comp.boss_dps(con, enc.id, diff, bosses), raidplan.class_specs(con, enc.id, diff))
     try:
         from paf.gamedata import talent_entry_names
 
@@ -225,8 +222,7 @@ def sheet(state: dict, enc, diff: int) -> dict | None:
     return {"boss": enc.name, "targets": [{"name": a.target, "whole_raid": a.whole_raid, "second_boss": a.second_boss,
                                            "players": [n for n, _s in a.proposed],
                                            "best": [s for s, _d, _n in a.ranking[:3]]} for a in rows],
-            "builds": builds(state, enc.id, diff, roles, names),
-            "swaps": [{"name": x.name, "current": x.current, "better": x.better, "gain": x.gain} for x in swaps]}
+            "builds": builds(state, enc.id, diff, roles, names)}
 
 
 def pretty(spec: str) -> str:
@@ -249,8 +245,6 @@ def text(sh: dict, difficulty: str, mrt: bool = False) -> str:
         change = (f"take {', '.join(b['take'])}" if b["take"] else "") + (
             (" / " if b["take"] and b["drop"] else "") + f"drop {', '.join(b['drop'])}" if b["drop"] else "")
         lines.append(f"{b['name']} ({what}): {change}")
-    for s in sh["swaps"]:
-        lines.append(f"{s['name']}: {pretty(s['better'])} does {s['gain']:+.0%} boss damage vs {pretty(s['current'])}")
     if len(lines) == 1:
         lines.append("Everyone on the boss, no change.")
     return "\n".join(lines)
@@ -315,22 +309,18 @@ def page_body(difficulty: str) -> str:
             f"{'on an add: padding talents' if b['side'] == 'pad' else 'on the boss: boss talents'}</small>"
             + (f"<br>take {e(', '.join(b['take']))}" if b["take"] else "")
             + (f"<br>drop {e(', '.join(b['drop']))}" if b["drop"] else "") + "</li>" for b in sh["builds"])
-        sw = "".join(f"<li><b>{e(s['name'])}</b>: {e(pretty(s['better']))} does {s['gain']:+.0%} boss damage vs "
-                     f"{e(pretty(s['current']))}</li>" for s in sh["swaps"])
         cards += (f"<article class='rl-boss'><header><h3>{e(x.name)}</h3>"
                   f"{copy_button(text(sh, difficulty), 'Copy for Discord')}"
                   f"{copy_button(text(sh, difficulty, mrt=True), 'Copy MRT note')}</header>"
                   f"<h4>Who hits what</h4><ul>{tg or '<li>Everyone on the boss: no add to assign.</li>'}</ul>"
                   + (f"<h4>Talents to change</h4><ul>{bd}</ul>" if bd else
                      "<h4>Talents</h4><p class='small muted'>Nobody needs to change, from what the log shows.</p>")
-                  + (f"<h4>Spec changes worth it</h4><ul>{sw}</ul>" if sw else "") + "</article>")
+                  + "</article>")
     allbtn = (copy_button("\n\n".join(text(sh, difficulty) for sh in everything), "Copy every boss for Discord")
               if everything else "")
     miss = (f"<p class='small muted'>Not prepared yet, so no sheet: {e(', '.join(missing))}. "
             f"<a href='/raid/prepare?difficulty={e(difficulty)}'>Prepare the whole raid</a> first.</p>" if missing else "")
-    how = ("<p class='small muted'>A spec change shows from +5%: the median boss damage of each spec in the top kills "
-           "of that boss, a reading of the top raids, not a sim of your player.</p>")
-    return head + roster + f"<h2>Boss by boss {allbtn}</h2>{how}{miss}<div class='rl-grid'>{cards}</div>{COPY_JS}"
+    return head + roster + f"<h2>Boss by boss {allbtn}</h2>{miss}<div class='rl-grid'>{cards}</div>{COPY_JS}"
 
 
 COPY_JS = """<script>document.addEventListener('click',function(ev){var b=ev.target.closest('.copy');if(!b)return;
