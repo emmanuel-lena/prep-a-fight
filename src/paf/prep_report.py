@@ -648,7 +648,8 @@ id=v==='detail'&&ids.indexOf('overview')>=0?'overview':ids[0]}
 try{localStorage.setItem('paf-view',id==='simple'?'simple':'detail')}catch(e){}
 document.body.classList.toggle('simple-on',id==='simple');document.querySelectorAll('.panel').forEach(function(p){
 p.hidden=p.id!==id});document.querySelectorAll('.tabs a').forEach(function(a){
-var on=a.getAttribute('href')==='#'+id;a.classList.toggle('on',on);a.setAttribute('aria-selected',on)});scrollTo(0,0)}
+var on=a.getAttribute('href')==='#'+id;a.classList.toggle('on',on);a.setAttribute('aria-selected',on)});
+var cur=document.querySelector('.tabs a.on');if(cur)cur.scrollIntoView({inline:'center',block:'nearest'});scrollTo(0,0)}
 addEventListener('hashchange',function(){show(location.hash.slice(1))});show(location.hash.slice(1));
 document.addEventListener('click',function(ev){var b=ev.target.closest('[data-copy]');if(!b)return;
 var t=b.getAttribute('data-copy'),done=function(){var o=b.textContent;b.textContent='Copied';
@@ -679,6 +680,9 @@ def render(d: PrepData) -> str:
             f'difficulty. The timings of the fight and the habits of the top players are less reliable than usual.</p>')
     tabs["overview"].append(briefing.moves_html(d))
     tabs["overview"].append(briefing.fight_map_html(d))
+    phone = simple.fight_html(d).replace("<details class='vp'>", "<details class='vp' open>")
+    if phone:  # under 640 px the timeline above needs 900 px: the fight top to bottom instead (briefing.css)
+        tabs["overview"].append(f"<div class='simple tl-phone'>{phone}</div>")
     tabs["overview"].append(briefing.checklist_html(d))
     if d.guide_summary:
         tabs["overview"].append("<h2 class='rv'>The boss, in a minute</h2><div class='rv'>" + d.guide_summary + "</div>")

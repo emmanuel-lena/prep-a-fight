@@ -308,6 +308,8 @@ var io = 'IntersectionObserver' in window ? new IntersectionObserver(function(es
     el.classList.add('in'); io.unobserve(el); });
 }, {threshold: .1}) : null;
 document.querySelectorAll('.rv').forEach(function(el){ io ? io.observe(el) : el.classList.add('in'); });
+// never hidden for good: a preview, a print or a slow window shows every block after a moment
+setTimeout(function(){ document.querySelectorAll('.rv').forEach(function(el){ el.classList.add('in'); }); }, 1500);
 // the timeline: a note tells its story in the margin below
 document.querySelectorAll('.tl').forEach(function(tl){
   var m = tl.closest('section').querySelector('.margin');

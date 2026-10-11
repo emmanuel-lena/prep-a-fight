@@ -99,3 +99,6 @@ th.n{text-align:right} /* a number column's header above its numbers */
 @media (pointer:coarse){.topbar .nav a,.nav-back,details>summary,.btn,button{min-height:44px}
   .topbar .nav a,.nav-back{display:inline-flex;align-items:center} details>summary{padding-block:10px}}
 table.fit{width:auto;min-width:min(100%,520px)} /* a short table: its columns close together */
+@media (min-width:641px) and (max-width:1000px){.nav-back span{display:none} .topbar .in{gap:10px}
+  .who summary span{display:none}
+  .topbar .nav a{padding:6px 8px}} /* a snapped window: the header stays on one line */

@@ -16,8 +16,8 @@
 .mmap a.ph3{background:color-mix(in srgb,var(--pos) 7%,transparent)}
 .mmap a.on{border-color:var(--accent);color:var(--fg);box-shadow:0 0 0 1px var(--accent)}
 .to-minutes{margin:0 0 12px}
-@media (prefers-reduced-motion:reduce){.mins{height:auto;overflow:visible;scroll-snap-type:none}
-  .mn{min-height:0} .mn-in{opacity:1;transform:none;transition:none}}
+@media (prefers-reduced-motion:reduce),(max-width:640px){.mins{height:auto;overflow:visible;scroll-snap-type:none}
+  .mn{min-height:0} .mn-in{opacity:1;transform:none;transition:none}} /* a phone: plain sections, no swipe trapped */
 @media (max-width:640px){.mins-wrap{grid-template-columns:1fr}.mmap{flex-direction:row;flex-wrap:wrap;position:static}
   .mmap a{width:34px}.mn{padding:18px 14px}}
 /* the simple view (paf.simple) */

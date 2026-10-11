@@ -92,3 +92,8 @@ details.more>summary{font:italic 400 17px var(--font-reading);color:var(--muted)
 .aim{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:14px 0}
 .aim .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
 .aim .kpi:first-child .v{color:var(--fg)}
+/* a phone reads the fight top to bottom (paf.simple.fight_html) instead of the 900 px timeline */
+.tl-phone{display:none}
+@media (max-width:640px){#overview .tl-scroll,#overview .margin{display:none} .tl-phone{display:block;max-width:none}}
+@media print{.js .rv{opacity:1;transform:none}}
+.tl-phone h2,.tl-phone .to-minutes{display:none} .tl-phone .card{margin-top:0} /* the overview has its own title */
