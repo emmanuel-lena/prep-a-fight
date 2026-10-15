@@ -63,6 +63,7 @@ class PrepData:
     patchwerk_dps: float | None = None
     timeline_file: str = ""
     talents: object | None = None  # paf.talent_sim.TalentComparison
+    specs: dict | None = None  # paf.specgear.to_json: your class's damage specs on this fight (the verdict first)
     plans: object | None = None  # paf.cdplan.PlanComparison
     gear: list[tuple[str, dict[str, float], float]] = field(default_factory=list)  # changes, per fight, weighted
     gear_fights: list[str] = field(default_factory=list)
@@ -673,7 +674,8 @@ def render(d: PrepData) -> str:
             f"<div class='partial'><b>First analysis, from {used} of the {found} top kills</b><span>Measured on our "
             "corpora: the fight is within about 2% of the full corpus and the talent pick rates within about 3 points. "
             "The full analysis runs in the background: this sheet refreshes by itself when it is done.</span></div>")
-    tabs["overview"].append(briefing.lede_html(d) + briefing.aim_html(d) + briefing.confidence_pill(d))
+    tabs["overview"].append(briefing.lede_html(d) + briefing.aim_html(d) + briefing.spec_html(d)
+                            + briefing.confidence_pill(d))
     if d.kills and d.kills < THIN_CORPUS:
         tabs["overview"].append(
             f'<p class="notice small"><b>Thin data:</b> only {d.kills} ranked kills of your spec on this boss and '

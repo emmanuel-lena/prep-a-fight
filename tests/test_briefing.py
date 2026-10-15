@@ -46,3 +46,12 @@ def test_what_to_aim_for_comes_first_in_the_overview():
     alone = briefing.aim_html(SimpleNamespace(sim_dps=200000.0, sim_boss_dps=None, patchwerk_dps=None, spec="Arms",
                                               your_profile=None))
     assert "200k" in alone and "The best" not in alone
+
+
+def test_your_spec_on_this_boss_is_said_under_what_to_aim_for():
+    d = SimpleNamespace(specs={"verdict": "ok", "mine": "Subtlety", "sentence": "Subtlety fits this boss: ...",
+                               "rows": [{"spec": "Subtlety", "label": "Subtlety", "sim": 100.0},
+                                        {"spec": "Outlaw", "label": "Outlaw", "sim": 94.0}]})
+    html = briefing.spec_html(d)
+    assert "Your spec on this boss." in html and "Subtlety fits this boss" in html and "Outlaw -6%" in html
+    assert briefing.spec_html(SimpleNamespace(specs=None)) == ""

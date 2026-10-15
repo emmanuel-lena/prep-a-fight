@@ -1167,6 +1167,18 @@ def cmd_prep(args: argparse.Namespace) -> int:
             for t in side:
                 if t and t[1]:
                     d.links.setdefault(t[0], f"spell={t[1]}")
+    from paf import specgear
+
+    if len(specgear.DAMAGE_SPECS.get(cls, ())) > 1 and spec in specgear.DAMAGE_SPECS.get(cls, ()):
+        step("Your class's specs on this boss")
+        try:  # your character in each damage spec of your class, on this fight (paf.specgear)
+            sg = specgear.compare(profile_text, client, enc, diff, diff_name, cls, spec, fight.to_simc(),
+                                  root / "specs", character=_active_character(), target_error=args.error,
+                                  log=lambda m: print(m, flush=True))
+            d.specs = specgear.to_json(sg)
+            print(f"  {d.specs['sentence']}")
+        except Exception as ex:  # noqa: BLE001 - an extra of the prep: never fails it
+            print(f"  your class's specs: skipped ({str(ex)[:120]})")
     from paf.prep_report import _key as cd_key_of
 
     for ab in tl_all.abilities:  # when the top players cast each cooldown (for the plan timelines)

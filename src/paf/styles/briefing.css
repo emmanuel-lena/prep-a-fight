@@ -97,3 +97,5 @@ details.more>summary{font:italic 400 17px var(--font-reading);color:var(--muted)
 @media (max-width:640px){#overview .tl-scroll,#overview .margin{display:none} .tl-phone{display:block;max-width:none}}
 @media print{.js .rv{opacity:1;transform:none}}
 .tl-phone h2,.tl-phone .to-minutes{display:none} .tl-phone .card{margin-top:0} /* the overview has its own title */
+.spec-say{margin:4px 0 12px;font-size:15px;max-width:80ch} .spec-say span{margin-left:4px}
+.spec-say.go b{color:var(--pos)} .spec-say.warn b{color:var(--warn)}

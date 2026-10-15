@@ -259,25 +259,25 @@ def verdict(r: Result) -> tuple[str, str]:
     if mine is None or not mine.sim:
         return "warn", f"Your {spec_label(r.mine)} could not be simmed in the top players' gear on this fight."
     if not others:
-        return "ok", (f"Stay {spec_label(r.mine)}: no other damage spec of your class has enough ranked players on "
-                      f"this boss to compare.")
+        return "ok", (f"{spec_label(r.mine)} fits this boss: no other damage spec of your class has enough ranked "
+                      f"players on it to compare.")
     best = max(others, key=lambda x: x.sim)
     gap = 100 * (best.sim / mine.sim - 1)
     noise = _noise(best.error, mine.error)
     tops_gap = 100 * (best.tops / mine.tops - 1)
     me, it = spec_label(r.mine), spec_label(best.spec)
     if gap > noise and tops_gap > 0:
-        return "go", (f"Play {it}: in the top players' gear at {TOP_ILVL} it sims {gap:+.1f}% over your {me} on this "
-                      f"fight (noise ±{noise:.1f}%), and the top {it} players do {tops_gap:+.0f}% over the "
-                      f"top {me}.")
+        return "go", (f"{it} could do more here: in the top players' gear at {TOP_ILVL} it sims {gap:+.1f}% over "
+                      f"your {me} on this fight (noise ±{noise:.1f}%), and the top {it} players do "
+                      f"{tops_gap:+.0f}% over the top {me}. Worth a try if you play it.")
     if gap > noise:
         return "warn", (f"{it} sims {gap:+.1f}% over your {me} (noise ±{noise:.1f}%), but the top {it} "
-                        f"players do {tops_gap:+.0f}% against the top {me}: the sim and the logs disagree, stay "
-                        f"{me} unless you try it.")
+                        f"players do {tops_gap:+.0f}% against the top {me}: the sim and the logs disagree: {me} "
+                        f"is the safer choice unless you try it.")
     logs = f"; the top {it} players do {tops_gap:+.0f}% against the top {me}"
-    return "ok", (f"Stay {me}: {it}, the best other spec, sims {gap:+.1f}% on this fight, within the noise "
-                  f"(±{noise:.1f}%){logs}." if gap > -noise else
-                  f"Stay {me}: it sims {-gap:.1f}% over {it}, the best other spec, on this fight (noise "
+    return "ok", (f"{me} fits this boss: {it}, the best other spec, sims {gap:+.1f}% on this fight, within the "
+                  f"noise (±{noise:.1f}%){logs}." if gap > -noise else
+                  f"{me} fits this boss: it sims {-gap:.1f}% over {it}, the best other spec, on this fight (noise "
                   f"±{noise:.1f}%){logs}.")
 
 
@@ -390,7 +390,7 @@ def compare(profile: str, client, enc, difficulty: int, diff_name: str, cls: str
 def to_json(r: Result) -> dict:
     kind, text = verdict(r)
     title = (text.split(":")[0] if kind in ("go", "ok") else "Not compared" if "could not be simmed" in text else
-             "The sim and the logs disagree")
+             "The sim and the logs disagree")  # "Outlaw could do more here", "Subtlety fits this boss"
     rows = [{"spec": x.spec, "label": spec_label(x.spec), "tops": x.tops, "tops_lo": x.tops_lo, "tops_hi": x.tops_hi,
              "sim": x.sim, "error": x.error, "gear": x.gear, "items": x.items} for x in r.rows]
     return {"boss": r.boss, "difficulty": r.difficulty, "mine": r.mine, "ilvl": TOP_ILVL, "metric": r.metric,

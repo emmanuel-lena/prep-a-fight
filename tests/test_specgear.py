@@ -57,13 +57,13 @@ def result(mine_sim, other_sim, mine_tops=100.0, other_tops=100.0, error=0.1):
 
 def test_the_verdict_says_play_stay_or_that_the_sim_and_the_logs_disagree():
     kind, text = specgear.verdict(result(100.0, 106.0, other_tops=104.0))
-    assert kind == "go" and text.startswith("Play Enhancement: ") and "+6.0%" in text and "+4%" in text
+    assert kind == "go" and text.startswith("Enhancement could do more here: ") and "+6.0%" in text and "+4%" in text
     kind, text = specgear.verdict(result(100.0, 100.2))
-    assert kind == "ok" and text.startswith("Stay Elemental: ") and "within the noise" in text
+    assert kind == "ok" and text.startswith("Elemental fits this boss: ") and "within the noise" in text
     kind, text = specgear.verdict(result(100.0, 95.0))
     assert kind == "ok" and "it sims 5.0% over Enhancement" in text
     kind, text = specgear.verdict(result(100.0, 106.0, other_tops=97.0))
-    assert kind == "warn" and "disagree" in text and "stay Elemental" in text
+    assert kind == "warn" and "disagree" in text and "Elemental is the safer choice" in text
 
 
 def test_the_gear_and_your_kills_in_a_sentence():
@@ -100,7 +100,8 @@ def test_the_tops_median_comes_with_its_noise():
 def test_the_result_page_and_the_tool():
     r = result(100.0, 106.0, other_tops=104.0)
     html = workshop_views.render({"kind": "specgear", **specgear.to_json(r)})
-    assert "Play Enhancement" in html and "Each spec on you" in html and "the best of three builds" in html
+    assert "Enhancement could do more here" in html and "Each spec on you" in html
+    assert "the best of three builds" in html
     assert "specgear" in workshop.BY_CMD
     args = workshop.args("specgear", {"boss": ["3492"], "difficulty": ["heroic"]})
     assert args[:2] == ["specgear", "3492"] and "--difficulty" in args

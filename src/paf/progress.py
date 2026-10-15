@@ -41,6 +41,8 @@ PREP_STEPS = (
      "When the top players press their cooldowns.", 1),
     ("Talent builds", "Sim the top players' talent builds",
      "Your character with each talent build of the top players, on this fight.", 3),
+    ("Your class's specs", "Your class's specs on this boss",
+     "Your character in each damage spec of your class, on this fight, next to what their top players do.", 2),
     ("Ideal cooldown plan", "Find your best cooldown plan",
      "Tries holding each cooldown for the adds, the burst windows... keeps what beats the default rotation, then "
      "checks it on harder versions of the fight. The longest step: thousands of simulated pulls on your CPU.", 20),

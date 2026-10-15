@@ -120,6 +120,11 @@ def change_card(d) -> str:
         rows.append(f"<li><span class='pics'>{pics}</span><div><b>Swap some gear</b><span class='sz {_size(w)}'>"
                     f"{SIZE_WORDS[_size(w)]}</span><span class='what'>{'; '.join(linkify(c, d.links) for c in changes.split('; '))}"
                     f"</span></div></li>")
+    s = getattr(d, "specs", None)
+    if s and s.get("verdict") == "go":  # another spec of your class does clearly more here, sim and logs agree
+        spec_ic = icons.img(icons.CLASS_ICON.format(cls=d.class_name.lower()), "medium") if d.class_name else ""
+        rows.append(f"<li>{spec_ic}<div><b>{e(s.get('title') or 'Another spec could do more here')}</b>"
+                    f"<span class='what'>{e(s.get('sentence', ''))}</span></div></li>")
     if getattr(d, "imported", False):  # no bags: the best gear and the loot need the /simc export
         rows.append("<li><span class='ok bad' aria-hidden='true'>!</span><div><b>Paste your /simc export</b>"
                     "<span class='what'>Your character was read from a log, without your bags: with /simc the "

@@ -283,6 +283,23 @@ def aim_html(d) -> str:
     return f"<div class='aim rv'>{cells}</div>"
 
 
+def spec_html(d) -> str:
+    """Your class's damage specs on this fight (paf.specgear), in one sentence under what to aim for: advice for
+    you only, never about another player."""
+    s = getattr(d, "specs", None)
+    if not s or not s.get("sentence"):
+        return ""
+    rows = [r for r in s.get("rows") or [] if r.get("sim")]
+    mine = next((r for r in rows if r["spec"] == s.get("mine")), None)
+    others = ""
+    if mine and len(rows) > 1:
+        others = " (" + ", ".join(f"{r['label']} {100 * (r['sim'] / mine['sim'] - 1):+.0f}%"
+                                   for r in sorted(rows, key=lambda r: -r["sim"]) if r is not mine) + " in the sim)"
+    kind = {"go": "go", "warn": "warn"}.get(s.get("verdict"), "ok")
+    return (f"<p class='spec-say {kind} rv'><b>Your spec on this boss.</b> {e(s['sentence'])}"
+            f"<span class='muted'>{e(others)}</span></p>")
+
+
 def confidence_pill(d) -> str:
     if not d.validation:
         return ""
