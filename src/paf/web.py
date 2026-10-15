@@ -191,17 +191,57 @@ def busy() -> str:
     return ""
 
 
-def run_update() -> str:
-    """Download the new installer, start it over this install and close the app (the installer reopens it)."""
+def pause_all(why: str) -> None:
+    """Pause every prep running and the raid queue (an update: the app resumes them at its next start); the last
+    raid and the raid's roles are read again at the start anyway."""
+    from paf import lastraid, raidlead, raidqueue
+    from paf.jobrun import kill_tree
+
+    for jid, _job in loading_running():
+        JOBS.pause(jid, why)
+    q = raidqueue.load()
+    if raidqueue.active(q):
+        raidqueue.pause(why)
+    for module, key in ((lastraid, "_pid"), (raidlead, "pid")):
+        try:
+            state = module.load()
+            if module.runner_alive(state):
+                kill_tree(int(state[key]))
+        except Exception:  # noqa: BLE001 - a reader that cannot be stopped never blocks an update
+            pass
+
+
+def loading_running() -> list:
+    from paf import loading
+
+    return list(loading.running_preps())
+
+
+def resume_paused(why: str) -> int:
+    """At the app's start: the preps an update paused go on (the raid queue: paf.raidqueue.resume)."""
+    n = 0
+    for jid in JOBS.paused(why):
+        if JOBS.resume(jid):
+            n += 1
+    return n
+
+
+def run_update(pause: bool = False) -> str:
+    """Download the new installer, start it over this install and close the app (the installer reopens it). With
+    something running, it asks first; `pause` pauses it, and the app resumes it after the update."""
     from paf import update
 
     rel, folder = update.STATE.get("release"), update.install_dir()
     if rel is None or folder is None:
         return "<h1>Nothing to update</h1><p><a href='/'>Back home</a></p>"
     working = busy()
+    if working and not pause:
+        return (f"<h1>{e(working)}</h1><p class='lead'>The update pauses it, and the app resumes it by itself when "
+                "it opens again (the logs already read are kept; the sims of the boss being prepared run again)."
+                "</p><form method='post' action='/update' class='cta'><input type='hidden' name='pause' value='1'>"
+                "<button class='btn'>Pause it and update</button><a class='btn ghost' href='/'>Not now</a></form>")
     if working:
-        return (f"<h1>{e(working)}</h1><p class='lead'>Updating would stop it. Update when it is done (the banner "
-                "stays).</p><p><a href='/'>Back home</a></p>")
+        pause_all("update")
     try:
         setup = update.download(rel)
     except (OSError, ValueError) as ex:
@@ -250,11 +290,16 @@ class Jobs:
         def run() -> None:
             with log.open("w", encoding="utf-8", errors="replace") as out:
                 flags = {"creationflags": 0x08000000} if sys.platform == "win32" else {}  # CREATE_NO_WINDOW
+                from paf.jobrun import SESSION
+
                 proc = subprocess.Popen([_python(), "-m", "paf", *args], stdout=out, stderr=subprocess.STDOUT,
-                                        env={**_env(), "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}, **flags)
+                                        env={**_env(), "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}, **flags,
+                                        **SESSION)
                 job["pid"] = proc.pid
                 self._save(jid, job)
                 code = proc.wait()
+            if job["status"] == "paused":  # stopped on purpose: it waits for Resume
+                return
             job["status"] = "done" if code == 0 else f"failed (exit {code})"
             self._save(jid, job)
             if NOTIFY["on"] and args[:1] == ["prep"]:
@@ -269,7 +314,8 @@ class Jobs:
         import json
 
         meta = {"args": job["args"], "result": str(job["result"] or ""), "status": job["status"],
-                "started": job["started"], "pid": job.get("pid")}
+                "started": job["started"], "pid": job.get("pid"), "why": job.get("why", ""),
+                "next": job.get("next", "")}
         (data_dir() / "web" / f"job-{jid}.json").write_text(json.dumps(meta), encoding="utf-8")
 
     def get(self, jid: str) -> dict | None:
@@ -287,6 +333,10 @@ class Jobs:
         log = data_dir() / "web" / f"job-{jid}.log"
         text = log.read_text(encoding="utf-8", errors="replace") if log.is_file() else ""
         status = meta["status"]
+        if status in ("paused", "resumed"):
+            return {"args": meta["args"], "log": log, "result": Path(meta["result"]) if meta["result"] else None,
+                    "status": status, "started": meta["started"], "why": meta.get("why", ""),
+                    "next": meta.get("next", "")}
         if status == "running":  # started by an earlier run of the app: read the outcome from the log
             # still running: its process is alive (a long silent step, like extracting simc, writes nothing for
             # minutes); without a pid (an older app), a log written in the last 15 min
@@ -295,7 +345,48 @@ class Jobs:
             status = "done" if "Prep sheet:" in text else "failed" if "Traceback" in text else (
                 "running" if alive else "stopped")
         return {"args": meta["args"], "log": log, "result": Path(meta["result"]) if meta["result"] else None,
-                "status": status, "started": meta["started"]}
+                "status": status, "started": meta["started"], "pid": meta.get("pid")}
+
+    def pause(self, jid: str, why: str = "") -> bool:
+        """Stop a running prep so it can go on later (Resume): the kills it downloaded and the Warcraft Logs answers
+        stay in the corpus and the cache; its sims run again. `why`: 'update' when an update paused it (the app
+        resumes it at its next start)."""
+        from paf.jobrun import kill_tree
+
+        job = self.get(jid)
+        if job is None or job["status"] != "running":
+            return False
+        pid = job.get("pid") or (self.jobs.get(jid) or {}).get("pid")
+        live = self.jobs.get(jid, job)
+        live.update(status="paused", why=why)
+        self._save(jid, live)
+        if pid:
+            kill_tree(int(pid))
+        return True
+
+    def resume(self, jid: str) -> str | None:
+        """Start a paused prep again (a new job, the same command); the paused one points to it."""
+        job = self.get(jid)
+        if job is None or job["status"] != "paused":
+            return job.get("next") if job else None
+        new = self.start(job["args"], job["result"])
+        job.update(status="resumed", next=new)
+        self._save(jid, job)
+        return new
+
+    def paused(self, why: str | None = None) -> list[str]:
+        """The paused jobs (for one reason, when given), most recent first."""
+        import json
+
+        out = []
+        for p in sorted((data_dir() / "web").glob("job-*.json"), key=lambda p: -p.stat().st_mtime):
+            try:
+                meta = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if meta.get("status") == "paused" and (why is None or meta.get("why") == why):
+                out.append(p.stem[4:])
+        return out
 
 
 def pid_alive(pid: int) -> bool:
@@ -1372,7 +1463,10 @@ var poll=setInterval(function(){{fetch('/job/{e(jid)}?part=live').then(function(
 if(h.indexOf('data-reload')>=0){{clearInterval(poll);location.reload();return}}
 var box=document.getElementById('live');var open=box.querySelector('details[open]');box.innerHTML=h;
 if(open){{var d=box.querySelector('details');if(d)d.open=true}}}}).catch(function(){{}})}},{POLL_S * 1000})}})();</script>"""
-    return page("Preparing...", f"<div id='live'>{live}</div>{guide_preview(job['args'])}{js}", job=jid)
+    if status != "running":  # paused, stopped or failed: nothing to follow (a paused page must not reload itself)
+        js = ""
+    return page("Preparing..." if status == "running" else "Prep", f"<div id='live'>{live}</div>"
+                f"{guide_preview(job['args'])}{js}", job=jid)
 
 
 POLL_S = 5  # the prep page asks for its live part this often
@@ -1415,7 +1509,20 @@ def prep_live(jid: str, job: dict, log: str, elapsed: int) -> str:
                 f"<span class='jb-bar big'><span style='width:{pct}%'></span></span>")
         calm = ("<div class='leave'><b>You can leave this page.</b> The prep keeps running: a banner on top of every "
                 "page shows how far it is, and its sheet appears on the home page. You can even close the app.</div>"
-                "<p class='small muted'>Your computer stays usable: the simulations run at low priority.</p>")
+                "<p class='small muted'>Your computer stays usable: the simulations run at low priority.</p>"
+                f"<form method='post' action='/job/{e(jid)}/pause' class='cta'><button class='btn ghost'>Pause this "
+                "prep</button><span class='small muted'>Resume it whenever you want: the logs already read are kept."
+                "</span></form>")
+    elif status == "paused":
+        why = " for the update" if job.get("why") == "update" else ""
+        head = "The prep is paused"
+        lead = (f"Paused{why}. It goes on from the logs already read; the sims of this boss run again."
+                f"<form method='post' action='/job/{e(jid)}/resume' class='cta'><button class='btn'>Resume the prep"
+                "</button></form>")
+        calm = ""
+    elif status == "resumed":
+        head, calm = "The prep was resumed", ""
+        lead = f"<a class='btn' href='/job/{e(job.get('next', ''))}'>Follow it</a>"
     else:
         head = "The prep stopped" if status == "stopped" else f"The prep failed ({e(status)})"
         lead = ("The log below says why. Go back to the boss page to try again, or "
@@ -1677,7 +1784,14 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/feedback":
                 self._send(page("Feedback", send_feedback(form)))
             elif self.path == "/update":
-                self._send(page("Update", run_update()))
+                self._send(page("Update", run_update(pause=bool(form.get("pause")))))
+            elif self.path.startswith("/job/") and self.path.endswith(("/pause", "/resume")):
+                jid = self.path.split("/")[2]
+                if self.path.endswith("/pause"):
+                    JOBS.pause(jid)
+                    self._redirect(f"/job/{jid}")
+                else:
+                    self._redirect(f"/job/{JOBS.resume(jid) or jid}")
             elif self.path == "/update/check":
                 from paf import update
 

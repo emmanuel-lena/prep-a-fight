@@ -16,6 +16,27 @@ from pathlib import Path
 from paf.config import data_dir
 
 
+def kill_tree(pid: int) -> None:
+    """Stop a job's process and everything it started (simc): stopping the Python process alone left simc running."""
+    import os
+    import signal
+
+    try:
+        if sys.platform == "win32":
+            subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, timeout=30,
+                           creationflags=0x08000000)
+        else:
+            try:
+                os.killpg(os.getpgid(pid), signal.SIGTERM)  # its own session: the whole group
+            except (ProcessLookupError, PermissionError):
+                os.kill(pid, signal.SIGTERM)
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+SESSION = {} if sys.platform == "win32" else {"start_new_session": True}  # posix: a job's group can be stopped
+
+
 def run_job(args: list[str], result: Path | None = None, should_stop: Callable[[], bool] | None = None,
             on_start: Callable[[str], None] | None = None, log=print) -> tuple[str, str]:
     """Run `paf <args>` to its end: (job id, 'done' | 'failed' | 'stopped'). should_stop is asked every 2 s (the job
@@ -33,7 +54,8 @@ def run_job(args: list[str], result: Path | None = None, should_stop: Callable[[
     flags = {"creationflags": 0x08000000} if sys.platform == "win32" else {}  # CREATE_NO_WINDOW
     with (folder / f"job-{jid}.log").open("w", encoding="utf-8", errors="replace") as out:
         proc = subprocess.Popen([_python(), "-m", "paf", *args], stdout=out, stderr=subprocess.STDOUT,
-                                env={**_env(), "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}, **flags)
+                                env={**_env(), "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}, **flags,
+                                **SESSION)
         meta["pid"] = proc.pid
         save()
         if on_start:
@@ -41,7 +63,7 @@ def run_job(args: list[str], result: Path | None = None, should_stop: Callable[[
         while proc.poll() is None:
             time.sleep(2)
             if should_stop and should_stop():
-                proc.terminate()
+                kill_tree(proc.pid)
                 proc.wait()
                 meta["status"] = "stopped"
                 save()

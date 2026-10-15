@@ -112,3 +112,18 @@ def test_a_queue_cut_off_by_a_shutdown_goes_on_at_launch(home, monkeypatch):
     q["stop"] = True  # stopped by the player: stays stopped
     raidqueue.save(q)
     assert not raidqueue.resume() and len(started) == 1
+
+
+def test_a_queue_paused_by_an_update_goes_on_at_launch(home, monkeypatch):
+    from paf import characters
+
+    monkeypatch.setattr(characters, "current_slug", lambda: "zapper-shaman")
+    started = []
+    monkeypatch.setattr(raidqueue, "spawn_runner", lambda: started.append(1))
+    q = raidqueue.build(ENCS, "heroic", "zapper-shaman", set())
+    q["pid"] = 999999
+    raidqueue.save(q)
+    raidqueue.pause("update")
+    assert raidqueue.load()["paused"] == "update" and raidqueue.load()["stop"]
+    assert raidqueue.resume() and started  # the app opens again after the update: the queue goes on
+    assert not raidqueue.load()["stop"] and raidqueue.load()["paused"] == ""

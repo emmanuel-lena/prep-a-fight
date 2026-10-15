@@ -117,7 +117,9 @@ def _after_reset() -> None:
     try:
         from paf import raidqueue, web
 
-        if raidqueue.resume():  # cut off by the computer's shutdown: it goes on
+        if web.resume_paused("update"):  # paused by the update that just installed: they go on
+            print("Resuming the preps the update paused", flush=True)
+        if raidqueue.resume():  # cut off by the computer's shutdown, or paused by an update: it goes on
             print("Preparing the raid again where it was cut off", flush=True)
         elif raidqueue.after_reset(web.journal_order(web._encounters())):
             print("New week: preparing the raid again", flush=True)

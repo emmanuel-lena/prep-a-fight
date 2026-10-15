@@ -93,10 +93,12 @@ def start(q: dict) -> bool:
 
 
 def _keep(q: dict) -> None:
-    """The runner saves its queue without losing a stop asked meanwhile (by the app or the icon's menu)."""
+    """The runner saves its queue without losing a stop or a pause asked meanwhile (by the app or the icon's menu)."""
     now = load()
     if now and now.get("stop"):
         q["stop"] = True
+        if now.get("paused"):
+            q["paused"] = now["paused"]
     save(q)
 
 
@@ -110,6 +112,16 @@ def spawn_runner() -> None:
         subprocess.Popen([_python(), "-m", "paf", "raidqueue"], stdout=out, stderr=subprocess.STDOUT,
                          creationflags=flags, env={**_env(), "PYTHONIOENCODING": "utf-8", "PYTHONUNBUFFERED": "1"},
                          **({} if sys.platform == "win32" else {"start_new_session": True}))
+
+
+def pause(why: str) -> None:
+    """Pause the queue (an update): the prep running now is stopped and redone when the queue goes on; resume()
+    restarts a queue paused for an update at the app's next start."""
+    q = load()
+    if q:
+        q["stop"] = True
+        q["paused"] = why
+        save(q)
 
 
 def stop() -> None:
@@ -217,8 +229,10 @@ def run(log=print) -> int:
                 [("Open prep-a-fight", _open_app), ("Stop preparing", stop)], _open_app)
     try:
         while True:
-            q["stop"] = (load() or q).get("stop", False)
+            now = load() or q
+            q["stop"] = now.get("stop", False)
             if q["stop"]:
+                q["paused"] = now.get("paused", "")
                 break
             if characters.current_slug() != q["character"]:
                 q["paused"] = "character"
@@ -268,6 +282,9 @@ def resume() -> bool:
     from paf import characters
 
     q = load()
+    if q and q.get("paused") == "update" and not runner_alive(q):  # paused by an update: it goes on now
+        q.update(stop=False, paused="")
+        save(q)
     if not q or runner_alive(q) or q.get("finished") or q.get("stop") or q.get("paused"):
         return False
     if q.get("character") != characters.current_slug():

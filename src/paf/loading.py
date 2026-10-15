@@ -121,6 +121,19 @@ def banner(jid: str, job: dict) -> str:
             f"<span class='jb-bar'><span style='width:{pct}%'></span></span><span class='jb-go'>See &rarr;</span></a>")
 
 
+def paused_banner(jid: str, job: dict) -> str:
+    return (f"<div class='job-banner paused' data-job='{e(jid)}'><span class='jb-txt'>The prep of "
+            f"<b>{e(_boss_name(job['args']))}</b> is paused</span><form method='post' action='/job/{e(jid)}/resume'>"
+            f"<button class='btn ghost'>Resume</button></form></div>")
+
+
 def banners(skip: str = "") -> str:
-    """The banner of each prep running (but the one whose page this is)."""
-    return "".join(banner(jid, job) for jid, job in running_preps() if jid != skip)
+    """The banner of each prep running (but the one whose page this is), then of each prep paused."""
+    from paf.web import JOBS
+
+    out = "".join(banner(jid, job) for jid, job in running_preps() if jid != skip)
+    for jid in JOBS.paused()[:3]:
+        job = JOBS.get(jid)
+        if jid != skip and job and (job.get("args") or [""])[0] == "prep":
+            out += paused_banner(jid, job)
+    return out

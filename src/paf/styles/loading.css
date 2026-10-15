@@ -30,3 +30,5 @@
 .leave{margin:14px 0 6px;padding:12px 16px;border-radius:12px;border:1px solid color-mix(in srgb,var(--pos) 45%,var(--line));
   background:color-mix(in srgb,var(--pos) 10%,var(--surface));font-size:15.5px;line-height:1.5;max-width:720px}
 @media (prefers-reduced-motion:reduce){#paf-load.on .pl-bar{animation:none;width:60%}.pl-spin,.busy .btn.go::after{animation:none}}
+.job-banner.paused{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.job-banner.paused form{margin:0}
