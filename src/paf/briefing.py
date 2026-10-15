@@ -283,21 +283,41 @@ def aim_html(d) -> str:
     return f"<div class='aim rv'>{cells}</div>"
 
 
-def spec_html(d) -> str:
-    """Your class's damage specs on this fight (paf.specgear), in one sentence under what to aim for: advice for
-    you only, never about another player."""
-    s = getattr(d, "specs", None)
-    if not s or not s.get("sentence"):
-        return ""
+def spec_role(s: dict) -> str:
+    role = "padding the adds (total damage)" if s.get("role") == "total" else "boss damage"
+    n = s.get("assigns") or 0
+    return role + (f", with your {n} assignment{'s' if n != 1 else ''}" if n else "")
+
+
+def spec_gaps(s: dict) -> list[tuple[str, float | None, str]]:
+    """(spec, its gap on you in %, its class: go | same | low) for each spec simmed, yours first (gap None)."""
     rows = [r for r in s.get("rows") or [] if r.get("sim")]
     mine = next((r for r in rows if r["spec"] == s.get("mine")), None)
-    others = ""
-    if mine and len(rows) > 1:
-        others = " (" + ", ".join(f"{r['label']} {100 * (r['sim'] / mine['sim'] - 1):+.0f}%"
-                                   for r in sorted(rows, key=lambda r: -r["sim"]) if r is not mine) + " in the sim)"
-    kind = {"go": "go", "warn": "warn"}.get(s.get("verdict"), "ok")
-    return (f"<p class='spec-say {kind} rv'><b>Your spec on this boss.</b> {e(s['sentence'])}"
-            f"<span class='muted'>{e(others)}</span></p>")
+    if mine is None:
+        return []
+    out: list[tuple[str, float | None, str]] = [(mine["label"], None, "mine")]
+    for r in sorted((r for r in rows if r is not mine), key=lambda r: -r["sim"]):
+        gap = 100 * (r["sim"] / mine["sim"] - 1)
+        noise = 2 * ((r.get("error") or 0) ** 2 + (mine.get("error") or 0) ** 2) ** 0.5
+        out.append((r["label"], gap, "go" if gap > noise and s.get("verdict") == "go" else
+                    "same" if abs(gap) <= noise else "low" if gap < 0 else "up"))
+    return out
+
+
+def spec_html(d) -> str:
+    """We simmed your character in each damage spec of your class (paf.specgear): one tile per spec with its gap on
+    you, for your role and assignments on this fight. Advice for you only, never about another player."""
+    s = getattr(d, "specs", None)
+    gaps = spec_gaps(s) if s else []
+    if len(gaps) < 2:
+        return ""
+    tiles = "".join(
+        f"<div class='spt {kind}'><span class='spt-n'>{e(name)}</span><span class='spt-v'>"
+        f"{'your spec' if gap is None else 'same' if kind == 'same' else f'{gap:+.0f}%'}</span></div>"
+        for name, gap, kind in gaps)
+    return (f"<div class='specs rv'><p class='specs-head'><b>We simmed your character in each spec of your class"
+            f"</b> <span class='muted'>for {e(spec_role(s))}, on this fight</span></p>"
+            f"<div class='spt-row'>{tiles}</div></div>")
 
 
 def confidence_pill(d) -> str:

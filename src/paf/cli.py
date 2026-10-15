@@ -1171,11 +1171,14 @@ def cmd_prep(args: argparse.Namespace) -> int:
 
     if len(specgear.DAMAGE_SPECS.get(cls, ())) > 1 and spec in specgear.DAMAGE_SPECS.get(cls, ()):
         step("Your class's specs on this boss")
-        try:  # your character in each damage spec of your class, on this fight (paf.specgear)
+        try:  # your character in each damage spec of your class, on this fight with your assignments (paf.specgear)
+            from paf.prep_report import wanted
+
+            role = wanted(d) or "boss"  # padding: total damage; else boss damage
             sg = specgear.compare(profile_text, client, enc, diff, diff_name, cls, spec, fight.to_simc(),
                                   root / "specs", character=_active_character(), target_error=args.error,
-                                  log=lambda m: print(m, flush=True))
-            d.specs = specgear.to_json(sg)
+                                  metric="dps" if role == "total" else "bossdps", log=lambda m: print(m, flush=True))
+            d.specs = specgear.to_json(sg) | {"role": role, "assigns": len(d.assigns)}
             print(f"  {d.specs['sentence']}")
         except Exception as ex:  # noqa: BLE001 - an extra of the prep: never fails it
             print(f"  your class's specs: skipped ({str(ex)[:120]})")

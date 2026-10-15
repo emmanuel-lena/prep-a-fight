@@ -48,10 +48,15 @@ def test_what_to_aim_for_comes_first_in_the_overview():
     assert "200k" in alone and "The best" not in alone
 
 
-def test_your_spec_on_this_boss_is_said_under_what_to_aim_for():
-    d = SimpleNamespace(specs={"verdict": "ok", "mine": "Subtlety", "sentence": "Subtlety fits this boss: ...",
-                               "rows": [{"spec": "Subtlety", "label": "Subtlety", "sim": 100.0},
-                                        {"spec": "Outlaw", "label": "Outlaw", "sim": 94.0}]})
+def test_your_character_in_each_spec_shows_as_tiles_for_your_role():
+    rows = [{"spec": "Subtlety", "label": "Subtlety", "sim": 100.0, "error": 0.1},
+            {"spec": "Outlaw", "label": "Outlaw", "sim": 106.0, "error": 0.1},
+            {"spec": "Assassination", "label": "Assassination", "sim": 99.9, "error": 0.1}]
+    d = SimpleNamespace(specs={"verdict": "go", "mine": "Subtlety", "role": "boss", "assigns": 1, "rows": rows})
     html = briefing.spec_html(d)
-    assert "Your spec on this boss." in html and "Subtlety fits this boss" in html and "Outlaw -6%" in html
+    assert "We simmed your character in each spec of your class" in html
+    assert "for boss damage, with your 1 assignment, on this fight" in html
+    assert "<div class='spt mine'><span class='spt-n'>Subtlety</span><span class='spt-v'>your spec</span>" in html
+    assert "<div class='spt go'><span class='spt-n'>Outlaw</span><span class='spt-v'>+6%</span>" in html
+    assert "<div class='spt same'><span class='spt-n'>Assassination</span><span class='spt-v'>same</span>" in html
     assert briefing.spec_html(SimpleNamespace(specs=None)) == ""

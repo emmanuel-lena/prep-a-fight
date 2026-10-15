@@ -122,9 +122,14 @@ def change_card(d) -> str:
                     f"</span></div></li>")
     s = getattr(d, "specs", None)
     if s and s.get("verdict") == "go":  # another spec of your class does clearly more here, sim and logs agree
-        spec_ic = icons.img(icons.CLASS_ICON.format(cls=d.class_name.lower()), "medium") if d.class_name else ""
-        rows.append(f"<li>{spec_ic}<div><b>{e(s.get('title') or 'Another spec could do more here')}</b>"
-                    f"<span class='what'>{e(s.get('sentence', ''))}</span></div></li>")
+        from paf.briefing import spec_gaps, spec_role
+
+        best = next(((name, gap) for name, gap, kind in spec_gaps(s) if kind == "go"), None)
+        if best:
+            spec_ic = icons.img(icons.CLASS_ICON.format(cls=d.class_name.lower()), "medium") if d.class_name else ""
+            rows.append(f"<li>{spec_ic}<div><b>{e(best[0])} could do {best[1]:+.0f}%</b><span class='what'>We simmed "
+                        f"your character in each spec: for {e(spec_role(s))}, on this boss. The top "
+                        f"{e(best[0])} players are ahead too.</span></div></li>")
     if getattr(d, "imported", False):  # no bags: the best gear and the loot need the /simc export
         rows.append("<li><span class='ok bad' aria-hidden='true'>!</span><div><b>Paste your /simc export</b>"
                     "<span class='what'>Your character was read from a log, without your bags: with /simc the "
