@@ -235,13 +235,13 @@ body.autoclock .fv .t.missed::after{content:' · no press'}
 
 /* second screen: a boss mod */
 .fv .ss{position:fixed;inset:0;z-index:50;background:var(--bg);display:none;overflow:auto;padding:max(22px,env(safe-area-inset-top,0px)) max(32px,env(safe-area-inset-right,0px)) 24px max(32px,env(safe-area-inset-left,0px))}
-.fv .ss.open{display:grid;grid-template-rows:auto 1fr auto;gap:18px}
+.fv .ss.open{display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:18px}  /* the controls stay in view: the middle scrolls */
 .fv .ss-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .fv .ss-top #ss-close{margin-left:auto}
 .fv .ss-top h2{font:600 1.15rem var(--font-reading);margin:0;display:flex;align-items:center;gap:10px}
 .fv .ss-clock{font:700 30px/1 var(--font-display);font-variant-numeric:tabular-nums}
 .fv .ss-phase{font-size:14px;color:var(--muted)}
-.fv .ss-mid{display:grid;align-content:start;justify-items:center;gap:22px;padding-top:6vh}
+.fv .ss-mid{display:grid;align-content:start;justify-items:center;gap:22px;padding-top:4vh;overflow:auto;min-height:0}
 .fv .ss .call{min-height:300px;align-content:start;grid-template-rows:auto auto 1fr}
 .fv .ss .call .win{align-self:end}
 .fv .ss .call .lab{min-height:114px}

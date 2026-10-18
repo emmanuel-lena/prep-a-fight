@@ -543,6 +543,13 @@ def suggestions(d: PrepData) -> list[Suggestion]:
                            for k in ks) + f": {e(phrase)}" for phrase, ks in by_rule.items()]
         others = ", ".join(f"{_goal(o)} damage {v:+.1f}%" for o, v in p.totals.items()
                            if o not in (p.objective, "adds"))
+        played_p = simple_plan(d)
+        if played_p is not None and played_p is not p and played_p.gain > 2 * played_p.error:  # the real cost
+            for o in ("total", "boss"):
+                if o in p.totals and o in played_p.totals and o != p.objective:
+                    rel = 100 * ((1 + p.totals[o] / 100) / (1 + played_p.totals[o] / 100) - 1)
+                    others += f"; {_goal(o)} damage {rel:+.1f}% vs the plan the sheet plays"
+                    break
         if others:
             lines.append(f"<span class='muted small'>Also: {e(others)}.</span>")
         if d.mrt.get(p.objective):
@@ -688,8 +695,13 @@ def export_html(d: PrepData) -> str:
     """The rebuilt fight as simc lines, to sim it on Raidbots or anywhere else."""
     buttons = " ".join(copy_button(text, "Copy the fight" if not label else f"Copy the fight + plan for {label}")
                        for label, text in d.export.items())
+    fi = d.fight
+    has = ["duration"] + [w for w, on in (("add waves", fi and fi.add_waves), ("immune windows", fi and fi.invulnerable),
+                                          ("damage windows", fi and fi.vulnerable), ("movement", fi and fi.movement),
+                                          ("Bloodlust", fi and fi.lust_time is not None),
+                                          ("Power Infusion", fi and fi.power_infusion)) if on]  # only what it holds
     return f'''<h2>Sim this fight on Raidbots</h2><div class="card"><p class="small">The fight above as SimulationCraft
-lines: duration, add waves, immune and vulnerable windows, movement, Bloodlust, Power Infusion. On
+lines: {e(", ".join(has))}. On
 <a href="https://www.raidbots.com/simbot/advanced" target="_blank" rel="noopener">Raidbots, Advanced</a>: paste your
 <code>/simc</code> export, then these lines under it, in the same box. Leave the fight style out (Patchwerk removes
 the raid events).</p><p>{buttons}</p></div>'''
@@ -728,8 +740,8 @@ def defensives_html(d: PrepData) -> str:
 def nsrt_block(note: str) -> str:
     if not note:
         return ""
-    return (f'<h4>Northern Sky Raid Tools reminders {copy_button(note, "Copy for NSRT")}</h4><p class="tiny muted">Personal '
-            f'reminders, times from each phase.</p><pre class="small note-pre">{e(note)}</pre>')
+    return (f'<div class="nb"><h4>Northern Sky Raid Tools reminders {copy_button(note, "Copy for NSRT")}</h4><p '
+            f'class="tiny muted">Personal reminders, times from each phase.</p><pre class="small note-pre">{e(note)}</pre></div>')
 
 
 def suggestions_html(d: PrepData) -> str:
@@ -1068,8 +1080,11 @@ def render(d: PrepData) -> str:
                 tabs["raid"].append(f"{head}<div class='ws-answer'>"
                                     f"{workshop_views.render({'kind': kind, **tools[kind]})}</div>")
         tabs["raid"].append(workshop_views.CSS)
-    if d.raid and (d.raid.verdicts or any(c for _t, c, _l, _n in d.waves)):  # no adds: nothing to decide, no section
+    adds = any(c for _t, c, _l, _n in d.waves)
+    if d.raid and (d.raid.verdicts or adds):
         tabs["raid"].append(raid_section(d.raid, bool(d.gear or d.loot)))
+    elif d.raid or not adds:  # no adds on this boss: nothing to decide, no section
+        pass
     else:
         tabs["raid"].append("""<h2>Your raid and the adds</h2><div class="card"><p>Not set for this prep. Set your guild
 on the home page of the app (its latest public log is used), or paste one of your raid's logs on the boss page: the prep
@@ -1189,13 +1204,13 @@ for reference: a build can be worse there and much better on this fight. Error a
             blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, err=1e9 if p.objective == "secondary" or _stall(d, p) else 0.0)}
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span>{" <span class='pill gold'>the sheet plays this plan</span>" if p.objective == first else ""}</h3>
 {("<p class='small'>Played because " + ("your raid pads the adds" if p.objective == "total" else "your raid stays on the boss" if p.objective == "boss" else "it is your choice") + " (see Your raid, in this section)." + (" When the plan presses a burst while the boss is immune, the fight tab moves it onto the adds that spawn then." if d.fight is not None and d.fight.invulnerable else "") + "</p>") if p.objective == first and p.objective in ("boss", "total") else ""}
-{"<p class='small muted'>Burst damage counts only the damage on " + e(burst_names(d)[1] or "the burst targets") + ": worth it only if your raid needs them dead fast" + ("." if _stall(d, p) else ", at the cost of the boss and total damage above.") + "</p>" if p.objective == "secondary" else ""}
+{"<p class='small muted'>Burst damage counts only the damage on " + e(burst_names(d)[1] or "the burst targets") + ": worth it only if your raid needs " + e(burst_names(d)[1] or "them") + " dead fast" + ("." if _stall(d, p) else ", at the cost of the boss and total damage above.") + "</p>" if p.objective == "secondary" else ""}
 {checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases, links=d.links)}
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
 {"<p class='small muted'>The cooldowns not listed follow SimC's default priority list: their times can move with the ones the plan holds.</p>" if changed else ""}
 <div class="pp-grid"><div><h4>Play-by-play of one simulated pull</h4><div class="scroll pp"><table>
 <tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></div>
-{(f'<div><h4>MRT note {copy_button(note, "Copy the MRT note")}</h4><pre class="small note-pre">{e(note)}</pre>'
+{(f'<div><div class="nb"><h4>MRT note {copy_button(note, "Copy the MRT note")}</h4><pre class="small note-pre">{e(note)}</pre></div>'
   + nsrt_block(d.nsrt.get(p.objective, "")) + "</div>") if (changed or p.objective == first) and note else
  "<div><p class='small muted'>The default priority list as it is: no note to paste. The fight tab's note has its "
  "presses and your defensives.</p></div>"}</div>

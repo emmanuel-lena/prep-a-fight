@@ -102,7 +102,7 @@ th.n{text-align:right}
 /* a plan's play-by-play over its notes, the MRT note and the NSRT reminders side by side */
 .pp-grid{grid-template-columns:minmax(0,1fr)!important}
 @media (min-width:1100px){.pp-grid>div:last-child{column-count:2;column-gap:24px}
-  .pp-grid>div:last-child>h4{break-after:avoid} .pp-grid>div:last-child .note-pre{break-inside:avoid}}
+  .pp-grid>div:last-child>h4{break-after:avoid} .pp-grid>div:last-child .note-pre,.pp-grid .nb{break-inside:avoid}}
 .pp-grid .pp{max-height:none}
 /* the plan the sheet plays carries the emphasis, not the biggest number */
 .sugg.major:not(.rec){border-left-color:var(--line)!important} .sugg.rec{border-left:3px solid var(--accent)!important}

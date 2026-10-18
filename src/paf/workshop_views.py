@@ -319,7 +319,7 @@ def comp(d: dict) -> str:
                    f"<i>{e(t['name'])}</i>.</p><p class='lab'>The specs of your raid that hit both bosses the hardest"
                    "</p>")
         elif t["players"]:
-            kind = "Whole raid, plus a few" if t["whole_raid"] else "Assigned"
+            kind = "Whole raid" if t["whole_raid"] else "Assigned"
             say = (f"<p><span>{'The whole raid hits it, and in the top raids' if t['whole_raid'] else 'In the top raids,'}"
                    f"</span> <b class='num'>{t['players']}</b> <span>players stay on it</span></p>"
                    "<p class='lab'>The specs of your raid that do the most damage on it</p>")

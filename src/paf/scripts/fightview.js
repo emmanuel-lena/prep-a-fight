@@ -461,6 +461,7 @@
       var l = pts[pts.length - 1]; return l[1] + (t - l[0]) * 2;
     };
   }
+  var LANE = { move: 0, adds: 1, immune: 2, lust: 2, cd: 0, pot: 1, def: 2 };
   function layout() {
     var tl = $('tl'); if (!tl || !tl.offsetParent) return;
     tl.querySelectorAll('.strip').forEach(function (x) { x.remove(); });
@@ -468,7 +469,11 @@
     var sb = spine.getBoundingClientRect(), tlb = tl.getBoundingClientRect(), lanes = { boss: 0, you: 0 };
     FV.strips.forEach(function (s) {
       var y0 = yAt(s.t), y1 = yAt(s.t + s.d), el = document.createElement('div');
-      var side = s.side === 'boss' ? -1 : 1, lane = lanes[s.side]++ % 3;
+      // one lane per kind, the same in every stage: the same meaning always in the same column
+      var side = s.side === 'boss' ? -1 : 1, lane = LANE[s.k] != null ? LANE[s.k] : lanes[s.side]++ % 3;
+      var busy = lanes['b' + s.side] = lanes['b' + s.side] || {};
+      while ((busy[lane] || -1e9) > s.t) lane += 3;  // two at once of a kind: the second one further out
+      busy[lane] = s.t + s.d;
       el.className = 'strip s-' + s.k; el.setAttribute('aria-hidden', 'true'); el.title = s.n + ', ' + Math.round(s.d) + ' s';
       el.style.top = y0 + 'px'; el.style.height = Math.max(6, y1 - y0) + 'px';
       el.style.left = (sb.left - tlb.left + sb.width / 2 + side * (14 + lane * 9) - 3) + 'px';
