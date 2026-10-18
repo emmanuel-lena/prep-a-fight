@@ -1203,12 +1203,12 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
     except Exception:  # noqa: BLE001 - no pack: the choice stays offered
         pass
     if no_adds:
-        goal_html = ('<section class="ob-step" data-step="goal"><h2>Your goal on this boss</h2>'
+        goal_html = ('<section class="ob-step" data-step="goal"><h2><span class="vh">Step 1 of 4: </span>Your goal on this boss</h2>'
                      '<p>No adds on this boss: the prep plays for <b>boss damage</b>.</p>'
                      '<input type="hidden" name="goal" value="boss">'
                      f'<div class="ob-actions">{nxt}</div></section>')
     else:
-        goal_html = ('<section class="ob-step" data-step="goal"><h2>What do you want from this boss?</h2>'
+        goal_html = ('<section class="ob-step" data-step="goal"><h2><span class="vh">Step 1 of 4: </span>What do you want from this boss?</h2>'
                      '<div class="goals">' + """<label class="goal"><input type="radio" name="goal" value="boss"><span><b>Boss damage</b>
 <small>Progress: your raid lead wants everyone on the boss. Cooldowns and gear aim at the boss.</small></span></label>
 <label class="goal"><input type="radio" name="goal" value="total"><span><b>Pad the adds</b>
@@ -1222,15 +1222,15 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
 <input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
 <ol class="ob-dots" aria-hidden="true"><li></li><li></li><li></li><li></li></ol>
 {goal_html}
-<section class="ob-step" data-step="assigns"><h2>Are you assigned to something?</h2>{assigns}
+<section class="ob-step" data-step="assigns"><h2><span class="vh">Step 2 of 4: </span>Are you assigned to something?</h2>{assigns}
 <p class="small muted ob-note">Each assignment is simulated: its moves and its downtime change your cooldown plan and your gear.</p>
 <div class="ob-actions">{back}{nxt}</div></section>
-<section class="ob-step" data-step="raid"><h2>Your raid</h2>
+<section class="ob-step" data-step="raid"><h2><span class="vh">Step 3 of 4: </span>Your raid</h2>
 <input name="raid" style="width:100%" value="{e(raid_now)}"
 placeholder="Link to one of your raid's logs: https://www.warcraftlogs.com/reports/..." aria-label="Raid log link">
 <p class="small muted" style="margin-top:6px">{e(raid_hint(no_adds))}</p>
 <div class="ob-actions">{back}{nxt}</div></section>
-<section class="ob-step" data-step="go"><h2>Ready to prepare</h2>
+<section class="ob-step" data-step="go"><h2><span class="vh">Step 4 of 4: </span>Ready to prepare</h2>
 <ul class="recap">
 <li data-if="goal=boss">For <b>boss damage</b>.</li><li data-if="goal=total">For <b>total damage</b> (pad the adds).</li>
 <li data-if="goal=auto">Your raid's log decides between boss damage and padding.</li>
@@ -1385,7 +1385,7 @@ def plan_block(enc, difficulty: str) -> str:
 <code>pi 0:20 2:30</code>, <code>no boss-movement</code>. The mechanics ticked in "Are you assigned to something?" are added as <code>assign</code> lines.
 Every sim of the prep (gear, talents, cooldowns) runs on this fight.</p>
 <form method="post" action="/plan"><input type="hidden" name="boss" value="{enc.id}">
-<input type="hidden" name="difficulty" value="{e(difficulty)}"><textarea name="plan">{e(text)}</textarea>
+<input type="hidden" name="difficulty" value="{e(difficulty)}"><textarea name="plan" aria-label="Fight plan lines">{e(text)}</textarea>
 <p><button class="btn ghost">Save the plan</button></p></form>"""
 
 
@@ -1414,7 +1414,7 @@ def notes_block(enc, difficulty: str) -> str:
     return f"""<p class="small muted">Detected in the logs, with the evidence. Correct what the logs cannot tell (e.g. the
 real damage amp of a unit: <code>amp &lt;unit&gt; 2.0</code>), save, then prepare the fight again.</p>
 <form method="post" action="/notes"><input type="hidden" name="boss" value="{enc.id}">
-<input type="hidden" name="difficulty" value="{e(difficulty)}"><textarea name="notes">{e(text)}</textarea>
+<input type="hidden" name="difficulty" value="{e(difficulty)}"><textarea name="notes" aria-label="Boss notes">{e(text)}</textarea>
 <p><button class="btn ghost">Save the notes</button></p></form>"""
 
 

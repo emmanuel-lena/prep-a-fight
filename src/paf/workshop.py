@@ -140,7 +140,12 @@ READY_JS = ("<script>(function(s){var f=s&&s.form;if(!f)return;function goal(){v
             "||{}).dataset;na=na&&na.na;f.querySelectorAll('[name=objective]').forEach(function(r){var l=r.closest('label')"
             "||r;if(r.value==='total'||r.value==='all'){l.hidden=!!na;if(na&&r.checked){var b=f.querySelector("
             "'[name=objective][value=boss]');if(b)b.checked=true}}});if(f.dataset.addsOnly){var n=f.querySelector('.ws-noadds'),"
-            "g=f.querySelector('.ws-go .btn');if(n)n.hidden=!na;if(g)g.disabled=!!na}}s.addEventListener('change',goal);document.addEventListener('DOMContentLoaded',goal);goal();function up(){var c=f.querySelector("
+            "g=f.querySelector('.ws-go .btn');if(na){var o=[].filter.call(s.options,function(o){return !o.dataset.na})[0];"
+            "if(o){s.value=o.value;na=null}}if(n)n.hidden=!na;if(g)g.disabled=!!na}prep()}"
+            "function prep(){if(!f.dataset.needsPrep)return;var c=f.querySelector('[name=difficulty]:checked');"
+            "var o=s.options[s.selectedIndex],ok=!c||!o||(' '+o.dataset.r+' ').indexOf(' '+c.value+' ')>=0,"
+            "p=f.querySelector('.ws-noprep'),g=f.querySelector('.ws-go .btn');if(p)p.hidden=ok;"
+            "if(g&&!f.dataset.addsOnly)g.disabled=!ok}f.addEventListener('change',prep)s.addEventListener('change',goal);document.addEventListener('DOMContentLoaded',goal);goal();function up(){var c=f.querySelector("
             "'[name=difficulty]:checked')||f.querySelector('select[name=difficulty]');if(!c)return;"
             "[].forEach.call(s.options,function(o){if(o.dataset.n==null)return;o.textContent=o.dataset.n+((' '+"
             "o.dataset.r+' ').indexOf(' '+c.value+' ')>=0?' · has a sheet':'')})}f.addEventListener('change',"
@@ -197,10 +202,10 @@ def _field(kind: str, encounters: list) -> str:
                                                   if d != "lfr"], settings.get("difficulty"))
     if kind == "goal":
         return _segs("objective", "Your goal", [("boss", "Boss damage", "progress: everyone on the boss"),
-                                                ("total", "Total damage", "pad the adds, or parse")], "boss")
+                                                ("total", "Pad the adds", "total damage: the adds count too")], "boss")
     if kind == "goal3":
-        return _segs("objective", "Your goal", [("all", "Both", "a plan for each"),
-                                                ("boss", "Boss damage", ""), ("total", "Total damage", "")], "all")
+        return _segs("objective", "Your goal", [("all", "Both", "a plan for each"),  # the wizard's words
+                                                ("boss", "Boss damage", ""), ("total", "Pad the adds", "")], "all")
     if kind == "raid":
         g = settings.get("guild")
         hint = f"Empty: the latest public log of {g}." if g else "Or set your guild in Settings."
@@ -222,11 +227,13 @@ def tool_page(cmd: str, encounters: list) -> str | None:
     return (f"<div class='ws'>"
             f"<header class='ws-tool'>{_icon(t.icon, 'ws-big')}<div><h1>{e(t.title)}</h1><p class='lead'>{e(t.question)}"
             f"</p></div></header>"
-            f"<form method='post' action='/tool/{e(cmd)}' class='ws-form'{' data-adds-only=1' if cmd in ADDS_ONLY else ''}>"
+            f"<form method='post' action='/tool/{e(cmd)}' class='ws-form'{' data-adds-only=1' if cmd in ADDS_ONLY else ''}"
+            f"{' data-needs-prep=1' if t.needs_prep else ''}>"
             f"<input type='hidden' name='_curated' value='1'>"
             f"{fields}<p class='ws-gives'><b>You get:</b> {e(t.gives)}</p>{note}"
             "<p class='ws-note ws-noadds' hidden>No adds on this boss: nothing for this tool to read. Pick a boss with "
-            "adds.</p>"
+            "adds.</p><p class='ws-note ws-noprep' hidden>No sheet for this boss at this difficulty yet: prepare it from "
+            "<a href='/'>Home</a> first, then run this tool.</p>"
             f"<div class='ws-go'><button class='btn go'>Run it &rarr;</button><span class='muted small'>About "
             f"{e(t.minutes)} min, on your computer. You can leave the page: it keeps running.</span></div></form></div>{CSS}")
 

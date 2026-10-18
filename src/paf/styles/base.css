@@ -157,3 +157,4 @@ details.set-group[open]>summary::-webkit-details-marker,details.bc-more[open]>su
 details.card[open]>summary::before,details.more[open]>summary::before,details.set-group[open]>summary::before,
 details.bc-more[open]>summary::before{content:none}
 .nw{white-space:nowrap}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap} /* read by screen readers only */
