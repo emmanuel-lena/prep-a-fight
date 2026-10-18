@@ -122,6 +122,7 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
     if fight is None or not plan.timeline:
         return ""
     dur = fight.duration
+    px = max(px, 930 / max(dur, 1))  # the fight across the card's width, whatever its length
     W = int(dur * px) + 170
     x0 = 160
 
@@ -133,7 +134,9 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
     # time axis
     axis = "".join(f'<line x1="{x(s)}" y1="14" x2="{x(s)}" y2="100%" stroke="var(--line)"/>'
                    f'<text x="{x(s) + 2}" y="11" font-size="10" fill="var(--muted)">{_mmss(s)}</text>'
-                   for s in range(0, int(dur) + 1, 60))
+                   for s in range(0, int(dur) + 1, 60)) + (
+        f'<line x1="{x(dur)}" y1="14" x2="{x(dur)}" y2="100%" stroke="var(--muted)" stroke-dasharray="3 3"/>'
+        f'<text x="{x(dur) - 2}" y="11" font-size="10" fill="var(--muted)" text-anchor="end">kill {_mmss(dur)}</text>')
     # fight strip
     fight_row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">Fight</text>']
     for w in fight.add_waves:
@@ -177,7 +180,7 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
         rows.append("".join(row))
         y += 22
     return (f'<div class="scroll"><svg class="plan-tl" viewBox="0 0 {W} {y + 4}" width="100%" '
-            f'style="font-family:system-ui;max-width:{W * 1.35:.0f}px">{axis}'
+            f'style="font-family:system-ui;max-width:{W * 1.15:.0f}px">{axis}'
             f'{"".join(rows)}</svg></div><p class="small muted">Dots: this plan (one simulated pull). Pale bars: '
             f'when the top players cast the same cooldown. Green: add waves; gold: boss vulnerability windows '
             f'(x = damage taken); grey: boss away; pink line: Bloodlust.</p>')
