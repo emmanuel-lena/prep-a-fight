@@ -47,7 +47,8 @@ def lede_html(d) -> str:
                    f" A council of {len(members)} bosses, never stacked: the top players hit one at a time and start "
                    f"on {e(focus[0].name)}.")
     if d.add_share_spec is not None and not (focus and d.add_share_spec < 0.05):  # a council: said above
-        a = d.add_share_spec
+        real = getattr(d, "boss_share_real", None)  # the calibration's figure, said the same everywhere
+        a = 1 - real if real is not None else d.add_share_spec
         second += (f" The best {e(d.spec)} players keep {1 - a:.0%} of their damage on the boss and put {a:.0%} on the adds."
                   if a >= 0.05 else f" The best {e(d.spec)} players put {1 - a:.0%} of their damage on the boss.")
         from paf.prep_report import wanted

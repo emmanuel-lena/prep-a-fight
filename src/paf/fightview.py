@@ -223,8 +223,13 @@ def items(d) -> list[tuple[float, Item]]:
     if end:
         add(end, Item("boss", "kill", "The kill", f"The kill, around {_mmss(end)}"))
     cuts = sorted(s for _n, s in d.phases if s >= 1)
-    for w in (d.movement.windows if d.movement else []):  # the strategy's movement: a bar, never an event
-        a, b = w.start, w.start + w.duration
+    spans: list[list] = []  # back-to-back windows (one ends as the next starts) are one move
+    for w in sorted(d.movement.windows if d.movement else [], key=lambda w: w.start):
+        if spans and w.start - spans[-1][1] <= 1.0:
+            spans[-1][1] = max(spans[-1][1], w.start + w.duration)
+        else:
+            spans.append([w.start, w.start + w.duration, w])
+    for a, b, w in spans:  # the strategy's movement: a bar, never an event
         for s0, s1 in zip([a] + [c for c in cuts if a < c < b], [c for c in cuts if a < c < b] + [b], strict=True):
             long = s1 - s0 > MOVE_LONG
             add(s0, Item("boss", "move", "Movement", f"Movement from {_mmss(s0)} to {_mmss(s1)}" if long else

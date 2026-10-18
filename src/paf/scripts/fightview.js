@@ -153,7 +153,7 @@
     var moves = on.filter(function (b) { return b.k === 'move'; }).sort(function (a, b) { return until(b) - until(a); });
     on = on.filter(function (b) { return b.k !== 'move' || b === moves[0]; });  // overlapping moves: the longest
     return on.length ? on.map(function (b) {
-      if (b.k === 'move') return 'Moving until ' + mmss(until(b));
+      if (b.k === 'move') return 'Moving until ' + mmss(moveEnd(b));
       if (b.k === 'immune') return waiting(b.t) ? 'Intermission due: the boss goes immune any moment' : 'Boss immune, back in ' + secs(until(b) - t);
       return b.n;
     }).join(' · ') : '—';
@@ -195,6 +195,14 @@
       if (t >= (a >= 0 ? eff(N[a].t) : x[1])) p = x[0];
     });
     return p;
+  }
+  function moveEnd(b) {  // a move cut at a stage's start goes on in the next one: until the last of the chain
+    var end = until(b), more = true;
+    while (more) {
+      more = false;
+      B.forEach(function (m) { if (m.k === 'move' && !gone(m.t) && Math.abs(eff(m.t) - end) <= 1 && until(m) > end) { end = until(m); more = true; } });
+    }
+    return end;
   }
   function nextAnchor(t) { for (var i = 0; i < N.length; i++) if (N[i].k !== 'pull' && !gone(N[i].t) && eff(N[i].t) > t) return i; return -1; }
 
@@ -337,11 +345,15 @@
     if (!$('ss').open) return;
     var out = [], seen = {};
     var mine = [];
+    var groups = [];  // presses at the same second share one bar: the boss's events keep their room
     byEff().forEach(function (a) {
       var e = aeff(a), k = e.toFixed(0) + a.n;
       if (e < t - 0.5 || e > t + 60 || seen[k]) return;
-      seen[k] = 1; mine.push([e, a.n]); out.push(bar(e, t, 'mine', a.ic, 'You', a.n));
+      seen[k] = 1; mine.push([e, a.n]);
+      var g = groups.filter(function (g) { return Math.abs(g.e - e) < 1; })[0];
+      if (g) g.n.push(a.n); else groups.push({ e: e, ic: a.ic, n: [a.n] });
     });
+    groups.forEach(function (g) { out.push(bar(g.e, t, 'mine', g.ic, 'You', g.n.join(' + '))); });
     B.forEach(function (b) {  // the moves to come: a boss mod shows them too
       var e = eff(b.t);
       if (b.k === 'move' && b.d >= 5 && !gone(b.t) && e >= t - 0.5 && e <= t + 60) out.push(bar(e, t, 'boss', b.ic || '', 'Boss', 'Movement, ' + Math.round(b.d) + ' s'));
@@ -349,7 +361,8 @@
     N.forEach(function (a) {
       var e = eff(a.t);
       if (a.k === 'pull' || gone(a.t) || e < t - 0.5 || e > t + 60) return;
-      if (mine.some(function (m) { return Math.abs(m[0] - e) <= 1 && m[1].indexOf(a.n) >= 0; })) return;  // "Kill X" says it
+      var unit = a.n.replace(/^\d+ × /, '');  // "12 × Restless Amani": "Kill Restless Amani" says it
+      if (mine.some(function (m) { return Math.abs(m[0] - e) <= 1 && m[1].indexOf(unit) >= 0; })) return;
       out.push(bar(e, t, 'boss', a.ic, 'Boss', a.n));
     });
     B.forEach(function (b) {  // a boss cast that is no sync point (Dig In on its stage's start): still announced

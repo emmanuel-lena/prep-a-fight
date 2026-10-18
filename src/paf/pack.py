@@ -58,6 +58,7 @@ class PackData:
     # how much the top players cast and move (paf.review.tops_activity): busy, moving, [(busy, moving) per phase]
     activity: tuple | None = None
     version: int = VERSION
+    boss_share_waves: bool = False  # boss_share counts the boss units played as add waves as adds (packs since 0.7.5)
 
 
 def now_utc() -> str:

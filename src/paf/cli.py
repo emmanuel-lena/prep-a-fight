@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import time
 
@@ -1019,7 +1020,12 @@ def cmd_prep(args: argparse.Namespace) -> int:
     print(f"  {kills} kills, {len(fight.add_waves)} add waves / targets, duration {_mmss(fight.duration)}")
 
     step("Calibrating the fight on the logs")
-    target = pk.boss_share if pk is not None else real_boss_share(con, enc.id, diff, boss, spec)
+    waves = {re.sub(r"\s*\([^)]*\)", "", w.name).strip() for w in fight.add_waves}
+    local = real_boss_share(con, enc.id, diff, boss, spec, waves) if con is not None else None
+    target = local if local is not None else pk.boss_share if pk is not None else None
+    if local is None and pk is not None and not pk.boss_share_waves and any(not w.scalable for w in fight.add_waves):
+        d.notes.append("The top players' boss share comes from an older prep pack that counts boss units played as "
+                       "add waves (an Echo, a guardian) as the boss: the calibration leans toward fewer adds.")
     if target is not None:
         cal = calibrate(profile_text, fight, target, root / "calibrate")
         fight.add_scale = cal.scale
@@ -1226,7 +1232,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
         new = pack.PackData(enc.id, diff, cls, spec, pack.now_utc(), kills, boss, pack_fight, list(phases), add_share,
                             moving_share, target, d.validation, tl, tl_all, builds,
                             raidneed.add_types(con, enc.id, diff), mechs, d.actions, d.defensives,
-                            review_mod.tops_activity(con, enc.id, diff, spec))
+                            review_mod.tops_activity(con, enc.id, diff, spec), boss_share_waves=True)
         print(f"  prep pack saved: {pack.save(new)}")
         if settings.get("share_packs") == "on" and new.validation:
             print(f"  prep pack {pack.publish(new)}")
@@ -1357,7 +1363,6 @@ def cmd_prep(args: argparse.Namespace) -> int:
     except Exception as exc:  # noqa: BLE001 - only a convenience
         print(f"  (the sheet's data was not saved for a later render: {str(exc)[:120]})")
     import json
-    import re
 
     from paf.prep_report import suggestions
 

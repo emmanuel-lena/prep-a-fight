@@ -396,6 +396,9 @@ def raid_section(r: RaidInfo, gear: bool = True) -> str:
     verdict = (f"Stay on the boss: {what} the one{'s' if gear else ''} for boss damage." if r.objective == "boss"
                else f"Pad the adds: {what} the one{'s' if gear else ''} for total damage.")
     mine = f" On this boss your spec is <b>{e(r.your_archetype)}</b>." if r.your_archetype else ""
+    if r.objective != "boss" and "single" in (r.your_archetype or ""):  # why a single-target spec still pads
+        mine += (" Single target or not, your raid lacks the cleave to kill the adds in time: when they are up, "
+                 "your damage on them counts more than on the boss.")
     p = r.your_profile
     build = ""
     if p is not None:
@@ -1071,7 +1074,9 @@ and the gear for that.</p></div>""")
         if d.boss_share_real is not None and d.waves:
             cal = (f" The top players put {d.boss_share_real:.0%} of their damage on the boss in their logs: the rebuilt "
                    f"fight is tuned toward that by counting each add wave at {d.add_scale:g} of its size (SimC hits every "
-                   f"add in range, real players do not).")
+                   f"add in range, real players do not)." if (d.add_scale or 1) < 1 else
+                   f" The top players put {d.boss_share_real:.0%} of their damage on the boss in their logs; the rebuilt "
+                   f"fight keeps every add wave at its full size (the add counts come from the logs).")
         tabs["fight"].append(f"""<h2>Your character on this fight</h2><div class="card">
 <p>{d.sim_dps:,.0f} DPS on the rebuilt fight{boss}, vs {d.patchwerk_dps:,.0f} on a Patchwerk of the same length
 ({(d.sim_dps / d.patchwerk_dps - 1):+.0%}).{cal}</p></div>""")
@@ -1176,7 +1181,7 @@ for reference: a build can be worse there and much better on this fight. Error a
 <div class="pp-grid"><div><h4>Play-by-play of one simulated pull</h4><div class="scroll pp"><table>
 <tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></div>
 {(f'<div><h4>MRT note {copy_button(note, "Copy the MRT note")}</h4><pre class="small note-pre">{e(note)}</pre>'
-  + nsrt_block(d.nsrt.get(p.objective, "")) + "</div>") if changed else
+  + nsrt_block(d.nsrt.get(p.objective, "")) + "</div>") if (changed or p.objective == first) and note else
  "<div><p class='small muted'>The default priority list as it is: no note to paste. The fight tab's note has its "
  "presses and your defensives.</p></div>"}</div>
 </div>""")

@@ -23,11 +23,13 @@ SCALES = (0.1, 0.2, 0.3, 0.45, 0.6, 0.8, 1.0)
 
 
 def real_boss_share(con: sqlite3.Connection, encounter_id: int, difficulty: int, boss_name: str,
-                    spec: str) -> float | None:
+                    spec: str, waves: set[str] | frozenset[str] = frozenset()) -> float | None:
     """Median share of the ranked players' damage done to the boss, secondary boss units included (they share
-    the boss's health, e.g. a heart; in the simulated fight their damage is boss damage through `vulnerable`)."""
+    the boss's health, e.g. a heart; in the simulated fight their damage is boss damage through `vulnerable`).
+    A boss unit the rebuilt fight plays as an add wave (`waves`: Nek'zali's Echo of Jawae) counts as an add, as the
+    sims count it: compared with their boss-only share, it would make them look 20 points off."""
     where, params = kills_filter(encounter_id, difficulty)
-    boss_units = {r[0] for r in con.execute("SELECT name FROM npc WHERE is_boss=1")} | {boss_name}
+    boss_units = ({r[0] for r in con.execute("SELECT name FROM npc WHERE is_boss=1")} | {boss_name}) - set(waves)
     rows = con.execute(
         f"SELECT d.report, d.fight_id, d.target, d.amount FROM damage_by_target d "
         f"JOIN fight f USING(report, fight_id) JOIN ranked r USING(report, fight_id) "
