@@ -281,7 +281,7 @@ def page_body(difficulty: str) -> str:
         return head + (f"{err}<div class='rl-start'><p>The roster comes from your raid's last log: your last raid "
                        f"(read when the app starts), else your guild's latest log (Settings).</p>"
                        f"<form method='post' action='/raidlead/read'><input type='hidden' name='difficulty' "
-                       f"value='{e(difficulty)}'><button class='btn'>Read my raid's roster</button></form></div>"
+                       f"value='{e(difficulty)}'><button class='btn go'>Read my raid's roster</button></form></div>"
                        + _tools())
     bench = set(state.get("bench") or [])
     chips = "".join(

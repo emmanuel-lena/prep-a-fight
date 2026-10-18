@@ -92,6 +92,7 @@ def page_body() -> str:
     key_done = has_credentials()
     skip = "<button type='button' class='btn ghost skip'>Skip</button>"
     return f"""<div class="ob" data-key="{'1' if key_done else ''}">
+<p class="ob-brand">prep-a-<b>fight</b></p>
 <ol class="ob-dots" aria-hidden="true">{''.join('<li></li>' for _ in STEPS[1:])}</ol>
 
 <section class="ob-step" data-step="welcome">

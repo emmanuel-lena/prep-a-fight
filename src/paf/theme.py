@@ -36,7 +36,7 @@ HEAD = ('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="p
 
 BACK = ("<button type='button' class='nav-back' hidden aria-label='Go back' title='Go back' onclick='history.back()'>"
         "&larr; <span>Go back</span></button><script>(function(){var b=document.currentScript.previousElementSibling;"
-        "if(history.length>1&&['/','/reclear','/raidlead','/characters','/settings'].indexOf(location.pathname)<0)"
+        "if(history.length>1&&['/','/reclear','/raidlead','/characters','/settings','/feedback'].indexOf(location.pathname)<0)"
              "b.hidden=false;})();</script>")
 # a Home button with a little house, back to the home page from anywhere (hidden on the home page itself)
 HOME = ("<a class='nav-back nav-home' href='/' hidden aria-label='Home' title='Home'><svg viewBox='0 0 24 24' "
@@ -73,7 +73,7 @@ FEEDBACK = ("<a class='side-fb' href='/feedback' title='Feedback'>" + _svg("M4 5
 BACK_ICON = ("<button type='button' class='side-back' hidden aria-label='Go back' title='Go back' "
              "onclick='history.back()'>" + _svg("M15 5l-7 7 7 7") + "<span>Back</span></button>"
              "<script>(function(){var b=document.currentScript.previousElementSibling;"
-             "if(history.length>1&&['/','/reclear','/raidlead','/characters','/settings'].indexOf(location.pathname)<0)"
+             "if(history.length>1&&['/','/reclear','/raidlead','/characters','/settings','/feedback'].indexOf(location.pathname)<0)"
              "b.hidden=false;})();</script>")
 # the place the page belongs to, lit in the side bar
 SIDE_JS = ("<script>(function(){var p=location.pathname,best=null;document.querySelectorAll('.side-nav a').forEach("

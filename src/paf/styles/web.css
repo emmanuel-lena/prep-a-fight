@@ -202,4 +202,8 @@ h2 .btn.copy{margin-left:8px;vertical-align:middle;text-transform:none;letter-sp
 .boss-guide>h2:first-child{margin-top:4px}
 @media (min-width:1000px){.boss-main{position:sticky;top:24px;align-self:start}}
 .settings .cta{position:sticky;bottom:0;background:var(--surface);padding:12px 0;border-top:1px solid var(--line)}
-@media (max-width:1600px){.bcards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+.bcards{grid-template-columns:repeat(auto-fill,minmax(380px,1fr))}
+.ccard.on{border-color:var(--fg)} .ccard .cc-txt>b{font:600 18px var(--font-reading)} .ccard .cc-spec{font-weight:500}
+.rq-list li{grid-template-columns:2.2em minmax(0,1fr) auto;padding-block:6px;font-variant-numeric:tabular-nums}
+.set-cols td:first-child{width:150px}

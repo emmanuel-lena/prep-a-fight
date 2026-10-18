@@ -146,11 +146,6 @@ SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
          "Warcraft Logs points per hour (of 3600) the reading in the background may use; a prep you wait for "
          "uses the whole quota."),
         ("region", "Rankings from one region only", "EU, US, KR, TW or CN; empty for all regions."),
-        ("auto_logs", "Last raids read at start",
-         "\"active\" for the active character, else names separated by commas, empty for none (also set per "
-         "character in Characters)."),
-        ("class", "Class", "Follows the active character."),
-        ("spec", "Spec", "Follows the active character."),
         ("cache_max_mb", "Disk cache cap (MB)", "Sim results and Warcraft Logs answers; the oldest go first."),
         ("onboarded", "First-run steps done", "Off: the welcome steps show again."),
     ]),
@@ -179,7 +174,9 @@ def _setting_control(key: str) -> str:
 
 def settings_form() -> str:
     """The settings, grouped and in words, with one Save."""
-    listed = {k for _g, _f, rows in SETTINGS_FORM for k, _l, _h in rows}
+    # set elsewhere, never typed: the class and spec follow the active character, the last raids read are ticked
+    # per character in Characters
+    listed = {k for _g, _f, rows in SETTINGS_FORM for k, _l, _h in rows} | {"class", "spec", "auto_logs"}
     groups = [(g, folded, [r for r in rows if r[0] in settings.SETTINGS]) for g, folded, rows in SETTINGS_FORM]
     groups[-1][2].extend((k, k.replace("_", " ").capitalize(), s.help) for k, s in settings.SETTINGS.items()
                          if k not in listed)
@@ -230,7 +227,7 @@ def settings_page(message: str = "") -> str:
     return f"""<h1>Settings</h1><p class="lead">Your raid, the app, your Warcraft Logs access and where things stand.
 </p>{msg}<div class="set-cols"><div>
 <form method="post" action="/settings" class="card settings">{settings_form()}
-<div class="cta"><button class="btn">Save</button></div></form></div><div>
+<div class="cta"><button class="btn go">Save</button></div></form></div><div>
 {account}<h2>Warcraft Logs key</h2><div class="card"><p class="small measure">{current} To use another one (a new
 client, or a regenerated secret): create or open it on <a href="https://www.warcraftlogs.com/api/clients"
 target="_blank" rel="noopener">warcraftlogs.com/api/clients</a>, then paste both values.

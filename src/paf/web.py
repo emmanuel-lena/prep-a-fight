@@ -73,7 +73,7 @@ a new prep, stop sharing and share again.</p>
 forum...): it opens in any browser, nobody needs the app.</p>
 <p class='small muted'>The sheet shows your character's name and gear: anyone with the link can see them. It stays
 online 30 days, and you can stop sharing it at any time.</p>
-<form method='post' action='/share/{e(key)}'><button class='btn'>Share it</button></form></div>""")
+<form method='post' action='/share/{e(key)}'><button class='btn go'>Share it</button></form></div>""")
 
 
 COPY_JS = """<script>document.addEventListener('click',function(ev){var b=ev.target.closest('[data-copy]');if(!b)return;
@@ -552,7 +552,7 @@ def view_page(key: str, tab: str) -> bytes:
         f'<a class="{"on" if k == tab else ""}" href="/view/{e(key)}?tab={k}">{e(label)}</a>'
         for k, label in TABS if k in item["files"])
     others = "".join(f'<option value="/view/{e(x["key"])}"{" selected" if x["key"] == key else ""}>'
-                     f'{e(x["name"])} ({e(x["difficulty"])})</option>'
+                     f'{e(x["name"])} · {e(x["difficulty"][:1].upper())}</option>'
                      for x in prepared())
     src = f'/report/{e(item["files"][tab])}'
     boss_link = _boss_link(item)
@@ -911,7 +911,7 @@ def reclear_page() -> str:
         last = ("<section class='rc-empty'><h2>No raid read yet</h2><p>Each time it starts, the app reads your "
                 "character's latest log of the current raid and shows here what cost you the most on each boss. "
                 "Raid with your character logged on Warcraft Logs, then come back.</p>"
-                "<form method='post' action='/lastraid/again'><button class='btn'>Look for my last raid now</button>"
+                "<form method='post' action='/lastraid/again'><button class='btn go'>Look for my last raid now</button>"
                 "</form></section>")
     return (f"<div class='rc'><header class='rc-head'><h1>Reclear</h1><p class='lead'>Your last raid, read against "
             f"the top players of your spec: what cost you the most, boss by boss, and where to look in the log.</p>"
@@ -1048,7 +1048,7 @@ def raid_board(encs, class_name: str, spec: str) -> str:
                   f"<div class='rb-ds'>{states}</div></div></div>")
     return (f"<h2 class='h-mine'>Your raid, boss by boss</h2>{queue_strip(settings.get('difficulty'))}"
             f"<div class='rb-row'>{items}</div>{QUEUE_JS}{RB_JS}"
-            "<p class='small muted rb-legend'><span>Point at a boss: its three difficulties, and a click to "
+            "<p class='small muted rb-legend'><span>Point at a boss to see its three difficulties; click one to open its sheet or "
             "the sheet or the prep.</span> <span>A grey boss is not prepared for this week yet.</span></p>")
 
 
@@ -1212,9 +1212,9 @@ placeholder="Link to one of your raid's logs: https://www.warcraftlogs.com/repor
 {(f"<aside class='boss-guide'>{guide}</aside>") if guide else ""}</div>
 {_story_css()}{STORY_JS}
 <h2>Advanced</h2>
-<details class="card"><summary>Your fight plan: your own movements, Bloodlust, Power Infusion</summary>
+<details class="card" open><summary>Your fight plan: your own movements, Bloodlust, Power Infusion</summary>
 {plan_block(enc, difficulty)}</details>
-<details class="card"><summary>What you know about this boss: damage amps, targets to ignore</summary>
+<details class="card" open><summary>What you know about this boss: damage amps, targets to ignore</summary>
 {notes_block(enc, difficulty)}</details>"""
     return page(enc.name, body)
 
@@ -1395,7 +1395,7 @@ Your spec and the boss help."></textarea></label>
 <label class="check-row"><input type="checkbox" name="perf" checked><span> Attach performance measures: your computer's CPU,
 cores and memory, and how long each step took (nothing personal: no name, no log, no folder). They help make the app
 faster on every computer.</span></label>
-<div class="cta"><button class="btn">Send</button></div></form>
+<div class="cta"><button class="btn go">Send</button></div></form>
 <details class="card" open><summary>Exactly what is sent</summary><pre class="log">{e(preview[-20000:])}</pre></details>'''
 
 

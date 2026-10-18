@@ -110,12 +110,10 @@ def index() -> str:
     groups = ""
     for gid, title in GROUPS:
         groups += f"<h2>{e(title)}</h2>{cards([t.cmd for t in TOOLS if t.group == gid])}"
-    from paf.webtools import raw_index
 
     return (f"<div class='ws'><header class='ws-head'><div><h1>Tools</h1><p class='lead'>Each tool answers one "
             f"question. The prep of a boss already runs them all: here, run one again to dig further.</p></div>"
-            f"</header>{groups}<details class='ws-raw'><summary>For the curious: every command, with all "
-            f"its options</summary>{raw_index()}</details></div>{CSS}")
+            f"</header>{groups}</div>{CSS}")
 
 
 def _boss_select(encounters: list, optional: str = "", last: bool = False) -> str:
@@ -160,10 +158,7 @@ def tool_page(cmd: str, encounters: list) -> str | None:
     t = BY_CMD.get(cmd)
     if t is None:
         return None
-    from paf.webtools import advanced_fields
-
-    fields = "".join(_field(k, encounters) for k in t.fields)
-    adv = advanced_fields(cmd, encounters, CURATED_FIELDS)
+    fields = "".join(_field(k, encounters) for k in t.fields)  # the CLI's other options: ?raw=1, for developers
     note = ("<p class='ws-note'>It reads the data of a prep of this boss: prepare the boss first if you have not "
             "(Home, then the boss).</p>" if t.needs_prep else "")
     return (f"<div class='ws'>"
@@ -171,8 +166,7 @@ def tool_page(cmd: str, encounters: list) -> str | None:
             f"</p></div></header>"
             f"<form method='post' action='/tool/{e(cmd)}' class='ws-form'><input type='hidden' name='_curated' value='1'>"
             f"{fields}<p class='ws-gives'><b>You get:</b> {e(t.gives)}</p>{note}"
-            + (f"<details class='ws-adv' open><summary>More options</summary>{adv}</details>" if adv else "")
-            + f"<div class='ws-go'><button class='btn go'>Run it &rarr;</button><span class='muted small'>About "
+            f"<div class='ws-go'><button class='btn go'>Run it &rarr;</button><span class='muted small'>About "
             f"{e(t.minutes)} min, on your computer. You can leave the page: it keeps running.</span></div></form></div>{CSS}")
 
 

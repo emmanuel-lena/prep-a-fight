@@ -9,7 +9,7 @@ def test_the_workshop_speaks_the_players_questions(tmp_path, monkeypatch):
     monkeypatch.setenv("PAF_HOME", str(tmp_path))
     page = workshop.index()
     assert page.count("class='ws-card'") == len(workshop.TOOLS)
-    assert "Best gear from your bags" in page and "?raw=1" in page  # every raw command, folded
+    assert "Best gear from your bags" in page and "?raw=1" not in page  # the CLI stays for developers
     form = workshop.tool_page("topgear", ENCS)
     assert "A training dummy (no boss)" in form and "name='objective'" in form and "name='_curated'" in form
     assert workshop.tool_page("not-a-tool", ENCS) is None

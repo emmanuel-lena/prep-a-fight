@@ -48,3 +48,4 @@
 .ws-p{margin:6px 0;font-size:15.5px} .ws-list{margin:4px 0 14px;padding-left:20px;font-size:14.5px;line-height:1.6}
 .ws-fine{font-size:13px;color:var(--muted);margin:10px 0 0}
 @media (max-width:640px){.ws h1{font-size:28px}.ws-form{padding:16px}}
+.ws-cards{grid-template-columns:repeat(auto-fill,minmax(380px,1fr))}

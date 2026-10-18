@@ -449,8 +449,8 @@ def night(d: dict) -> str:
         return icons.img(icons.CLASS_ICON.format(cls=cls.lower()), "medium", "it-ic") if cls else _img("")
     deaths = sum(v["deaths"] for v in summary.values())
     bare = sum(v["bare"] for v in summary.values())
-    head = _verdict("warn" if bare else "ok", f"{len(pulls)} {'pull' if len(pulls) == 1 else 'pulls'}, {deaths} "
-                    f"{'death' if deaths == 1 else 'deaths'} before the wipes",
+    said = (f"{deaths} {'death' if deaths == 1 else 'deaths'} before the wipes" if deaths else "no death")
+    head = _verdict("warn" if bare else "ok", f"{len(pulls)} {'pull' if len(pulls) == 1 else 'pulls'}, {said}",
                     f"<span>Died without a healthstone or a health potion first:</span> <span class='num'>{bare}</span>")
     rows = ""
     for name, v in sorted(summary.items(), key=lambda x: (-x[1]["bare"], -x[1]["deaths"])):
@@ -458,8 +458,9 @@ def night(d: dict) -> str:
         rows += (f"<tr><td class='who-c'>{ic(name)}<b>{e(name)}</b></td><td class='n'>{v['deaths']}</td>"
                  f"<td class='n {'bad' if v['bare'] else ''}'>{v['bare']}</td><td class='n'>{v['healthstone']}</td>"
                  f"<td class='n'>{v['health']}</td><td class='n {'bad' if not pot else ''}'>{pot}/{len(pulls)}</td></tr>")
-    table = (f"<div class='scroll'><table class='night'><tr><th>Player</th><th>Deaths</th><th>Without a healthstone or "
-             f"potion</th><th>Healthstones</th><th>Health potions</th><th>Pulls with a damage potion</th></tr>{rows}"
+    table = (f"<div class='scroll'><table class='night'><tr><th>Player</th><th class='n'>Deaths</th><th class='n'>Without a "
+             f"healthstone or potion</th><th class='n'>Healthstones</th><th class='n'>Health potions</th><th class='n'>"
+             f"Pulls with a damage potion</th></tr>{rows}"
              "</table></div>")
     detail = ""
     for r in pulls:
