@@ -72,7 +72,8 @@ def _moves(d) -> list[tuple[float, str, str, str]]:
                         f"It takes {e(add)}." if add else "",
                         copy_button(best.build.code, "Copy the talent string") if best.build.code else ""))
         else:
-            out.append((0.0, "Keep your talents: no build of the top players does better on this fight.", "", ""))
+            out.append((0.0, f"Keep your talents: no build of the top players beats yours by more than "
+                             f"{2 * d.talents.error:.1f}% on this fight.", "", ""))
     want = wanted(d) or "boss"
     plans = [p for p in d.optimized if p.objective in ("boss", "total")]
     plan = next((p for p in plans if p.objective == want and p.gain > 2 * p.error), None)
@@ -81,7 +82,7 @@ def _moves(d) -> list[tuple[float, str, str, str]]:
     if plan is not None:
         rules = [(cd_name(d, k), rule_phrase(d, r.name)) for k, r in plan.choice.items() if r.name != "default"]
         say = "; ".join(f"{n}: {r}" for n, r in rules) + ("" if getattr(plan, "robust", True) else
-                                                          " Not robust: the gain can vanish on a harder fight.")
+                                                          ". Not robust: the gain can vanish on a harder fight.")
         out.append((plan.gain, f"Play your cooldowns for {e(_goal(plan.objective))} damage.", e(say),
                     copy_button(d.mrt[plan.objective], "Copy the MRT note") if d.mrt.get(plan.objective) else ""))
     elif plans:

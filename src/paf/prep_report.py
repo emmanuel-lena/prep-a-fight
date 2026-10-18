@@ -532,6 +532,12 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         if want is not None and p.objective == want:
             tag = (" <span class='pill gold'>your choice</span>" if d.goal in ("boss", "total")
                    else " <span class='pill gold'>recommended for your raid</span>")
+            other = next((o for o in d.optimized if o.objective in ("boss", "total") and o.objective != want
+                          and o.gain > p.gain and o.robust and not p.robust), None)
+            if other is not None:  # why the sheet plays the smaller, fragile plan
+                lines.append(f"<span class='small'>Played because {'your raid pads the adds' if want == 'total' else 'your raid stays on the boss'} "
+                             f"(see Your raid). On a night you {'focus the boss' if want == 'total' else 'pad the adds'}, the "
+                             f"other plan is the safer one.</span>")
         elif want is None and p.objective in ("boss", "total"):
             tag = " <span class='pill'>pick one: see Your raid</span>"
         elif costly(p):
@@ -688,7 +694,8 @@ def suggestions_html(d: PrepData) -> str:
         rows.append(f'<div class="sugg {s.severity}{rec}">{pic}<div><div class="t"><span class="sev">{label}</span> '
                     f'{s.title}</div><div class="d">{details}</div></div>{gain}</div>')
     if not rows:
-        return '<p class="muted">Nothing to change: no talent, gear or cooldown change beats yours here.</p>'
+        return (f'<p class="muted">Nothing to change: no talent, {"gear or " if d.gear else "spec or "}cooldown change '
+                'beats yours here.</p>')
     return f'<div class="card suggs">{"".join(rows)}</div>'
 
 
@@ -1001,7 +1008,7 @@ for reference: a build can be worse there and much better on this fight. Error a
             if p.flags:
                 checks += "<ul class='small'>" + "".join(f"<li class='warn'>&#9888; {e(re.sub(r'[-+]0[.]0%', 'about 0%', f))}</li>"
                                                          for f in p.flags) + "</ul>"
-            blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, err=1e9 if p.objective == "secondary" else 0.0)}
+            blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, err=1e9 if p.objective == "secondary" or _stall(d, p) else 0.0)}{" <span class='pill gold'>the sheet plays this plan</span>" if p.objective == first else ""}
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span></h3>
 {"<p class='small muted'>Burst damage counts only the damage on " + e(burst_names(d)[1] or "the burst targets") + ": worth it only if your raid needs them dead fast" + ("." if _stall(d, p) else ", at the cost of the boss and total damage above.") + "</p>" if p.objective == "secondary" else ""}
 {checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases)}
