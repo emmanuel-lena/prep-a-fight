@@ -58,6 +58,7 @@ def test_checklist():
     d.lust = 120
     d.role_bullets = ["Kill the Clutch.", "Burst the Heart."]
     d.assigns = ["Malice: interrupt"]
+    d.waves = [(60.0, 4, 20.0, "Clutch")]  # adds: pad them or not is the raid's call
     page = render(d)
     assert "Once the pull starts" in page and "Bloodlust usually comes around 2:00" in page
     assert "Kill the Clutch." in page and "Your assignment: Malice: interrupt" in page

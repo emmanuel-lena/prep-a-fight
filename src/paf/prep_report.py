@@ -174,7 +174,7 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
     for label in labels:
         color = PALETTE[sum(map(ord, _key(label))) % len(PALETTE)]  # one color per cooldown, the same in every chart
         shown = (names or {}).get(_key(label)) or label.title()
-        row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">{e(shown[:18])}</text>']
+        row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">{e(shown[:24])}</text>']
         tt = tops.get(_key(label)) or []
         if tt and tops_players:
             bins: dict[int, int] = {}
@@ -587,6 +587,8 @@ def checklist_items(d: PrepData) -> list[tuple[str, str]]:
         item("Your role (your choice): <b>" + ("boss damage first" if d.goal == "boss" else "pad the adds") + "</b>")
     elif d.raid and d.raid.objective:
         item("Your role: <b>" + ("stay on the boss" if d.raid.objective == "boss" else "pad the adds") + "</b>")
+    elif not any(c for _t, c, _l, _n in d.waves):  # no adds on this boss: nothing to decide
+        item("Your role: <b>the boss</b> <span class='muted'>(no adds to pad on this boss)</span>")
     else:
         item("Your role: ask your raid lead whether you should pad the adds or focus the boss "
              "<span class='muted'>(or set your guild in the app: the prep decides from your raid)</span>")
@@ -824,7 +826,8 @@ def render(d: PrepData) -> str:
                                 f'cooldown (timelines) &rarr;</a></p>')
 
     # the fight
-    rows = "".join(f"<tr><td>{_mmss(t)}</td><td>{e(n)}</td></tr>" for n, t in d.phases)
+    rows = "".join(f"<tr><td>{_mmss(t)}</td><td>{e('Stage One' if i == 0 and n.lower() == d.boss.lower() else n)}"
+                   f"</td></tr>" for i, (n, t) in enumerate(sorted(d.phases, key=lambda p: p[1])))
     waves = "".join(f"<tr><td>{_mmss(t)}</td><td class='n'>{c or '-'}</td>"
                     f"<td class='n'>{alive(d.fight, t, life):.0f}s</td><td>{e(names)}</td></tr>" for t, c, life, names in d.waves)
     extra = []
@@ -846,13 +849,14 @@ def render(d: PrepData) -> str:
                  "<th>Boss</th><th>Kills</th></tr>"
                  + "".join(f"<tr><td>{_mmss(f.start)}-{_mmss(f.start + f.duration)}</td><td>{e(f.name)}</td>"
                            f"<td class='n'>{f.support:.0%}</td></tr>" for f in d.fight.focus) + "</table></div>")
-    tabs["fight"].append(f"""<h2>The fight</h2><div class="card"><p>Typical duration {_mmss(d.duration)}; {"; ".join(extra)}.</p>
-<div class="scroll"><table class="fit">{rows}</table></div>
-<h3 class="small muted" style="margin-top:14px">Add waves (typical timeline across kills)</h3>
+    adds_block = (f"""<h3 class="small muted" style="margin-top:14px">Add waves (typical timeline across kills)</h3>
 <p class="small muted">"Simmed": the adds of the wave in the sims, counted at {d.add_scale:g} of their real number so that
 the sims put as much on the boss as the top players do (SimC hits every add in range).</p>
 <div class="scroll"><table class="fit"><tr><th>Time</th><th class="n">Simmed</th><th class="n">Alive</th><th>Types</th></tr>{waves}</table></div>
-{focus}{f'<p><a href="{e(d.timeline_file)}">Cooldown timelines of the top players</a></p>' if d.timeline_file else ''}
+""" if waves else "")
+    tabs["fight"].append(f"""<h2>The fight</h2><div class="card"><p>Typical duration {_mmss(d.duration)}; {"; ".join(extra)}.</p>
+<div class="scroll"><table class="fit">{rows}</table></div>
+{adds_block}{focus}{f'<p><a href="{e(d.timeline_file)}">Cooldown timelines of the top players</a></p>' if d.timeline_file else ''}
 </div>""")
     if d.export:
         tabs["fight"].append(export_html(d))
@@ -888,7 +892,7 @@ and the gear for that.</p></div>""")
             boss = (f", {d.sim_boss_dps:,.0f} of it on the boss ({d.sim_boss_dps / d.sim_dps:.0%}: your character's own "
                     f"share in this sim, with its talents and plan)")
         cal = ""
-        if d.boss_share_real is not None:
+        if d.boss_share_real is not None and d.waves:
             cal = (f" The top players put {d.boss_share_real:.0%} of their damage on the boss in their logs: the rebuilt "
                    f"fight is tuned toward that by counting each add wave at {d.add_scale:g} of its size (SimC hits every "
                    f"add in range, real players do not).")
@@ -941,7 +945,18 @@ for reference: a build can be worse there and much better on this fight. Error a
 </div>""")
 
     # ideal play-by-play per objective
-    if d.optimized:
+    flat = bool(d.optimized) and all(abs(p.gain) <= 2 * p.error for p in d.optimized)
+    if flat:  # no plan beats the default priority list on any goal: one block, not three of the same
+        p = d.optimized[0]
+        note = d.mrt.get(p.objective, "")
+        tabs["cooldowns"].append(
+            "<h2>Ideal cooldown play-by-play</h2><div class='card'><p><b>The default priority list is already right "
+            "on this fight:</b> press your cooldowns as soon as they are ready. No other plan beats it for boss, total "
+            f"or burst damage (all within the noise, ±{p.error:.1f}%).</p>"
+            f"{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases)}"
+            + (f"<h4>MRT note {copy_button(note, 'Copy the MRT note')}</h4><pre class='small note-pre'>{e(note)}</pre>"
+               if note else "") + "</div>")
+    if d.optimized and not flat:
         blocks = []
         first = wanted(d) or simple._plan(d).objective if simple._plan(d) else None
         for p in sorted(d.optimized, key=lambda p: p.objective != first):  # the sheet's plan first
