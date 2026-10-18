@@ -188,8 +188,10 @@ h2 .btn.copy{margin-left:8px;vertical-align:middle;text-transform:none;letter-sp
   .boss-cols{display:grid;grid-template-columns:minmax(0,640px) minmax(0,1fr);gap:36px;align-items:start}
   .boss-cols .story{margin-top:0}
   .home-hero{grid-template-columns:minmax(0,620px) minmax(0,1fr);grid-template-areas:"start me" "start chars";
-    column-gap:40px;align-items:start}
+    grid-template-rows:auto 1fr;column-gap:40px;align-items:start}
   .home-hero .start{grid-area:start;max-width:none} .home-hero .me{grid-area:me} .home-hero .chars{grid-area:chars}}
 .ccard .cc-spec{font-weight:600;color:var(--fg)}
 /* settings: the groups titled like the other sections of the app */
 .set-group>legend,.set-group>summary{font:600 15px var(--font-display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.set-cols td.act{text-align:right;white-space:nowrap} .set-cols td.act form{margin:0}
+.crumb{margin:0 0 8px;font-size:14px} .crumb a{color:var(--muted);text-decoration:none} .crumb a:hover{color:var(--fg)}

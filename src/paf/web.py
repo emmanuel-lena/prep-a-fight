@@ -57,7 +57,8 @@ def share_page(key: str, error: str = "") -> str:
     if item is None:
         return "<h1>Not found</h1><p>Nothing prepared for this boss yet.</p>"
     info = share.current(key)
-    head = (f"<h1>Share this prep</h1><p class='lead'>{e(item['name'])} &middot; {e(item['difficulty'])}"
+    head = (f"<p class='crumb'><a href='/view/{e(key)}'>&larr; Back to the prep sheet</a></p><h1>Share this prep</h1>"
+            f"<p class='lead'>{e(item['name'])} {theme.diff_pill(item['difficulty'])}"
             + (f" &middot; {e(item['spec'])}" if item.get("spec") else "") + "</p>")
     err = f"<p class='notice'>{e(error)}</p>" if error else ""
     if info:
@@ -67,14 +68,12 @@ onclick='this.select()'><button type='button' data-copy='{e(info["url"])}'>Copy 
 <a class='btn ghost' href='{e(info["url"])}' target='_blank' rel='noopener'>Open</a></p>
 <p class='small muted'>It stays online {info.get("days", 30)} days, then disappears. To publish a newer version after
 a new prep, stop sharing and share again.</p>
-<form method='post' action='/unshare/{e(key)}'><button class='btn ghost'>Stop sharing</button></form></div>
-<p><a href='/view/{e(key)}'>Back to the prep sheet</a></p>{COPY_JS}""")
+<form method='post' action='/unshare/{e(key)}'><button class='btn ghost'>Stop sharing</button></form></div>{COPY_JS}""")
     return (head + err + f"""<div class='card'><p>Get a link to this prep sheet for your raid (Discord, guild
 forum...): it opens in any browser, nobody needs the app.</p>
 <p class='small muted'>The sheet shows your character's name and gear: anyone with the link can see them. It stays
 online 30 days, and you can stop sharing it at any time.</p>
-<form method='post' action='/share/{e(key)}'><button class='btn'>Share it</button></form></div>
-<p><a href='/view/{e(key)}'>Back to the prep sheet</a></p>""")
+<form method='post' action='/share/{e(key)}'><button class='btn'>Share it</button></form></div>""")
 
 
 COPY_JS = """<script>document.addEventListener('click',function(ev){var b=ev.target.closest('[data-copy]');if(!b)return;
