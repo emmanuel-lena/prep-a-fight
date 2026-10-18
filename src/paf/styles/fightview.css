@@ -471,4 +471,4 @@ dialog.ss::backdrop{background:var(--bg)}
 .fv .ss-boss{font-size:15px;color:var(--muted);margin-left:8px} .fv .ss-boss:empty{display:none}
 .fv .ev small{display:block}
 .fv .ph-band{top:54px}
-.fv .tl-end{height:30vh}
+.fv .tl-end{height:12vh}

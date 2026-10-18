@@ -7,10 +7,11 @@
   if (!root || typeof FV === 'undefined') return;
   var A = FV.acts, N = FV.anchors, B = FV.boss, $ = function (id) { return document.getElementById(id); };
   var LEAD = 5, NOW_FOR = 3, SAME = 1, BOUNCE = 3, QUIET = 1.5, LAST_PUSH = 30;
-  var WIN = { pull: [-5, 10], phase: [-30, 40], immune: [-30, 40], adds: [-10, 12], cast: [-10, 12] }, FIRST = 10, NEAR = 4, CARRY = 10, FAR = 30, THEN = 60;
+  var WIN = { pull: [-5, 10], phase: [-20, 25], immune: [-20, 25], adds: [-10, 12], cast: [-10, 12] }, FIRST = 10, NEAR = 4, CARRY = 10, FAR = 30, THEN = 60;
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   var st = { cur: 0, playing: false, speed: 1, sound: false, conf: [], key: '', curRow: -1, target: -1, lastPress: -1e9,
-             quietUntil: 0, userScroll: 0, last: null, ssFrom: null, sq: [], sqAt: 0, said: {}, owed: [], globalHeld: false };
+             quietUntil: 0, userScroll: 0, last: null, ssFrom: null, sq: [], sqAt: 0, said: {}, owed: [], globalHeld: false,
+             called: {} };
 
   function mmss(t) { var s = Math.max(0, Math.round(t)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
   function clock(t) { return t < 0 ? '−' + mmss(-t) : mmss(t); }
@@ -61,6 +62,7 @@
     for (var i = 0; i < G.length; i++) {
       var g = G[i];
       if (g.last >= t - NOW_FOR && (after == null || g.at > after + 0.5)) {
+        if (after == null && st.called[g.at.toFixed(1)] && g.last < t - 0.5 && G[i + 1]) continue;  // said already
         // already pressed: the next press takes over as soon as it is near (not before Play, at the pull)
         if (after == null && g.last < t - 0.5 && (st.playing || t !== 0) && G[i + 1] && G[i + 1].at - t <= LEAD) return G[i + 1];
         return g;
@@ -118,6 +120,19 @@
       if (b.k === 'immune') return 'Boss immune, back in ' + secs(until(b) - t);
       return b.n;
     }).join('; ') : '—';
+  }
+  /* the you line: the press due now, else the adds still to kill, else what the boss being immune leaves you */
+  function youNow(t, cc) {
+    if (cc.state === 'go') return names(cc.g);
+    if (!st.playing && t === 0 && cc.g) return names(cc.g);
+    var adds = B.filter(function (b) { return b.k === 'adds' && !gone(b.t) && eff(b.t) <= t && t < until(b); })[0];
+    if (adds) return 'Kill the ' + adds.n.replace(/^\d+ × /, '') + ' (' + secs(until(adds) - t) + ' left)';
+    var imm = B.filter(function (b) { return b.k === 'immune' && !gone(b.t) && eff(b.t) <= t && t < until(b); })[0];
+    if (imm) {
+      var next = N.filter(function (a) { return a.k === 'adds' && !gone(a.t) && eff(a.t) > t && eff(a.t) < until(imm); })[0];
+      return next ? 'Nothing to hit: ' + next.n + ' in ' + secs(eff(next.t) - t) : 'Nothing to hit until the boss is back';
+    }
+    return 'Your rotation';
   }
   function title(t, cc) {
     if (t < 0) return 'Before the pull';
@@ -204,7 +219,8 @@
     txt($('c-phase'), ph); txt($('ss-phase'), ph);
     txt($('c-title'), title(t, cc));
     var bl = bossNow(t); txt($('c-boss'), bl); txt($('ss-boss'), bl === '—' ? '' : bl);
-    txt($('c-you'), cc.state === 'go' ? names(cc.g) : 'Your rotation');
+    txt($('c-you'), youNow(t, cc));
+    if (cc.state === 'go' && cc.g) st.called[cc.g.at.toFixed(1)] = 1;
     ['c-call', 'ss-call'].forEach(function (id) { var el = $(id); set(el, cc.html); el.className = cc.cls; });
     var th = then(t, cc); txt($('c-then'), th); txt($('ss-then'), th);
     var n = nextAnchor(t);
@@ -265,6 +281,10 @@
       if (e < t - 0.5 || e > t + 60 || seen[k]) return;
       seen[k] = 1; mine.push([e, a.n]); out.push(bar(e, t, 'mine', a.ic, 'You', a.n));
     });
+    B.forEach(function (b) {  // the moves to come: a boss mod shows them too
+      var e = eff(b.t);
+      if (b.k === 'move' && b.d >= 5 && !gone(b.t) && e >= t - 0.5 && e <= t + 60) out.push(bar(e, t, 'boss', '', 'Boss', 'Everyone moves for ' + Math.round(b.d) + ' s'));
+    });
     N.forEach(function (a) {
       var e = eff(a.t);
       if (a.k === 'pull' || gone(a.t) || e < t - 0.5 || e > t + 60) return;
@@ -288,7 +308,7 @@
     if (!st.playing) return;
     if (st.last != null) st.cur += (now - st.last) / 1000 * st.speed;
     st.last = now;
-    if (st.cur > FV.end + 30) { setPlay(false, true); st.cur = 0; st.conf = []; st.owed = []; st.key = ''; say('Playback over. Play to start again.'); render(); return; }
+    if (st.cur > FV.end + 30) { setPlay(false, true); st.cur = 0; st.conf = []; st.owed = []; st.called = {}; st.key = ''; say('Playback over. Play to start again.'); render(); return; }
     render();
     requestAnimationFrame(tick);
   }
@@ -310,9 +330,9 @@
   }
   function pullTimer() {
     if (st.playing) { say('The fight is running: pause or wipe first.'); return; }
-    st.cur = -10; st.conf = []; st.owed = []; st.key = ''; st.saidKeys = false; setPlay(true, true); say('Pull in 10 seconds.');
+    st.cur = -10; st.conf = []; st.owed = []; st.called = {}; st.key = ''; st.saidKeys = false; setPlay(true, true); say('Pull in 10 seconds.');
   }
-  function wipe() { setPlay(false, true); st.cur = 0; st.conf = []; st.owed = []; st.key = ''; st.saidKeys = false; render(); say('Wipe: back to the pull.'); }
+  function wipe() { setPlay(false, true); st.cur = 0; st.conf = []; st.owed = []; st.called = {}; st.key = ''; st.saidKeys = false; render(); say('Wipe: back to the pull.'); }
 
   /* "it starts now": exactly the boss event the button names */
   function sync() {

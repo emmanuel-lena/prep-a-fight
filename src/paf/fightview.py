@@ -182,7 +182,8 @@ def items(d) -> list[tuple[float, Item]]:
     for f in (d.fight.focus if d.fight is not None else []):
         add(f.start, Item("you", "do", f.name, f"Hit {f.name}", _icon(d, f.name)))
     if d.lust is not None:
-        add(d.lust, Item("boss", "lust", "Bloodlust", "Your raid's Bloodlust", _icon(d, "Bloodlust"), LUST_SECONDS))
+        lust = 0.0 if d.lust < 1 else d.lust  # within a second of the pull: at the pull
+        add(lust, Item("boss", "lust", "Bloodlust", "Your raid's Bloodlust", _icon(d, "Bloodlust"), LUST_SECONDS))
     names, order, _ = simple._pressed(d)
     dur = _durations(d)
     for n in names:
@@ -384,7 +385,7 @@ LEGEND = ("<div class='fv-legend' aria-hidden='true'><span><i class='s-cd'></i>y
           "<span><i class='s-pot'></i>your potion</span><span><i class='s-def'></i>your defensive</span>"
           "<span><i class='s-lust'></i>Bloodlust</span>"
           "<span><i class='s-adds'></i>adds alive</span><span><i class='s-move'></i>everyone moves</span>"
-          "<span>each bar lasts as long as it does in the fight</span></div>")
+          "<span>bar length = how long it lasts</span></div>")
 
 
 def _side(d) -> str:
