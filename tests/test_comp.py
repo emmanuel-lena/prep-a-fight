@@ -96,7 +96,7 @@ def test_the_night_tracker():
     d = tracker.to_dict("x", [row], {"Moon": "Druid-Balance"})
     assert d["summary"]["Moon"]["bare"] == 1 and d["summary"]["Dk"]["pulls_damage_potion"] == 1
     page = workshop_views.render({"kind": "night", **d})
-    assert "1 pulls, 1 deaths before the wipes" in page and "Pull by pull" in page
+    assert "1 pull, 1 death before the wipes" in page and "Pull by pull" in page
 
 
 def test_the_raid_tab_of_the_sheet_shows_the_raid_tools():

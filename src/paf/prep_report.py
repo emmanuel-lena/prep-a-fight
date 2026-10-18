@@ -623,9 +623,8 @@ def defensives_html(d: PrepData) -> str:
 def nsrt_block(note: str) -> str:
     if not note:
         return ""
-    return (f'<details><summary class="small">Northern Sky Raid Tools reminders (personal reminders, times from each '
-            f'phase)</summary>{copy_button(note, "Copy")}<pre class="small" style="white-space:pre-wrap">{e(note)}</pre>'
-            f'</details>')
+    return (f'<h4>Northern Sky Raid Tools reminders {copy_button(note, "Copy")}</h4><p class="tiny muted">Personal '
+            f'reminders, times from each phase.</p><pre class="small note-pre">{e(note)}</pre>')
 
 
 def suggestions_html(d: PrepData) -> str:
@@ -881,11 +880,10 @@ for reference: a build can be worse there and much better on this fight. Error a
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span></h3>
 {checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names)}
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
-<details><summary class="small">Play-by-play of one simulated pull</summary><div class="scroll"><table>
-<tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></details>
-<details><summary class="small">MRT note (to paste in Method Raid Tools)</summary>{copy_button(note, "Copy")}
-<pre class="small" style="white-space:pre-wrap">{e(note)}</pre></details>
-{nsrt_block(d.nsrt.get(p.objective, ""))}
+<div class="pp-grid"><div><h4>Play-by-play of one simulated pull</h4><div class="scroll pp"><table>
+<tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></div>
+<div><h4>MRT note {copy_button(note, "Copy")}</h4><pre class="small note-pre">{e(note)}</pre>
+{nsrt_block(d.nsrt.get(p.objective, ""))}</div></div>
 </div>""")
         tabs["cooldowns"].append("<h2>Ideal cooldown play-by-play, per objective</h2>" + "".join(blocks))
 
@@ -962,7 +960,7 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
                    briefing.spec_html(d), "<h2>Everything worth changing, by gain</h2>" + suggestions_html(d)]
         + tabs["gear"],
         "boss": tabs["boss"],
-        "deeper": tabs["overview"] + [simple.review_card(d)] + tabs["cooldowns"] + tabs["raid"] + tabs["fight"]
+        "deeper": tabs["overview"] + [f"<div class='simple'>{simple.review_card(d)}</div>"] + tabs["cooldowns"] + tabs["raid"] + tabs["fight"]
         + [_tools_html()],
     }
     sections["deeper"] = [_contents("".join(sections["deeper"]))]

@@ -444,7 +444,8 @@ def night(d: dict) -> str:
         return icons.img(icons.CLASS_ICON.format(cls=cls.lower()), "medium", "it-ic") if cls else _img("")
     deaths = sum(v["deaths"] for v in summary.values())
     bare = sum(v["bare"] for v in summary.values())
-    head = _verdict("warn" if bare else "ok", f"{len(pulls)} pulls, {deaths} deaths before the wipes",
+    head = _verdict("warn" if bare else "ok", f"{len(pulls)} {'pull' if len(pulls) == 1 else 'pulls'}, {deaths} "
+                    f"{'death' if deaths == 1 else 'deaths'} before the wipes",
                     f"<span>Died without a healthstone or a health potion first:</span> <span class='num'>{bare}</span>")
     rows = ""
     for name, v in sorted(summary.items(), key=lambda x: (-x[1]["bare"], -x[1]["deaths"])):

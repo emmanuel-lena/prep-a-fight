@@ -63,3 +63,9 @@ a:focus-visible,button:focus-visible,.chip:focus-within,.tabs a:focus-visible{ou
 .dd-toc a{padding:4px 10px;border-radius:999px;background:var(--surface-2);color:var(--fg);font-size:13.5px;text-decoration:none}
 .dd-toc a:hover{background:var(--accent-soft)}
 .panel h2[id^="dd-"]{scroll-margin-top:90px}
+/* a cooldown plan's play-by-play and its notes, side by side, shown (nothing folded) */
+.pp-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:18px;margin-top:12px}
+.pp-grid h4{margin:0 0 6px;font:600 13px var(--font-display);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);display:flex;align-items:center;gap:8px}
+.pp-grid .pp{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.note-pre{white-space:pre-wrap;margin:0 0 12px;padding:10px 12px;background:var(--surface-2);border-radius:8px;max-height:320px;overflow:auto}
+@media (max-width:900px){.pp-grid{grid-template-columns:minmax(0,1fr)}}
