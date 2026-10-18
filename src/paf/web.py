@@ -1273,7 +1273,8 @@ function recap(){
   var goal = (f.querySelector('input[name=goal]:checked') || f.querySelector('input[name=goal][type=hidden]') || {}).value || 'auto';
   var picked = [].slice.call(f.querySelectorAll('input[name=assign]:checked')).map(function(i){
     var t = i.parentNode.cloneNode(true); var m = t.querySelector('.meta'); if (m) m.remove(); return t.textContent.trim(); });
-  var raid = (f.querySelector('input[name=raid]') || {}).value || '';
+  var rf = f.querySelector('input[name=raid]'); if (rf) rf.value = rf.value.trim();  // spaces alone are an empty field
+  var raid = (rf || {}).value || '';
   var badraid = raid && !/warcraftlogs[.]com[/]reports[/][A-Za-z0-9]{16}/.test(raid);
   if (badraid) raid += ' (not a Warcraft Logs report link: fix it or leave it empty)';
   else if (raid) { var m = raid.match(/reports[/]([A-Za-z0-9]{16})/), fi = raid.match(/fight=([0-9]+)/);
@@ -1300,7 +1301,8 @@ function show(i, back){
     var base = g === 'auto' ? hp.dataset.full : hp.dataset.full.replace(/; with "Let my raid decide".*$/, '.');
     hp.dataset.t = base; if (!f.querySelector('input[name=raid]').value.trim()) hp.textContent = base;
     if (!hp.dataset.h) { hp.dataset.h = '1'; hp.style.minHeight = hp.offsetHeight + 'px'; } }
-  var h2 = steps[at].querySelector('[aria-invalid=true]') || steps[at].querySelector('h2');  // a field in error first
+  var h2 = steps[at].querySelector('[aria-invalid=true]') || steps[at].querySelector('input[name=raid]')
+    || steps[at].querySelector('h2');  // a field in error first, the log field ready to paste into, else the heading
   if (h2) { if (h2.tagName === 'H2') h2.tabIndex = -1; h2.focus({preventScroll: true}); }  // keep the place
   var cur = steps[at]; cur.classList.add('arriving');  // a double click on Next must not tick what lands under it
   setTimeout(function(){ cur.classList.remove('arriving');
@@ -1319,6 +1321,7 @@ f.querySelectorAll('input[name=gear],input[name=optimize]').forEach(function(c){
   var none = !f.querySelector('input[name=gear]:checked') && !f.querySelector('input[name=optimize]:checked');
   var n = f.querySelector('.sim-none'); if (n) n.hidden = !none; }); });  // both off: what the prep still gives
 if (rl) ['change', 'input'].forEach(function(ev){ rl.addEventListener(ev, function(e){  // checked when the field is left
+  if (e.type === 'change') rl.value = rl.value.trim();
   if (e.type === 'input' && !rl.classList.contains('bad')) return;  // while typing, only an error already shown clears
   var bad = rl.value.trim() && !/warcraftlogs[.]com[/]reports[/][A-Za-z0-9]{16}/.test(rl.value);
   rl.classList.toggle('bad', !!bad); rl.setAttribute('aria-invalid', bad ? 'true' : 'false'); if (go) go.disabled = !!bad;
