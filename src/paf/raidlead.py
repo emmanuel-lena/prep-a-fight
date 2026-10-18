@@ -268,7 +268,7 @@ def page_body(difficulty: str) -> str:
                     f'onchange="this.form.submit()"><span>{e(DIFF_LABELS.get(d, d))}</span></label>'
                     for d in settings.DIFFICULTIES if d != "lfr")
     head = (f"<h1>Raid lead</h1><p class='lead'>Your raid's roles on every boss, from your roster and the top raids: "
-            f"who hits which add, who changes talents, which spec change is worth it. You think about the strategy."
+            f"who hits which add, who changes talents, which spec change is worth it. The strategy stays yours."
             f"</p><form method='get' action='/raidlead' class='segs' role='radiogroup' aria-label='Difficulty'>{diffs}"
             f"</form>")
     reading = runner_alive(state)

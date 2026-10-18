@@ -57,7 +57,7 @@ TOOLS: tuple[Tool, ...] = (
     Tool("raid", "Pad the adds or stay on the boss?", "From your raid's composition and DPS: do the others already "
          "cover the adds?", "inv_misc_groupneedmore", "raid", "1-3", ("boss", "difficulty", "raid"),
          "The verdict for each add type, and why."),
-    Tool("review", "Who does what in your raid", "Who stays on the boss, who pads, who should go on a secondary "
+    Tool("review", "Your raid's pull, player by player", "Who stays on the boss, who pads, who should go on a secondary "
          "target? Your raid's pull next to the top raids.", "inv_misc_spyglass_03", "raid", "1",
          ("boss", "difficulty", "raid"), "Each player's damage on the boss and on each target, next to the top "
          "players of their spec, and what to change for more boss damage."),
@@ -162,8 +162,8 @@ def tool_page(cmd: str, encounters: list) -> str | None:
     if t is None:
         return None
     fields = "".join(_field(k, encounters) for k in t.fields)  # the CLI's other options: ?raw=1, for developers
-    note = ("<p class='ws-note'>It reads the data of a prep of this boss: prepare the boss first if you have not "
-            "(Home, then the boss).</p>" if t.needs_prep else "")
+    note = ("<p class='ws-note'>It reads the data of a prep of the boss you pick: a boss not prepared yet is prepared "
+            "from <a href='/'>Home</a> first.</p>" if t.needs_prep else "")
     return (f"<div class='ws'>"
             f"<header class='ws-tool'>{_icon(t.icon, 'ws-big')}<div><h1>{e(t.title)}</h1><p class='lead'>{e(t.question)}"
             f"</p></div></header>"

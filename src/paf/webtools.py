@@ -167,7 +167,8 @@ def _setting_control(key: str) -> str:
         return f"<select name='{e(key)}' id='s-{e(key)}'>" + "".join(
             f"<option value='{e(c)}'{' selected' if c == cur else ''}>"
             f"{e(c.upper() if len(c) <= 3 else c.capitalize())}</option>"  # EU, LFR, Heroic
-            for c in s.choices) + "</select>"
+            for c in s.choices  # no LFR to pick, as on every other page
+            if not (key == "difficulty" and c == "lfr" and cur != "lfr")) + "</select>"
     kind = " inputmode='numeric'" if s.kind is int else ""
     return f"<input name='{e(key)}' id='s-{e(key)}' value='{e(str(cur))}'{kind}>"
 
@@ -226,8 +227,7 @@ def settings_page(message: str = "") -> str:
     account = (f"<h2>Warcraft Logs</h2><div class='card'>{account}</div>" if wcllogin.available() else "")
     return f"""<h1>Settings</h1><p class="lead">Your raid, the app, your Warcraft Logs access and where things stand.
 </p>{msg}<div class="set-cols"><div>
-<form method="post" action="/settings" class="card settings"><div class="cta cta-top"><button class="btn go">Save
-</button></div>{settings_form()}
+<form method="post" action="/settings" class="card settings">{settings_form()}
 <div class="cta"><button class="btn go">Save</button></div></form></div><div>
 {account}<h2>Warcraft Logs key</h2><div class="card"><p class="small measure">{current} To use another one (a new
 client, or a regenerated secret): create or open it on <a href="https://www.warcraftlogs.com/api/clients"

@@ -441,7 +441,7 @@ def _encounters() -> list:
     except Exception:  # noqa: BLE001 - the UI must still load without credentials
         return []
     zone = max((x.zone_id for x in encs), default=None)
-    return [x for x in encs if x.zone_id == zone]
+    return journal_order([x for x in encs if x.zone_id == zone])  # the raid's order, on every page
 
 
 DIFF_NAMES = tuple(settings.DIFFICULTIES)
@@ -551,12 +551,14 @@ def view_page(key: str, tab: str) -> bytes:
     tabs = "".join(
         f'<a class="{"on" if k == tab else ""}" href="/view/{e(key)}?tab={k}">{e(label)}</a>'
         for k, label in TABS if k in item["files"])
+    def spec_of(x: dict) -> str:  # "subtlety-rogue" in the key: two sheets of a boss told apart
+        return x["key"].partition(f'-{x["difficulty"]}-')[2].replace("-", " ").title()
     others = "".join(f'<option value="/view/{e(x["key"])}"{" selected" if x["key"] == key else ""}>'
-                     f'{e(x["name"])} · {e(x["difficulty"][:1].upper())}</option>'
-                     for x in prepared())
+                     f'{e(x["name"])} · {e(x["difficulty"][:1].upper())} · {e(spec_of(x))}</option>'
+                     for x in sorted(prepared(), key=lambda x: (x["name"], x["difficulty"], x["key"])))
     src = f'/report/{e(item["files"][tab])}'
     boss_link = _boss_link(item)
-    nav = (f'<label class="side-lab">This boss</label><select onchange="location=this.value" aria-label="Boss">'
+    nav = (f'<label class="side-lab">Your sheets</label><select onchange="location=this.value" aria-label="Your sheets">'
            f'{others}</select><div class="side-links">{tabs}'
            + (f'<a href="{e(boss_link)}">Edit &amp; re-run</a>' if boss_link else "")
            + (f'<a href="/share/{e(key)}">Share</a>' if "prep" in item["files"] else "")
@@ -1049,7 +1051,7 @@ def raid_board(encs, class_name: str, spec: str) -> str:
     return (f"<h2 class='h-mine'>Your raid, boss by boss</h2>{queue_strip(settings.get('difficulty'))}"
             f"<div class='rb-row'>{items}</div>{QUEUE_JS}{RB_JS}"
             "<p class='small muted rb-legend'><span>Point at a boss to see its three difficulties; click one to open "
-            "its sheet or start its prep.</span> <span>A grey boss is not prepared for this week yet.</span></p>")
+            "its sheet or start its prep. A grey boss is not prepared for this week yet.</span></p>")
 
 
 def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
@@ -1118,17 +1120,21 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
             mechs = []
     current = {a.lower() for a in current_assigns(enc, difficulty)}
     if mechs:
-        chips = ""
+        chips, seen = "", set()
         for m in mechs:
+            if m.name.lower() in seen:  # one box per mechanic, however many times the logs list it
+                continue
+            seen.add(m.name.lower())
             when = ", ".join(f"{int(t // 60)}:{int(t % 60):02d}" for t in m.times[:4]) + ("…" if len(m.times) > 4 else "")
             what = "interrupt" if m.kind == "interrupt" else f"{m.players_per_kill:.0f} players per kill"
             cost = f", ~{m.cost:g} s of movement" if m.cost else ""
             checked = " checked" if m.name.lower() in current or m.key in current else ""
             chips += (f'<label class="chip" title="{e(when)}"><input type="checkbox" name="assign" value="{e(m.name)}"'
                       f'{checked}>{e(m.name)} <span class="meta">{what}{cost}</span></label>')
-        article = "an" if spec[:1].lower() in "aeiou" else "a"
+        label = f"{spec} {settings.get('class') or ''}".strip()  # "Subtlety Rogue", as everywhere else
+        article = "an" if label[:1].lower() in "aeiou" else "a"
         assigns = (f'<p class="small muted">Tick what you handle on this fight. Timings and the movement it costs '
-                   f'{article} {e(spec)} come from the logs; hover a mechanic to see when it happens.</p>'
+                   f'{article} {e(label)} come from the logs; hover a mechanic to see when it happens.</p>'
                    f'<div class="chips">{chips}</div>')
     elif kills:
         assigns = ('<p class="muted small">The mechanics are collected during the first prep (about 2 quota points '
@@ -1169,7 +1175,7 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
     g = settings.get("guild")
     raid_said = f"the latest public log of {g}" if g else ""
     nxt = "<button type='button' class='btn go next'>Next &rarr;</button>"
-    back = "<button type='button' class='btn ghost prev'>&larr; Back</button>"
+    back = "<button type='button' class='btn ghost prev'>&larr; Previous step</button>"  # not the sidebar's Back
     body = f"""<div class="boss-cols"><div class="boss-main"><h1>{e(enc.name)} {diff_pill(difficulty)}</h1>
 <p class="lead">{last.strip() or ""}</p>{est_html}
 <form method="post" action="/prep" class="ob story" data-boss="{enc.id}-{e(difficulty)}">
@@ -1264,7 +1270,7 @@ def prepared_link(enc, difficulty: str) -> str:
 
     key = report_key(enc.name, difficulty)
     return f' <a href="/view/{e(key)}">Open the last prep sheet &rarr;</a>' if any(
-        x["key"] == key for x in prepared()) else ""
+        x["key"] == key and "prep" in x["files"] for x in prepared()) else ""  # a timeline alone is no sheet
 
 
 def _plan_path(enc, difficulty: str) -> Path:
@@ -1338,7 +1344,7 @@ def plan_block(enc, difficulty: str) -> str:
                 "dodge...), Bloodlust and Power Infusion timings, on top of the rebuilt fight.</p>")
     return f"""<p class="small muted">What you do on this fight that the logs cannot guess, one line each: <code>2:45 move 6</code>
 (6 s of movement), <code>5:30 move 8 shift -5..+5</code> (the optimizer picks the best moment), <code>lust 0:00</code>,
-<code>pi 0:20 2:30</code>, <code>no boss-movement</code>. The mechanics ticked above are added as <code>assign</code> lines.
+<code>pi 0:20 2:30</code>, <code>no boss-movement</code>. The mechanics ticked in "Are you assigned to something?" are added as <code>assign</code> lines.
 Every sim of the prep (gear, talents, cooldowns) runs on this fight.</p>
 <form method="post" action="/plan"><input type="hidden" name="boss" value="{enc.id}">
 <input type="hidden" name="difficulty" value="{e(difficulty)}"><textarea name="plan">{e(text)}</textarea>
@@ -1402,8 +1408,8 @@ def feedback_page(jid: str = "", note: str = "") -> str:
 <form method="post" action="/feedback" class="card"><input type="hidden" name="job" value="{e(jid)}">
 <label>Your message <textarea name="message" required placeholder="What you did, what you expected, what you got.
 Your spec and the boss help."></textarea></label>
-<label class="check-row"><input type="checkbox" name="log" checked><span> Attach the {"log of this prep" if jid else "app's log"}
-(below; your Warcraft Logs key, user folder and email addresses are removed)</span></label>
+{f"""<label class="check-row"><input type="checkbox" name="log" checked><span> Attach the {"log of this prep" if jid else "app's log"}
+(below; your Warcraft Logs key, user folder and email addresses are removed)</span></label>""" if log.strip() else ""}
 <label class="check-row"><input type="checkbox" name="perf" checked><span> Attach performance measures: your computer's CPU,
 cores and memory, and how long each step took (nothing personal: no name, no log, no folder). They help make the app
 faster on every computer.</span></label>

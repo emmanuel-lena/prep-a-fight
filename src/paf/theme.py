@@ -81,7 +81,9 @@ SIDE_JS = ("<script>(function(){var p=location.pathname,best=null;document.query
            "var fb=document.querySelector('.side-fb');if(!best&&fb&&p.indexOf('/feedback')===0)best=fb;"
            "if(!best&&(p.indexOf('/view/')===0||p.indexOf('/boss')===0||p.indexOf('/job/')===0||p.indexOf('/raid/')===0"
            "||p.indexOf('/share/')===0))"
-           "best=document.querySelector(\".side-nav a[href='/']\");if(best){best.classList.add('on');"
+           "best=document.querySelector(\".side-nav a[href='/']\");"
+           "if(!best&&p.indexOf('/tool')===0)best=document.querySelector(\".side-nav a[href='/settings']\");"  # every tool: Settings
+           "if(best){best.classList.add('on');"
            "best.setAttribute('aria-current','page')}})();</script>")
 
 
