@@ -23,7 +23,7 @@ from paf import icons, simple, theme
 ROW_GAP = 6.0  # seconds: events this close share one row of the timeline
 PRE = -2.0  # where "before the pull" sits
 ANCHORS = ("phase", "immune", "adds", "cast")  # boss events a press can confirm, and that name a row, in this order
-YOU_ORDER = ("pot", "cd", "def", "do", "move")  # your items in a row: the burst first, the movement cue last
+YOU_ORDER = ("do", "pot", "cd", "def", "move")  # your items in a row: the job first, then the burst, the move last
 LUST_SECONDS = 40.0
 POTION_SECONDS = 30.0
 DEF_SUPPORT = 0.4  # a defensive is shown when at least this share of the top players press one there
@@ -308,8 +308,10 @@ def _ctx(t: float, its: list[tuple[float, Item]]) -> str:
     """What a press is for, in a few words: on the pull, on the boss event it answers, inside Bloodlust."""
     if t < 0:
         return "before the pull"
-    if t < 5:
+    if t < 1:
         return "on the pull"
+    if t < 5:
+        return "just after the pull"
     near = [x for at, x in its if x.side == "boss" and x.kind in ANCHORS and t - 8 <= at <= t + 1]
     if near:
         order = ("adds", "cast", "immune", "phase")  # what you press it for, the most concrete first
@@ -331,7 +333,8 @@ def data(d, ms: list[Moment], dur: float) -> dict:
 
     phase_starts = [s for _n, s, _e in phases[1:]]
     acts = [{"t": round(t, 1), "n": x.text, "k": x.kind, "ic": x.icon, "d": round(x.dur, 1),
-             "c": "" if x.kind == "move" else _ctx(t, its)} for t, x in its if x.side == "you"]
+             "c": "" if x.kind == "move" else (_ctx(t, its) or ("as soon as it is ready" if x.kind == "cd" else ""))}
+            for t, x in its if x.side == "you"]
     acts.sort(key=lambda a: (a["t"], YOU_ORDER.index(a["k"])))
     return {
         "end": round(dur, 1),
@@ -341,7 +344,7 @@ def data(d, ms: list[Moment], dur: float) -> dict:
         "anchors": [PULL] + [{"t": round(t, 1), "n": x.name if x.kind in ("phase", "immune") else x.text, "k": x.kind,
                      "p": ph(t), "ic": x.icon} for t, x in its if x.side == "boss" and x.kind in ANCHORS and t >= 1
                     and not (x.kind != "phase" and any(abs(t - s) <= 1 for s in phase_starts))],
-        "boss": [{"t": round(t, 1), "d": round(x.dur, 1), "n": x.text, "k": x.kind} for t, x in its
+        "boss": [{"t": round(t, 1), "d": round(x.dur, 1), "n": x.text, "k": x.kind, "ic": x.icon} for t, x in its
                  if x.side == "boss" and x.kind not in ("phase",)],
         "strips": [{"t": round(t, 1), "d": round(x.dur, 1), "k": x.kind, "side": x.side, "n": x.name}
                    for t, x in its if x.dur and x.kind in ("cd", "pot", "def", "lust", "adds", "move", "immune")],
@@ -416,7 +419,8 @@ def _second_screen(d) -> str:
             "<span class='ss-clock' id='ss-clock'>0:00</span><span class='ss-phase' id='ss-phase'></span>"
             "<span class='ss-boss' id='ss-boss' aria-label='Boss'></span>"
             f"{_btn('ss-close', 'Back to the plan', 'Escape')}</div>"
-            "<div class='ss-mid'><div class='call' id='ss-call'></div><p class='then' id='ss-then'></p>"
+            "<div class='ss-mid'><div class='call' id='ss-call'></div><p class='ss-you' id='ss-you'></p>"
+            "<p class='then' id='ss-then'></p>"
             "<div class='bars' id='ss-bars' role='list' aria-label='Coming up'></div></div>"
             f"<div class='ss-bot'><div class='grp'>{_btn('ss-play', 'Play', cls='btn primary')}"
             f"{_btn('ss-pull', 'Start at 10 on the pull timer', 'Alt+P')}"

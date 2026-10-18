@@ -472,3 +472,5 @@ dialog.ss::backdrop{background:var(--bg)}
 .fv .ev small{display:block}
 .fv .ph-band{top:54px}
 .fv .tl-end{height:12vh}
+.fv .fbar.boss b{color:var(--fg)}
+.fv .ss .ss-you{margin:0 auto;text-align:center}

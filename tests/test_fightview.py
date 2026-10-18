@@ -32,7 +32,7 @@ def test_moments_put_the_boss_and_you_together(monkeypatch):
     assert first.t < 0 and first.title == "Before the pull" and first.you[0].kind == "pot"  # a pre-pot
     adds = next(m for m in ms if m.t == 50.0)
     assert adds.title == "4 × Amani" and adds.anchor.kind == "adds"
-    assert [y.text for y in adds.you] == ["Shadow Blades", "Kill Amani"]  # 52 s shares the adds' row, burst first
+    assert [y.text for y in adds.you] == ["Kill Amani", "Shadow Blades"]  # 52 s shares the adds' row, the job first
     assert next(y for y in adds.you if y.text == "Shadow Blades").dur == 16.0  # its aura, from the game data
     two = next(m for m in ms if m.t == 150.0)
     assert two.title == "Stage Two begins"  # a phase always opens its own row

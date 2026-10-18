@@ -11,7 +11,7 @@
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   var st = { cur: 0, playing: false, speed: 1, sound: false, conf: [], key: '', curRow: -1, target: -1, lastPress: -1e9,
              quietUntil: 0, userScroll: 0, last: null, ssFrom: null, sq: [], sqAt: 0, said: {}, owed: [], globalHeld: false,
-             called: {} };
+             called: {}, lastPressAt: -1e9 };
 
   function mmss(t) { var s = Math.max(0, Math.round(t)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
   function clock(t) { return t < 0 ? '−' + mmss(-t) : mmss(t); }
@@ -62,7 +62,8 @@
     for (var i = 0; i < G.length; i++) {
       var g = G[i];
       if (g.last >= t - NOW_FOR && (after == null || g.at > after + 0.5)) {
-        if (after == null && st.called[g.at.toFixed(1)] && g.last < t - 0.5 && G[i + 1]) continue;  // said already
+        var said = st.called[gkey(g)];
+        if (after == null && said != null && said < st.lastPressAt && g.last < t - 0.5 && G[i + 1]) continue;  // said before
         // already pressed: the next press takes over as soon as it is near (not before Play, at the pull)
         if (after == null && g.last < t - 0.5 && (st.playing || t !== 0) && G[i + 1] && G[i + 1].at - t <= LEAD) return G[i + 1];
         return g;
@@ -70,6 +71,7 @@
     }
     return null;
   }
+  function gkey(g) { return g.acts.map(function (a) { return a.t + a.n; }).join('|'); }
   function names(g, sep) { return g.acts.map(function (a) { return a.n; }).join(sep || ' + '); }
   function icon(ic) {
     return ic ? '<i class="ic" aria-hidden="true" style="background-image:url(\'https://wow.zamimg.com/images/wow/icons/medium/' + esc(ic) + '.jpg\')"></i>'
@@ -87,8 +89,9 @@
     }
     var dt = g.owed ? 0 : g.at - t, c = g.owed ? 'late: the boss came early' : g.acts[0].c;
     if (dt > FAR) {
+      var head = youNow(t, { state: 'far' });
       return { key: 'far' + g.at.toFixed(0), g: g, cls: 'call fv-next', state: 'far', say: '',
-               html: '<span class="lab">Your rotation</span><p class="pend">Next: ' + esc(names(g)) + ' at ' + mmss(g.at) + (c ? ', ' + esc(c) : '') + '</p>' };
+               html: '<span class="lab">' + esc(head) + '</span><p class="pend">Next press: ' + esc(names(g)) + ' at ' + mmss(g.at) + (c ? ', ' + esc(c) : '') + '</p>' };
     }
     var state = dt <= 0.5 ? 'go' : dt <= LEAD ? 'ready' : 'soon';
     var kick = state === 'go' ? (cap(c) || 'Press') : (state === 'ready' ? 'Get ready' : 'Next') + (c ? ', ' + c : '');
@@ -125,9 +128,15 @@
   function youNow(t, cc) {
     if (cc.state === 'go') return names(cc.g);
     if (!st.playing && t === 0 && cc.g) return names(cc.g);
+    if (t < 0) return 'Pull in ' + secs(-t);
     var adds = B.filter(function (b) { return b.k === 'adds' && !gone(b.t) && eff(b.t) <= t && t < until(b); })[0];
     if (adds) return 'Kill the ' + adds.n.replace(/^\d+ × /, '') + ' (' + secs(until(adds) - t) + ' left)';
     var imm = B.filter(function (b) { return b.k === 'immune' && !gone(b.t) && eff(b.t) <= t && t < until(b); })[0];
+    var due = B.filter(function (b) {  // an intermission planned now but not confirmed: keep hitting until it comes
+      return b.k === 'immune' && !gone(b.t) && !st.conf.some(function (c) { return Math.abs(c.pt - b.t) <= 1; })
+        && eff(b.t) <= t && t - eff(b.t) < 25;
+    })[0];
+    if (due) return 'Hit the boss: it goes immune any moment';
     if (imm) {
       var next = N.filter(function (a) { return a.k === 'adds' && !gone(a.t) && eff(a.t) > t && eff(a.t) < until(imm); })[0];
       return next ? 'Nothing to hit: ' + next.n + ' in ' + secs(eff(next.t) - t) : 'Nothing to hit until the boss is back';
@@ -163,11 +172,12 @@
     N.forEach(function (a, i) {
       if (confirmed(i) || a.t < past || gone(a.t)) return;
       var w = WIN[a.k] || WIN.cast, d = t - eff(a.t);
-      // a phase is late no more once boss events planned after it are past too: a press now is for them
-      if ((a.k === 'phase' || a.k === 'immune') && d > 0 && N.some(function (b) { return b.t > a.t && eff(b.t) < t - 1 && b.k !== 'pull'; })) return;
       if (d >= w[0] && d <= w[1]) c.push({ i: i, d: d, k: a.k });
     });
     if (!c.length) return -1;
+    // nothing planned after a phase can come before it: while it is in its window, later events wait
+    var open = c.filter(function (x) { return x.k === 'phase' || x.k === 'immune'; }).map(function (x) { return N[x.i].t; });
+    if (open.length) { var first = Math.min.apply(null, open); c = c.filter(function (x) { return N[x.i].t <= first + 1; }); }
     var pull = c.filter(function (x) { return x.k === 'pull'; })[0];
     if (pull && !st.conf.length && t < 10) return pull.i;
     var big = function (x) { return x.k === 'phase' || x.k === 'immune'; };
@@ -215,12 +225,15 @@
   function render() {
     var t = st.cur, cc = call(t), sh = shift(1e9);
     txt($('c-time'), clock(t)); txt($('ss-clock'), clock(t));
-    var ph = phaseAt(t) + (st.conf.length && Math.abs(Math.round(sh)) >= 2 ? ' · boss ' + Math.abs(Math.round(sh)) + ' s ' + (sh > 0 ? 'behind' : 'ahead') : '');
+    var ph = phaseAt(t) + (st.conf.length && Math.abs(Math.round(sh)) > 2 ? ' · boss ' + Math.abs(Math.round(sh)) + ' s ' + (sh > 0 ? 'behind' : 'ahead') : '');
     txt($('c-phase'), ph); txt($('ss-phase'), ph);
+    var pn = phaseAt(t);
+    if (st.playing && st.lastPhase && pn !== st.lastPhase) say(pn + '.');
+    st.lastPhase = pn;
     txt($('c-title'), title(t, cc));
     var bl = bossNow(t); txt($('c-boss'), bl); txt($('ss-boss'), bl === '—' ? '' : bl);
-    txt($('c-you'), youNow(t, cc));
-    if (cc.state === 'go' && cc.g) st.called[cc.g.at.toFixed(1)] = 1;
+    var yn = youNow(t, cc); txt($('c-you'), yn); txt($('ss-you'), yn === 'Your rotation' || cc.state === 'go' ? '' : yn);
+    if (cc.state === 'go' && cc.g && st.called[gkey(cc.g)] == null) st.called[gkey(cc.g)] = st.cur;
     ['c-call', 'ss-call'].forEach(function (id) { var el = $(id); set(el, cc.html); el.className = cc.cls; });
     var th = then(t, cc); txt($('c-then'), th); txt($('ss-then'), th);
     var n = nextAnchor(t);
@@ -283,7 +296,7 @@
     });
     B.forEach(function (b) {  // the moves to come: a boss mod shows them too
       var e = eff(b.t);
-      if (b.k === 'move' && b.d >= 5 && !gone(b.t) && e >= t - 0.5 && e <= t + 60) out.push(bar(e, t, 'boss', '', 'Boss', 'Movement, ' + Math.round(b.d) + ' s'));
+      if (b.k === 'move' && b.d >= 5 && !gone(b.t) && e >= t - 0.5 && e <= t + 60) out.push(bar(e, t, 'boss', b.ic || '', 'Boss', 'Movement, ' + Math.round(b.d) + ' s'));
     });
     N.forEach(function (a) {
       var e = eff(a.t);
@@ -346,7 +359,7 @@
     N.forEach(function (b, j) {  // the boss events at the same time are confirmed with it
       if (Math.abs(b.t - a.t) <= 1) st.conf.push({ i: j, pt: b.t, at: st.cur + (b.t - a.t), big: b.k === 'phase' || b.k === 'immune' });
     });
-    st.lastPress = now; st.quietUntil = now + QUIET * 1000; st.key = '';
+    st.lastPress = now; st.lastPressAt = st.cur; st.quietUntil = now + QUIET * 1000; st.key = '';
     var how = Math.abs(late) <= 2 ? 'on time' : 'boss ' + Math.abs(late) + ' s ' + (late > 0 ? 'behind' : 'ahead of') + ' the plan';
     // a press not called yet that this moves into the past is called now, once (a defensive, a potion, a cooldown)
     A.forEach(function (x, k) {
