@@ -129,7 +129,7 @@ SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
         ("difficulty", "Difficulty", "The difficulty a new prep starts on."),
         ("guild", "Guild", "Its latest log gives your raid's composition (who hits the adds, pad or not)."),
         ("guild_server", "Guild's server", "For example Kazzak."),
-        ("guild_region", "Guild's region", ""),
+        ("guild_region", "Guild's region", "Where your guild's logs are read from."),
     ]),
     ("The app", False, [
         ("refresh_after_reset", "Prepare again after the weekly reset",
@@ -209,7 +209,7 @@ def settings_page(message: str = "") -> str:
 
         rl = WCLClient().rate_limit()
         quota = (f"{rl['pointsSpentThisHour']:.0f} / {rl['limitPerHour']} points used this hour "
-                 f"(reset in {int(rl['pointsResetIn']) // 60} min)")
+                 f"(reset in {max(1, round(rl['pointsResetIn'] / 60))} min)")  # never "0 min"
     except Exception as ex:  # noqa: BLE001 - shown as is
         quota = f"<span class='neg'>{e(str(ex)[:160])}</span>"
     msg = f"<p class='notice small' role='status'>{e(message)}</p>" if message else ""
@@ -233,7 +233,9 @@ def settings_page(message: str = "") -> str:
     return f"""<h1>Settings</h1><p class="lead">Your raid, the app, your Warcraft Logs access and where things stand.
 </p>{msg}<div class="set-cols"><div>
 <form method="post" action="/settings" class="card settings">{settings_form()}
-<div class="cta"><button class="btn go">Save</button></div></form></div><div>
+<div class="cta"><button class="btn go">Save</button><span class="dirty-note">Unsaved changes</span></div></form>
+<script>(function(f){{f.addEventListener('input',function(){{f.classList.add('dirty')}})}})(document.currentScript
+.previousElementSibling)</script></div><div>
 {account}<h2>Warcraft Logs key</h2><div class="card"><p class="small measure">{current} To use another one (a new
 client, or a regenerated secret): create or open it on <a href="https://www.warcraftlogs.com/api/clients"
 target="_blank" rel="noopener">warcraftlogs.com/api/clients</a>, then paste both values.

@@ -103,9 +103,11 @@ def page_body() -> str:
     regions_g = "".join(f"<option value='{r}'{' selected' if r == greg else ''}>{r.upper()}</option>"
                         for r in settings.SETTINGS["guild_region"].choices)
     # already set: keep it and go on (a Save that changes nothing, or a "Skip" that sounds like dropping it, is not it)
-    keep_char = ("<button type='button' class='btn go next'>Keep this character &rarr;</button>"
-                 "<button class='btn ghost'>Load the pasted one</button>")
-    keep_guild = "<button class='btn ghost'>Save changes</button><button type='button' class='btn go next'>Keep it &rarr;</button>"
+    # a field changed: the save button takes the primary place and "Keep" goes (see JS), nothing typed is lost
+    keep = "<button type='button' class='btn go next keep'>{} &rarr;</button>"
+    keep_char = "<button class='btn ghost save-alt'>Load the pasted one</button>" + keep.format("Keep this character")
+    keep_char_wcl = "<button class='btn ghost save-alt'>Find this one instead</button>" + keep.format("Keep this character")
+    keep_guild = "<button class='btn ghost save-alt'>Save changes</button>" + keep.format("Keep it")
     summary = "; ".join(x for x in (
         "Warcraft Logs connected" if key_done else "",
         f"character {char.name}" if char else "",
@@ -140,7 +142,7 @@ def page_body() -> str:
 <a class="btn ghost" href="/onboard/skip">Skip all</a></div></section>
 
 <section class="ob-step" data-step="key">
-<h1>{'Warcraft Logs: connected' if key_done else 'Connect to Warcraft Logs' if wcllogin.available() else 'Your Warcraft Logs key'}</h1>
+<h1>{'Warcraft Logs: ready' if key_done else 'Connect to Warcraft Logs' if wcllogin.available() else 'Your Warcraft Logs key'}</h1>
 {done_html if key_done else key_form}</section>
 
 <section class="ob-step" data-step="character">
@@ -152,7 +154,7 @@ def page_body() -> str:
 <div class="row"><input name="name" placeholder="Character name" required><input name="server" placeholder="Server" required>
 <select name="region" aria-label="Region">{regions}</select></div>
 <p class="ob-err" role="alert"></p>
-<div class="ob-actions"><button class="btn go">Find my character</button>{skip}</div></form>
+<div class="ob-actions">{keep_char_wcl if char else '<button class="btn go">Find my character</button>' + skip}</div></form>
 <form class="ob-form ob-tab" data-tab="simc" data-to="/onboard/simc" method="post" action="/profile">
 <p class="small muted">In game: type <code>/simc</code>, then Ctrl+A, Ctrl+C, and paste here (it includes your bags).</p>
 <textarea name="simc" required placeholder="Paste the /simc export here"></textarea>
@@ -185,6 +187,9 @@ JS = """<script>
 var root = document.querySelector('.ob'); if (!root) return;
 var steps = [].slice.call(root.querySelectorAll('.ob-step')), dots = [].slice.call(root.querySelectorAll('.ob-dots li'));
 var names = steps.map(function(s){ return s.dataset.step; }), at = 0, done = {};
+root.querySelectorAll('form').forEach(function(f){ f.addEventListener('input', function(){  // an edit: save it, not keep
+  var k = f.querySelector('.keep'), s = f.querySelector('.save-alt'); if (!k || !s) return;
+  k.remove(); s.classList.remove('ghost'); s.classList.add('go'); }); });
 function store(i){ try { localStorage.setItem('paf-onboard', names[i]); } catch (e) {} }
 function show(i, back){
   at = Math.max(0, Math.min(steps.length - 1, i));

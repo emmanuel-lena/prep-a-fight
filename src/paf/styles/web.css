@@ -234,3 +234,4 @@ textarea[name=plan],textarea[name=notes]{font-family:var(--font-data);font-size:
 .settings .cta{position:sticky;bottom:0;z-index:2;background:var(--surface);padding:12px 0;margin:0 0 -6px;border-top:1px solid var(--line)}
 .set-cols .key-in{width:100%}
 .status td{height:56px;box-sizing:border-box}
+.settings .dirty-note{display:none;margin-left:12px;color:var(--accent);font-weight:600} .settings.dirty .dirty-note{display:inline} .settings.dirty .cta{background:var(--accent-soft)}
