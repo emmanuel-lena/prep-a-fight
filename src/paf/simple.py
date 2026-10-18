@@ -71,7 +71,7 @@ def _size(gain: float) -> str:
     return "big" if gain >= 3 else "some" if gain >= 1 else "tiny"
 
 
-SIZE_WORDS = {"big": "a big gain", "some": "a small gain", "tiny": "barely matters"}
+SIZE_WORDS = {"big": "a major gain", "some": "a moderate gain", "tiny": "a minor gain"}  # the words of What to change
 
 
 # --- the three cards -----------------------------------------------------------------------------------------------
