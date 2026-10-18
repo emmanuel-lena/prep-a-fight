@@ -408,6 +408,9 @@ def raid_section(r: RaidInfo, gear: bool = True) -> str:
         for v in r.verdicts)
     groups = "".join(f"<li><b>{e(k)}</b> ({len(ps)}): {e(re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', ', '.join(ps)))}</li>"
                      for k, ps in r.archetypes.items() if ps)
+    rest = r.players - sum(len(ps) for ps in r.archetypes.values())
+    if groups and rest > 0:  # every player of the log accounted for
+        groups += f"<li><b>healers and tanks</b> ({rest}): not counted for the adds</li>"
     what = "the cooldown plan and the gear on this sheet are" if gear else "the cooldown plan on this sheet is"
     verdict = (f"Stay on the boss: {what} the one{'s' if gear else ''} for boss damage." if r.objective == "boss"
                else f"Pad the adds: {what} the one{'s' if gear else ''} for total damage.")
@@ -687,6 +690,8 @@ def checklist_items(d: PrepData) -> list[tuple[str, str]]:
         item("Bloodlust goes out at the pull" if d.lust < 15 else f"Bloodlust usually comes around {_mmss(d.lust)}")
     mine = [a for a in d.actions if a.kind in ("kill", "contact", "interrupt", "mechanic")
             and not (a.kind == "interrupt" and not a.text.startswith("Interrupt"))]
+    for n, t in gate_kills(d):  # the add that ends the immunity, first
+        item(f"{icons.img(_sfallback(d, n), 'small')}{e(t)}")
     for a in mine[:6]:
         item(f"{icons.img(d.icons.get(a.name, '') or _sfallback(d, a.name), 'small')}{e(a.text)}")
     if not mine:
@@ -839,6 +844,19 @@ def _tools_html() -> str:
                               "mechanics"), target="_top"))
 
 
+def gate_kills(d: PrepData) -> list[tuple[str, str]]:
+    """(unit, sentence) of each add whose death ends the boss's immunity: the target that gates the fight."""
+    out = []
+    for w in (d.fight.invulnerable if d.fight is not None else []):
+        for t, c, _life, names in d.waves:
+            if c and w.start - 2 <= t <= w.start + w.duration:
+                name = re.sub(r"\s*\([^)]*\)", "", names).strip()
+                out.append((name, f"Kill the {name}: the boss is immune from {_mmss(w.start)} until it dies (it comes at "
+                                  f"{_mmss(t)}; the top raids take about {w.duration - (t - w.start):.0f} s)."))
+                break
+    return out
+
+
 def mech_around(html: str, d: PrepData) -> str:
     """The journal card of a mechanic that hits players (not a boss cast) gets its times from the logs too."""
     casts = {n for n, _ts in d.boss_casts}
@@ -847,7 +865,7 @@ def mech_around(html: str, d: PrepData) -> str:
             continue
         times = ", ".join(_mmss(t) for t in ts)
         html = re.sub(rf"(<b>{re.escape(e(name))}</b>[^<]*(?:<span[^>]*>[^<]*</span>[^<]*)*</div>)(?!<div class='small muted'>around)",
-                      lambda m, times=times: m.group(1) + f"<div class='small muted'>around {times}</div>", html, count=1)
+                      lambda m, times=times: m.group(1) + f"<div class='small muted'>around {times}</div>", html)
     return html
 
 
@@ -867,7 +885,8 @@ def stage_times(html: str, phases: list[tuple[str, float]], duration: float) -> 
 
         def keep(m: re.Match) -> str:
             ts = [t for t in re.findall(r"\d+:\d\d", m.group(1)) if span[0] - 15 <= secs(t) < span[1]]
-            return f"around {', '.join(ts)}" if ts else ""
+            early = any(secs(t) < span[0] - 1 for t in ts)  # cast just before its stage starts: said so
+            return (f"around {', '.join(ts)}" + (" (just before the stage starts)" if early else "")) if ts else ""
         body = re.sub(r"around ((?:\d+:\d\d(?:, )?)+)(?:…)?", keep, sec.group(3))
         body = re.sub(r"<div class='small muted'>(?: &middot; )?</div>", "", body.replace(">&middot; ", ">"))
         return sec.group(1) + body + "</section>"
@@ -1047,8 +1066,10 @@ def render(d: PrepData) -> str:
             blocks = ""
             for kind, title in groups.items():
                 rows = [a for a in d.actions if a.kind == kind]
-                if rows:
+                gates = gate_kills(d) if kind == "kill" else []  # the unit that ends an immunity comes first
+                if rows or gates:
                     blocks += (f"<h3>{e(title)}</h3><ul>" + "".join(
+                        f"<li>{icons.img(_sfallback(d, n), 'small')}{e(t)}</li>" for n, t in gates) + "".join(
                         f"<li>{icons.img(d.icons.get(a.name, '') or _sfallback(d, a.name), 'small')}{e(a.text)}</li>" for a in rows) + "</ul>")
             tabs["boss"].insert(0, "<h2>What the top players do, from their logs</h2><div class='card guide'>"
                                 f"{blocks}</div>")
