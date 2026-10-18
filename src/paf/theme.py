@@ -82,7 +82,8 @@ SIDE_JS = ("<script>(function(){var p=location.pathname,best=null;document.query
            "if(!best&&(p.indexOf('/view/')===0||p.indexOf('/boss')===0||p.indexOf('/job/')===0||p.indexOf('/raid/')===0"
            "||p.indexOf('/share/')===0))"
            "best=document.querySelector(\".side-nav a[href='/']\");"
-           "if(!best&&p.indexOf('/tool')===0)best=document.querySelector(\".side-nav a[href='/settings']\");"  # every tool: Settings
+           "var near=null;if(!best&&p.indexOf('/tool')===0)near=document.querySelector(\".side-nav a[href='/settings']\");"
+           "if(near)near.classList.add('on');"  # a tool: lit under Settings, which files them, but not 'the current page'
            "if(best){best.classList.add('on');"
            "best.setAttribute('aria-current','page')}})();</script>")
 

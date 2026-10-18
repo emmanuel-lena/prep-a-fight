@@ -1145,7 +1145,7 @@ and the gear for that.</p></div>""")
             cells = ""
             for f in tc.fights:
                 tot, boss = r.per_fight.get(f, (None, None))
-                cells += f"<td class='n'>{_pct(tot, 1, err=tc.error)}{'<br><span class=small>on the boss ' + _pct(boss, 1, err=2 * tc.error) + '</span>' if boss is not None else ''}</td>"
+                cells += f"<td class='n'>{_pct(tot, 1, err=2 * tc.error)}{'<br><span class=small>on the boss ' + _pct(boss, 1, err=2 * tc.error) + '</span>' if boss is not None else ''}</td>"
             both = set(r.add) & set(r.drop)
             add = [t for t in dict.fromkeys(r.add) if t not in both]
             drop = [t for t in dict.fromkeys(r.drop) if t not in both]

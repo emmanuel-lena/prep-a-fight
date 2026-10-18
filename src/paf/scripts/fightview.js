@@ -139,7 +139,7 @@
     var n = group(t, cc.g.last);
     if (!n || n.at - t > THEN) return '';
     var c = n.acts[0].c === 'default list timing' ? '' : n.acts[0].c, said = names(n);
-    return 'Then ' + said + ' at ' + mmss(n.at) + (c && said.indexOf(c.replace(/^on (the )?/, '')) < 0 ? ' · ' + c : '');
+    return 'Then ' + said + ' at ' + mmss(n.at) + (c && said.indexOf(c.replace(/^on (the )?/, '').replace(/^\d+ × /, '')) < 0 ? ' · ' + c : '');
   }
 
   /* the boss line: what is running now (adds alive, the boss immune, Bloodlust) or was just cast */

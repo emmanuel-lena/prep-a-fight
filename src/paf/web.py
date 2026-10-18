@@ -1193,27 +1193,41 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
     raid_said = f"the latest public log of {g}" if g else ""
     nxt = "<button type='button' class='btn go next'>Next &rarr;</button>"
     back = "<button type='button' class='btn ghost prev'>&larr; Previous step</button>"  # not the sidebar's Back
-    body = f"""<div class="boss-cols"><div class="boss-main"><h1>{e(enc.name)} {diff_pill(difficulty)}</h1>
-<p class="lead">{last.strip() or ""}</p>{est_html}
-<form method="post" action="/prep" class="ob story" data-boss="{enc.id}-{e(difficulty)}">
-<input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
-<ol class="ob-dots" aria-hidden="true"><li></li><li></li><li></li><li></li></ol>
-<section class="ob-step" data-step="goal"><h2>What do you want from this boss?</h2>
-<div class="goals">
-<label class="goal"><input type="radio" name="goal" value="boss"><span><b>Boss damage</b>
+    no_adds = False  # the prep pack knows the fight: a boss without adds has nothing to pad
+    try:
+        from paf import pack
+
+        pk = pack.load(enc.id, diff, settings.get("class"), spec)
+        no_adds = pk is not None and not pk.fight.add_waves
+    except Exception:  # noqa: BLE001 - no pack: the choice stays offered
+        pass
+    if no_adds:
+        goal_html = ('<section class="ob-step" data-step="goal"><h2>Your goal on this boss</h2>'
+                     '<p>No adds on this boss: the prep plays for <b>boss damage</b>.</p>'
+                     '<input type="hidden" name="goal" value="boss">'
+                     f'<div class="ob-actions">{nxt}</div></section>')
+    else:
+        goal_html = ('<section class="ob-step" data-step="goal"><h2>What do you want from this boss?</h2>'
+                     '<div class="goals">' + """<label class="goal"><input type="radio" name="goal" value="boss"><span><b>Boss damage</b>
 <small>Progress: your raid lead wants everyone on the boss. Cooldowns and gear aim at the boss.</small></span></label>
 <label class="goal"><input type="radio" name="goal" value="total"><span><b>Pad the adds</b>
 <small>Your job is the adds, or you farm for parses: cooldowns and gear for total damage.</small></span></label>
 <label class="goal"><input type="radio" name="goal" value="auto" checked><span><b>Let my raid decide</b>
 <small>The prep reads your raid's log: if the others already cover the adds, you stay on the boss.</small></span></label>
-</div><div class="ob-actions">{nxt}</div></section>
+""" + f'</div><div class="ob-actions">{nxt}</div></section>')
+    body = f"""<div class="boss-cols"><div class="boss-main"><h1>{e(enc.name)} {diff_pill(difficulty)}</h1>
+<p class="lead">{last.strip() or ""}</p>{est_html}
+<form method="post" action="/prep" class="ob story" data-boss="{enc.id}-{e(difficulty)}">
+<input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
+<ol class="ob-dots" aria-hidden="true"><li></li><li></li><li></li><li></li></ol>
+{goal_html}
 <section class="ob-step" data-step="assigns"><h2>Are you assigned to something?</h2>{assigns}
 <p class="small muted ob-note">Each assignment is simulated: its moves and its downtime change your cooldown plan and your gear.</p>
 <div class="ob-actions">{back}{nxt}</div></section>
 <section class="ob-step" data-step="raid"><h2>Your raid</h2>
 <input name="raid" style="width:100%" value="{e(raid_now)}"
 placeholder="Link to one of your raid's logs: https://www.warcraftlogs.com/reports/..." aria-label="Raid log link">
-<p class="small muted" style="margin-top:6px">{e(raid_hint())}</p>
+<p class="small muted" style="margin-top:6px">{e(raid_hint(no_adds))}</p>
 <div class="ob-actions">{back}{nxt}</div></section>
 <section class="ob-step" data-step="go"><h2>Ready to prepare</h2>
 <ul class="recap">
@@ -1309,8 +1323,11 @@ def current_raid(enc, difficulty: str) -> str:
         return ""
 
 
-def raid_hint() -> str:
+def raid_hint(no_adds: bool = False) -> str:
     g = settings.get("guild")
+    if no_adds:  # nothing to pad: the log says how your last pull compares
+        return (f"Empty: the latest public log of {g} is used" if g else "Optional") + (
+            ": it shows how your last pull compares with the top players'.")
     if g:
         return (f"Empty: the latest public log of {g} is used. Your raid's composition and DPS decide whether you pad "
                 f"the adds or stay on the boss.")
@@ -1394,7 +1411,7 @@ def notes_block(enc, difficulty: str) -> str:
                 "boss's health, damage amps...) with their evidence.</p>")
     text = _fresh_header(p.read_text(encoding="utf-8-sig"))
     return f"""<p class="small muted">Detected in the logs, with the evidence. Correct what the logs cannot tell (e.g. the
-real damage amp of a heart: <code>amp Venomous Heart 2.0</code>), save, then prepare the fight again.</p>
+real damage amp of a unit: <code>amp &lt;unit&gt; 2.0</code>), save, then prepare the fight again.</p>
 <form method="post" action="/notes"><input type="hidden" name="boss" value="{enc.id}">
 <input type="hidden" name="difficulty" value="{e(difficulty)}"><textarea name="notes">{e(text)}</textarea>
 <p><button class="btn ghost">Save the notes</button></p></form>"""

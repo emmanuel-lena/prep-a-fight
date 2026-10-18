@@ -370,7 +370,7 @@ def spec_html(d) -> str:
     tiles += "".join(f"<div class='spt low'><span class='spt-n'>{e(r.get('label', r.get('spec', '')))}</span>"
                      f"<span class='spt-v'>not simmed: {why(r)}</span></div>"
                      for r in s.get("rows") or [] if not r.get("sim"))
-    return (f"<div class='specs rv'><p class='specs-head'><b>We simmed your character in each spec of your class"
+    return (f"<div class='specs rv'><p class='specs-head'><b>We simmed your character in each damage spec of your class"
             f"</b> <span class='muted'>for {e(spec_role(s))}, on this fight</span></p>"
             f"<div class='spt-row'>{tiles}</div></div>")
 

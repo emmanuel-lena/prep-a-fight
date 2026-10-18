@@ -54,7 +54,7 @@ def test_your_character_in_each_spec_shows_as_tiles_for_your_role():
             {"spec": "Assassination", "label": "Assassination", "sim": 99.9, "error": 0.1}]
     d = SimpleNamespace(specs={"verdict": "go", "mine": "Subtlety", "role": "boss", "assigns": 1, "rows": rows})
     html = briefing.spec_html(d)
-    assert "We simmed your character in each spec of your class" in html
+    assert "We simmed your character in each damage spec of your class" in html
     assert "for boss damage, with your 1 assignment, on this fight" in html
     assert "<div class='spt mine'><span class='spt-n'>Subtlety</span><span class='spt-v'>your spec</span>" in html
     assert "<div class='spt go'><span class='spt-n'>Outlaw</span><span class='spt-v'>+6%</span>" in html

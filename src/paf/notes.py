@@ -132,6 +132,8 @@ def notes_template(fight: Fight) -> str:
                      f"'{base}' ({when}). Not simulated: raid cooldowns can explain it too. If it really is a damage "
                      f"amp, uncomment and set the real value:")
         lines.append(f"# amp {base} {vs[0].multiplier:g}")
+    if lines[-1] == "# Detected in the logs:":  # said, not an empty list
+        lines.append("#   nothing: no boss-type unit and no damage window on this fight.")
     return "\n".join(lines) + "\n"
 
 
