@@ -72,13 +72,21 @@ the weekly reset, the app prepares the same bosses again by itself (setting `ref
 **The week after**: when the app starts, it finds your character's last raid log on Warcraft Logs (no link to paste)
 and reads it in the background: the night pull by pull, your rotation on the bosses you killed, why the others did
 not die and your worst pull against your best. The home page opens on *Your last raid*: two or three things to clean
-per boss. Tick the characters it reads on the Characters page.
+per boss, and the **Reclear** page gathers it with the tools that dig into a log. Tick the characters it reads on
+the Characters page.
 
 **Raid lead**: from your raid's last log, the roles on every prepared boss: who hits which add, who changes talents
 (boss or padding side, from the top players of each spec), which spec change is worth it; bench players in a click,
 copy the whole thing for Discord or as an MRT note.
 
-The prep sheet gives:
+The prep sheet has four sections:
+- **The fight**, open first: your job on this boss in a few lines, then the whole fight on one clock (the boss | the
+  pull clock | you) with how long each cooldown, add wave and Bloodlust lasts. Press Play (or start it on the pull
+  timer) and a card says what to press next, when, and why; one key press on a boss event ("it starts now") follows
+  a raid ahead of or behind the plan. A second screen shows it as a boss mod, with voice and beeps;
+- **What to change**: talents, gear, your class's other specs and the cooldown plan, each with its gain;
+- **The boss**: the boss in 60 seconds and every ability, from the Encounter Journal and the logs;
+- **Dig deeper**: every number behind the sheet:
 - the fight: phases, add waves, lust, and the boss's mechanics;
 - your DPS on the rebuilt fight vs a Patchwerk;
 - a validation: the top players' own characters simmed on the rebuilt fight vs their real DPS;
@@ -86,9 +94,9 @@ The prep sheet gives:
 - the **ideal cooldown play-by-play for boss damage, total damage and damage to adds**, with an MRT note;
 - what the top players actually do with their cooldowns;
 - your best items and what the boss drops for you;
-- in Tools, which spec of your class does the most on this boss: your character simmed in each spec in the top
+- which spec of your class does the most on this boss: your character simmed in each spec in the top
   players' gear at the season's top item level, their gap in the logs, and your own kills;
-- a short "what to remember" list at the top.
+- a short "what to remember" list, and every tool that digs further into this boss.
 
 ### Boss notes: what the logs cannot tell
 
