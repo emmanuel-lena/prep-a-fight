@@ -253,8 +253,8 @@ def text(sh: dict, difficulty: str, mrt: bool = False) -> str:
 def _tools() -> str:
     from paf import workshop
 
-    return (f"<h2>Dig deeper into a log</h2>{workshop.cards(('review', 'comp', 'raid', 'night', 'assigns', 'mechanics'))}"
-            f"{workshop.CSS}")
+    return (f"<h2>Dig deeper into a log</h2>{workshop.cards(('review', 'comp', 'raid', 'night'))}"
+            f"<h2>The boss, for your assignments</h2>{workshop.cards(('assigns', 'mechanics'))}{workshop.CSS}")
 
 
 def page_body(difficulty: str) -> str:

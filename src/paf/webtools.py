@@ -245,7 +245,7 @@ autocomplete="off">
 <tr><td>prep-a-fight</td><td class="small">version {e(__version__)}</td><td class="act">
 <form method="post" action="/update/check"><button class="btn ghost">Check for updates</button></form></td></tr>
 <tr><td>Warcraft Logs</td><td class="small">{quota}</td><td class="act"></td></tr>
-<tr><td>Caches (sims, logs)</td><td class="small">{size(cache_root()) / 1e6:,.0f} MB
+<tr><td class="nw">Caches (sims, logs)</td><td class="small">{size(cache_root()) / 1e6:,.0f} MB
 (cap {settings.get('cache_max_mb')} MB)</td><td class="act"></td></tr>
 <tr><td>Data folder</td><td class="small">{e(str(data_dir()))}</td><td class="act"></td></tr>
 <tr><td>Checked</td><td class="small">{time.strftime('%d %b %H:%M')}</td><td class="act"></td></tr></table></div>

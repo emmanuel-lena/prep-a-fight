@@ -91,7 +91,7 @@ def page_body() -> str:
     regions = "".join(f"<option>{r}</option>" for r in settings.SETTINGS["guild_region"].choices)
     key_done = has_credentials()
     skip = "<button type='button' class='btn ghost skip'>Skip</button>"
-    key_form = f"""{connect_block() + "<div class='ob-actions'>" + skip + "</div><details class='ob-own'><summary>Or use your own API key</summary>"
+    key_form = f"""{connect_block() + "<div class='ob-actions'>" + skip + "</div><details class='ob-own' open><summary>Or use your own API key</summary>"
  if wcllogin.available() else ""}
 <p>The app reads the top players' logs with <b>your own</b> free Warcraft Logs API key (each player has an hourly quota, so the key is not shared).</p>
 <ol class="small"><li>Log in on <a href="https://www.warcraftlogs.com/api/clients" target="_blank" rel="noopener">warcraftlogs.com/api/clients</a> and click <b>Create Client</b>.</li>

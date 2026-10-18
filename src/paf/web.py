@@ -1433,7 +1433,7 @@ Your spec and the boss help us."></textarea></label>
 cores and memory, and how long each step took (nothing personal: no name, no log, no folder). They help make the app
 faster on every computer.</span></label>
 <div class="cta"><button class="btn go">{"Send" if feedback.endpoint() else "Open it on GitHub"}</button></div></form>
-<details class="card" open><summary>Exactly what is sent</summary><pre class="log">{e(preview[-20000:])}</pre></details>'''
+<h2>Exactly what is sent</h2><div class="card"><pre class="log">{e(preview[-20000:])}</pre></div>'''
 
 
 def send_feedback(form: dict) -> str:

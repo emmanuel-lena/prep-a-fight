@@ -156,3 +156,4 @@ details.card[open]>summary::-webkit-details-marker,details.more[open]>summary::-
 details.set-group[open]>summary::-webkit-details-marker,details.bc-more[open]>summary::-webkit-details-marker{display:none}
 details.card[open]>summary::before,details.more[open]>summary::before,details.set-group[open]>summary::before,
 details.bc-more[open]>summary::before{content:none}
+.nw{white-space:nowrap}
