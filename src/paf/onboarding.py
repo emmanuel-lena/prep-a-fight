@@ -102,6 +102,10 @@ def page_body() -> str:
     guild, gserver, greg = settings.get("guild") or "", settings.get("guild_server") or "", settings.get("guild_region")
     regions_g = "".join(f"<option value='{r}'{' selected' if r == greg else ''}>{r.upper()}</option>"
                         for r in settings.SETTINGS["guild_region"].choices)
+    # already set: keep it and go on (a Save that changes nothing, or a "Skip" that sounds like dropping it, is not it)
+    keep_char = ("<button type='button' class='btn go next'>Keep this character &rarr;</button>"
+                 "<button class='btn ghost'>Load the pasted one</button>")
+    keep_guild = "<button class='btn ghost'>Save changes</button><button type='button' class='btn go next'>Keep it &rarr;</button>"
     summary = "; ".join(x for x in (
         "Warcraft Logs connected" if key_done else "",
         f"character {char.name}" if char else "",
@@ -120,7 +124,7 @@ def page_body() -> str:
 {"</details>" if wcllogin.available() else ""}
 """
     via = "your Warcraft Logs account" if wcllogin.logged_in() else "your own API key"
-    done_html = (f"<p>Connected: the app reads the logs with {via}. Nothing to do here.</p>"  # no connect button then
+    done_html = (f"<p>The app reads the logs with {via}. Nothing to do here.</p>"  # no connect button then
                  "<div class='ob-actions'><button type='button' class='btn go next'>Next &rarr;</button></div>")
     return f"""<div class="ob" data-key="{'1' if key_done else ''}">
 <p class="ob-brand">prep-a-<b>fight</b></p>
@@ -153,21 +157,22 @@ def page_body() -> str:
 <p class="small muted">In game: type <code>/simc</code>, then Ctrl+A, Ctrl+C, and paste here (it includes your bags).</p>
 <textarea name="simc" required placeholder="Paste the /simc export here"></textarea>
 <p class="ob-err" role="alert"></p>
-<div class="ob-actions"><button class="btn go">Load this character</button>{skip}</div></form></section>
+<div class="ob-actions">{keep_char if char else '<button class="btn go">Load this character</button>' + skip}</div></form></section>
 
 <section class="ob-step" data-step="raid">
-<h1>Your raid <span class="pill">optional</span></h1>
+<h1>Your guild <span class="pill">optional</span></h1>
 <p>Your guild's latest public log tells the prep who plays what in your raid: whether the others cover the adds
 (stay on the boss) or you should pad them, and how your last pull compares with the top players'.</p>
 <form class="ob-form" data-to="/onboard/raid" method="post" action="/guild">
-<div class="row"><input name="guild" placeholder="Guild name" value="{esc(guild)}"><input name="server" placeholder="Server"
- value="{esc(gserver)}"><select name="region" aria-label="Region">{regions_g}</select></div>
+<div class="row ob-labelled"><label>Guild<input name="guild" placeholder="Guild name" value="{esc(guild)}"></label>
+<label>Server<input name="server" placeholder="Server" value="{esc(gserver)}"></label>
+<label>Region<select name="region">{regions_g}</select></label></div>
 <p class="ob-err" role="alert"></p>
-<div class="ob-actions"><button class="btn go">Save</button>{skip}</div></form></section>
+<div class="ob-actions">{keep_guild if guild else '<button class="btn go">Save</button>' + skip}</div></form></section>
 
 <section class="ob-step" data-step="done">
 <h1>Ready</h1>
-<p class="ob-summary" data-title="your raid is saved" data-text="You can set the rest later in Settings."></p>
+<p class="ob-summary" data-title="your raid is saved" data-text="{'Everything can be changed later in Settings.' if summary else 'You can set the rest later in Settings.'}"></p>
 {f"<p class='muted'>Already set: {esc(summary)}.</p>" if summary else ""}
 <div class="ob-actions"><a class="btn go finish" href="/onboard/finish">Prepare a boss &rarr;</a></div></section>
 </div>"""

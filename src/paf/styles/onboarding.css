@@ -32,3 +32,4 @@ body:has(.ob:not(.story))>main{grid-column:1;display:grid;align-content:start;pa
 .ob-note{margin-top:14px} .ob-actions .btn{box-sizing:border-box;height:46px} /* notes off the controls; buttons one height */
 .what-sim{border:1px solid var(--line);border-radius:10px;padding:8px 14px 10px;margin:12px 0 0} .what-sim legend{font-weight:600;padding:0 6px}
 .ob select{height:48px;box-sizing:border-box}
+.ob-labelled label{flex:1;min-width:140px;display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:600} .ob-labelled label input,.ob-labelled label select{width:100%}

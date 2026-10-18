@@ -230,3 +230,7 @@ textarea[name=plan],textarea[name=notes]{font-family:var(--font-data);font-size:
 .set-row input[type=checkbox]{margin-left:0;justify-self:start} /* on the inputs' left edge */
 .set-cols .card>table td:first-child{width:1%;white-space:nowrap;padding-right:18px} /* label and buttons tight, the value takes the room */
 .status .val{display:flex;align-items:center;justify-content:space-between;gap:12px} .status .val form{margin:0;flex:none} /* a button beside its value, not a column of its own */
+/* Settings: Save always in reach; the key fields as wide as the others; one row height in Status */
+.settings .cta{position:sticky;bottom:0;z-index:2;background:var(--surface);padding:12px 0;margin:0 0 -6px;border-top:1px solid var(--line)}
+.set-cols .key-in{width:100%}
+.status td{height:56px;box-sizing:border-box}
