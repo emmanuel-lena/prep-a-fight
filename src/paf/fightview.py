@@ -80,7 +80,7 @@ class Moment:
 
 
 def _mmss(t: float) -> str:
-    s = round(max(0.0, t))  # rounded, as the page's script shows it
+    s = int(max(0.0, t))  # whole seconds, as the MRT note and Dig deeper write them
     return f"{s // 60}:{s % 60:02d}"
 
 
@@ -184,9 +184,9 @@ def items(d) -> list[tuple[float, Item]]:
     if d.lust is not None:
         lust = 0.0 if d.lust < 1 else d.lust  # within a second of the pull: at the pull
         add(lust, Item("boss", "lust", "Bloodlust", "Your raid's Bloodlust", _icon(d, "Bloodlust"), LUST_SECONDS))
-    names, order, _ = simple._pressed(d)
+    _names, order, _ = simple._pressed(d)
     dur = _durations(d)
-    for n in names:
+    for n in order:  # every press of the plan (Your job lists the main ones)
         pot = "potion" in n.lower()
         for t in order[n]:
             at = PRE if t < 0.5 and (n in d.precast or pot) else t
@@ -414,11 +414,15 @@ def cap(s: str) -> str:
     return s[:1].upper() + s[1:]
 
 
-LEGEND = ("<div class='fv-legend' aria-hidden='true'><span><i class='s-cd'></i>your cooldown</span>"
-          "<span><i class='s-pot'></i>your potion</span><span><i class='s-def'></i>your defensive</span>"
-          "<span><i class='s-lust'></i>Bloodlust</span>"
-          "<span><i class='s-adds'></i>adds alive</span><span><i class='s-move'></i>everyone moves</span>"
-          "<span>bar length = how long it lasts</span></div>")
+LEGEND_KINDS = (("cd", "your cooldown"), ("pot", "your potion"), ("def", "your defensive"), ("lust", "Bloodlust"),
+                ("adds", "adds alive"), ("move", "everyone moves"))
+
+
+def legend(its: list) -> str:
+    """The legend of the bars this fight has, none other."""
+    kinds = {x.kind for _t, x in its if x.dur}
+    spans = "".join(f"<span><i class='s-{k}'></i>{label}</span>" for k, label in LEGEND_KINDS if k in kinds)
+    return f"<div class='fv-legend' aria-hidden='true'>{spans}<span>bar length = how long it lasts</span></div>"
 
 
 def _side(d) -> str:
@@ -474,7 +478,7 @@ def html(d) -> str:
             sections.append(_phase_html(name, start, end, pi, rows, its))
     payload = json.dumps(data(d, ms, dur)).replace("</", "<\\/")
     return (f"<div class='fv'><a class='skip' href='#tl'>Skip to the fight</a><div class='sheet-fv'>{_side(d)}"
-            f"<section class='ftl' id='tl' tabindex='-1' aria-label='The fight'>{LEGEND}{''.join(sections)}"
+            f"<section class='ftl' id='tl' tabindex='-1' aria-label='The fight'>{legend(its)}{''.join(sections)}"
             f"<div class='tl-end'></div></section></div>{_second_screen(d)}"
             "<p class='vh' id='sr' aria-live='polite' aria-atomic='false'></p>"
             f"<script>var FV={payload};</script><script>{JS}</script></div>")

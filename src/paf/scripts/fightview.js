@@ -13,7 +13,7 @@
              quietUntil: 0, userScroll: 0, last: null, ssFrom: null, sq: [], sqAt: 0, said: {}, owed: [], globalHeld: false,
              called: {}, lastPressAt: -1e9 };
 
-  function mmss(t) { var s = Math.max(0, Math.round(t)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  function mmss(t) { var s = Math.max(0, Math.floor(t + 1e-6)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
   function clock(t) { return t < 0 ? '−' + mmss(-t) : mmss(t); }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function secs(n) { return Math.max(1, Math.ceil(n - 0.05)) + ' s'; }

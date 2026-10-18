@@ -21,10 +21,19 @@ def bullets(text: str) -> list[str]:
     return [p.strip() for p in parts if p.strip()]
 
 
-def readable(text: str) -> str:
+DIFF_IDS = {"lfr": 17, "normal": 14, "heroic": 15, "mythic": 16}
+
+
+def readable(text: str, difficulty: str = "heroic") -> str:
     """The journal's text without its unresolved game variables: [Name] links become the name, "X Shadow damage"
     reads "Shadow damage", "by X%" reads "by a share", a lost target name ("fixate on the .") reads "a player"."""
-    t = re.sub(r"\[([^\]]+)\]", r"\1", text or "")
+    did = DIFF_IDS.get((difficulty or "heroic").lower(), 15)
+
+    def by_diff(m: re.Match) -> str:  # $?DIFF15|DIFF16[text on those][text otherwise]: the sheet's difficulty
+        ids = {int(x) for x in re.findall(r"\d+", m.group(1))}
+        return m.group(2) if did in ids else (m.group(3) or "")
+    t = re.sub(r"\$\?((?:DIFF\d+\|?)+)\[([^\]]*)\](?:\[([^\]]*)\])?", by_diff, text or "")
+    t = re.sub(r"\[([^\]]+)\]", r"\1", t)
     t = re.sub(r" by X%", "", t)
     t = re.sub(r"\bX% of\b", "a share of", t)
     t = re.sub(r"\bX%", "some", t)
@@ -32,6 +41,8 @@ def readable(text: str) -> str:
     t = re.sub(r"\bX (sec|seconds?)\b", r"a few \1", t)
     t = re.sub(r"\b(?:inflicting|deals?|dealing) X\b", lambda m: m.group(0)[:-2], t)
     t = re.sub(r"\bX (\w+ damage)", r"\1", t)
+    t = re.sub(r"\bX or fewer\b", "only a few", t)
+    t = re.sub(r"\bX or more\b", "enough", t)
     t = re.sub(r"\bthe \.", "a player.", t)
     return t if t == text else re.sub(r"\s{2,}", " ", t)
 
@@ -76,7 +87,7 @@ def grouped(html: str) -> str:
     return "".join(out) + html[pos:]
 
 
-def modernize(html: str) -> str:
+def modernize(html: str, difficulty: str = "heroic") -> str:
     """A guide stored by an older prep, as the current builder writes it: nothing folded, the journal's variables as
     words (the sheet is rendered again from the prep's data without its game data)."""
     if not html:
@@ -93,7 +104,7 @@ def modernize(html: str) -> str:
     if "class='abg'" not in h:
         h = grouped(h)
     h = re.sub(r"<h3>What you do \(([^)]*)\)</h3>", r"<h3>What the journal tells \1</h3>", h)
-    return readable(h)
+    return readable(h, difficulty)
 
 
 def _mmss(t: float) -> str:

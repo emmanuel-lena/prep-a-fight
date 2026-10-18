@@ -573,7 +573,8 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         played = simple_plan(d)
         rules = {cd_name(d, k): rule_phrase(d, r.name) for k, r in (played.choice.items() if played else [])}
         said = [f"Your plan: {a.ability} {rules[a.ability]} (SimC finds it worth more that way for your character)."
-                for a in held if a.ability in rules and "only on" not in rules[a.ability].replace("only on add", "")]
+                for a in held if a.ability in rules and "only on" not in rules[a.ability].replace("only on add", "")
+                and not rules[a.ability].startswith("as SimC's default")]
         out.append(Suggestion("info", "The top players keep " + ", ".join(lk(a.ability) for a in held) + " for "
                               + e(" / ".join(x for x in (vuln, units) if x) or "the burst windows"), [e(s) for s in said],
                               None, ic(held[0].ability)))
@@ -839,7 +840,7 @@ def render(d: PrepData) -> str:
     tabs["overview"].append(briefing.moves_html(d))
     tabs["overview"].append(briefing.checklist_html(d))
     if d.guide_summary or d.guide_abilities:
-        tabs["boss"].append("<h2>The boss in 60 seconds</h2>" + bossguide.modernize(d.guide_summary).replace(
+        tabs["boss"].append("<h2>The boss in 60 seconds</h2>" + bossguide.modernize(d.guide_summary, d.difficulty).replace(
             '<a href="#boss">Every ability, phase by phase &rarr;</a>', ""))
         if d.actions:
             groups = {"kill": "Adds to kill", "contact": "Units handled by contact (soak)", "interrupt": "Interrupts", "assignment": "Assignments",
@@ -855,7 +856,7 @@ def render(d: PrepData) -> str:
         tabs["boss"].append(defensives_html(d))
         tabs["boss"].append("<h2>Every ability, phase by phase</h2><p class='small muted'>From the in-game "
                             "Encounter Journal; timings and how many players are hit come from the ranked kills.</p>"
-                            + f"<div class='stages'>{stage_times(bossguide.modernize(d.guide_abilities), d.phases, d.duration)}"
+                            + f"<div class='stages'>{stage_times(bossguide.modernize(d.guide_abilities, d.difficulty), d.phases, d.duration)}"
                             "</div>")
     else:
         tabs["boss"].append(defensives_html(d))
@@ -987,7 +988,8 @@ for reference: a build can be worse there and much better on this fight. Error a
     flat = bool(d.optimized) and all(abs(p.gain) <= 2 * p.error for p in d.optimized)
     if flat:  # no plan beats the default priority list on any goal: one block, not three of the same
         p = d.optimized[0]
-        note = d.mrt.get(p.objective, "")
+        note = re.sub(r"cooldowns for .*\(\+?-?0\.0%\)", "cooldowns: SimC's default priority list",
+                      d.mrt.get(p.objective, ""), count=1)
         tabs["cooldowns"].append(
             "<h2>Ideal cooldown play-by-play</h2><div class='card'><p><b>The default priority list is already right "
             "on this fight:</b> play it as it is. No other plan beats it for boss, total "
@@ -1028,7 +1030,7 @@ for reference: a build can be worse there and much better on this fight. Error a
                                                          for f in p.flags) + "</ul>"
             blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, err=1e9 if p.objective == "secondary" or _stall(d, p) else 0.0)}
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span>{" <span class='pill gold'>the sheet plays this plan</span>" if p.objective == first else ""}</h3>
-{("<p class='small'>Played because " + ("your raid pads the adds" if p.objective == "total" else "your raid stays on the boss" if p.objective == "boss" else "it is your choice") + " (see Your raid, in this section).</p>") if p.objective == first and p.objective in ("boss", "total") else ""}
+{("<p class='small'>Played because " + ("your raid pads the adds" if p.objective == "total" else "your raid stays on the boss" if p.objective == "boss" else "it is your choice") + " (see Your raid, in this section)." + (" The fight tab calls a burst pressed while the boss is immune on the adds that follow." if d.fight is not None and d.fight.invulnerable else "") + "</p>") if p.objective == first and p.objective in ("boss", "total") else ""}
 {"<p class='small muted'>Burst damage counts only the damage on " + e(burst_names(d)[1] or "the burst targets") + ": worth it only if your raid needs them dead fast" + ("." if _stall(d, p) else ", at the cost of the boss and total damage above.") + "</p>" if p.objective == "secondary" else ""}
 {checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases)}
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
