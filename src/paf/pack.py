@@ -25,7 +25,7 @@ from paf.fight import Fight
 from paf.raidneed import AddType
 from paf.talent_sim import Build
 
-VERSION = 1
+VERSION = 2  # 2: boss units up from the first hit, recurring boss casts (0.8.7)
 MIN_KILLS = 100  # fewer: the add waves may split (measured at 84 kills); a pack under it is neither shared nor used
 GROWN = 50  # the local corpus has this many more kills than the pack: the pack is made again from it
 # weekly reset per region, in UTC (weekday: Monday = 0). To check against Blizzard's announcements: EU Wednesday
