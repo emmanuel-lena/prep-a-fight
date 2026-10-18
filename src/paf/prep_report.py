@@ -838,7 +838,38 @@ def unsimmed_amps(d: PrepData) -> list[str]:
     return [n for n in dict.fromkeys(names) if n not in known]
 
 
+def onto_adds(d: PrepData) -> None:
+    """A burst a plan presses while the boss is immune, just before its adds spawn, goes on the spawn (as the fight
+    tab calls it): every plan's timeline, MRT note and NSRT reminders then say the same time."""
+    if d.fight is None or not d.fight.invulnerable or not d.optimized:
+        return
+    from paf.optimize import mrt_note, nsrt_note
+
+    spawns = sorted(t for t, *_ in d.waves)
+    imm = [(w.start, w.start + w.duration) for w in d.fight.invulnerable]
+
+    def snap(t: float) -> float:
+        if any(a <= t < b for a, b in imm):
+            return next((s for s in spawns if t < s <= t + 6), t)
+        return t
+    spell_ids = {n.lower(): int(r.split("=", 1)[1]) for n, r in d.links.items()
+                 if r.startswith("spell=") and r.split("=", 1)[1].isdigit()}
+    for p in d.optimized:
+        moved = [(snap(t), label) for t, label in p.timeline]
+        if moved == list(p.timeline):
+            continue
+        p.timeline = moved
+        if p.objective in d.mrt:
+            d.mrt[p.objective] = mrt_note(d.boss, p, d.fight, d.cd_names)
+        old = d.nsrt.get(p.objective, "")
+        enc = re.match(r"EncounterID:(\d+)", old)
+        tag = re.search(r";tag:([^;]+);", old)
+        if enc and tag:
+            d.nsrt[p.objective] = nsrt_note(int(enc[1]), p, d.fight, d.phases, tag[1], spell_ids, d.cd_names)
+
+
 def render(d: PrepData) -> str:
+    onto_adds(d)
     pre = {n for n in d.precast} | {n for n in d.links if "potion" in n.lower()} | {"Potion"}
 
     def before_pull(note: str) -> str:  # a press cast before the pull says so, as the fight tab's note does
@@ -1084,7 +1115,7 @@ for reference: a build can be worse there and much better on this fight. Error a
             changed = {k: r for k, r in p.choice.items() if r.name != "default"}
             rules = "".join(f"<tr><td>{icons.img(d.icons.get(k, ''), 'small')} {link(cd_name(d, k), d.links.get(k))}</td>"
                             f"<td>{e(rule_phrase(d, r.name))}</td></tr>"
-                            for k, r in changed.items()) or "<tr><td colspan=2>the default priority list</td></tr>"
+                            for k, r in changed.items()) or "<tr><td>Every cooldown</td><td>as SimC's default priority list casts it</td></tr>"
             others = ", ".join(f"{_goal(o)} {_pct(v, 1)}" for o, v in p.totals.items() if o != p.objective)
             steps = ""
             if p.timeline and d.fight is not None:

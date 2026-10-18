@@ -352,6 +352,12 @@
       if (mine.some(function (m) { return Math.abs(m[0] - e) <= 1 && m[1].indexOf(a.n) >= 0; })) return;  // "Kill X" says it
       out.push(bar(e, t, 'boss', a.ic, 'Boss', a.n));
     });
+    B.forEach(function (b) {  // a boss cast that is no sync point (Dig In on its stage's start): still announced
+      var e = eff(b.t);
+      if (b.k !== 'cast' || gone(b.t) || e < t - 0.5 || e > t + 60) return;
+      if (N.some(function (a) { return a.n === b.n && Math.abs(a.t - b.t) <= 1; })) return;
+      out.push(bar(e, t, 'boss', b.ic || '', 'Boss', b.n));
+    });
     out.sort(function (a, b) { return a[0] - b[0]; });
     set($('ss-bars'), out.slice(0, 7).map(function (x) { return x[1]; }).join('') || '<p class="pend">Nothing in the next minute: your rotation.</p>');
   }

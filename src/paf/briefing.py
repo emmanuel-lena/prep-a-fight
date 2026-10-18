@@ -275,9 +275,13 @@ def aim_html(d) -> str:
     dummy, and what the top players of your spec really do here."""
     if not d.sim_dps:
         return ""
-    you = d.sim_boss_dps or d.sim_dps
-    tiles = [("You can aim for", _k(you), (f"boss DPS, {_k(d.sim_dps)} in all" if d.sim_boss_dps else "DPS")
-              + " on this fight, played well")]
+    from paf.prep_report import wanted
+
+    pad = hasattr(d, "goal") and wanted(d) == "total" and d.sim_boss_dps  # your role is to pad: the total first
+    you = d.sim_dps if pad else (d.sim_boss_dps or d.sim_dps)
+    unit = (f"DPS in all, {_k(d.sim_boss_dps)} on the boss" if pad else
+            f"boss DPS, {_k(d.sim_dps)} in all" if d.sim_boss_dps else "DPS")
+    tiles = [("You can aim for", _k(you), unit + " on this fight, played well")]
     if d.patchwerk_dps:
         tiles.append(("On a training dummy", _k(d.patchwerk_dps),
                       f"DPS: this fight costs you {1 - d.sim_dps / d.patchwerk_dps:.0%}" if d.sim_dps < d.patchwerk_dps
@@ -351,10 +355,16 @@ def confidence_pill(d) -> str:
     med = d.validation[1]
     gap = abs(med - 1)
     level = "high" if gap <= 0.05 else "medium" if gap <= 0.12 else "low"
-    say = {"high": "the sim matches what the best players really did: trust the numbers.",
-           "medium": f"the sim is {gap:.0%} off what the best players really did: trust which option wins more than "
-                     f"the exact %.",
-           "low": f"the sim is {gap:.0%} off what the best players really did: read the numbers as hints."}[level]
+    say = {"high": "the sim matches the damage the best players really did: trust the numbers.",
+           "medium": f"the sim is {gap:.0%} off the damage the best players really did: trust which option wins more "
+                     f"than the exact %.",
+           "low": f"the sim is {gap:.0%} off the damage the best players really did: read the numbers as hints."}[level]
+    share = next((m for n in d.notes if (m := re.search(r"puts (\d+)% of (?:its|your) damage on the boss vs (\d+)%", n))),
+                 None)
+    if share and int(share[1]) != int(share[2]):  # the total is right, the split between boss and adds is not
+        low = int(share[1]) < int(share[2])
+        say += (f" Its boss share is {share[1]}% vs their {share[2]}%: boss-only numbers run "
+                f"{'low' if low else 'high'}, add damage {'high' if low else 'low'}.")
     return f"<p class='trust {level} rv'><span>How much to trust this:</span> {e(say)}</p>"
 
 

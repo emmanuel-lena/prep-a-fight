@@ -478,8 +478,8 @@ def night(d: dict) -> str:
         detail += (f"<li><div class='j-head'><b>{e(r['boss'])}</b><small><span class='num'>{_mmss(r['duration'])}</span>"
                    f" &middot; {end}</small></div><div class='whos'>{who}</div></li>")
     return (f"{head}<h3>Over the night</h3>{table}<details class='more' open><summary>Pull by pull ({len(pulls)})</summary>"
-            f"<ul class='pulls'>{detail}</ul></details><p class='ws-fine'>Read from the casts of the log: a potion "
-            "pressed before the pull is not counted, nor the deaths of the wipe itself. A name in red died without a "
+            f"<ul class='pulls'>{detail}</ul></details><p class='ws-fine'>Read from the casts of the log: a damage "
+            "potion counts from 10 s before the pull (the pre-pot); the deaths of the wipe itself are left out. A name in red died without a "
             "healthstone or a health potion first.</p>")
 
 def pulldiff(d: dict) -> str:
