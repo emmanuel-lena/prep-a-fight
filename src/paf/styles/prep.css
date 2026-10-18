@@ -56,3 +56,10 @@ a:focus-visible,button:focus-visible,.chip:focus-within,.tabs a:focus-visible{ou
 .change-top .cards{grid-template-columns:minmax(0,1fr)}
 .change-top{margin-bottom:22px}
 .sugg .t .ics.ph,.sugg .d .ics.ph{display:none}
+/* Dig deeper: a row of links to its parts */
+.dd-toc{display:grid;gap:8px;margin:4px 0 22px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.dd-toc p{margin:0;color:var(--muted);font-size:14px}
+.dd-toc div{display:flex;flex-wrap:wrap;gap:6px 8px}
+.dd-toc a{padding:4px 10px;border-radius:999px;background:var(--surface-2);color:var(--fg);font-size:13.5px;text-decoration:none}
+.dd-toc a:hover{background:var(--accent-soft)}
+.panel h2[id^="dd-"]{scroll-margin-top:90px}

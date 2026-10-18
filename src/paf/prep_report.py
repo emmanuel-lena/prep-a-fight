@@ -646,11 +646,13 @@ TABS = (("overview", "Overview"), ("boss", "The boss"), ("cooldowns", "Cooldowns
         ("fight", "The fight"))
 TAB_JS = """<script>
 (function(){var ids=[...document.querySelectorAll('.panel')].map(function(p){return p.id});
-function show(id){if(ids.indexOf(id)<0)id=ids[0];document.body.classList.toggle('on-fight',id==='fight');
+function show(id){var to=null,el=id&&document.getElementById(id);
+if(ids.indexOf(id)<0&&el&&el.closest('.panel')){to=el;id=el.closest('.panel').id}if(ids.indexOf(id)<0)id=ids[0];document.body.classList.toggle('on-fight',id==='fight');
 document.querySelectorAll('.panel').forEach(function(p){
 p.hidden=p.id!==id});document.querySelectorAll('.tabs a').forEach(function(a){
 var on=a.getAttribute('href')==='#'+id;a.classList.toggle('on',on);a.setAttribute('aria-selected',on)});
-var cur=document.querySelector('.tabs a.on');if(cur)cur.scrollIntoView({inline:'center',block:'nearest'});scrollTo(0,0);
+var cur=document.querySelector('.tabs a.on');if(cur)cur.scrollIntoView({inline:'center',block:'nearest'});
+if(to)to.scrollIntoView();else scrollTo(0,0);
 if(window.__fv&&id==='fight')window.__fv.layout()}
 addEventListener('hashchange',function(){show(location.hash.slice(1))});show(location.hash.slice(1));
 document.addEventListener('click',function(ev){var b=ev.target.closest('[data-copy]');if(!b)return;
@@ -661,6 +663,28 @@ navigator.clipboard.writeText(t).then(done,function(){prompt('Copy:',t)})}else{p
 
 
 WS_CSS = theme.style("workshop")
+
+
+def _contents(body: str) -> str:
+    """Dig deeper is long: its headings get anchors and a row of links on top to jump to one."""
+    import re
+
+    heads = []
+
+    def anchor(m: re.Match) -> str:
+        text = re.sub(r"<[^>]+>", "", m.group(2)).strip()
+        if not text:
+            return m.group(0)
+        hid = f"dd-{len(heads)}"
+        heads.append((hid, text))
+        return f"<h2{m.group(1)} id='{hid}'>{m.group(2)}</h2>"
+
+    body = re.sub(r"<h2([^>]*)>(.*?)</h2>", anchor, body, flags=re.S)
+    if len(heads) < 3:
+        return body
+    links = "".join(f"<a href='#{hid}' data-jump>{e(t[:48])}</a>" for hid, t in heads)
+    return (f"<nav class='dd-toc' aria-label='In this section'><p>Every number behind the sheet, for who digs. "
+            f"Jump to:</p><div>{links}</div></nav>{body}")
 
 
 def _tools_html() -> str:
@@ -937,6 +961,7 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
         "deeper": tabs["overview"] + [simple.review_card(d)] + tabs["cooldowns"] + tabs["raid"] + tabs["fight"]
         + [_tools_html()],
     }
+    sections["deeper"] = [_contents("".join(sections["deeper"]))]
     cls_icon = icons.img(icons.CLASS_ICON.format(cls=d.class_name.lower()), "large", "hero-ic") if d.class_name else ""
     header = f"""<header class="sheet-hero"><div class="in">{cls_icon}<div class="txt">
 <h1>{e(d.boss)} {diff_pill(d.difficulty)}</h1>
