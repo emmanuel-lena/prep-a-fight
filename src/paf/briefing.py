@@ -49,6 +49,10 @@ def lede_html(d) -> str:
         a = d.add_share_spec
         second += (f" The best {e(d.spec)} players keep {1 - a:.0%} of their damage on the boss and put {a:.0%} on the adds."
                   if a >= 0.05 else f" The best {e(d.spec)} players stay on the boss almost the whole time.")
+        from paf.prep_report import wanted
+
+        if wanted(d) == "total":  # your raid's call goes against what the top players do: say why, in the same breath
+            second += " Your raid lacks cleave: you pad the adds."
     return f"<p class='lede rv'>{first}{second}</p>"
 
 

@@ -74,3 +74,13 @@ def test_goal_chosen_by_the_player():
     d.optimized = [p]
     page = render(d)
     assert "Your role (your choice): <b>boss damage first</b>" in page and "your choice</span>" in page
+
+
+def test_notes_read_in_time_order():
+    from paf.prep_report import in_time_order
+
+    mrt = "head\n{time:3:00} Shadow Blades\n{time:0:09} Defensive: Feint\n"
+    assert in_time_order(mrt) == "head\n{time:0:09} Defensive: Feint\n{time:3:00} Shadow Blades\n"
+    nsrt = "EncounterID:1\ntime:90.7;ph:1;tag:x\ntime:28.6;ph:2;tag:x\ntime:9.2;ph:1;tag:x\ntime:13.9;ph:1.5;tag:x"
+    assert in_time_order(nsrt).splitlines()[1:] == ["time:9.2;ph:1;tag:x", "time:90.7;ph:1;tag:x",
+                                                     "time:13.9;ph:1.5;tag:x", "time:28.6;ph:2;tag:x"]

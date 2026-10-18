@@ -238,6 +238,28 @@ def verdicts(types: list[AddType], comp: list[tuple[str, float]], you: tuple[str
     return out
 
 
+def readable(reason: str) -> str:
+    """A verdict saved by an older prep, in the current words (the sheet is rendered again from the prep's data)."""
+    import re
+
+    m = re.fullmatch(r"even with you, your raid puts (\d+%) of the top raids' damage on them \(their weakest quarter: "
+                     r"(\d+%)\): pad them, your raid lacks cleave", reason)
+    if m:
+        return (f"pad them: your raid does {m[1]} of the top raids' damage on them, even counting you (the weakest "
+                f"top raids do {m[2]}); it lacks cleave")
+    m = re.fullmatch(r"without you, your raid already puts (\d+%) of the top raids' damage on them \(their weakest "
+                     r"quarter: (\d+%)\): the others cover them, stay on the boss", reason)
+    if m:
+        return (f"stay on the boss: without you, your raid already does {m[1]} of the top raids' damage on them (the "
+                f"weakest top raids do {m[2]})")
+    m = re.fullmatch(r"you make the difference: (\d+%) of the top raids' damage on them without you, (\d+%) with you "
+                     r"\(their weakest quarter: (\d+%)\)", reason)
+    if m:
+        return (f"pad them, you make the difference: your raid does {m[1]} of the top raids' damage on them without "
+                f"you, {m[2]} with you (the weakest top raids do {m[3]})")
+    return reason
+
+
 def overall(vs: list[AddVerdict]) -> str | None:
     """The objective for your cooldowns and gear: the verdict on the add type that weighs the most."""
     return vs[0].verdict if vs else None

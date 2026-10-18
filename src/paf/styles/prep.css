@@ -85,3 +85,5 @@ th.n{text-align:right}
 .panel .stages{display:grid;gap:16px;align-items:start}
 @media (min-width:1300px){.panel .stages{grid-template-columns:repeat(2,minmax(0,1fr))} .panel .stages .stage{margin:0}}
 @media (min-width:1300px){.panel .stages{display:block;column-count:2;column-gap:16px} .panel .stages .stage{break-inside:avoid;margin:0 0 16px}}
+@media (min-width:1300px){.panel .stages .stage{break-inside:auto;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+  .panel .stages .ab,.panel .stages .unit,.panel .stages .unit-d{break-inside:avoid} .panel .stages .stage>h3{break-after:avoid}}

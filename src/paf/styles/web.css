@@ -219,3 +219,6 @@ textarea[name=plan],textarea[name=notes]{font-family:var(--font-data);font-size:
 @media (min-width:1300px){.boss-journal .stages{display:block;column-count:2;column-gap:16px} .boss-journal .stage{break-inside:avoid;margin:0 0 16px}}
 .rq-cols{display:grid;gap:24px;align-items:start}
 @media (min-width:1100px){.rq-cols{grid-template-columns:minmax(0,560px) minmax(0,1fr)} .rq-plan{position:sticky;top:24px}}
+/* the journal flows ability by ability across two columns (a stage's card continues in the next column) */
+@media (min-width:1300px){.boss-journal .stage{break-inside:auto;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+  .boss-journal .ab,.boss-journal .unit,.boss-journal .unit-d{break-inside:avoid} .boss-journal .stage>h3{break-after:avoid}}

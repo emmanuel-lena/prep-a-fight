@@ -6,7 +6,7 @@ import html
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from paf import bossguide, icons, theme
+from paf import bossguide, icons, raidneed, theme
 from paf.theme import diff_pill
 from paf.wowhead import SCRIPT as WH_SCRIPT
 from paf.wowhead import link, linkify
@@ -158,7 +158,7 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
     for label in labels:
         color = PALETTE[sum(map(ord, _key(label))) % len(PALETTE)]  # one color per cooldown, the same in every chart
         shown = (names or {}).get(_key(label)) or label.title()
-        row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">{e(shown[:24])}</text>']
+        row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">{e(shown[:18])}</text>']
         tt = tops.get(_key(label)) or []
         if tt and tops_players:
             bins: dict[int, int] = {}
@@ -363,7 +363,7 @@ def raid_section(r: RaidInfo) -> str:
     rows = "".join(
         f"<tr><td>{e(v.add.name)}</td><td class='n'>{v.without_you:.0%}</td><td class='n'>{v.with_you:.0%}</td>"
         f"<td class='n'>{v.low:.0%}</td><td><b>{'boss' if v.verdict == 'boss' else 'pad'}</b>: "
-        f"{e(v.reason)}</td></tr>" for v in r.verdicts)
+        f"{e(raidneed.readable(v.reason))}</td></tr>" for v in r.verdicts)
     import re
 
     groups = "".join(f"<li><b>{e(k)}</b> ({len(ps)}): {e(re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', ', '.join(ps)))}</li>"
@@ -443,7 +443,7 @@ def suggestions(d: PrepData) -> list[Suggestion]:
     if d.raid and d.raid.verdicts:
         v = d.raid.verdicts[0]
         what = "stay on the boss" if d.raid.objective == "boss" else "pad the adds"
-        out.append(Suggestion("info", f"With your raid, <b>{what}</b>", [e(v.reason)]))
+        out.append(Suggestion("info", f"With your raid, <b>{what}</b>", [e(raidneed.readable(v.reason))]))
     if d.talents and d.talents.rows:
         best = best_build(d)
         g = best.per_fight.get(d.talents.fights[0], (0.0, None))[0] if best else 0.0
@@ -711,7 +711,27 @@ def _tools_html() -> str:
                               "mechanics"), target="_top"))
 
 
+def in_time_order(note: str) -> str:
+    """An MRT note ({time:m:ss}) or NSRT reminders (time:s;ph:n) with the defensives merged in time order (the
+    player reads it before pasting it); the lines without a time keep their place on top."""
+    import re
+
+    def when(line: str):
+        m = re.match(r"\{time:(\d+):(\d+)", line)
+        if m:
+            return (0.0, int(m[1]) * 60 + int(m[2]))
+        m = re.match(r"time:([\d.]+);ph:([\d.]+)", line)
+        return (float(m[2]), float(m[1])) if m else None
+
+    lines = note.splitlines()
+    head = [x for x in lines if when(x) is None]
+    timed = sorted((x for x in lines if when(x) is not None), key=when)
+    return "\n".join(head + timed) + ("\n" if note.endswith("\n") else "")
+
+
 def render(d: PrepData) -> str:
+    d.mrt = {k: in_time_order(v) for k, v in d.mrt.items()}
+    d.nsrt = {k: in_time_order(v) for k, v in d.nsrt.items()}
     tabs: dict[str, list[str]] = {k: [] for k, _ in TABS}
 
     def lk(text: str) -> str:
