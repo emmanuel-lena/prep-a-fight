@@ -45,13 +45,15 @@ def _ic(d, name: str, size: str = "medium", cls: str = "") -> str:
 
 
 def _plan(d):
-    """The cooldown plan of the sheet: the player's (or the raid's) objective, else the best one worth it."""
+    """The cooldown plan of the sheet: the player's (or the raid's) objective, even when it changes nothing (then it
+    is the default list's timings); the best one worth it only when nobody made the call."""
     from paf.prep_report import wanted
 
-    want = wanted(d) or "boss"
+    called = wanted(d)
+    want = called or "boss"
     plans = [p for p in d.optimized if p.objective in ("boss", "total")]
     plan = next((p for p in plans if p.objective == want), None)
-    if plan is None or plan.gain <= 2 * plan.error:
+    if called is None and (plan is None or plan.gain <= 2 * plan.error):
         better = max((p for p in plans if p.gain > 2 * p.error), key=lambda p: p.gain, default=None)
         plan = better or plan
     return plan

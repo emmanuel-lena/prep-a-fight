@@ -998,7 +998,11 @@ for reference: a build can be worse there and much better on this fight. Error a
     if d.optimized and not flat:
         blocks = []
         first = wanted(d) or simple._plan(d).objective if simple._plan(d) else None
+        twins = {"adds"} if any(o.objective == "secondary" and {k for k, r in o.choice.items() if r.name != "default"}
+                                 for o in d.optimized) else set()  # burst on the adds says what 'adds' would
         for p in sorted(d.optimized, key=lambda p: p.objective != first):  # the sheet's plan first
+            if p.objective in twins:
+                continue
             changed = {k: r for k, r in p.choice.items() if r.name != "default"}
             rules = "".join(f"<tr><td>{icons.img(d.icons.get(k, ''), 'small')} {link(cd_name(d, k), d.links.get(k))}</td>"
                             f"<td>{e(rule_phrase(d, r.name))}</td></tr>"
@@ -1030,8 +1034,9 @@ for reference: a build can be worse there and much better on this fight. Error a
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
 <div class="pp-grid"><div><h4>Play-by-play of one simulated pull</h4><div class="scroll pp"><table>
 <tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></div>
-<div><h4>MRT note {copy_button(note, "Copy the MRT note")}</h4><pre class="small note-pre">{e(note)}</pre>
-{nsrt_block(d.nsrt.get(p.objective, ""))}</div></div>
+{(f'<div><h4>MRT note {copy_button(note, "Copy the MRT note")}</h4><pre class="small note-pre">{e(note)}</pre>'
+  + nsrt_block(d.nsrt.get(p.objective, "")) + "</div>") if changed else
+ "<div><p class='small muted'>The default priority list as it is: no note to paste, press your cooldowns as soon as they are ready.</p></div>"}</div>
 </div>""")
         tabs["cooldowns"].append("<h2>Ideal cooldown play-by-play, per objective</h2>" + "".join(blocks))
 
