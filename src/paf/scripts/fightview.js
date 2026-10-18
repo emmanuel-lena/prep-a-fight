@@ -7,7 +7,7 @@
   if (!root || typeof FV === 'undefined') return;
   var A = FV.acts, N = FV.anchors, B = FV.boss, $ = function (id) { return document.getElementById(id); };
   var LEAD = 5, NOW_FOR = 3, SAME = 1, BOUNCE = 3, QUIET = 1.5, LAST_PUSH = 30;
-  var WIN = { pull: [-5, 10], phase: [-20, 25], immune: [-20, 25], adds: [-10, 12], cast: [-10, 12] }, FIRST = 10, NEAR = 4, CARRY = 10, FAR = 30, THEN = 60;
+  var WIN = { pull: [-5, 10], phase: [-20, 25], immune: [-20, 25], adds: [-10, 12], cast: [-10, 12] }, FIRST = 10, NEAR = 4, CARRY = 10, FAR = 30, THEN = 60, HOLD = 60;
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   var st = { cur: 0, playing: false, speed: 1, sound: false, conf: [], key: '', curRow: -1, target: -1, lastPress: -1e9,
              quietUntil: 0, userScroll: 0, last: null, ssFrom: null, sq: [], sqAt: 0, said: {}, owed: [], globalHeld: false,
@@ -21,7 +21,25 @@
   function visible() { var p = root.closest('.panel'); return !p || !p.hidden; }
 
   /* the clock: a confirmed boss event moves every later event by the boss's delay */
+  /* a raid that confirms its boss events and whose next phase is late: the plan waits for that phase (up to a
+     minute), so nothing planned after it is called before it comes */
+  function holding() {
+    if (!st.conf.length) return null;  // a plain playback never waits: nobody confirms anything
+    var past = lastPt();
+    for (var i = 0; i < N.length; i++) {
+      var a = N[i];
+      if ((a.k !== 'phase' && a.k !== 'immune') || a.t <= past || confirmed(i)) continue;
+      var e = a.t + baseShift(a.t);
+      return e <= st.cur && st.cur - e <= HOLD ? { a: a, by: st.cur - e } : null;
+    }
+    return null;
+  }
   function shift(pt) {
+    var h = holding();
+    return baseShift(pt) + (h && pt >= h.a.t - 0.01 ? h.by : 0);
+  }
+  function waiting(pt) { var h = holding(); return !!h && Math.abs(h.a.t - pt) <= 1; }
+  function baseShift(pt) {
     var s = 0, best = -1e9;
     st.conf.forEach(function (c) {
       // a confirmed phase also carries what comes just before it (a defensive for its opening hit)
@@ -115,12 +133,15 @@
 
   /* the boss line: what is running now (adds alive, the boss immune, Bloodlust) or was just cast */
   function bossNow(t) {
-    var on = B.filter(function (b) { var e = eff(b.t); return b.k !== 'tank' && !gone(b.t) && e <= t && t < until(b); });
+    var on = B.filter(function (b) {
+      var e = eff(b.t);  // long stretches of moving stay on the timeline's bars, not on the boss line
+      return b.k !== 'tank' && !(b.k === 'move' && b.d > 20) && !gone(b.t) && e <= t && t < until(b);
+    });
     var moves = on.filter(function (b) { return b.k === 'move'; }).sort(function (a, b) { return until(b) - until(a); });
     on = on.filter(function (b) { return b.k !== 'move' || b === moves[0]; });  // overlapping moves: the longest
     return on.length ? on.map(function (b) {
       if (b.k === 'move') return 'Moving until ' + mmss(until(b));
-      if (b.k === 'immune') return 'Boss immune, back in ' + secs(until(b) - t);
+      if (b.k === 'immune') return waiting(b.t) ? 'Intermission due: the boss goes immune any moment' : 'Boss immune, back in ' + secs(until(b) - t);
       return b.n;
     }).join('; ') : '—';
   }
@@ -134,7 +155,7 @@
     var imm = B.filter(function (b) { return b.k === 'immune' && !gone(b.t) && eff(b.t) <= t && t < until(b); })[0];
     var due = B.filter(function (b) {  // an intermission planned now but not confirmed: keep hitting until it comes
       return b.k === 'immune' && !gone(b.t) && !st.conf.some(function (c) { return Math.abs(c.pt - b.t) <= 1; })
-        && eff(b.t) <= t && t - eff(b.t) < 25;
+        && (waiting(b.t) || (eff(b.t) <= t && t - eff(b.t) < 25));
     })[0];
     if (due) return 'Hit the boss: it goes immune any moment';
     if (imm) {
@@ -158,6 +179,7 @@
     FV.phases.forEach(function (x, k) {
       if (!k) return;
       var a = N.findIndex(function (n) { return n.k === 'phase' && Math.abs(n.t - x[1]) < 0.6; });
+      if (a >= 0 && waiting(N[a].t)) return;  // a late phase starts when it comes
       if (t >= (a >= 0 ? eff(N[a].t) : x[1])) p = x[0];
     });
     return p;
@@ -250,8 +272,10 @@
       if (hide && !b.hidden && document.activeElement === b) $(id === 'c-sync' ? 'play' : 'ss-play').focus();
       b.hidden = hide;
       if (!hide) {
-        txt(b.firstChild, N[st.target].n + ' started?');
-        b.setAttribute('aria-label', N[st.target].n + ' started? Press Control Shift Space');
+        var both = N.filter(function (x) { return Math.abs(x.t - N[st.target].t) <= 1 && x.k !== 'pull'; }).map(function (x) { return x.n; });
+        var lbl = (both.length > 1 ? both.join(' / ') : N[st.target].n) + ' started?';
+        txt(b.firstChild, lbl);
+        b.setAttribute('aria-label', lbl + ' Press Control Shift Space');
       }
     });
     if (st.target >= 0 && !st.saidKeys && st.playing) { say('Control Shift Space confirms a boss event when it starts.'); st.saidKeys = true; }

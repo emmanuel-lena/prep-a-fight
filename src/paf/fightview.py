@@ -192,7 +192,8 @@ def items(d) -> list[tuple[float, Item]]:
             at = PRE if t < 0.5 and (n in d.precast or pot) else t
             add(at, Item("you", "pot" if pot else "cd", n, n, _icon(d, n), POTION_SECONDS if pot else dur.get(n, 0.0)))
     for t, s, why in _defensives(d):
-        add(t, Item("you", "def", s, f"{s} for {why}" if why else s, _icon(d, s), dur.get(s, 0.0)))
+        add(t, Item("you", "def", s, f"{s} for {why}" if why else f"{s}: the top players take a defensive here",
+                    _icon(d, s), dur.get(s, 0.0)))
     end = d.duration or (d.fight.duration if d.fight else 0)
     if end:
         add(end, Item("boss", "kill", "The kill", f"The kill, around {_mmss(end)}"))
