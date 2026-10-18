@@ -145,7 +145,8 @@ def _defensives(d) -> list[tuple[float, str, str]]:
         if hits:
             t = max(0.0, min(hits, key=lambda c: abs(c - t)) - 1)
         # the logs tie it to that ability; with no cast of it close by, it is a hit that lands long after its cast
-        late = m.boss_ability in casts and not hits
+        # no cast of it around the press (8 s before to 12 s after, as the defensives table reads it): a late hit
+        late = m.boss_ability in casts and not [c for c in casts[m.boss_ability] if t - 8 <= c <= t + 12]
         why = f"{m.boss_ability}'s damage" if late else m.boss_ability
         out.append((t, m.spells[0][0], why))
     return out
@@ -325,6 +326,12 @@ def job_html(d) -> str:
     if defs:
         s, why = defs[0][1], defs[0][2]
         rows.append((s, f"<b>{e(s)}</b>{' for ' + e(why) if why else ''}, the top players' defensive."))
+    wins = d.movement.windows if d.movement else []
+    for t, it in items(d):  # a mobility spell the fight tab calls for a move: said, with who presses it
+        if it.side == "you" and it.kind == "move":
+            share = next((sh for w in wins if abs(w.start - t) <= 1.5 for n, sh in w.spells if n == it.name), None)
+            who = f": {share:.0%} of the top players press it there" if share else ""
+            rows.append((it.name, f"<b>{e(it.name)}</b> for the move at {_mmss(t)}{who}."))
     names, _order, _held = simple._pressed(d)
     order: dict[str, list[float]] = {}  # the times the fight view calls (a burst moved onto its adds included)
     for t, it in items(d):

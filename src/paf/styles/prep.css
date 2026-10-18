@@ -113,3 +113,4 @@ th.n{text-align:right}
 .sugg.rec .sev{background:var(--fg)!important;color:var(--bg)!important;border-color:var(--fg)!important}
 .sugg:not(.rec){box-shadow:none!important}
 .gen{margin-top:28px}
+.pp td{vertical-align:baseline} /* the small context text on the line of its time */
