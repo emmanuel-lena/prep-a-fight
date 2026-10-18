@@ -1276,6 +1276,8 @@ function recap(){
   var raid = (f.querySelector('input[name=raid]') || {}).value || '';
   var badraid = raid && !/warcraftlogs[.]com[/]reports[/][A-Za-z0-9]{16}/.test(raid);
   if (badraid) raid += ' (not a Warcraft Logs report link: fix it or leave it empty)';
+  else if (raid) { var m = raid.match(/reports[/]([A-Za-z0-9]{16})/), fi = raid.match(/fight=([0-9]+)/);
+    raid = 'report ' + m[1].slice(0, 6) + '\u2026' + (fi ? ', pull ' + fi[1] : ''); }  // short, not the raw link
   var rli = f.querySelector('.recap-raid'); if (rli && rli.closest('li')) rli.closest('li').classList.toggle('bad', !!badraid);
   f.querySelector('.recap-assigns').textContent = picked.join(', ');
   f.querySelector('.recap-raid').textContent = raid;

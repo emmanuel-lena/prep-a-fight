@@ -244,3 +244,4 @@ textarea[name=plan],textarea[name=notes]{font-family:var(--font-data);font-size:
 /* the Save bar sticks only once there is something to save: at rest it ends the form and covers nothing */
 .settings .cta{position:static;box-shadow:none} .settings.dirty .cta{position:sticky;box-shadow:0 -10px 14px -10px rgba(0,0,0,.18)}
 .adv h3{margin:0 0 8px;font:600 15px var(--font-body);color:var(--fg)}
+.adv code{white-space:nowrap}
