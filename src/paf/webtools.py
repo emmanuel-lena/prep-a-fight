@@ -245,7 +245,8 @@ autocomplete="off">
 <button class="btn ghost">Save and test</button></form>
 <p class="tiny muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p></div>
 <h2>Status</h2><div class="card"><table class="status">
-<tr><td>SimulationCraft</td><td class="small"><div class="val"><span>{simc}</span><form method="post" action="/tool/setup">
+<tr><td>SimulationCraft</td><td class="small"><div class="val"><span>{simc}</span>
+<form method="post" action="/tool/setup">
 <button class="btn ghost">Update</button></form></div></td></tr>
 <tr><td>prep-a-fight</td><td class="small"><div class="val"><span>version {e(__version__)}</span>
 <form method="post" action="/update/check"><button class="btn ghost">Check for updates</button></form></div></td></tr>
