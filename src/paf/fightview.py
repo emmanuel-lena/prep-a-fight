@@ -207,6 +207,14 @@ def items(d) -> list[tuple[float, Item]]:
             if MOVE_CUE <= s1 - s0 <= MOVE_LONG and w.spells:
                 s = w.spells[0][0]
                 add(s0, Item("you", "move", s, f"{s} for the move", _icon(d, s)))
+    spawns = [t for t, it in out if it.kind == "adds"]
+    imm = [(w.start, w.start + w.duration) for w in (d.fight.invulnerable if d.fight is not None else [])]
+    for k, (t, it) in enumerate(out):  # a burst pressed while the boss is immune, just before its adds: on the adds
+        if it.kind in ("cd", "pot") and any(a <= t < b for a, b in imm):
+            s = next((s for s in spawns if t < s <= t + 6), None)
+            if s is not None:
+                it.t = s
+                out[k] = (s, it)
     starts = sorted(s for _n, s in d.phases if s >= 1)
     for k, (t, it) in enumerate(out):  # a boss event logged just before a phase starts belongs to that phase
         s = next((s for s in starts if s - 1.0 <= t < s), None)
@@ -317,7 +325,8 @@ def _ctx(t: float, its: list[tuple[float, Item]]) -> str:
     if near:
         order = ("adds", "cast", "immune", "phase")  # what you press it for, the most concrete first
         x = min(near, key=lambda x: (order.index(x.kind), abs(x.t - t)))
-        return "on the " + x.text if x.kind == "adds" else ("when it starts" if x.kind == "phase" else "on " + x.text)
+        return ("on the " + x.text if x.kind == "adds" else "when it starts" if x.kind == "phase" else
+                "when the boss goes immune" if x.kind == "immune" else "on " + x.text)
     return ""
 
 
@@ -334,7 +343,7 @@ def data(d, ms: list[Moment], dur: float) -> dict:
 
     phase_starts = [s for _n, s, _e in phases[1:]]
     acts = [{"t": round(t, 1), "n": x.text, "k": x.kind, "ic": x.icon, "d": round(x.dur, 1),
-             "c": "" if x.kind == "move" else (_ctx(t, its) or ("as soon as it is ready" if x.kind == "cd" else ""))}
+             "c": "" if x.kind == "move" else (_ctx(t, its) or ("default list timing" if x.kind == "cd" else ""))}
             for t, x in its if x.side == "you"]
     acts.sort(key=lambda a: (a["t"], YOU_ORDER.index(a["k"])))
     return {
@@ -355,7 +364,10 @@ def data(d, ms: list[Moment], dur: float) -> dict:
 def mrt(d) -> str:
     plan = simple._plan(d)
     want = plan.objective if plan is not None else "boss"
-    return d.mrt.get(want) or next(iter(d.mrt.values()), "")
+    note = d.mrt.get(want) or next(iter(d.mrt.values()), "")
+    if plan is not None and not any(r.name != "default" for r in plan.choice.values()):  # the default list's timings
+        note = re.sub(r"cooldowns for [^\n]*\(\+?-?0\.0%\)", "cooldowns: SimC's default priority list", note, count=1)
+    return note
 
 
 def _btn(id_: str, label: str, keys: str = "", cls: str = "btn", hidden: bool = False, more: str = "") -> str:

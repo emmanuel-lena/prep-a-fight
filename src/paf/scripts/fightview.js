@@ -60,8 +60,8 @@
     st.conf.forEach(function (c) { if (c.big && c.pt > b.t + 0.01 && c.at > e) end = Math.min(end, c.at); });
     return end;
   }
-  /* a press's real time: one tied to no boss event ("as soon as it is ready") never waits for a late phase */
-  function aeff(a) { return a.c === 'as soon as it is ready' ? a.t + baseShift(a.t) : eff(a.t); }
+  /* a press's real time: one tied to no boss event ("default list timing") never waits for a late phase */
+  function aeff(a) { return a.c === 'default list timing' ? a.t + baseShift(a.t) : eff(a.t); }
   function afterHold(pt) { var h = holding(); return !!h && pt > h.a.t + 0.5; }
   var byEff = function () { return A.filter(function (a) { return !gone(a.t); }).sort(function (a, b) { return aeff(a) - aeff(b); }); };
   function confirmed(i) { return st.conf.some(function (c) { return c.i === i; }); }
@@ -109,12 +109,13 @@
       return { key: 'none', cls: 'call fv-next', state: 'none', say: '', html: '<span class="lab">Your rotation</span><p class="pend">Nothing to press before the kill.</p>' };
     }
     var h = holding();
-    if (h && !g.owed && afterHold(g.acts[0].t) && g.acts[0].c !== 'as soon as it is ready') {
+    if (h && !g.owed && afterHold(g.acts[0].t) && g.acts[0].c !== 'default list timing') {
       return { key: 'wait' + h.a.t, g: g, cls: 'call fv-next', state: 'far', say: '',
                html: '<span class="lab">' + esc(youNow(t, { state: 'far' })) + '</span><p class="pend">Next press, once ' +
                  esc(h.a.n) + ' starts: ' + esc(names(g)) + '</p>' };
     }
     var dt = g.owed ? 0 : g.at - t, c = g.owed ? 'late: the boss came early' : g.acts[0].c;
+    if (c === 'default list timing') c = '';  // said by the time itself
     if (dt > FAR) {
       var head = youNow(t, { state: 'far' });
       return { key: 'far' + g.at.toFixed(0), g: g, cls: 'call fv-next', state: 'far', say: '',
@@ -136,7 +137,7 @@
     if (cc.state === 'far') return '';
     var n = group(t, cc.g.last);
     if (!n || n.at - t > THEN) return '';
-    var c = n.acts[0].c, said = names(n);
+    var c = n.acts[0].c === 'default list timing' ? '' : n.acts[0].c, said = names(n);
     return 'Then ' + said + ' at ' + mmss(n.at) + (c && said.indexOf(c.replace(/^on (the )?/, '')) < 0 ? ' · ' + c : '');
   }
 

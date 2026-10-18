@@ -227,7 +227,7 @@ def rule_phrase(d: PrepData, rule: str) -> str:
     if m:
         what = "the next add wave" if m.group(1) == "adds" else (vuln or "the damage amp")
         return f"keep for {what} if it comes within {m.group(2)} s, otherwise use it"
-    return {"default": "as SimC's default priority list", "on_cooldown": "on cooldown",
+    return {"default": "as SimC's default priority list", "on_cooldown": "the moment it is ready (the default list can wait some seconds)",
             "add_waves": "only on add waves", "secondary_targets": f"only on {units or 'the secondary targets'}",
             "vulnerable_windows": f"only during {vuln or 'the damage amp'}", "lust_pi": "with Bloodlust",
             "not_before_move": "not in the 4 s before moving"}.get(rule, rule.replace("_", " "))
@@ -1128,10 +1128,12 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
     # the four sections: the fight to play, what to change, the boss, and everything else for who digs
     from paf import fightview
 
+    card = simple.change_card(d)
     sections: dict[str, list[str]] = {
         "fight": notices + [fightview.html(d)],
-        "change": [f"<div class='simple change-top'><div class='cards'>{simple.change_card(d)}</div></div>",
-                   briefing.spec_html(d), "<h2>Everything worth changing</h2>" + suggestions_html(d)]
+        "change": [f"<div class='simple change-top'><div class='cards'>{card}</div></div>",
+                   briefing.spec_html(d), ("<h2>Worth knowing</h2>" if "Nothing to change" in card else
+                                           "<h2>Everything worth changing</h2>") + suggestions_html(d)]
         + tabs["gear"],
         "boss": tabs["boss"],
         "deeper": tabs["overview"] + [f"<div class='simple'>{simple.review_card(d)}</div>"] + tabs["cooldowns"] + tabs["raid"] + tabs["fight"]

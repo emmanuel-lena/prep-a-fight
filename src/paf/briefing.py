@@ -86,7 +86,7 @@ def _moves(d) -> list[tuple[float, str, str, str]]:
         out.append((plan.gain, f"Play your cooldowns for {e(_goal(plan.objective))} damage.", e(say),
                     copy_button(d.mrt[plan.objective], "Copy the MRT note") if d.mrt.get(plan.objective) else ""))
     elif plans:
-        out.append((0.0, "Press your cooldowns as soon as they are ready: holding them gains nothing here.", "", ""))
+        out.append((0.0, "Play SimC's default priority list: no cooldown plan beats it here.", "", ""))
     if d.gear:
         changes, _, w = d.gear[0]
         if w > 2 * d.gear_error:
