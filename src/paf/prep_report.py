@@ -439,6 +439,17 @@ def copy_button(text: str, label: str) -> str:
     return f'<button type="button" class="btn ghost copy" data-copy="{e(text)}">{e(label)}</button>'
 
 
+def _stall(d, p) -> str:
+    """A plan that holds a cooldown and loses far more boss damage than any cooldown is worth: SimC's default rotation
+    ties other spells to that cooldown, so they stop while it is held (Subtlety: Shadow Dance waits on Shadow Blades)."""
+    held = [d.cd_names.get(k, k) for k, r in p.choice.items() if r.name != "default"]
+    boss = p.totals.get("boss") if p.objective != "boss" else p.gain
+    if held and boss is not None and boss < -15:
+        return (f"The {-boss:.0f}% boss loss is mostly a sim artifact: SimC's default rotation ties other spells to "
+                f"{held[0]}, so they stop while it is held. The real cost is lower; the gain is real.")
+    return ""
+
+
 def _severity(gain: float | None) -> str:
     if gain is None:
         return "info"
@@ -506,9 +517,12 @@ def suggestions(d: PrepData) -> list[Suggestion]:
             lines.append(copy_button(d.mrt[p.objective], "Copy the MRT note")
                          + (" " + copy_button(d.nsrt[p.objective], "Copy for NSRT") if d.nsrt.get(p.objective) else "")
                          + " <span class='muted small'>to paste in Method Raid Tools or Northern Sky Raid Tools</span>")
-        if p.flags:
-            lines.append("<details class='why'><summary>&#9888; Why to double-check</summary>"
-                         + "".join(f"<div>{e(f)}</div>" for f in p.flags) + "</details>")
+        stall = _stall(d, p)
+        if stall:
+            lines.append(f"<div class='why'>&#9888; {e(stall)}</div>")
+        if p.flags:  # shown, not folded; a sign under the shown precision says nothing
+            lines.append("<div class='why'>&#9888; To double-check: " + "; ".join(
+                e(re.sub(r"[-+]0\.0%", "about 0%", f)) for f in p.flags) + "</div>")
         first = next(iter(p.choice), "")
         goal = {"boss": "if you focus the boss", "total": "if you pad the adds",
                 "secondary": f"to burst {burst_names(d)[1] or 'the secondary targets'}"}.get(p.objective, p.objective)
@@ -970,7 +984,7 @@ for reference: a build can be worse there and much better on this fight. Error a
                 from paf.optimize import fight_context
 
                 steps = "".join(f"<tr><td>{_mmss(t)}</td><td>{e(cd_name(d, label.lower().replace(' ', '_')))}</td>"
-                                f"<td class='small muted'>{e(fight_context(d.fight, t).replace('lust', 'Bloodlust'))}"
+                                f"<td class='small muted'>{e(fight_context(d.fight, t).replace('lust', 'Bloodlust') or ('the end of the fight: used before it ends' if t > d.fight.duration - 25 else ''))}"
                                 "</td></tr>" for t, label in p.timeline)
             note = d.mrt.get(p.objective, "")
             checks = ""
@@ -992,7 +1006,7 @@ for reference: a build can be worse there and much better on this fight. Error a
 </div>""")
         tabs["cooldowns"].append("<h2>Ideal cooldown play-by-play, per objective</h2>" + "".join(blocks))
 
-    if d.alignment:
+    if d.alignment and (d.alignment[0].adds_cover or d.alignment[0].units_cover):  # no adds: nothing to hold for
         a0 = d.alignment[0]
         rows = ""
         for a in d.alignment:
@@ -1054,6 +1068,16 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
                                                                                             "burst targets")
              for n in d.notes]  # notes saved by older preps, in the current words
     notes = [n.replace("trajectories is scaled by 0:", "trajectories is ignored (scaled by 0):") for n in notes]
+
+    def direction(n: str) -> str:  # a calibration note saved by an older prep, in the direction the numbers go
+        m = re.match(r"Even with the add waves counted at the minimum, SimC's default priority list puts (\d+)% of "
+                     r"your damage on the boss vs (\d+)%", n)
+        if not m:
+            return n
+        from paf.cli import calibration_note
+
+        return calibration_note(int(m[1]) / 100, int(m[2]) / 100)
+    notes = [direction(n) for n in notes]
     if d.validation:
         lo, med, hi = d.validation
         notes.insert(0, f"Validation: the top players' own characters simmed on this rebuilt fight give {med:.0%} of "

@@ -867,6 +867,17 @@ def cmd_raidqueue(args: argparse.Namespace) -> int:
     return raidqueue.run()
 
 
+def calibration_note(got: float, target: float) -> str:
+    """What a boss share the sims cannot reach means for the numbers, in the direction it really goes."""
+    head = (f"Even with the add waves counted at the minimum, SimC's default priority list puts {got:.0%} of your "
+            f"damage on the boss vs {target:.0%} in the top players' logs: ")
+    if got > target:
+        return (head + "SimC keeps single-target spells on the boss while real players also spend them on adds and "
+                "burst targets. Boss-only numbers are optimistic, add damage pessimistic.")
+    return (head + "SimC spreads more of it on the adds than real players do (cleave and AoE hit every add in range). "
+            "Boss-only numbers are pessimistic, add damage optimistic.")
+
+
 def _pickle_sheet(d) -> bytes:
     """The sheet's data as a pickle: database rows become dicts, functions made on the fly (the plans' rules, the
     compared plans) are dropped; nothing on the sheet reads them."""
@@ -1017,11 +1028,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
         print(f"  top players: {target:.0%} of damage on the boss; add counts x{cal.scale:g}"
               + (f" (simulated: {got:.0%})" if got is not None else ""))
         if got is not None and abs(got - target) > 0.05:
-            d.notes.append(
-                f"Even with the add waves counted at the minimum, SimC's default priority list puts {got:.0%} of "
-                f"your damage on the boss vs {target:.0%} in the top players' logs: SimC keeps single-target spells on "
-                f"the boss while real players also spend them on adds and burst targets. Boss-only numbers are "
-                f"optimistic, add damage pessimistic.")
+            d.notes.append(calibration_note(got, target))
     if pk is not None:  # the pack's validation: the top players' characters were simmed when it was made
         fight.movement_scale = pk.fight.movement_scale
         d.validation = pk.validation
