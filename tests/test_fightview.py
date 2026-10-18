@@ -80,3 +80,14 @@ def test_a_tank_only_cast_is_dimmed_and_never_confirmed(monkeypatch):
     assert first.boss[0].kind == "tank" and first.boss[0].text == "Soul Transfer (tank)" and first.anchor is None
     data = json.loads(re.search(r"var FV=(\{.*?\});</script>", fightview.html(d)).group(1))
     assert "Soul Transfer" not in [a["n"] for a in data["anchors"]]
+
+
+def test_the_desktop_holds_the_sync_key_only_while_a_fight_plays():
+    from paf import desktop
+
+    api = desktop.Api()
+    api.sync_key(True)
+    assert api.want.is_set()
+    api.sync_key(False)
+    assert not api.want.is_set()
+    assert "__fv" in desktop.SYNC_JS and "sync()" in desktop.SYNC_JS

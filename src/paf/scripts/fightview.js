@@ -282,8 +282,15 @@
     render();
     requestAnimationFrame(tick);
   }
+  /* in the desktop app, the same key works while the game has the focus (paf.desktop holds it while a fight plays) */
+  function globalKey(on) {
+    try {
+      var w = window.pywebview ? window : (window.parent && window.parent.pywebview ? window.parent : null);
+      if (w && w.pywebview.api && w.pywebview.api.sync_key) w.pywebview.api.sync_key(on);
+    } catch (e) { /* a browser: the key works in the page only */ }
+  }
   function setPlay(on, quiet) {
-    st.playing = on; st.last = null;
+    st.playing = on; st.last = null; globalKey(on);
     if (on) requestAnimationFrame(tick);
     if (!quiet) say(on ? 'Playing from ' + clock(st.cur) : 'Paused at ' + clock(st.cur));
     render();
@@ -408,6 +415,7 @@
   var lt; window.addEventListener('resize', function () { clearTimeout(lt); lt = setTimeout(layout, 150); });
   if (window.ResizeObserver) new ResizeObserver(function () { clearTimeout(lt); lt = setTimeout(layout, 100); }).observe($('tl'));
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
+  window.addEventListener('pagehide', function () { globalKey(false); });
   window.__fv = { st: st, render: render, layout: layout, sync: sync, eff: eff };
   layout(); render();
 })();

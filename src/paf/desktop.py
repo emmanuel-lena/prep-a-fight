@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import sys
 import threading
+import time
 from pathlib import Path
 
 from paf.config import data_dir, load_dotenv, migrate_old_home
@@ -98,6 +99,53 @@ def _serve_in_process(window) -> bool:
     return ok[0]
 
 
+# the fight view's "it starts now" key, while the game has the focus: Ctrl+Shift+Space registered for the whole
+# system only while a fight plays in the app (the page asks for it through pywebview's js_api)
+SYNC_JS = ("(function(){var w=window,f=w.__fv;if(!f){var i=document.querySelector('iframe');"
+           "try{f=i&&i.contentWindow.__fv}catch(e){}}if(f)f.sync()})()")
+
+
+class Api:
+    """What the pages may ask of the window (window.pywebview.api)."""
+
+    def __init__(self) -> None:
+        self.want = threading.Event()
+
+    def sync_key(self, on: bool) -> bool:
+        if on:
+            self.want.set()
+        else:
+            self.want.clear()
+        return sys.platform == "win32"
+
+
+def _sync_key_loop(window, api: Api) -> None:
+    """Windows only: hold the global key while the page wants it, and press the fight view's sync on it."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = ctypes.windll.user32
+        mod, vk, hotkey, msg = 0x0002 | 0x0004 | 0x4000, 0x20, 0x0312, wintypes.MSG()  # ctrl+shift, no repeat, space
+        held = tried = False
+        while True:
+            if api.want.is_set() and not held and not tried:
+                held = bool(user32.RegisterHotKey(None, 1, mod, vk))  # taken by another program: the in-app key only
+                tried = True
+            elif not api.want.is_set():
+                if held:
+                    user32.UnregisterHotKey(None, 1)
+                held = tried = False
+            while user32.PeekMessageW(ctypes.byref(msg), None, 0, 0, 1):
+                if msg.message == hotkey:
+                    window.evaluate_js(SYNC_JS)
+            time.sleep(0.05)
+    except Exception as ex:  # noqa: BLE001 - the key in the app still works
+        print(f"no global sync key: {ex}", flush=True)
+
+
 def _open(window, server_url: str) -> None:
     """Show the app: through paf.local when possible, else through the local server."""
     from paf import inproc, web
@@ -172,8 +220,10 @@ def main() -> int:
         pass
     from paf.loading import startup_page
 
+    api = Api()
     window = webview.create_window(TITLE, html=startup_page(), width=1320, height=920, min_size=(900, 600),
-                                   background_color="#181219")
+                                   background_color="#181219", js_api=api)
+    threading.Thread(target=_sync_key_loop, args=(window, api), daemon=True).start()
     web.QUIT["hook"] = window.destroy  # an update is being installed: close, the installer reopens the app
     web.NOTIFY.update(on=True, title=TITLE)  # a prep done while the window is behind others: a notification
     webview.start(_open, (window, url), icon=str(ICON) if ICON.is_file() else None)
