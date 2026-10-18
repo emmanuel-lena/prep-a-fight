@@ -119,6 +119,9 @@ def night(client, code: str, encounter_id: int | None = None, live: bool = False
         row = PullRow(f["id"], f.get("name") or str(f["encounterID"]), f["difficulty"], bool(f["kill"]), dur,
                       None if f["kill"] else (f.get("bossPercentage") or 0) / 100)
         players: dict[str, PlayerPull] = defaultdict(PlayerPull)
+        for pid in f.get("friendlyPlayers") or []:  # everyone in the pull, also who did nothing tracked (no potion)
+            if pid in actors:
+                players[actors[pid]["name"]]
         table = client.query(DEATHS, {"c": code, "f": [f["id"]]}, cache_ttl=86400)["reportData"]["report"]["table"]
         table = table.get("data", table) if isinstance(table, dict) else {}
         deaths = sorted(((e["timestamp"] - t0) / 1000, e["name"]) for e in table.get("entries") or [])

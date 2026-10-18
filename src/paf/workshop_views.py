@@ -321,7 +321,7 @@ def comp(d: dict) -> str:
         elif t["players"]:
             kind = "Whole raid" if t["whole_raid"] else "Assigned"
             say = (f"<p><span>Players on it in the top raids:</span> <b class='num'>{t['players']}</b>"
-                   + (" <span>(on top of the whole raid)</span>" if t["whole_raid"] else "") + "</p>"
+                   + (" <span>(besides the whole raid hitting it)</span>" if t["whole_raid"] else "") + "</p>"
                    "<p class='lab'>The specs of your raid that do the most damage on it</p>")
         else:
             kind = "Whole raid"

@@ -730,7 +730,7 @@ def stage_times(html: str, phases: list[tuple[str, float]], duration: float) -> 
             return sec.group(0)
 
         def keep(m: re.Match) -> str:
-            ts = [t for t in re.findall(r"\d+:\d\d", m.group(1)) if span[0] - 2 <= secs(t) < span[1]]
+            ts = [t for t in re.findall(r"\d+:\d\d", m.group(1)) if span[0] - 15 <= secs(t) < span[1]]
             return f"around {', '.join(ts)}" if ts else ""
         body = re.sub(r"around ((?:\d+:\d\d(?:, )?)+)(?:…)?", keep, sec.group(3))
         body = re.sub(r"<div class='small muted'>(?: &middot; )?</div>", "", body.replace(">&middot; ", ">"))
@@ -1010,7 +1010,12 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
 <table><tr><th>Item</th><th>Slot</th><th>In your best sets</th><th>Single swap</th></tr>{body}</table>
 <p class="small muted">At item level {d.loot_ilvl}; statistical error about +/-{d.loot_error:.2f}%.</p></div>""")
 
-    notes = list(d.notes)
+    notes = [re.sub(r"^SimC puts (\d+%) of your damage on the boss vs (\d+%) in the top players' logs, even with more "
+                    r"adds:", r"Even with the add waves counted at the minimum, SimC's default priority list puts \1 "
+                    r"of your damage on the boss vs \2 in the top players' logs:", n).replace("secondary targets",
+                                                                                            "burst targets")
+             for n in d.notes]  # notes saved by older preps, in the current words
+    notes = [n.replace("trajectories is scaled by 0:", "trajectories is ignored (scaled by 0):") for n in notes]
     if d.validation:
         lo, med, hi = d.validation
         notes.insert(0, f"Validation: the top players' own characters simmed on this rebuilt fight give {med:.0%} of "

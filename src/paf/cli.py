@@ -1018,9 +1018,10 @@ def cmd_prep(args: argparse.Namespace) -> int:
               + (f" (simulated: {got:.0%})" if got is not None else ""))
         if got is not None and abs(got - target) > 0.05:
             d.notes.append(
-                f"SimC puts {got:.0%} of your damage on the boss vs {target:.0%} in the top players' logs, even "
-                f"with more adds: SimC keeps single-target spells on the boss while real players also spend them "
-                f"on adds and secondary targets. Boss-only numbers are optimistic, add damage pessimistic.")
+                f"Even with the add waves counted at the minimum, SimC's default priority list puts {got:.0%} of "
+                f"your damage on the boss vs {target:.0%} in the top players' logs: SimC keeps single-target spells on "
+                f"the boss while real players also spend them on adds and burst targets. Boss-only numbers are "
+                f"optimistic, add damage pessimistic.")
     if pk is not None:  # the pack's validation: the top players' characters were simmed when it was made
         fight.movement_scale = pk.fight.movement_scale
         d.validation = pk.validation

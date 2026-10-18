@@ -25,7 +25,7 @@ def readable(text: str) -> str:
     """The journal's text without its unresolved game variables: [Name] links become the name, "X Shadow damage"
     reads "Shadow damage", "by X%" reads "by a share", a lost target name ("fixate on the .") reads "a player"."""
     t = re.sub(r"\[([^\]]+)\]", r"\1", text or "")
-    t = re.sub(r"\bby X%", "by a share", t)
+    t = re.sub(r" by X%", "", t)
     t = re.sub(r"\bX% of\b", "a share of", t)
     t = re.sub(r"\bX%", "some", t)
     t = re.sub(r"\bX (yards?|yd)\b", r"a few \1", t)
