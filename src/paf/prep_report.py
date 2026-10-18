@@ -518,7 +518,9 @@ def suggestions(d: PrepData) -> list[Suggestion]:
                               + e(" / ".join(x for x in (vuln, units) if x) or "the burst windows"), [],
                               None, ic(held[0].ability)))
     order = {"info": 0}
-    return sorted(out, key=lambda s: (order.get(s.severity, 1) if s.title.startswith("With your raid") else 1,
+    # your raid's verdict first, then the gains, biggest first, the situational ones last
+    return sorted(out, key=lambda s: (order.get(s.severity, 1) if s.title.startswith("With your raid") else
+                                      2 if s.severity == "info" and s.gain is not None else 1,
                                       -(s.gain if s.gain is not None else -1)))
 
 
@@ -630,6 +632,8 @@ def suggestions_html(d: PrepData) -> str:
     rows = []
     for s in suggestions(d):
         label = {"major": "Major", "moderate": "Moderate", "minor": "Minor", "info": "Info"}[s.severity]
+        if s.severity == "info" and s.gain is not None:  # a gain only for some raids (a burst they may not need)
+            label = "Situational"
         gain = f'<div class="gain">{s.gain:+.1f}%</div>' if s.gain is not None else '<div class="gain"></div>'
         pic = icons.img(s.icon or "inv_misc_groupneedmore", "medium")
         details = "".join(f"<div>{x}</div>" for x in s.details)

@@ -130,6 +130,15 @@ def change_card(d) -> str:
             rows.append(f"<li>{spec_ic}<div><b>{e(best[0])} could do {best[1]:+.0f}%</b><span class='what'>We simmed "
                         f"your character in each spec: for {e(spec_role(s))}, on this boss. The top "
                         f"{e(best[0])} players are ahead too.</span></div></li>")
+    plan = _plan(d)
+    if plan is not None and plan.gain > 2 * plan.error and any(r.name != "default" for r in plan.choice.values()):
+        from paf.prep_report import rule_phrase
+
+        held = [(d.cd_names.get(k, k), r.name) for k, r in plan.choice.items() if r.name != "default"]
+        what = "; ".join(f"{n}: {rule_phrase(d, r)}" for n, r in held)
+        rows.append(f"<li>{_ic(d, held[0][0])}<div><b>Play your cooldowns this way</b><span class='sz "
+                    f"{_size(plan.gain)}'>{SIZE_WORDS[_size(plan.gain)]}</span><span class='what'>{e(what)}. The fight "
+                    f"tab calls them at their times.</span></div></li>")
     if getattr(d, "imported", False):  # no bags: the best gear and the loot need the /simc export
         rows.append("<li><span class='ok bad' aria-hidden='true'>!</span><div><b>Paste your /simc export</b>"
                     "<span class='what'>Your character was read from a log, without your bags: with /simc the "

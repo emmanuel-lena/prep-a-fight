@@ -24,11 +24,11 @@ def test_the_fight_comes_first_then_what_to_change(monkeypatch):
                         lambda plan, fight, names: [(20, ["Ascendance"]), (80, ["Stormkeeper"]), (200, ["Ascendance"])])
     page = render(d)
     assert page.index('id="fight"') < page.index('id="change"') < page.index('id="deeper"')  # the fight by default
-    assert "Nothing to change" in page.split('id="change"', 1)[1]
+    assert "Play your cooldowns this way" in page.split('id="change"', 1)[1]  # the plan is a change too
     view = simple.simple_html(d)
     assert "Your cooldowns" in view and "Hold them for these moments." in view
     assert re.search(r"<b>Ascendance</b><span class='times'><time>0:20</time><time>3:20</time>", view)
-    assert "Nothing to change" in view  # no talents nor gear worth it
+    assert "Play your cooldowns this way" in view and "Nothing to change" not in view  # the plan is the change
     assert "See all the details" in view
     assert "{" not in view
 
@@ -58,7 +58,7 @@ def test_simple_view_in_french(monkeypatch):
     monkeypatch.setattr("paf.optimize.plan_moments", lambda plan, fight, names: [(20, ["Ascendance"])])
     monkeypatch.setenv("PAF_LANG", "fr")
     page = translate(simple.simple_html(d))
-    assert "Tes CD" in page and "Garde-les pour ces moments." in page and "Rien à changer" in page
+    assert "Tes CD" in page and "Garde-les pour ces moments." in page
     assert "Le combat, pas à pas" in page and "À gauche : ce que fait le boss." in page
 
 
