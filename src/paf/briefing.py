@@ -87,7 +87,8 @@ def _moves(d) -> list[tuple[float, str, str, str]]:
         out.append((plan.gain, f"Play your cooldowns for {e(_goal(plan.objective))} damage.", e(say),
                     copy_button(d.mrt[plan.objective], "Copy the MRT note") if d.mrt.get(plan.objective) else ""))
     elif plans:
-        out.append((0.0, "Play SimC's default priority list: no cooldown plan beats it here.", "", ""))
+        role = {"total": " for padding the adds", "boss": " for boss damage"}.get(wanted(d) or "", "")
+        out.append((0.0, f"Play SimC's default priority list: no cooldown plan beats it{role} here.", "", ""))
     if d.gear:
         changes, _, w = d.gear[0]
         if w > 2 * d.gear_error:
@@ -363,7 +364,7 @@ def confidence_pill(d) -> str:
                  None)
     if share and int(share[1]) != int(share[2]):  # the total is right, the split between boss and adds is not
         low = int(share[1]) < int(share[2])
-        say += (f" Its boss share is {share[1]}% vs their {share[2]}%: boss-only numbers run "
+        say += (f" In the top players' gear its boss share is {share[1]}% vs their {share[2]}%: boss-only numbers run "
                 f"{'low' if low else 'high'}, add damage {'high' if low else 'low'}.")
     return f"<p class='trust {level} rv'><span>How much to trust this:</span> {e(say)}</p>"
 

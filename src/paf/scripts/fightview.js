@@ -16,7 +16,7 @@
   function mmss(t) { var s = Math.max(0, Math.floor(t + 1e-6)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
   function clock(t) { return t < 0 ? '−' + mmss(-t) : mmss(t); }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function secs(n) { return Math.max(1, Math.ceil(n - 0.05)) + ' s'; }
+  function secs(n) { return Math.max(1, Math.floor(n + 0.05)) + ' s'; }  // clock + countdown = the printed time (both cut)
   function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
   function visible() { var p = root.closest('.panel'); return !p || !p.hidden; }
 
@@ -177,7 +177,7 @@
     return 'Your rotation';
   }
   function title(t, cc) {
-    if (t < 0) return 'Before the pull';
+    if (t < 0 || (cc.g && cc.g.at < 0 && !st.playing)) return 'Before the pull';  // idle at 0:00 with precasts due: their moment
     if (cc.state === 'end') return 'Last push';
     var cur = '';
     N.forEach(function (a) {

@@ -462,7 +462,7 @@ def night(d: dict) -> str:
     rows = ""
     for name, v in sorted(summary.items(), key=lambda x: (-x[1]["bare"], -x[1]["deaths"])):
         pot = v["pulls_damage_potion"]
-        rows += (f"<tr><td class='who-c'>{ic(name)}<b>{e(name)}</b></td><td class='n'>{v['deaths']}</td>"
+        rows += (f"<tr><td class='who-c{' bad' if v['bare'] else ''}'>{ic(name)}<b>{e(name)}</b></td><td class='n'>{v['deaths']}</td>"
                  f"<td class='n {'bad' if v['bare'] else ''}'>{v['bare']}</td><td class='n'>{v['healthstone']}</td>"
                  f"<td class='n'>{v['health']}</td><td class='n {'bad' if not pot else ''}'>{pot}/{len(pulls)}</td></tr>")
     table = (f"<div class='scroll'><table class='night'><tr><th>Player</th><th class='n'>Deaths</th><th class='n'>Without a "

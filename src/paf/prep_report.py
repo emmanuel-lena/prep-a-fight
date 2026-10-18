@@ -377,7 +377,7 @@ def _goal(objective: str) -> str:
     return {"boss": "boss", "total": "total (pad)", "secondary": "burst"}.get(objective, objective)
 
 
-def raid_section(r: RaidInfo) -> str:
+def raid_section(r: RaidInfo, gear: bool = True) -> str:
     you = (f"you ({e(r.you[0])}, {r.you[1] / 1000:,.0f}k DPS)" if r.you_found else
            f"{'an' if r.you[0][:1].lower() in 'aeiou' else 'a'} {e(r.you[0])} at your raid's median DPS ({r.you[1] / 1000:,.0f}k; you are not in that log)")
     head = (f"<p class='small'>From your raid's log <a href='https://www.warcraftlogs.com/reports/{e(r.report)}' "
@@ -392,8 +392,9 @@ def raid_section(r: RaidInfo) -> str:
         for v in r.verdicts)
     groups = "".join(f"<li><b>{e(k)}</b> ({len(ps)}): {e(re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', ', '.join(ps)))}</li>"
                      for k, ps in r.archetypes.items() if ps)
-    verdict = ("Stay on the boss: the cooldown plan and the gear below are the ones for boss damage." if r.objective
-               == "boss" else "Pad the adds: the cooldown plan and the gear below are the ones for total damage.")
+    what = "the cooldown plan and the gear on this sheet are" if gear else "the cooldown plan on this sheet is"
+    verdict = (f"Stay on the boss: {what} the one{'s' if gear else ''} for boss damage." if r.objective == "boss"
+               else f"Pad the adds: {what} the one{'s' if gear else ''} for total damage.")
     mine = f" On this boss your spec is <b>{e(r.your_archetype)}</b>." if r.your_archetype else ""
     p = r.your_profile
     build = ""
@@ -408,8 +409,8 @@ def raid_section(r: RaidInfo) -> str:
            f"corpus): {e(', '.join(r.estimated))}.</p>" if r.estimated else "")
     return f"""<h2>Your raid and the adds</h2><div class="card">{head}
 <p><b>{verdict}</b>{mine}</p>
-<div class="scroll"><table><tr><th>Adds</th><th>Your raid without you</th><th>With you</th>
-<th>Top raids' weakest quarter</th><th>Verdict</th></tr>{rows}</table></div>
+<div class="scroll"><table><tr><th>Adds</th><th class="n">Your raid without you</th><th class="n">With you</th>
+<th class="n">Top raids' weakest quarter</th><th>Verdict</th></tr>{rows}</table></div>
 <p class="small muted">Damage your raid puts on these adds, as a share of the top raids' (their median = 100%).</p>
 <p class="small">Your raid on this boss, by what each spec does with the adds:</p><ul class="small">{groups}</ul>{est}{build}
 <details open><summary class="small">How it is computed</summary><p class="small muted">Measured: on this boss, each spec puts
@@ -679,6 +680,12 @@ lines: duration, add waves, immune and vulnerable windows, movement, Bloodlust, 
 the raid events).</p><p>{buttons}</p></div>'''
 
 
+def fightview_support() -> float:
+    from paf.fightview import DEF_SUPPORT
+
+    return DEF_SUPPORT
+
+
 def defensives_html(d: PrepData) -> str:
     """When the top players of your spec press their defensives, and what hits them then."""
     df = d.defensives
@@ -698,7 +705,8 @@ def defensives_html(d: PrepData) -> str:
                       for n, sid, per, share in df.usage[:6])
     return (f"<h2>Defensives</h2><div class='card'><p class='small'>When the top players of your spec press a "
             f"defensive on this boss ({df.kills} kills), and the boss ability cast just before or after. SimC does not "
-            f"simulate survival: this is advice, not a gain.</p>{table}"
+            f"simulate survival: this is advice, not a gain. The fight tab and the notes call the moments where "
+            f"{fightview_support():.0%} or more of the top players press one.</p>{table}"
             + (f"<p class='small muted'>Used: {usage}.</p>" if usage else "") + "</div>")
 
 
@@ -869,6 +877,9 @@ def onto_adds(d: PrepData) -> None:
 
 
 def render(d: PrepData) -> str:
+    import copy
+
+    d = copy.deepcopy(d)  # the sheet's words are set here; the data saved after it (and rendered again) stays as simmed
     onto_adds(d)
     pre = {n for n in d.precast} | {n for n in d.links if "potion" in n.lower()} | {"Potion"}
 
@@ -889,7 +900,7 @@ def render(d: PrepData) -> str:
 
         def tidy(v: str) -> str:
             lines = in_time_order("\n".join([x for x in v.splitlines() if " Defensive: " not in x] + defs)).splitlines()
-            return "\n".join(lines[:1] + fightview.prepull(lines[1:]))
+            return "\n".join(dict.fromkeys(lines[:1] + fightview.prepull(lines[1:])))  # once each, however often run
         d.mrt = {k: tidy(v) for k, v in d.mrt.items()}
     if d.nsrt and d.defensives and d.defensives.moments:  # NSRT reminds the same defensives as the fight tab
         from paf.defensives import Defensives, nsrt_lines
@@ -905,7 +916,28 @@ def render(d: PrepData) -> str:
                 return v
             lines = [x for x in lines if not re.search(rf";spellid:({'|'.join(ids)});", x)
                      and not x.startswith("-- prep-a-fight: defensives not placed")]
-            return in_time_order("\n".join(lines + nsrt_lines(kept, int(enc[1]), d.phases, tag)))
+            return in_time_order("\n".join(lines + nsrt_lines(kept, int(enc[1]), d.phases, tag)
+                                            + move_lines(int(enc[1]), tag)))
+        from paf.optimize import NSRT_UNSURE_AFTER, nsrt_phase
+
+        def move_lines(enc: int, tag: str) -> list[str]:  # the presses for a move the fight tab calls (Shadowstep)
+            out, dropped = [], []
+            for t, it in fightview.items(d):
+                if it.side != "you" or it.kind != "move":
+                    continue
+                ref = d.links.get(it.name, "")
+                sid = ref[6:].split("&")[0] if ref.startswith("spell=") else ""
+                ph, since = nsrt_phase(enc, d.phases, t)
+                limit = NSRT_UNSURE_AFTER.get((enc, ph))
+                if ph == 0 or (limit is not None and since > limit):
+                    dropped.append(f"{it.name} {_mmss(t)}")
+                    continue
+                what = f"spellid:{sid}" if sid.isdigit() else f"text:{it.name.replace(';', ',')}"
+                out.append(f"time:{since:.1f};ph:{ph:g};tag:{tag};{what};dur:5")
+            if dropped:
+                out.append("-- prep-a-fight: moves not placed (NSRT changes phase at a moment the logs do not give; "
+                           "see the MRT note): " + ", ".join(dropped))
+            return out
         d.nsrt = {k: renote(v) for k, v in d.nsrt.items()}
     played = simple._plan(d)
     if played is not None and d.mrt.get(played.objective):  # the plan you play: one note, the fight tab's, everywhere
@@ -1022,7 +1054,7 @@ the sims put as much on the boss as the top players do (SimC hits every add in r
                                     f"{workshop_views.render({'kind': kind, **tools[kind]})}</div>")
         tabs["raid"].append(workshop_views.CSS)
     if d.raid:
-        tabs["raid"].append(raid_section(d.raid))
+        tabs["raid"].append(raid_section(d.raid, bool(d.gear or d.loot)))
     else:
         tabs["raid"].append("""<h2>Your raid and the adds</h2><div class="card"><p>Not set for this prep. Set your guild
 on the home page of the app (its latest public log is used), or paste one of your raid's logs on the boss page: the prep
@@ -1098,7 +1130,7 @@ for reference: a build can be worse there and much better on this fight. Error a
         tabs["cooldowns"].append(
             "<h2>Ideal cooldown play-by-play</h2><div class='card'><p><b>The default priority list is already right "
             "on this fight:</b> play it as it is. No other plan beats it for boss, total "
-            f"or burst damage (all within the noise, ±{max(p.error, 0.01):.2f}%)."
+            "or burst damage (every gap within the sims' noise)."
             + (f" The sims leave out {e(', '.join(unsimmed_amps(d)))}: see the fight tab." if unsimmed_amps(d) else "")
             + "</p>"
             f"{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases, links=d.links)}"
@@ -1153,7 +1185,10 @@ for reference: a build can be worse there and much better on this fight. Error a
     if d.alignment and (d.alignment[0].adds_cover or d.alignment[0].units_cover):  # no adds: nothing to hold for
         a0 = d.alignment[0]
         rows = ""
+        tested = {cd_name(d, k) for p in d.optimized for k in p.choice}  # the cooldowns the plans hold or release
         for a in d.alignment:
+            if (tested and a.ability not in tested) or not (a.in_adds or a.in_units):
+                continue  # an AoE spender is on adds by nature, not held; a row of zeros says nothing
             held = []
             if a.in_adds > a.adds_cover * 1.5 and a.in_adds - a.adds_cover > 0.1:
                 held.append("held for adds")
@@ -1256,7 +1291,10 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
     sections["deeper"] = [_contents("".join(sections["deeper"]))]
     b = sections["boss"]  # the boss tab opens on what the top players do beside the boss in 60 seconds
     if len(b) >= 2 and b[0].startswith("<h2>What the top players do") and b[1].startswith("<h2>The boss in 60"):
-        sections["boss"] = [f"<div class='boss-top'><div>{b[0]}</div><div>{b[1]}</div></div>"] + b[2:]
+        rest = b[2:]
+        defs = next((x for x in rest if x.startswith("<h2>Defensives</h2>")), "")  # the left column's second card
+        rest = [x for x in rest if x is not defs]
+        sections["boss"] = [f"<div class='boss-top'><div>{b[0]}{defs}</div><div>{b[1]}</div></div>"] + rest
     cls_icon = icons.img(icons.CLASS_ICON.format(cls=d.class_name.lower()), "large", "hero-ic") if d.class_name else ""
     header = f"""<header class="sheet-hero"><div class="in">{cls_icon}<div class="txt">
 <h1>{e(d.boss)} {diff_pill(d.difficulty)}</h1>
