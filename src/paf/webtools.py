@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import html
 import os
-import time
 
 from paf import __version__, settings
 from paf.config import data_dir
@@ -247,8 +246,7 @@ autocomplete="off">
 <tr><td>Warcraft Logs</td><td class="small">{quota}</td><td class="act"></td></tr>
 <tr><td class="nw">Caches (sims, logs)</td><td class="small">{size(cache_root()) / 1e6:,.0f} MB
 (cap {settings.get('cache_max_mb')} MB)</td><td class="act"></td></tr>
-<tr><td>Data folder</td><td class="small">{e(str(data_dir()))}</td><td class="act"></td></tr>
-<tr><td>Checked</td><td class="small">{time.strftime('%d %b %H:%M')}</td><td class="act"></td></tr></table></div>
+<tr><td>Data folder</td><td class="small">{e(str(data_dir()))}</td><td class="act"></td></tr></table></div>
 <h2>Every tool</h2><div class="card"><p class="small">The prep of a boss runs them all; each one is also on its own
 page, to dig further: <a href="/tools">see every tool</a>.</p></div>
 </div></div>"""

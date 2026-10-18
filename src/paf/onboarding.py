@@ -88,7 +88,7 @@ def page_body() -> str:
     from paf import wcllogin
     from paf.web import connect_block, has_credentials
 
-    regions = "".join(f"<option>{r}</option>" for r in settings.SETTINGS["guild_region"].choices)
+    regions = "".join(f"<option value='{r}'>{r.upper()}</option>" for r in settings.SETTINGS["guild_region"].choices)
     key_done = has_credentials()
     skip = "<button type='button' class='btn ghost skip'>Skip</button>"
     key_form = f"""{connect_block() + "<div class='ob-actions'>" + skip + "</div><details class='ob-own' open><summary>Or use your own API key</summary>"

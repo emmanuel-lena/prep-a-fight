@@ -1,4 +1,4 @@
-.ob{max-width:620px;margin:20px auto;position:relative}
+.ob{width:min(620px,100%);margin:20px auto;position:relative} /* one column width: nothing moves between steps */
 .ob-dots{display:flex;gap:8px;list-style:none;padding:0;margin:0 0 26px}
 .ob-dots li{width:34px;height:5px;border-radius:3px;background:var(--line);transition:background .3s}
 .ob-dots li.on{background:var(--accent)}
@@ -31,3 +31,4 @@ body:has(.ob:not(.story))>main{grid-column:1;display:grid;align-content:center;m
 .ob-brand{font:600 18px var(--font-display);margin:0 0 18px;color:var(--fg)} .ob-brand b{color:var(--accent)}
 .ob-note{margin-top:14px} .ob-actions .btn{box-sizing:border-box;height:46px} /* notes off the controls; buttons one height */
 .what-sim{border:1px solid var(--line);border-radius:10px;padding:8px 14px 10px;margin:12px 0 0} .what-sim legend{font-weight:600;padding:0 6px}
+.ob select{height:48px;box-sizing:border-box}

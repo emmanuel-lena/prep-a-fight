@@ -563,7 +563,7 @@ def view_page(key: str, tab: str) -> bytes:
     others = "".join(
         f'<optgroup label="{e(g)}">' + "".join(
             f'<option value="/view/{e(x["key"])}"{" selected" if x["key"] == key else ""}>'
-            f'{e(x["name"])} · {e(x["difficulty"].capitalize())}</option>' for x in xs) + "</optgroup>"
+            f'{e(x["difficulty"].capitalize())} · {e(x["name"])}</option>' for x in xs) + "</optgroup>"
         for g, xs in sorted(groups.items(), key=lambda kv: (kv[0] != spec_of(item), kv[0])))
     src = f'/report/{e(item["files"][tab])}'
     boss_link = _boss_link(item)

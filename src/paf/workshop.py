@@ -73,7 +73,8 @@ TOOLS: tuple[Tool, ...] = (
          "Each player over the night, then each pull: deaths, healthstones, potions.", needs_prep=False),
     Tool("diff", "Two pulls side by side", "What went better in one pull than in another, for the raid and for "
          "you?", "inv_misc_spyglass_02", "raid", "1-2", ("boss", "difficulty", "raid"),
-         "Both pulls' boss health, deaths, damage per target, and your damage, casts and buffs in each.",
+         "From the log you give: its worst and best pulls without a death (else its best wipe and the kill), with "
+         "both pulls' boss health, deaths, damage per target, and your damage, casts and buffs in each.",
          needs_prep=False),
     Tool("rotation", "Your rotation, spell by spell", "In single target, cleave and AoE: do you cast what the best "
          "rotation casts, with your gear and talents?", "ability_rogue_rollthebones", "cds", "1-2",
