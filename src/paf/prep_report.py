@@ -204,7 +204,9 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
             + (" Green: add waves." if fight.add_waves else "")
             + (" Gold: boss vulnerability windows (x = damage taken)." if fight.vulnerable else "")
             + (" Grey: boss away." if fight.invulnerable else "")
-            + (" Pink line: Bloodlust." if fight.lust_time is not None else "") + "</p>")
+            + (" Pink line: Bloodlust." if fight.lust_time is not None else "")
+            + (" Dashed lines: stage changes." if phases and len(phases) > 1 else "")
+            + (" A press before the pull is drawn at 0:00." if any(t < 0.5 for t, _l in plan.timeline) else "") + "</p>")
 
 
 def _base(name: str) -> str:
@@ -915,6 +917,14 @@ def render(d: PrepData) -> str:
 
     d = copy.deepcopy(d)  # the sheet's words are set here; the data saved after it (and rendered again) stays as simmed
     onto_adds(d)
+    from paf import simple as _simple
+
+    played = _simple._plan(d)  # what you can aim for: your character playing the plan the sheet calls, not the default
+    d.aim_plan = bool(played and played.gain > 2 * played.error and d.sim_dps)
+    if d.aim_plan:
+        d.sim_dps *= 1 + played.totals.get("total", 0.0) / 100
+        if d.sim_boss_dps:
+            d.sim_boss_dps *= 1 + played.totals.get("boss", 0.0) / 100
     pre = {n for n in d.precast} | {n for n in d.links if "potion" in n.lower()} | {"Potion"}
 
     def before_pull(note: str) -> str:  # a press cast before the pull says so, as the fight tab's note does
@@ -1103,7 +1113,8 @@ and the gear for that.</p></div>""")
         boss = ""
         if d.sim_boss_dps:
             boss = (f", {d.sim_boss_dps:,.0f} of it on the boss ({d.sim_boss_dps / d.sim_dps:.0%}: your character's own "
-                    f"share in this sim, with its talents and plan)")
+                    f"share in this sim, with its talents and "
+                    f"{'the plan the sheet plays' if getattr(d, 'aim_plan', False) else 'SimC' + chr(39) + 's default list'})")
         cal = ""
         if d.boss_share_real is not None and d.waves:
             cal = (f" The top players put {d.boss_share_real:.0%} of their damage on the boss in their logs: the rebuilt "

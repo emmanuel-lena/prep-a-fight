@@ -102,7 +102,8 @@
   function call(t) {
     var g = group(t);
     if (!g) {
-      if (t >= FV.end - LAST_PUSH) {
+      // the last push: near the kill, once no boss event is still to come (a Dig In at 4:09 is not the end)
+      if (t >= FV.end - LAST_PUSH && !B.some(function (b) { return b.k === 'cast' && !gone(b.t) && eff(b.t) > t && b.t < FV.end; })) {
         return { key: 'end', cls: 'call fv-next fv-end', state: 'end', say: '', html: '<span class="lab">Last push <span class="cd">' +
           (t < FV.end ? 'kill around ' + mmss(FV.end) : 'any moment') + '</span></span><p class="pend">Everything on the boss until it drops.</p>' };
       }

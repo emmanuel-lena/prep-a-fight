@@ -63,7 +63,7 @@
 .fv .lc{text-transform:none}
 .fv .call .lab .cd small{font-size:.8em;color:inherit;opacity:.75}
 .fv .ss .call .lab .cd small{font-size:.32em;margin-left:.08em;vertical-align:.9em}
-.fv .call .lab .cd{text-transform:none;font:700 15px var(--font-display);letter-spacing:.02em;font-variant-numeric:tabular-nums;color:var(--fg)}
+.fv .call .lab .cd{text-transform:none;font:700 15px var(--font-display);letter-spacing:.02em;font-variant-numeric:tabular-nums;color:var(--fg);white-space:nowrap}
 .fv .call .acts{display:grid;gap:8px}
 .fv .call .a+.a{margin-top:8px}
 .fv .ss .call .acts{align-items:start}
