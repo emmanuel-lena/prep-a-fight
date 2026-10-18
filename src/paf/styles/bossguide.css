@@ -19,3 +19,6 @@
 .stage>.abg>.ab:first-child{border-top:0;padding-top:0}
 .stage>.abg{border-bottom:1px solid var(--line);padding-bottom:4px;margin-bottom:8px}
 .stage>.abg:last-child{border-bottom:0}
+/* a unit's abilities read as the unit's: a rule down their side, the boss's own abilities after it stand clear */
+.abg:has(>.unit){border-left:3px solid var(--line);padding-left:10px;margin-left:2px}
+.abg>.unit{font-weight:700;margin-bottom:2px}
