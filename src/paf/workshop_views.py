@@ -17,6 +17,11 @@ SLOTS = {"head": "Head", "neck": "Neck", "shoulder": "Shoulders", "back": "Back"
 _RUNS = re.compile(r"^Runs(?: and best set)?:\s*(.+?)\s*$", re.M)
 
 
+
+def _spaced(spec: str) -> str:
+    """Warcraft Logs' "BeastMastery Hunter" as the game writes it: "Beast Mastery Hunter"."""
+    return re.sub(r"(?<=[a-z])(?=[A-Z])", " ", spec)
+
 def run_dir(log: str) -> Path | None:
     m = list(_RUNS.finditer(log))
     return Path(m[-1].group(1)) if m else None
@@ -261,7 +266,7 @@ def review(d: dict) -> str:
         else:
             say = (line(main, p["shares"].get(main, 0.0), p["habit"].get(main, 0.0)) if p["habit"]
                    else "<small>Spec not measured on this boss.</small>")
-        return (f"<li class='pl {p['verdict']}'>{ic}<span class='l-name'><b>{e(p['name'])}</b><small>{e(p['spec'])}</small>"
+        return (f"<li class='pl {p['verdict']}'>{ic}<span class='l-name'><b>{e(p['name'])}</b><small>{e(_spaced(p['spec']))}</small>"
                 f"</span><span class='p-say'>{say}</span></li>")
     groups = [("to_target", "Should go on a target"), ("to_boss", "Can move damage to the boss"),
               ("ok", "Play like the top players of their spec"), ("unknown", "Not measured")]
@@ -305,7 +310,7 @@ def comp(d: dict) -> str:
     cards = ""
     for t in targets:
         ranking = "".join(
-            f"<li>{ic(r['spec'])}<span class='l-name'><b>{e(r['spec'])}</b><small>{e(', '.join(r['players']))}</small>"
+            f"<li>{ic(r['spec'])}<span class='l-name'><b>{e(_spaced(r['spec']))}</b><small>{e(', '.join(r['players']))}</small>"
             f"</span><span class='l-val'>{r['dps'] / 1000:,.0f}k</span></li>" for r in t["ranking"])
         if t["second_boss"]:
             kind = "Second boss"
@@ -326,7 +331,7 @@ def comp(d: dict) -> str:
         if t["proposed"]:
             block += f"<p class='lab go'>Put them on it</p><div class='whos'>{names(t['proposed'])}</div>"
         if t["pulled"]:
-            block += (f"<details class='more'><summary>On it in your pull ({len(t['pulled'])})</summary>"
+            block += (f"<details class='more' open><summary>On it in your pull ({len(t['pulled'])})</summary>"
                       f"<div class='whos'>{names(t['pulled'])}</div></details>")
         if t["missed"]:
             block += (f"<p class='lab warn'>Hardly hit it in your pull</p><div class='whos'>{names(t['missed'])}</div>")
@@ -464,7 +469,7 @@ def night(d: dict) -> str:
                       for t, n, b in dead[:12])
         detail += (f"<li><div class='j-head'><b>{e(r['boss'])}</b><small><span class='num'>{_mmss(r['duration'])}</span>"
                    f" &middot; {end}</small></div><div class='whos'>{who}</div></li>")
-    return (f"{head}<h3>Over the night</h3>{table}<details class='more'><summary>Pull by pull ({len(pulls)})</summary>"
+    return (f"{head}<h3>Over the night</h3>{table}<details class='more' open><summary>Pull by pull ({len(pulls)})</summary>"
             f"<ul class='pulls'>{detail}</ul></details><p class='ws-fine'>Read from the casts of the log: a potion "
             "pressed before the pull is not counted, nor the deaths of the wipe itself. A name in red died without a "
             "healthstone or a health potion first.</p>")

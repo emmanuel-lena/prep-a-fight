@@ -1085,8 +1085,7 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
         last = last + lastraid.CARD_JS if last else ""
     except Exception:  # noqa: BLE001 - the home always shows
         last = ""
-    mine = (f'<details class="home-more"><summary>Every prep sheet ({len(items)})</summary>{boss_cards(items)}'
-            f'</details>' if items else "")
+    mine = f'<h2>Every prep sheet ({len(items)})</h2>{boss_cards(items)}' if items else ""
     g = settings.get("guild")
     return f"""<section class="home-hero"><div class="me">{ic}<div><b>{e(loaded.name)}</b>
 <span>{e(loaded.spec.title())} {e(loaded.class_name.title())}{(" &middot; " + e(g)) if g else ""}</span></div></div>
@@ -1156,7 +1155,7 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
     if sections:
         gicons = icons_for(bossguide.spell_refs(sections))
         guide = (f"<h2>The boss in 60 seconds</h2>{bossguide.summary_html(sections, 'damage')}"
-                 f"<details class='card'><summary>Every ability, phase by phase (Encounter Journal)</summary>"
+                 f"<details class='card' open><summary>Every ability, phase by phase (Encounter Journal)</summary>"
                  f"{bossguide.abilities_html(sections, mechanics=mechs, icon_map=gicons)}</details>")
     try:  # where the data will come from, and how long: from what will really happen (paf.estimate)
         from paf import estimate
@@ -1398,7 +1397,7 @@ Your spec and the boss help."></textarea></label>
 cores and memory, and how long each step took (nothing personal: no name, no log, no folder). They help make the app
 faster on every computer.</span></label>
 <div class="cta"><button class="btn">Send</button></div></form>
-<details class="card"><summary>Exactly what is sent</summary><pre class="log">{e(preview[-20000:])}</pre></details>'''
+<details class="card" open><summary>Exactly what is sent</summary><pre class="log">{e(preview[-20000:])}</pre></details>'''
 
 
 def send_feedback(form: dict) -> str:

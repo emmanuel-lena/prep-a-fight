@@ -361,7 +361,10 @@ def raid_section(r: RaidInfo) -> str:
         f"<tr><td>{e(v.add.name)}</td><td class='n'>{v.without_you:.0%}</td><td class='n'>{v.with_you:.0%}</td>"
         f"<td class='n'>{v.low:.0%}</td><td><b>{'boss' if v.verdict == 'boss' else 'pad'}</b>: "
         f"{e(v.reason)}</td></tr>" for v in r.verdicts)
-    groups = "".join(f"<li><b>{e(k)}</b> ({len(ps)}): {e(', '.join(ps))}</li>" for k, ps in r.archetypes.items() if ps)
+    import re
+
+    groups = "".join(f"<li><b>{e(k)}</b> ({len(ps)}): {e(re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', ', '.join(ps)))}</li>"
+                     for k, ps in r.archetypes.items() if ps)
     verdict = ("Stay on the boss: the cooldown plan and the gear below are the ones for boss damage." if r.objective
                == "boss" else "Pad the adds: the cooldown plan and the gear below are the ones for total damage.")
     mine = f" On this boss your spec is <b>{e(r.your_archetype)}</b>." if r.your_archetype else ""
@@ -382,7 +385,7 @@ def raid_section(r: RaidInfo) -> str:
 <th>Top raids' weakest quarter</th><th>Verdict</th></tr>{rows}</table></div>
 <p class="small muted">Damage your raid puts on these adds, as a share of the top raids' (their median = 100%).</p>
 <p class="small">Your raid on this boss, by what each spec does with the adds:</p><ul class="small">{groups}</ul>{est}{build}
-<details><summary class="small">How it is computed</summary><p class="small muted">Measured: on this boss, each spec puts
+<details open><summary class="small">How it is computed</summary><p class="small muted">Measured: on this boss, each spec puts
 a share of its damage on these adds while they are up (from the ranked kills): well above the median of all players =
 AoE / funnel, well below = single target. Computed: your raid's damage on the adds = every player's DPS in your log x
 their spec's share; the same for every top raid gives the reference range. Rule (not a measurement): if your raid
@@ -676,7 +679,9 @@ def _contents(body: str) -> str:
     heads = []
 
     def anchor(m: re.Match) -> str:
-        text = re.sub(r"<[^>]+>", "", m.group(2)).strip()
+        import html as _h
+
+        text = _h.unescape(re.sub(r"<[^>]+>", "", m.group(2))).strip()
         if not text:
             return m.group(0)
         hid = f"dd-{len(heads)}"
@@ -707,7 +712,7 @@ def render(d: PrepData) -> str:
         return linkify(text, d.links)
 
     # overview: a raid briefing (paf.briefing); before it, the simple view (paf.simple)
-    from paf import briefing, simple
+    from paf import bossguide, briefing, simple
 
     notices: list[str] = []  # said on top of the fight
     if getattr(d, "partial", None):
@@ -724,7 +729,7 @@ def render(d: PrepData) -> str:
     tabs["overview"].append(briefing.moves_html(d))
     tabs["overview"].append(briefing.checklist_html(d))
     if d.guide_summary or d.guide_abilities:
-        tabs["boss"].append("<h2>The boss in 60 seconds</h2>" + d.guide_summary.replace(
+        tabs["boss"].append("<h2>The boss in 60 seconds</h2>" + bossguide.modernize(d.guide_summary).replace(
             '<a href="#boss">Every ability, phase by phase &rarr;</a>', ""))
         if d.actions:
             groups = {"kill": "Adds to kill", "contact": "Units handled by contact (soak)", "interrupt": "Interrupts", "assignment": "Assignments",
@@ -740,7 +745,7 @@ def render(d: PrepData) -> str:
         tabs["boss"].append(defensives_html(d))
         tabs["boss"].append("<h2>Every ability, phase by phase</h2><p class='small muted'>From the in-game "
                             "Encounter Journal; timings and how many players are hit come from the ranked kills.</p>"
-                            + d.guide_abilities)
+                            + bossguide.modernize(d.guide_abilities))
     else:
         tabs["boss"].append(defensives_html(d))
     if d.timeline_file:
@@ -819,7 +824,7 @@ and the gear for that.</p></div>""")
     if d.talents:
         tc = d.talents
         names = {"boss fight": "This fight", "patchwerk": "Single target (reference)"}
-        head = "".join(f"<th>{e(names.get(f, f))}</th>" for f in tc.fights)
+        head = "".join(f"<th class='n'>{e(names.get(f, f))}</th>" for f in tc.fights)
         body = f"<tr><td>your talents</td>{''.join('<td class=n>ref</td>' for _ in tc.fights)}<td></td></tr>"
         first = tc.fights[0]
         for r in sorted(tc.rows, key=lambda r: -(r.per_fight.get(first, (0.0, None))[0] or 0.0)):
@@ -867,7 +872,7 @@ for reference: a build can be worse there and much better on this fight. Error a
             if p.timeline and d.fight is not None:
                 from paf.optimize import fight_context
 
-                steps = "".join(f"<tr><td>{_mmss(t)}</td><td>{e(label)}</td><td class='small muted'>"
+                steps = "".join(f"<tr><td>{_mmss(t)}</td><td>{e(label[:1].upper() + label[1:])}</td><td class='small muted'>"
                                 f"{e(fight_context(d.fight, t))}</td></tr>" for t, label in p.timeline)
             note = d.mrt.get(p.objective, "")
             checks = ""

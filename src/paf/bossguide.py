@@ -36,6 +36,22 @@ def readable(text: str) -> str:
     return t if t == text else re.sub(r"\s{2,}", " ", t)
 
 
+def modernize(html: str) -> str:
+    """A guide stored by an older prep, as the current builder writes it: nothing folded, the journal's variables as
+    words (the sheet is rendered again from the prep's data without its game data)."""
+    if not html:
+        return html
+    h = re.sub(r"<details class='small fold'><summary><span>(.*?)</span></summary></details>",
+               r"<div class='small ab-d'>\1</div>", html, flags=re.S)
+    h = re.sub(r"<details><summary>([^<]*)</summary><ul class='small'>(.*?)</ul></details>",
+               r"<h3 class='other-role'>\1</h3><ul class='small muted'>\2</ul>", h, flags=re.S)
+    h = re.sub(r'<details class="card stage" (?:open)?\s*><summary><h3>(.*?)</h3></summary>(.*?)</details>',
+               r'<section class="card stage"><h3>\1</h3>\2</section>', h, flags=re.S)
+    h = re.sub(r"(<div class=\"unit\" style=\"[^\"]*\">)([^<]*) <span class='muted small clamp'>(.*?)</span></div>",
+               r"\1\2</div><p class='small muted unit-d'>\3</p>", h, flags=re.S)
+    return readable(h)
+
+
 def _mmss(t: float) -> str:
     return f"{int(t // 60)}:{int(t % 60):02d}"
 

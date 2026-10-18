@@ -29,19 +29,19 @@
 .sugg .t{font-size:15px;line-height:1.35} .sugg .d{font-size:13.5px;color:var(--fg);margin-top:4px}
 .sugg .d div{margin:3px 0}
 .ics{display:inline-block;width:18px;height:18px;border-radius:4px;vertical-align:-4px;margin-right:2px}
-.ics.ph{background:transparent}
+.ics.ics-ph{background:transparent}
 .panel{scroll-margin-top:16px}
 .sugg .gain{font-size:20px;font-weight:700;color:var(--pos);font-variant-numeric:tabular-nums;white-space:nowrap}
 .sev{display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;
   border-radius:5px;margin-right:6px;vertical-align:2px}
-.major .sev{background:var(--bronze);color:#1c1410} .moderate .sev{background:var(--accent-soft);color:var(--fg);
-  border:1px solid var(--accent)} .minor .sev{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.major .sev{background:var(--fg);color:var(--bg)} .moderate .sev{background:transparent;color:var(--fg);
+  border:1px solid var(--fg)} .minor .sev{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
 .info .sev{background:var(--lavender);color:#fff}
 .major{box-shadow:inset 3px 0 0 var(--bronze);padding-left:12px;margin-left:-15px}
 button.copy{padding:4px 10px;font-size:12.5px;margin:4px 6px 2px 0}
 .checklist ul{list-style:none;margin:0;padding:0} .checklist li{padding:8px 0;border-bottom:1px solid var(--line)}
 .checklist li:last-child{border-bottom:0} .checklist label{display:inline;margin:0;cursor:pointer}
-.checklist input:checked+span{text-decoration:line-through;color:var(--muted)} .checklist .ics.ph{display:none}
+.checklist input:checked+span{text-decoration:line-through;color:var(--muted)} .checklist .ics.ics-ph{display:none}
 .plus{color:var(--pos);font-weight:700} .minus{color:var(--neg);font-weight:700}
 details.why summary{color:var(--warn);font-size:13px;margin:4px 0} details.why div{color:var(--warn);font-size:13px}
 .conf{margin:-2px 0 4px}
@@ -55,7 +55,7 @@ a:focus-visible,button:focus-visible,.chip:focus-within,.tabs a:focus-visible{ou
 /* the sheet's "What to change": the verdict card alone on its row, full width */
 .change-top .cards{grid-template-columns:minmax(0,1fr)}
 .change-top{margin-bottom:22px}
-.sugg .t .ics.ph,.sugg .d .ics.ph{display:none}
+.sugg .t .ics.ics-ph,.sugg .d .ics.ics-ph{display:none}
 /* Dig deeper: a row of links to its parts */
 .dd-toc{display:grid;gap:8px;margin:4px 0 22px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
 .dd-toc p{margin:0;color:var(--muted);font-size:14px}
@@ -69,3 +69,7 @@ a:focus-visible,button:focus-visible,.chip:focus-within,.tabs a:focus-visible{ou
 .pp-grid .pp{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:8px}
 .note-pre{white-space:pre-wrap;margin:0 0 12px;padding:10px 12px;background:var(--surface-2);border-radius:8px;max-height:320px;overflow:auto}
 @media (max-width:900px){.pp-grid{grid-template-columns:minmax(0,1fr)}}
+pre,.note-pre{font-family:var(--font-data)}
+.note-pre{max-height:none}
+.sugg.info .gain{color:var(--muted)}
+th.n{text-align:right}

@@ -189,7 +189,7 @@ def settings_form() -> str:
             f"<div class='set-row{' set-check' if settings.SETTINGS[k].choices == ('on', 'off') else ''}'>"
             f"<label for='s-{e(k)}'>{e(label)}</label>{_setting_control(k)}"
             f"{f'<p class=set-help>{e(help_)}</p>' if help_ else ''}</div>" for k, label, help_ in rows)
-        out += (f"<details class='set-group'><summary>{e(group)}</summary>{fields}</details>" if folded else
+        out += (f"<details class='set-group' open><summary>{e(group)}</summary>{fields}</details>" if folded else
                 f"<fieldset class='set-group'><legend>{e(group)}</legend>{fields}</fieldset>")
     return out
 
@@ -245,11 +245,11 @@ autocomplete="off">
 <button class="btn ghost">Update</button></form></td></tr>
 <tr><td>prep-a-fight</td><td class="small">version {e(__version__)}</td><td class="act">
 <form method="post" action="/update/check"><button class="btn ghost">Check for updates</button></form></td></tr>
-<tr><td>Warcraft Logs</td><td class="small">{quota}</td></tr>
+<tr><td>Warcraft Logs</td><td class="small">{quota}</td><td class="act"></td></tr>
 <tr><td>Caches (sims, logs)</td><td class="small">{size(cache_root()) / 1e6:,.0f} MB
-(cap {settings.get('cache_max_mb')} MB)</td></tr>
-<tr><td>Data folder</td><td class="small">{e(str(data_dir()))}</td></tr>
-<tr><td>Checked</td><td class="small">{time.strftime('%d %b %H:%M')}</td></tr></table></div>
+(cap {settings.get('cache_max_mb')} MB)</td><td class="act"></td></tr>
+<tr><td>Data folder</td><td class="small">{e(str(data_dir()))}</td><td class="act"></td></tr>
+<tr><td>Checked</td><td class="small">{time.strftime('%d %b %H:%M')}</td><td class="act"></td></tr></table></div>
 <h2>Every tool</h2><div class="card"><p class="small">The prep of a boss runs them all; each one is also on its own
-page, to dig further: <a href="/tools">see every tool</a>. <a href="/feedback">Send us a feedback</a>.</p></div>
+page, to dig further: <a href="/tools">see every tool</a>.</p></div>
 </div></div>"""

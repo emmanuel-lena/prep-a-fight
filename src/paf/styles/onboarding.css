@@ -25,5 +25,6 @@
 .ob-summary{font-size:18px}
 @media (prefers-reduced-motion:reduce){.ob-step.on{animation:none}}
 /* the first run is its own moment: no side bar yet */
-body.has-side:has(.ob){grid-template-columns:minmax(0,1fr)} body:has(.ob)>.side{display:none}
-body:has(.ob)>main{grid-column:1;display:grid;align-content:center;min-height:100vh}
+body.has-side:has(.ob:not(.story)){grid-template-columns:minmax(0,1fr)} body:has(.ob:not(.story))>.side{display:none}
+body:has(.ob:not(.story))>main{grid-column:1;display:grid;align-content:center;min-height:100vh}
+.ob .btn:focus:not(:focus-visible){outline:none} .ob-actions .btn{min-height:46px}

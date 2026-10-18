@@ -149,7 +149,7 @@ ol.steps{list-style:none;margin:0;padding:0} .st{padding:7px 0;border-bottom:1px
 /* the raid lead (paf.raidlead) */
 .rl-wait,.rl-start{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0;padding:14px 18px;
   border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
-.rl-start p{margin:0;flex:1 1 100%;max-width:68ch}
+.rl-start p{margin:0;max-width:68ch}
 .rl-roster{margin:18px 0}
 .rl-chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
 .rl-p{margin:0} .rl-p button{display:inline-flex;flex-direction:column;align-items:flex-start;gap:0;padding:5px 12px;
@@ -196,3 +196,6 @@ h2 .btn.copy{margin-left:8px;vertical-align:middle;text-transform:none;letter-sp
 .set-cols td.act{text-align:right;white-space:nowrap} .set-cols td.act form{margin:0}
 .crumb{margin:0 0 8px;font-size:14px} .crumb a{color:var(--muted);text-decoration:none} .crumb a:hover{color:var(--fg)}
 .est-line{margin:-4px 0 18px;color:var(--muted);font-size:14px;max-width:80ch} .est-line b{color:var(--fg)}
+.rl-start p{flex:1 1 320px} .rl-start form{margin-left:auto}
+.rq-list,.rq-when,.rq-when+p{max-width:72ch}
+.set-cols td{vertical-align:middle}
