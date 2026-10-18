@@ -145,9 +145,9 @@
   function bossNow(t) {
     var hb = holding();
     var on = B.filter(function (b) {
-      var e = eff(b.t);  // long stretches of moving stay on the timeline's bars, not on the boss line
+      var e = eff(b.t);  // a movement, long or short, says until when on the boss line
       if (hb && Math.abs(b.t - hb.a.t) <= 1 && b.k !== 'immune') return false;  // with the late phase, not before it
-      return b.k !== 'tank' && !(b.k === 'move' && b.d > 20) && !gone(b.t) && e <= t && t < until(b);
+      return b.k !== 'tank' && !gone(b.t) && e <= t && t < until(b);
     });
     if (hb && hb.a.k === 'phase' && !on.some(function (b) { return b.k === 'immune'; })) on.unshift({ k: 'due', n: hb.a.n + ' due', t: hb.a.t, d: 0 });
     var moves = on.filter(function (b) { return b.k === 'move'; }).sort(function (a, b) { return until(b) - until(a); });

@@ -448,7 +448,7 @@ body.paused .fv .fside .call.fv-go{filter:saturate(.35)}
 .fv .ic.none{background:var(--surface-2);box-shadow:0 0 0 1px var(--line)}
 .fv .fm.kill .ev .main{font:600 15px var(--font-display)}
 .fv .strip.s-move,.fv-legend i.s-move{background:repeating-linear-gradient(to bottom,var(--muted) 0 2px,transparent 2px 5px);width:3px}
-.fv .strip.s-immune{background:repeating-linear-gradient(to bottom,var(--fg) 0 1px,transparent 1px 4px);width:6px;opacity:.5}
+.fv .strip.s-immune,.fv-legend i.s-immune{background:repeating-linear-gradient(to bottom,var(--fg) 0 1px,transparent 1px 4px);width:6px;opacity:.5}
 .fv .strip.s-def,.fv-legend i.s-def{background:transparent;box-shadow:inset 0 0 0 2px var(--def)}
 .fv .strip.s-move::before,.fv .strip.s-immune::before{display:none}
 dialog.ss{width:100%;height:100%;max-width:none;max-height:none;margin:0;border:0;color:var(--fg)}

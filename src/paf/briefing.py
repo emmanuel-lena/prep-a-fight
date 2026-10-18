@@ -323,8 +323,12 @@ def spec_html(d) -> str:
 
     def short(name: str) -> str:  # simmed one item short (too new for this simc build): said on its tile
         m = re.search(rf"{re.escape(name)}: the top players' (\w+) is unknown to this SimC", notes)
-        slot = re.sub(r"\d$", "", m[1]).replace("_", " ") if m else ""
-        return f" <small>simmed without its {e(slot)} (too new for SimC)</small>" if m else ""
+        if not m:
+            return ""
+        row = next((r for r in s.get("rows") or [] if r.get("label") == name), {})
+        item = next((i.get("name") for i in row.get("items") or [] if i.get("slot") == m[1]), "")
+        what = item or re.sub(r"\d$", "", m[1]).replace("_", " ")
+        return f" <small>simmed without {e(what)} (too new for SimC)</small>"
     tiles = "".join(
         f"<div class='spt {kind}'><span class='spt-n'>{e(name)}</span><span class='spt-v'>"
         f"{'your spec' if gap is None else 'same' if kind == 'same' else f'{gap:+.0f}%'}{short(name)}</span></div>"

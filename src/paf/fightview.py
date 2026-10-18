@@ -103,11 +103,20 @@ def _durations(d) -> dict[str, float]:
     except Exception:  # noqa: BLE001 - no game data: no bars
         return {}
     out: dict[str, float] = {}
+    try:
+        names = gamedata.spell_names()
+    except Exception:  # noqa: BLE001 - no names: the linked spell only
+        names = {}
     for name, ref in d.links.items():
         if ref.startswith("spell="):
             sid = ref[6:].split("&")[0]
-            if sid.isdigit() and 0 < table.get(int(sid), 0) <= 60:
+            if sid.isdigit() and 0 < (table.get(int(sid)) or 0) <= 60:
                 out[name] = table[int(sid)]
+            elif sid.isdigit():  # the cast spell has no aura (Ascendance 114050): its aura is a neighbour of the name
+                near = {table[s] for s in range(int(sid) - 3, int(sid) + 4)
+                        if names.get(s) == name and 0 < (table.get(s) or 0) <= 60}
+                if len(near) == 1:
+                    out[name] = near.pop()
     missing = {d.cd_names.get(k, k) for k in d.cd_names} - set(out)
     if missing:  # a cooldown the sheet does not link: its name in the game's spell table
         try:
@@ -138,6 +147,19 @@ def _defensives(d) -> list[tuple[float, str, str]]:
         late = m.boss_ability in casts and not hits
         why = f"{m.boss_ability}'s damage" if late else m.boss_ability
         out.append((t, m.spells[0][0], why))
+    return out
+
+
+def defensive_moments(d) -> list:
+    """The defensive moments the fight tab calls, at its times (for the NSRT reminders: the same presses)."""
+    from dataclasses import replace
+
+    kept = {(s, round(t, 1)) for t, s, _w in _defensives(d)}
+    out = []
+    for m in (d.defensives.moments if d.defensives else []):
+        if m.spells and m.share >= DEF_SUPPORT:
+            t = next((t for s, t in kept if s == m.spells[0][0] and abs(t - m.time) <= DEF_SNAP + 3), m.time)
+            out.append(replace(m, time=t))
     return out
 
 
@@ -393,6 +415,13 @@ def mrt(d) -> str:
     return "\n".join([head, *note_lines(d)])
 
 
+def prepull(lines: list[str]) -> list[str]:
+    """MRT fires {time:0:00} at the pull: the presses before it go on one plain line under the header."""
+    pre = [re.sub(r"^\{time:0:00\} | - before the pull$", "", x) for x in lines if x.endswith(" - before the pull")]
+    rest = [x for x in lines if not x.endswith(" - before the pull")]
+    return ([f"Before the pull: {', '.join(pre)}"] if pre else []) + rest
+
+
 def note_lines(d, kinds: tuple[str, ...] = ("cd", "pot", "def", "move")) -> list[str]:
     """The MRT lines of the presses the fight tab shows (of these kinds), each with what it is for."""
     its = items(d)
@@ -404,7 +433,7 @@ def note_lines(d, kinds: tuple[str, ...] = ("cd", "pot", "def", "move")) -> list
         said = c.replace("on the ", "").replace("on ", "") if c else ""
         why = " - " + c if c and c not in ("on the pull", "just after the pull") and said not in it.text else ""
         lines.append(f"{{time:{_mmss(max(0.0, t))}}} {it.text}{why}")
-    return lines
+    return prepull(lines)
 
 
 def _btn(id_: str, label: str, keys: str = "", cls: str = "btn", hidden: bool = False, more: str = "") -> str:
@@ -422,13 +451,13 @@ def _phase_html(name: str, start: float, end: float, pi: int, rows: str, its: li
     said = [x.text[0].lower() + x.text[1:] for _t, x in mine if x.kind == "immune"]
     said += [f"{x.text} at {_mmss(t)}" for t, x in mine if x.kind == "adds"]
     said += [f"everyone moves from {_mmss(t)} to {_mmss(t + x.dur)}" for t, x in mine
-             if x.kind == "move" and x.dur > MOVE_LONG]  # the stage's long movement, said with its times
+             if x.kind == "move" and x.dur >= MOVE_CUE]  # the stage's movement worth a word, with its times
     said.sort(key=lambda s: [int(v) for v in re.findall(r"(\d+):(\d\d)", s)[:1][0]] if re.search(r"\d+:\d\d", s)
               else [0, 0])
     lust = [t for t, x in mine if x.kind == "lust"]
     if lust:
         said.insert(0, "Bloodlust " + ("at the pull" if lust[0] < 5 else f"at {_mmss(lust[0])}"))
-    adv = f"<p class='ph-adv'>{e(cap(', then '.join(said)))}.</p>" if said else ""
+    adv = f"<p class='ph-adv'>{e(cap('; '.join(said)))}.</p>" if said else ""  # in time order; they can overlap
     return (f"<section class='stl' aria-labelledby='ph{pi}-h'><div class='ph-band' id='ph{pi}'><div class='ph-name'>"
             f"<h2 id='ph{pi}-h'>{e(name)}</h2><span>{lasts}lasts about {_mmss(round(end - start))}.</span></div>{adv}"
             f"<div class='ph-lanes' aria-hidden='true'>{lanes}</div></div>{rows}</section>")
@@ -439,7 +468,7 @@ def cap(s: str) -> str:
 
 
 LEGEND_KINDS = (("cd", "your cooldown"), ("pot", "your potion"), ("def", "your defensive"), ("lust", "Bloodlust"),
-                ("adds", "adds alive"), ("move", "everyone moves"))
+                ("adds", "adds alive"), ("move", "everyone moves"), ("immune", "boss immune"))
 
 
 def legend(its: list) -> str:

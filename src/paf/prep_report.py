@@ -148,8 +148,7 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
         f'<line x1="{x(dur)}" y1="14" x2="{x(dur)}" y2="100%" stroke="var(--muted)" stroke-dasharray="3 3"/>'
         f'<text x="{x(dur) - 2}" y="11" font-size="10" fill="var(--muted)" text-anchor="end">kill {_mmss(dur)}</text>')
     # fight strip
-    bare = not (fight.add_waves or fight.vulnerable or fight.invulnerable)  # only Bloodlust to draw: say so
-    fight_row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">{"Bloodlust" if bare else "Fight"}</text>']
+    fight_row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">Fight</text>']
     for name, s in sorted(phases or [], key=lambda p: p[1])[1:]:  # the stages, where raiders think in them
         axis += (f'<line x1="{x(s)}" y1="14" x2="{x(s)}" y2="100%" stroke="var(--fg)" stroke-opacity=".35" '
                  f'stroke-dasharray="2 4"><title>{e(name)} {_mmss(s)}</title></line>')
@@ -487,7 +486,7 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         v = d.raid.verdicts[0]
         what = "stay on the boss" if d.raid.objective == "boss" else "pad the adds"
         why = raidneed.readable(v.reason)
-        out.append(Suggestion("info", f"With your raid, <b>{what}</b>", [e(why[:1].upper() + why[1:])]))
+        out.append(Suggestion("info", f"With your raid, <b>{what}</b>", [e(why[:1].upper() + why[1:].rstrip(".") + ".")]))
     if d.talents and d.talents.rows:
         best = best_build(d)
         g = best.per_fight.get(d.talents.fights[0], (0.0, None))[0] if best else 0.0
@@ -856,8 +855,27 @@ def render(d: PrepData) -> str:
             r.build.label = f"top build {chr(65 + i)}"
     if d.mrt:  # every plan's note says the defensives the fight tab calls, not the logs' longer list
         defs = fightview.note_lines(d, ("def", "move"))
-        d.mrt = {k: in_time_order("\n".join([x for x in v.splitlines() if " Defensive: " not in x] + defs))
-                 for k, v in d.mrt.items()}
+
+        def tidy(v: str) -> str:
+            lines = in_time_order("\n".join([x for x in v.splitlines() if " Defensive: " not in x] + defs)).splitlines()
+            return "\n".join(lines[:1] + fightview.prepull(lines[1:]))
+        d.mrt = {k: tidy(v) for k, v in d.mrt.items()}
+    if d.nsrt and d.defensives and d.defensives.moments:  # NSRT reminds the same defensives as the fight tab
+        from paf.defensives import Defensives, nsrt_lines
+
+        ids = {str(s[1]) for m in d.defensives.moments for s in m.spells}
+        kept = Defensives(fightview.defensive_moments(d))
+
+        def renote(v: str) -> str:
+            lines = v.splitlines()
+            enc = re.match(r"EncounterID:(\d+)", lines[0] if lines else "")
+            tag = next((m[1] for x in lines if (m := re.search(r";tag:([^;]+);", x))), "")
+            if not enc or not tag:
+                return v
+            lines = [x for x in lines if not re.search(rf";spellid:({'|'.join(ids)});", x)
+                     and not x.startswith("-- prep-a-fight: defensives not placed")]
+            return in_time_order("\n".join(lines + nsrt_lines(kept, int(enc[1]), d.phases, tag)))
+        d.nsrt = {k: renote(v) for k, v in d.nsrt.items()}
     played = simple._plan(d)
     if played is not None and d.mrt.get(played.objective):  # the plan you play: one note, the fight tab's, everywhere
         d.mrt[played.objective] = fightview.mrt(d)
@@ -968,7 +986,7 @@ the sims put as much on the boss as the top players do (SimC hits every add in r
                   "night": "This boss in your raid's night"}
         for kind in ("comp", "wipe", "night"):
             if tools.get(kind):
-                head = "" if kind == "comp" else f"<h2>{e(titles[kind])}</h2>"  # comp's answer opens on its own title
+                head = f"<h2>{e(titles[kind])}</h2>"  # every block under a section heading
                 tabs["raid"].append(f"{head}<div class='ws-answer'>"
                                     f"{workshop_views.render({'kind': kind, **tools[kind]})}</div>")
         tabs["raid"].append(workshop_views.CSS)
@@ -1088,7 +1106,7 @@ for reference: a build can be worse there and much better on this fight. Error a
                                                          for f in p.flags) + "</ul>"
             blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, err=1e9 if p.objective == "secondary" or _stall(d, p) else 0.0)}
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span>{" <span class='pill gold'>the sheet plays this plan</span>" if p.objective == first else ""}</h3>
-{("<p class='small'>Played because " + ("your raid pads the adds" if p.objective == "total" else "your raid stays on the boss" if p.objective == "boss" else "it is your choice") + " (see Your raid, in this section)." + (" The fight tab calls a burst pressed while the boss is immune on the adds that follow." if d.fight is not None and d.fight.invulnerable else "") + "</p>") if p.objective == first and p.objective in ("boss", "total") else ""}
+{("<p class='small'>Played because " + ("your raid pads the adds" if p.objective == "total" else "your raid stays on the boss" if p.objective == "boss" else "it is your choice") + " (see Your raid, in this section)." + (" When the plan presses a burst while the boss is immune, the fight tab moves it onto the adds that spawn then." if d.fight is not None and d.fight.invulnerable else "") + "</p>") if p.objective == first and p.objective in ("boss", "total") else ""}
 {"<p class='small muted'>Burst damage counts only the damage on " + e(burst_names(d)[1] or "the burst targets") + ": worth it only if your raid needs them dead fast" + ("." if _stall(d, p) else ", at the cost of the boss and total damage above.") + "</p>" if p.objective == "secondary" else ""}
 {checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases, links=d.links)}
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>

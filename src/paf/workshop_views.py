@@ -302,10 +302,10 @@ def comp(d: dict) -> str:
     if not targets:
         return _verdict("ok", "Nothing to assign on this boss", "<span>The top raids put their damage on the boss.</span>")
     if assigned:
-        head = _verdict("go", "Who hits what in your raid", "<span>The specs of your raid that do the most damage on "
+        head = _verdict("go", "The specs that hit each target hardest", "<span>The specs of your raid that do the most damage on "
                         "each target, from the top kills of this boss.</span>")
     else:
-        head = _verdict("ok", "Who hits what in your raid", "<span>No add is assigned in the top raids: the whole raid "
+        head = _verdict("ok", "No add assigned", "<span>No add is assigned in the top raids: the whole raid "
                         "switches.</span>")
     cards = ""
     for t in targets:
