@@ -105,11 +105,13 @@ def page_body() -> str:
     # already set: keep it and go on (a Save that changes nothing, or a "Skip" that sounds like dropping it, is not it)
     # a field changed: the save button takes the primary place and "Keep" goes (see JS), nothing typed is lost
     keep = "<button type='button' class='btn go next keep'>{} &rarr;</button>"
-    keep_char = "<button class='btn ghost save-alt'>Load the pasted one</button>" + keep.format("Keep this character")
-    keep_char_wcl = "<button class='btn ghost save-alt'>Find this one instead</button>" + keep.format("Keep this character")
-    keep_guild = "<button class='btn ghost save-alt'>Save changes</button>" + keep.format("Keep it")
+    keep_char = "<button class='btn ghost save-alt' hidden>Load the pasted one</button>" + keep.format("Keep this character")
+    keep_char_wcl = ("<button class='btn ghost save-alt' hidden>Find this one instead</button>"
+                     + keep.format("Keep this character"))
+    keep_guild = "<button class='btn ghost save-alt' hidden>Save changes</button>" + keep.format("Keep it")
     summary = "; ".join(x for x in (
-        "Warcraft Logs connected" if key_done else "",
+        ("Warcraft Logs through your account" if wcllogin.logged_in() else "Warcraft Logs through your own API key")
+        if key_done else "",
         f"character {char.name}" if char else "",
         f"guild {guild}" if guild else "") if x)  # what is set already, said on the last step
     skip = "<button type='button' class='btn ghost skip'>Skip</button>"
@@ -137,7 +139,7 @@ def page_body() -> str:
 <ul class="ob-points"><li><b>What the best players do</b> on this boss, read from their logs.</li>
 <li><b>Your character simmed on the real fight</b>, rebuilt from those logs: talents, gear, cooldowns.</li>
 <li><b>One sheet</b>: what to change, when to press what, what to watch out for.</li></ul>
-<p class="muted">Free, on your computer. Four short steps; skip any of them, everything is in Settings later.</p>
+<p class="muted">Free, on your computer. Three short steps; skip any of them, everything is in Settings later.</p>
 <div class="ob-actions"><button type="button" class="btn go next">Start &rarr;</button>
 <a class="btn ghost" href="/onboard/skip">Skip all</a></div></section>
 
@@ -187,9 +189,10 @@ JS = """<script>
 var root = document.querySelector('.ob'); if (!root) return;
 var steps = [].slice.call(root.querySelectorAll('.ob-step')), dots = [].slice.call(root.querySelectorAll('.ob-dots li'));
 var names = steps.map(function(s){ return s.dataset.step; }), at = 0, done = {};
-root.querySelectorAll('form').forEach(function(f){ f.addEventListener('input', function(){  // an edit: save it, not keep
+root.querySelectorAll('form').forEach(function(f){ f.addEventListener('input', function(){  // an edit: save it first
   var k = f.querySelector('.keep'), s = f.querySelector('.save-alt'); if (!k || !s) return;
-  k.remove(); s.classList.remove('ghost'); s.classList.add('go'); }); });
+  s.hidden = false; s.classList.remove('ghost'); s.classList.add('go');
+  k.classList.remove('go'); k.classList.add('ghost'); k.innerHTML = 'Keep the saved one &rarr;'; }); });
 function store(i){ try { localStorage.setItem('paf-onboard', names[i]); } catch (e) {} }
 function show(i, back){
   at = Math.max(0, Math.min(steps.length - 1, i));

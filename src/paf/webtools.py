@@ -234,8 +234,9 @@ def settings_page(message: str = "") -> str:
 </p>{msg}<div class="set-cols"><div>
 <form method="post" action="/settings" class="card settings">{settings_form()}
 <div class="cta"><button class="btn go">Save</button><span class="dirty-note">Unsaved changes</span></div></form>
-<script>(function(f){{f.addEventListener('input',function(){{f.classList.add('dirty')}})}})(document.currentScript
-.previousElementSibling)</script></div><div>
+<script>(function(f){{var d=false;f.addEventListener('input',function(){{d=true;f.classList.add('dirty')}});
+f.addEventListener('submit',function(){{d=false}});window.addEventListener('beforeunload',function(ev){{if(d){{ev.preventDefault();
+ev.returnValue=''}}}})}})(document.currentScript.previousElementSibling)</script></div><div>
 {account}<h2>Warcraft Logs key</h2><div class="card"><p class="small measure">{current} To use another one (a new
 client, or a regenerated secret): create or open it on <a href="https://www.warcraftlogs.com/api/clients"
 target="_blank" rel="noopener">warcraftlogs.com/api/clients</a>, then paste both values.
