@@ -138,7 +138,9 @@ def change_card(d) -> str:
         what = "; ".join(f"{n}: {rule_phrase(d, r)}" for n, r in held)
         rows.append(f"<li>{_ic(d, held[0][0])}<div><b>Play your cooldowns this way</b><span class='sz "
                     f"{_size(plan.gain)}'>{SIZE_WORDS[_size(plan.gain)]}, {plan.gain:+.1f}%</span><span class='what'>{e(what)}. The fight "
-                    f"tab calls them at their times.</span></div></li>")
+                    f"tab calls them at their times."
+                    + ("" if getattr(plan, "robust", True) else " Not robust: the gain can vanish on a harder fight "
+                       "(see its checks in Dig deeper).") + "</span></div></li>")
     if getattr(d, "imported", False):  # no bags: the best gear and the loot need the /simc export
         rows.append("<li><span class='ok bad' aria-hidden='true'>!</span><div><b>Paste your /simc export</b>"
                     "<span class='what'>Your character was read from a log, without your bags: with /simc the "

@@ -446,7 +446,8 @@ def _stall(d, p) -> str:
     boss = p.totals.get("boss") if p.objective != "boss" else p.gain
     if held and boss is not None and boss < -15:
         return (f"The {-boss:.0f}% boss loss is mostly a sim artifact: SimC's default rotation ties other spells to "
-                f"{held[0]}, so they stop while it is held. The real cost is lower; the gain is real.")
+                f"{held[0]}, so they stop while it is held and pile up for the moment it is pressed. The real cost is "
+                f"lower and the gain likely overstated too: read this plan as a direction, not a number.")
     return ""
 
 
@@ -682,7 +683,8 @@ def suggestions_html(d: PrepData) -> str:
         gain = f'<div class="gain">{s.gain:+.1f}%{unit}</div>' if s.gain is not None else '<div class="gain"></div>'
         pic = icons.img(s.icon or "inv_misc_groupneedmore", "medium")
         details = "".join(f"<div>{x}</div>" for x in s.details)
-        rows.append(f'<div class="sugg {s.severity}">{pic}<div><div class="t"><span class="sev">{label}</span> '
+        rec = " rec" if "recommended for your raid" in s.title or "your choice" in s.title else ""
+        rows.append(f'<div class="sugg {s.severity}{rec}">{pic}<div><div class="t"><span class="sev">{label}</span> '
                     f'{s.title}</div><div class="d">{details}</div></div>{gain}</div>')
     if not rows:
         return '<p class="muted">Nothing to change: your character already plays this fight well.</p>'
@@ -966,7 +968,7 @@ for reference: a build can be worse there and much better on this fight. Error a
         tabs["cooldowns"].append(
             "<h2>Ideal cooldown play-by-play</h2><div class='card'><p><b>The default priority list is already right "
             "on this fight:</b> press your cooldowns as soon as they are ready. No other plan beats it for boss, total "
-            f"or burst damage (all within the noise, ±{p.error:.1f}%).</p>"
+            f"or burst damage (all within the noise, ±{max(p.error, 0.01):.2f}%).</p>"
             f"{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases)}"
             + (f"<h4>MRT note {copy_button(note, 'Copy the MRT note')}</h4><pre class='small note-pre'>{e(note)}</pre>"
                if note else "") + "</div>")
@@ -992,11 +994,14 @@ for reference: a build can be worse there and much better on this fight. Error a
                 checks += ("<p class='small'>Sensitivity (pessimistic variants of the fight): "
                            + ", ".join(f"{e(v)} {_pct(g, 1)}" for v, g in p.sensitivity.items())
                            + (" &rarr; <b>robust</b>" if p.robust else " &rarr; <b>not robust</b>") + "</p>")
+            if _stall(d, p):
+                checks += f"<p class='small warn'>&#9888; {e(_stall(d, p))}</p>"
             if p.flags:
-                checks += "<ul class='small'>" + "".join(f"<li class='warn'>&#9888; {e(f)}</li>" for f in p.flags) + "</ul>"
+                checks += "<ul class='small'>" + "".join(f"<li class='warn'>&#9888; {e(re.sub(r'[-+]0[.]0%', 'about 0%', f))}</li>"
+                                                         for f in p.flags) + "</ul>"
             blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, err=1e9 if p.objective == "secondary" else 0.0)}
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span></h3>
-{"<p class='small muted'>Burst damage counts only the damage on " + e(burst_names(d)[1] or "the burst targets") + ": worth it only if your raid needs them dead fast, at the cost of the boss and total damage above.</p>" if p.objective == "secondary" else ""}
+{"<p class='small muted'>Burst damage counts only the damage on " + e(burst_names(d)[1] or "the burst targets") + ": worth it only if your raid needs them dead fast" + ("." if _stall(d, p) else ", at the cost of the boss and total damage above.") + "</p>" if p.objective == "secondary" else ""}
 {checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases)}
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
 <div class="pp-grid"><div><h4>Play-by-play of one simulated pull</h4><div class="scroll pp"><table>
@@ -1081,7 +1086,8 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
     if d.validation:
         lo, med, hi = d.validation
         notes.insert(0, f"Validation: the top players' own characters simmed on this rebuilt fight give {med:.0%} of "
-                        f"their real DPS for the median one (the lowest {lo:.0%}, the highest {hi:.0%}).")
+                        f"their real DPS with the movement as calibrated ({lo:.0%} to {hi:.0%} across the movement "
+                        f"levels tried).")
     notes += [
         "A rebuilt fight is an approximation: good to choose between builds, items and plans, not a prediction "
         "of your exact DPS.",
