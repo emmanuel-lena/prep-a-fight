@@ -354,13 +354,25 @@ def compare(profile: str, client, enc, difficulty: int, diff_name: str, cls: str
             continue
         log(f"  {spec_label(spec)} in the top players' gear at {TOP_ILVL}...")
         first, *others = builds
-        try:
-            sim = simc.run(simc.build_input(character_in(profile, spec, builds[first], t.gear), fight_lines,
-                                            {k: builds[k] for k in others}),
-                           run_dir / simc_spec(spec), target_error=target_error)
-        except simc.SimcError as ex:
-            res.notes.append(f"{spec_label(spec)} could not be simmed ({str(ex)[-120:]}).")
+        gear, sim, dropped = list(t.gear), None, []
+        for _ in range(3):  # an item too new for this simc build: that slot left empty, said, and simmed again
+            try:
+                sim = simc.run(simc.build_input(character_in(profile, spec, builds[first], gear), fight_lines,
+                                                {k: builds[k] for k in others}),
+                               run_dir / simc_spec(spec), target_error=target_error)
+                break
+            except simc.SimcError as ex:
+                bad = re.search(r"Slot '(\w+)': Error retrieving item", str(ex))
+                if not bad or bad[1] in dropped:
+                    res.notes.append(f"{spec_label(spec)} could not be simmed ({str(ex)[-120:]}).")
+                    break
+                dropped.append(bad[1])
+                gear = [it if SLOTS.get(i) != bad[1] else {} for i, it in enumerate(gear)]
+        if sim is None:
             continue
+        if dropped:
+            res.notes.append(f"{spec_label(spec)}: the top players' {', '.join(dropped)} is unknown to this SimC "
+                             "build; simmed with that slot empty (a little under its real worth).")
         err = 100 * sim.baseline["dps"].error / sim.baseline["dps"].mean
         got = {first: (sim.baseline.get("prioritydps") or sim.baseline["dps"]).mean}
         for ps in sim.profilesets:

@@ -133,8 +133,8 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
         return ""
     dur = fight.duration
     px = max(px, 930 / max(dur, 1))  # the fight across the card's width, whatever its length
-    W = int(dur * px) + 170
-    x0 = 160
+    W = int(dur * px) + 200
+    x0 = 190  # room for a trinket's whole name ("Vile Vial of Volatile Venom")
 
     def x(t: float) -> float:
         return round(x0 + t * px, 1)
@@ -179,8 +179,8 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
         words = label.replace("_", " ").split()
         titled = " ".join(w if i and w.lower() in small else w[:1].upper() + w[1:] for i, w in enumerate(words))
         shown = (names or {}).get(_key(label)) or by_link.get(_key(label)) or titled
-        shown = shown if len(shown) <= 24 else shown[:23] + "…"
-        row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">{e(shown)}</text>']
+        full, shown = shown, shown if len(shown) <= 30 else shown[:29] + "…"
+        row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)"><title>{e(full)}</title>{e(shown)}</text>']
         tt = tops.get(_key(label)) or []
         if tt and tops_players:
             bins: dict[int, int] = {}
@@ -540,7 +540,7 @@ def suggestions(d: PrepData) -> list[Suggestion]:
             lines.append("<div class='why'>&#9888; " + "; ".join(
                 e(re.sub(r"[-+]0\.0%", "about 0%", f)[:1].upper() + re.sub(r"[-+]0\.0%", "about 0%", f)[1:])
                 for f in p.flags) + "</div>")
-        first = next(iter(p.choice), "")
+        first = next((k for k, r in p.choice.items() if r.name != "default"), next(iter(p.choice), ""))  # what it changes
         goal = {"boss": "if you focus the boss", "total": "if you pad the adds",
                 "secondary": f"to burst {burst_names(d)[1] or 'the secondary targets'}"}.get(p.objective, p.objective)
         tag = ""
@@ -560,8 +560,10 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         played = want is not None and p.objective == want
         sev = "info" if costly(p) else "alt" if (want is not None and not played and p.objective in ("boss", "total")) \
             else _severity(p.gain)  # a plan the sheet does not play is an alternative, whatever its size
+        from paf.simple import _fallback  # a potion or a racial: the picture the fight tab shows for it
+
         out.append(Suggestion(sev, f"Cooldown plan <b>{e(goal)}</b>{tag}", lines, p.gain,
-                              d.icons.get(first, ""), {"boss": "boss damage", "total": "total damage",
+                              d.icons.get(first, "") or _fallback(d, cd_name(d, first)), {"boss": "boss damage", "total": "total damage",
                                                        "secondary": "burst damage"}.get(p.objective, "")))
     if d.gear:
         changes, _, w = d.gear[0]
@@ -584,6 +586,10 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         said = [f"Your plan: {a.ability} {rules[a.ability]} (SimC finds it worth more that way for your character)."
                 for a in held if a.ability in rules and "only on" not in rules[a.ability].replace("only on add", "")
                 and not rules[a.ability].startswith("as SimC's default")]
+        tried = {cd_name(d, k) for p in d.optimized for k in p.choice}
+        kept = {cd_name(d, k) for p in d.optimized for k, r in p.choice.items() if r.name != "default"}
+        said += [f"{a.ability}: SimC tried holding it and finds no gain for your character; your plans leave it to "
+                 "the default priority list." for a in held if a.ability in tried and a.ability not in kept]
         out.append(Suggestion("info", "The top players keep " + ", ".join(lk(a.ability) for a in held) + " for "
                               + e(" / ".join(x for x in (vuln, units) if x) or "the burst windows"), [e(s) for s in said],
                               None, ic(held[0].ability)))
@@ -832,6 +838,15 @@ def render(d: PrepData) -> str:
             for line in note.splitlines())
     d.mrt = {k: before_pull(in_time_order(v)) for k, v in d.mrt.items()}
     d.nsrt = {k: in_time_order(v) for k, v in d.nsrt.items()}
+    from paf import fightview, simple
+
+    if d.talents and d.talents.rows and d.talents.fights:  # builds lettered in the order the sheet lists them: best first
+        f0 = d.talents.fights[0]
+        for i, r in enumerate(sorted(d.talents.rows, key=lambda r: -(r.per_fight.get(f0, (0.0, None))[0] or 0.0))):
+            r.build.label = f"top build {chr(65 + i)}"
+    played = simple._plan(d)
+    if played is not None and d.mrt.get(played.objective):  # the plan you play: one note, the fight tab's, everywhere
+        d.mrt[played.objective] = fightview.mrt(d)
     from dataclasses import replace as _replace
 
     d.actions = [_replace(a, text=re.sub(r"(take it in (\d+)% of the kills): expect it\.",
@@ -894,7 +909,9 @@ def render(d: PrepData) -> str:
         extra.append(f"Bloodlust at {_mmss(d.lust)}")
     if d.pi:
         extra.append("Power Infusion at " + ", ".join(_mmss(t) for t in d.pi))
-    extra.append(f"top {e(d.spec)} players move {d.moving_share:.0%} of the fight")
+    rv = getattr(d, "review", None)  # one figure on the sheet: the one "Your last pull" sets yours against
+    moving = rv.tops_moving if rv is not None and rv.tops_moving is not None else d.moving_share
+    extra.append(f"top {e(d.spec)} players move {moving:.0%} of the fight")
     if d.add_share_spec:
         extra.append(f"and do {d.add_share_spec:.0%} of their damage to adds")
     focus = ""
@@ -1124,7 +1141,10 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
                     r"of your damage on the boss vs \2 in the top players' logs:", n).replace("secondary targets",
                                                                                             "burst targets")
              for n in d.notes]  # notes saved by older preps, in the current words
-    notes = [n.replace("trajectories is scaled by 0:", "trajectories is ignored (scaled by 0):") for n in notes]
+    notes = [n.replace("trajectories is scaled by 0:", "trajectories is ignored (scaled by 0):").replace(
+        "SimC's default priority list puts", "SimC's default priority list, in the top players' gear, puts").replace(
+        "of your damage on the boss vs", "of its damage on the boss vs").replace(
+        "in the top players' logs:", "in their logs:") for n in notes]  # the calibration's player, not yours
 
     def direction(n: str) -> str:  # a calibration note saved by an older prep, in the direction the numbers go
         m = re.match(r"Even with the add waves counted at the minimum, SimC's default priority list puts (\d+)% of "
@@ -1172,7 +1192,7 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
 <h1>{e(d.boss)} {diff_pill(d.difficulty)}</h1>
 <p>{e(d.character)} &middot; {e(d.spec)} &middot; {d.kills} ranked kills &middot; {datetime.now():%d %b %Y %H:%M}</p>
 </div><nav class="tabs" aria-label="Sections"><div class="tabs-in" role="tablist">{''.join(
-        f'<a role="tab" href="#{k}">{e(label)}</a>' for k, label in SECTIONS if sections[k])}</div></nav>{briefing.ready_ring(briefing.ready_count(d))}</div></header>"""
+        f'<a role="tab" href="#{k}">{e(label)}</a>' for k, label in SECTIONS if sections[k])}</div></nav></div></header>"""
     panels = "".join(f'<section class="panel" id="{k}">{"".join(v)}</section>' for k, v in sections.items() if v)
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"<title>{e(d.boss)} prep</title><script>document.documentElement.classList.add('js')</script>"

@@ -48,7 +48,7 @@ def lede_html(d) -> str:
     if d.add_share_spec is not None and not (focus and d.add_share_spec < 0.05):  # a council: said above
         a = d.add_share_spec
         second += (f" The best {e(d.spec)} players keep {1 - a:.0%} of their damage on the boss and put {a:.0%} on the adds."
-                  if a >= 0.05 else f" The best {e(d.spec)} players stay on the boss almost the whole time.")
+                  if a >= 0.05 else f" The best {e(d.spec)} players put {1 - a:.0%} of their damage on the boss.")
         from paf.prep_report import wanted
 
         if wanted(d) == "total":  # your raid's call goes against what the top players do: say why, in the same breath
@@ -318,13 +318,22 @@ def spec_html(d) -> str:
     gaps = spec_gaps(s) if s else []
     if len(gaps) < 2:
         return ""
+    notes = " ".join(s.get("notes") or [])
+
+    def short(name: str) -> str:  # simmed one item short (too new for this simc build): said on its tile
+        return (" <small>one item short</small>" if f"{name}: the top players'" in notes and "unknown to this SimC"
+                in notes else "")
     tiles = "".join(
         f"<div class='spt {kind}'><span class='spt-n'>{e(name)}</span><span class='spt-v'>"
-        f"{'your spec' if gap is None else 'same' if kind == 'same' else f'{gap:+.0f}%'}</span></div>"
+        f"{'your spec' if gap is None else 'same' if kind == 'same' else f'{gap:+.0f}%'}{short(name)}</span></div>"
         for name, gap, kind in gaps)
+    failed = " ".join(s.get("notes") or [])
+
+    def why(r) -> str:  # said, never silently dropped, with its reason
+        return "SimC failed on it" if f"{r.get('spec')} could not be simmed" in failed else "no build found"
     tiles += "".join(f"<div class='spt low'><span class='spt-n'>{e(r.get('label', r.get('spec', '')))}</span>"
-                     "<span class='spt-v'>not simmed</span></div>"
-                     for r in s.get("rows") or [] if not r.get("sim"))  # said, never silently dropped
+                     f"<span class='spt-v'>not simmed: {why(r)}</span></div>"
+                     for r in s.get("rows") or [] if not r.get("sim"))
     return (f"<div class='specs rv'><p class='specs-head'><b>We simmed your character in each spec of your class"
             f"</b> <span class='muted'>for {e(spec_role(s))}, on this fight</span></p>"
             f"<div class='spt-row'>{tiles}</div></div>")

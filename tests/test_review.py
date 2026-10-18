@@ -29,3 +29,23 @@ def test_card_says_what_differs():
     assert "You keep casting like the top players do." in card and "You do not move more" in card
     d.review = None
     assert simple.review_card(d) == ""
+
+
+
+
+class Client:
+    def query(self, q, v, cache_ttl=0):
+        return {"reportData": {"report": {
+            "masterData": {"actors": [{"id": 7, "name": "Ixuu", "subType": "Rogue"}]},
+            "fights": [{"id": 1, "encounterID": 9, "difficulty": 4, "kill": True, "startTime": 0, "endTime": 60000,
+                        "phaseTransitions": []}]}}}
+
+    def events(self, *a, **k):
+        return [{"type": "cast", "abilityGameID": 1, "timestamp": t * 1000, "sourceID": 7} for t in range(0, 60, 2)]
+
+
+def test_a_namesake_of_another_class_is_not_you():
+    url = "https://www.warcraftlogs.com/reports/AbCdEf1234567890"
+    tops = (0.9, 0.3, [])
+    assert review.review(Client(), url, 9, 4, "Ixuu", ["P1"], tops, "rogue") is not None
+    assert review.review(Client(), url, 9, 4, "Ixuu", ["P1"], tops, "shaman") is None

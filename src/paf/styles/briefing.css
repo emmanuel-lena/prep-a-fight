@@ -103,6 +103,8 @@ details.more>summary{font:italic 400 17px var(--font-reading);color:var(--muted)
 .spt{display:flex;flex-direction:column;gap:2px;min-width:120px;padding:8px 12px;border:1px solid var(--line);
   border-radius:10px;background:var(--surface)}
 .spt-n{font-size:13px;color:var(--muted)} .spt-v{font:600 18px var(--font-data);color:var(--fg)}
+.spt-v small{display:block;font:400 11.5px var(--font-body);color:var(--muted)}
 .spt.mine{background:var(--surface-2)} .spt.mine .spt-v{font:600 14px var(--font-body);color:var(--muted)}
 .spt.go{border-color:color-mix(in srgb,var(--pos) 55%,var(--line))} .spt.go .spt-v{color:var(--pos)}
 .spt.same .spt-v,.spt.low .spt-v{color:var(--muted)}
+.checks .t>img:first-child{margin-right:8px;vertical-align:-3px} /* a mechanic's icon, kept off its words */

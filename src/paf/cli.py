@@ -869,8 +869,8 @@ def cmd_raidqueue(args: argparse.Namespace) -> int:
 
 def calibration_note(got: float, target: float) -> str:
     """What a boss share the sims cannot reach means for the numbers, in the direction it really goes."""
-    head = (f"Even with the add waves counted at the minimum, SimC's default priority list puts {got:.0%} of your "
-            f"damage on the boss vs {target:.0%} in the top players' logs: ")
+    head = (f"Even with the add waves counted at the minimum, SimC's default priority list, in the top "
+            f"players' gear, puts {got:.0%} of its damage on the boss vs {target:.0%} in their logs: ")
     if got > target:
         return (head + "SimC keeps single-target spells on the boss while real players also spend them on adds and "
                 "burst targets. Boss-only numbers are optimistic, add damage pessimistic.")
@@ -1094,7 +1094,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
                 activity = (pk.activity if pk is not None and pk.activity
                             else review.tops_activity(con, enc.id, diff, spec))  # an older pack: the local corpus
                 d.review = review.review(client, raid_url, enc.id, diff, profile.name, [n for n, _ in d.phases],
-                                         activity) if activity and activity[0] is not None else None
+                                         activity, profile.class_name) if activity and activity[0] is not None else None
             except (WCLError, ValueError, KeyError, TypeError) as ex:
                 print(f"  your own pull could not be read: {str(ex)[:120]}")
             if d.review:
@@ -1951,7 +1951,9 @@ def _raid_verdict(client, con, enc, diff: int, url: str, profile, spec: str, fil
     from paf.wcl import WCLError
 
     rc = raidneed.raid_from_report(client, url, enc.id, diff)
-    me = next((p for p in rc.players if profile.name and p[0].lower() == profile.name.lower()), None)
+    cls = (profile.class_name or "").replace("_", "").lower()
+    me = next((p for p in rc.players if profile.name and p[0].lower() == profile.name.lower()
+               and (not cls or p[1].rpartition(" ")[2].lower() == cls)), None)  # a namesake of another class is not you
     others = [(s, dps) for n, s, dps in rc.players if me is None or n != me[0]]
     if me is not None:
         you, found = (me[1], me[2]), True

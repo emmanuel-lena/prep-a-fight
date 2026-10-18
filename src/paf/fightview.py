@@ -32,6 +32,7 @@ MOVE_CUE = 10.0  # a movement window this long gets a "keep up" cue (with the sp
 MOVE_LONG = 20.0  # longer: a stretch of moving around, not one move
 MOVE_ICON = "inv_misc_map_01"  # a neutral picture: no spell of yours
 IMMUNE_ICON = "spell_holy_divineshield"
+PHASE_ICON = "inv_misc_pocketwatch_01"  # a stage begins: the clock, never an empty square
 
 
 @dataclass
@@ -133,7 +134,9 @@ def _defensives(d) -> list[tuple[float, str, str]]:
         hits = [c for c in casts.get(m.boss_ability, []) if t - 3 <= c <= t + DEF_SNAP] if m.boss_ability else []
         if hits:
             t = max(0.0, min(hits, key=lambda c: abs(c - t)) - 1)
-        why = m.boss_ability  # the logs tie it to that ability (a hit that can come long after its cast)
+        # the logs tie it to that ability; with no cast of it close by, it is a hit that lands long after its cast
+        late = m.boss_ability in casts and not hits
+        why = f"{m.boss_ability}'s damage" if late else m.boss_ability
         out.append((t, m.spells[0][0], why))
     return out
 
@@ -152,14 +155,14 @@ def items(d) -> list[tuple[float, Item]]:
     skip = {a.name for a in d.actions if a.kind == "ignore"}
     for name, start in sorted(d.phases, key=lambda p: p[1]):
         if start >= 1:
-            add(start, Item("boss", "phase", name, f"{name} begins"))
+            add(start, Item("boss", "phase", name, f"{name} begins", PHASE_ICON))
     starts = [s for _n, s in d.phases if s >= 1]
     for w in (d.fight.invulnerable if d.fight is not None else []):
         at = next((s for s in starts if abs(s - w.start) <= 3), w.start)  # an intermission: on its phase's row
         add(at, Item("boss", "immune", "Boss immune", f"The boss is immune for {w.duration:.0f} s", IMMUNE_ICON,
                      float(w.duration)))
     roles = getattr(d, "ability_roles", None) or {}
-    hits_you = {why for _t, _s, why in _defensives(d)}
+    hits_you = {why.removesuffix("'s damage") for _t, _s, why in _defensives(d)}
     for name, times in d.boss_casts:
         # the journal flags it for the tank only (and you need no defensive for it): shown dimmed, never confirmed
         tank = roles.get(name) == ["tank"] and name not in hits_you
@@ -252,7 +255,8 @@ def _ic(icon: str, cls: str = "ic") -> str:
 def _ev(it: Item, row_t: float | None = None) -> str:
     bold = it.side == "you" and it.kind in ("cd", "pot", "def")
     text = f"<b>{e(it.text)}</b>" if bold else e(it.text)
-    notes = [f"at {_mmss(it.t)}"] if row_t is not None and it.t >= 0 and abs(it.t - row_t) > 2 else []
+    # any time its row does not show says so: the page never snaps an event to a time it does not have
+    notes = [f"at {_mmss(it.t)}"] if row_t is not None and it.t >= 1 and _mmss(it.t) != _mmss(row_t) else []
     if it.dur and it.kind not in ("move", "immune"):
         notes.append(f"lasts {it.dur:.0f} s")
     small = f"<small>{', '.join(notes)}</small>" if notes else ""
@@ -414,7 +418,7 @@ def _phase_html(name: str, start: float, end: float, pi: int, rows: str, its: li
         said.insert(0, "Bloodlust " + ("at the pull" if lust[0] < 5 else f"at {_mmss(lust[0])}"))
     adv = f"<p class='ph-adv'>{e(cap(', then '.join(said)))}.</p>" if said else ""
     return (f"<section class='stl' aria-labelledby='ph{pi}-h'><div class='ph-band' id='ph{pi}'><div class='ph-name'>"
-            f"<h2 id='ph{pi}-h'>{e(name)}</h2><span>{lasts}lasts about {_mmss(end - start)}.</span></div>{adv}"
+            f"<h2 id='ph{pi}-h'>{e(name)}</h2><span>{lasts}lasts about {_mmss(round(end - start))}.</span></div>{adv}"
             f"<div class='ph-lanes' aria-hidden='true'>{lanes}</div></div>{rows}</section>")
 
 

@@ -281,7 +281,8 @@ def review_card(d) -> str:
     dur = d.duration or 0
     if r.tops_active is not None and r.tops_active - r.active >= CAST_GAP:
         worst = max(r.phases, key=lambda p: (p.tops_active or 0) - p.active, default=None)
-        where = f", above all in {worst.name}" if worst and (worst.tops_active or 0) - worst.active >= CAST_GAP else ""
+        where = (f", above all in {worst.name}" if len(r.phases) > 1 and worst
+                 and (worst.tops_active or 0) - worst.active >= CAST_GAP else "")
         says.append(f"You cast {(r.tops_active - r.active) * dur:.0f} s less than the top players over the fight{where}: "
                     f"always have a spell going, even while moving (instant spells).")
     elif r.tops_active is not None:
@@ -289,7 +290,8 @@ def review_card(d) -> str:
     moving = [p for p in r.phases if p.tops_moving is not None and p.moving - p.tops_moving >= MOVE_GAP]
     if moving:
         p = max(moving, key=lambda p: p.moving - p.tops_moving)
-        says.append(f"You move more than them in {p.name} ({p.moving:.0%} of the phase, top players {p.tops_moving:.0%}): "
+        span = f"in {p.name} ({p.moving:.0%} of the phase" if len(r.phases) > 1 else f"({p.moving:.0%} of the fight"
+        says.append(f"You move more than them {span}, top players {p.tops_moving:.0%}): "
                     f"outside the strategy's moments, stand still.")
     elif r.tops_moving is not None:
         says.append("You do not move more than the top players.")

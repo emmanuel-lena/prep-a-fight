@@ -138,21 +138,24 @@ def tops_activity(con: sqlite3.Connection, encounter_id: int, difficulty: int, s
 # --- your log (Warcraft Logs) ----------------------------------------------------------------------------------------
 
 FIGHTS_QUERY = """query($code:String!){ reportData { report(code:$code) {
-  masterData { actors(type:"Player") { id name } }
+  masterData { actors(type:"Player") { id name subType } }
   fights(killType: Encounters) { id encounterID difficulty kill startTime endTime phaseTransitions { id startTime } }
 } } }"""
 
 
 def review(client, url: str, encounter_id: int, difficulty: int, name: str, phase_names: list[str],
-           tops: tuple[float | None, float | None, list[tuple[float | None, float | None]]]) -> Review | None:
+           tops: tuple[float | None, float | None, list[tuple[float | None, float | None]]],
+           cls: str = "") -> Review | None:
     """Your pull of this boss in your raid's log (a kill first, else the longest) next to the top players'.
-    None when you are not in the log or the log has no pull of this boss."""
+    None when you are not in the log or the log has no pull of this boss. cls: your class (simc key); a namesake of
+    another class in the log is not you."""
     from paf.raidneed import report_code
 
     code = report_code(url)
     rep = client.query(FIGHTS_QUERY, {"code": code}, cache_ttl=3600)["reportData"]["report"] or {}
     me = next((a for a in (rep.get("masterData") or {}).get("actors") or []
-               if name and a.get("name", "").lower() == name.lower()), None)
+               if name and a.get("name", "").lower() == name.lower()
+               and (not cls or not a.get("subType") or a["subType"].lower() == cls.replace("_", "").lower())), None)
     pulls = [f for f in rep.get("fights") or [] if f["encounterID"] == encounter_id and f["endTime"] > f["startTime"]]
     if me is None or not pulls:
         return None

@@ -319,9 +319,9 @@ def comp(d: dict) -> str:
                    f"<i>{e(t['name'])}</i>.</p><p class='lab'>The specs of your raid that hit both bosses the hardest"
                    "</p>")
         elif t["players"]:
-            kind = "Whole raid" if t["whole_raid"] else "Assigned"
-            say = (f"<p><span>Players on it in the top raids:</span> <b class='num'>{t['players']}</b>"
-                   + (" <span>(besides the whole raid hitting it)</span>" if t["whole_raid"] else "") + "</p>"
+            kind = "Whole raid, plus a few" if t["whole_raid"] else "Assigned"
+            say = (f"<p><span>{'The whole raid hits it, and in the top raids' if t['whole_raid'] else 'In the top raids,'}"
+                   f"</span> <b class='num'>{t['players']}</b> <span>players stay on it</span></p>"
                    "<p class='lab'>The specs of your raid that do the most damage on it</p>")
         else:
             kind = "Whole raid"
@@ -337,9 +337,14 @@ def comp(d: dict) -> str:
             block += (f"<p class='lab warn'>Hardly hit it in your pull</p><div class='whos'>{names(t['missed'])}</div>")
         cards += (f"<div class='job'><div class='j-head'><b>{e(t['name'])}</b><small>{kind}</small></div>{say}{block}"
                   "</div>")
+    both = (" (those assigned to it for an assigned target" if any(t["players"] and not t["whole_raid"] for t in targets)
+            else "")
+    if any(t["second_boss"] for t in targets):
+        both += "; on both bosses for a second boss" if both else " (on both bosses for a second boss"
+    both += ")" if both else ""
     return (f"{head}<div class='jobs wide'>{cards}</div><p class='ws-fine'>DPS on the target of each spec's players in "
-            "the top kills of this boss (those assigned to it for an assigned target; on both bosses for a second "
-            "boss). It compares specs, not your players' skill, and does not know your strategy.</p>")
+            f"the top kills of this boss{both}. It compares specs, not your players' skill, and does not know your "
+            "strategy.</p>")
 
 def _mmss(t: float | None) -> str:
     if t is None or t == float("inf"):
@@ -449,7 +454,9 @@ def night(d: dict) -> str:
         return icons.img(icons.CLASS_ICON.format(cls=cls.lower()), "medium", "it-ic") if cls else _img("")
     deaths = sum(v["deaths"] for v in summary.values())
     bare = sum(v["bare"] for v in summary.values())
-    said = (f"{deaths} {'death' if deaths == 1 else 'deaths'} before the wipes" if deaths else "no death")
+    wipes = any(not r["kill"] for r in pulls)  # the deaths of a wipe itself are left out; a kill keeps them all
+    said = (f"{deaths} {'death' if deaths == 1 else 'deaths'}{' before the wipes' if wipes else ''}" if deaths
+            else "no death")
     head = _verdict("warn" if bare else "ok", f"{len(pulls)} {'pull' if len(pulls) == 1 else 'pulls'}, {said}",
                     f"<span>Died without a healthstone or a health potion first:</span> <span class='num'>{bare}</span>")
     rows = ""
