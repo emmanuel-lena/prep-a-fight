@@ -640,17 +640,18 @@ def suggestions_html(d: PrepData) -> str:
     return f'<div class="card suggs">{"".join(rows)}</div>'
 
 
+# the sheet's sections (the old tabs are gathered into them by render)
+SECTIONS = (("fight", "The fight"), ("change", "What to change"), ("boss", "The boss"), ("deeper", "Dig deeper"))
 TABS = (("overview", "Overview"), ("boss", "The boss"), ("cooldowns", "Cooldowns"), ("gear", "Gear & talents"), ("raid", "Your raid"),
         ("fight", "The fight"))
 TAB_JS = """<script>
 (function(){var ids=[...document.querySelectorAll('.panel')].map(function(p){return p.id});
-function show(id){if(ids.indexOf(id)<0){var v='';try{v=localStorage.getItem('paf-view')||''}catch(e){}
-id=v==='detail'&&ids.indexOf('overview')>=0?'overview':ids[0]}
-try{localStorage.setItem('paf-view',id==='simple'?'simple':'detail')}catch(e){}
-document.body.classList.toggle('simple-on',id==='simple');document.querySelectorAll('.panel').forEach(function(p){
+function show(id){if(ids.indexOf(id)<0)id=ids[0];document.body.classList.toggle('on-fight',id==='fight');
+document.querySelectorAll('.panel').forEach(function(p){
 p.hidden=p.id!==id});document.querySelectorAll('.tabs a').forEach(function(a){
 var on=a.getAttribute('href')==='#'+id;a.classList.toggle('on',on);a.setAttribute('aria-selected',on)});
-var cur=document.querySelector('.tabs a.on');if(cur)cur.scrollIntoView({inline:'center',block:'nearest'});scrollTo(0,0)}
+var cur=document.querySelector('.tabs a.on');if(cur)cur.scrollIntoView({inline:'center',block:'nearest'});scrollTo(0,0);
+if(window.__fv&&id==='fight')window.__fv.layout()}
 addEventListener('hashchange',function(){show(location.hash.slice(1))});show(location.hash.slice(1));
 document.addEventListener('click',function(ev){var b=ev.target.closest('[data-copy]');if(!b)return;
 var t=b.getAttribute('data-copy'),done=function(){var o=b.textContent;b.textContent='Copied';
@@ -668,28 +669,20 @@ def render(d: PrepData) -> str:
     # overview: a raid briefing (paf.briefing); before it, the simple view (paf.simple)
     from paf import briefing, simple
 
+    notices: list[str] = []  # said on top of the fight
     if getattr(d, "partial", None):
         used, found = d.partial
-        tabs["overview"].append(
+        notices.append(
             f"<div class='partial'><b>First analysis, from {used} of the {found} top kills</b><span>Measured on our "
             "corpora: the fight is within about 2% of the full corpus and the talent pick rates within about 3 points. "
             "The full analysis runs in the background: this sheet refreshes by itself when it is done.</span></div>")
-    tabs["overview"].append(briefing.lede_html(d) + briefing.aim_html(d) + briefing.spec_html(d)
-                            + briefing.confidence_pill(d))
+    tabs["overview"].append(briefing.lede_html(d) + briefing.aim_html(d) + briefing.confidence_pill(d))
     if d.kills and d.kills < THIN_CORPUS:
-        tabs["overview"].append(
+        notices.append(
             f'<p class="notice small"><b>Thin data:</b> only {d.kills} ranked kills of your spec on this boss and '
             f'difficulty. The timings of the fight and the habits of the top players are less reliable than usual.</p>')
     tabs["overview"].append(briefing.moves_html(d))
-    tabs["overview"].append(briefing.fight_map_html(d))
-    phone = simple.fight_html(d).replace("<details class='vp'>", "<details class='vp' open>")
-    if phone:  # under 640 px the timeline above needs 900 px: the fight top to bottom instead (briefing.css)
-        tabs["overview"].append(f"<div class='simple tl-phone'>{phone}</div>")
     tabs["overview"].append(briefing.checklist_html(d))
-    if d.guide_summary:
-        tabs["overview"].append("<h2 class='rv'>The boss, in a minute</h2><div class='rv'>" + d.guide_summary + "</div>")
-    tabs["overview"].append("<details class='more'><summary>Everything else worth knowing</summary>"
-                            + suggestions_html(d) + "</details>")
     if d.guide_summary or d.guide_abilities:
         tabs["boss"].append("<h2>The boss in 60 seconds</h2>" + d.guide_summary.replace(
             '<a href="#boss">Every ability, phase by phase &rarr;</a>', ""))
@@ -920,19 +913,24 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
     tabs["fight"].append('<h2>Notes</h2><div class="card small muted"><ul>' + "".join(f"<li>{e(n)}</li>" for n in notes)
                          + "</ul></div>")
 
+    # the four sections: the fight to play, what to change, the boss, and everything else for who digs
+    from paf import fightview
+
+    sections: dict[str, list[str]] = {
+        "fight": notices + [fightview.html(d)],
+        "change": [simple.change_card(d), briefing.spec_html(d), suggestions_html(d)] + tabs["gear"],
+        "boss": tabs["boss"],
+        "deeper": tabs["overview"] + [simple.review_card(d)] + tabs["cooldowns"] + tabs["raid"] + tabs["fight"],
+    }
     cls_icon = icons.img(icons.CLASS_ICON.format(cls=d.class_name.lower()), "large", "hero-ic") if d.class_name else ""
     header = f"""<header class="sheet-hero"><div class="in">{cls_icon}<div class="txt">
 <h1>{e(d.boss)} {diff_pill(d.difficulty)}</h1>
 <p>{e(d.character)} &middot; {e(d.spec)} &middot; {d.kills} ranked kills &middot; {datetime.now():%d %b %Y %H:%M}</p>
-</div><nav class="tabs" aria-label="Sections"><div class="tabs-in" role="tablist"><a role="tab" class="back-simple" href="#simple">&larr; Simple view</a>{''.join(f'<a role="tab" href="#{k}">{e(label)}</a>' for k, label in TABS
-                                                         if tabs[k])}</div></nav>{briefing.ready_ring(briefing.ready_count(d))}</div></header>"""
-    minutes = simple.minutes_html(d)
-    panels = (f'<section class="panel" id="simple">{simple.simple_html(d)}</section>'
-              + (f'<section class="panel" id="minutes"><h2>The fight, minute by minute</h2>{minutes}</section>'
-                 if minutes else "")) + "".join(
-        f'<section class="panel" id="{k}">{"".join(v)}</section>' for k, v in tabs.items() if v)
+</div><nav class="tabs" aria-label="Sections"><div class="tabs-in" role="tablist">{''.join(
+        f'<a role="tab" href="#{k}">{e(label)}</a>' for k, label in SECTIONS if sections[k])}</div></nav>{briefing.ready_ring(briefing.ready_count(d))}</div></header>"""
+    panels = "".join(f'<section class="panel" id="{k}">{"".join(v)}</section>' for k, v in sections.items() if v)
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"<title>{e(d.boss)} prep</title><script>document.documentElement.classList.add('js')</script>"
-            f"{WH_SCRIPT}{theme.HEAD}{briefing.FONTS}<style>{CSS}{briefing.CSS}{simple.CSS}</style>{theme.class_accent(d.class_name)}</head><body>{header}<main>{panels}"
-            f'<p class="small muted">Generated by prep-a-fight. Player names are not shown.</p></main>{TAB_JS}{briefing.JS}{simple.JS}'
+            f"{WH_SCRIPT}{theme.HEAD}{briefing.FONTS}<style>{CSS}{briefing.CSS}{simple.CSS}{fightview.CSS}</style>{theme.class_accent(d.class_name)}</head><body>{header}<main>{panels}"
+            f'<p class="small muted">Generated by prep-a-fight. Player names are not shown.</p></main>{TAB_JS}{briefing.JS}'
             f"</body></html>")

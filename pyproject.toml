@@ -29,7 +29,7 @@ prep-a-fight = "paf.desktop:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-paf = ["assets/*.ico", "styles/*.css"]
+paf = ["assets/*.ico", "styles/*.css", "scripts/*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

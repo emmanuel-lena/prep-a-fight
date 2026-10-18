@@ -18,18 +18,18 @@ def sheet():
     return d
 
 
-def test_simple_view_comes_first_with_three_questions(monkeypatch):
+def test_the_fight_comes_first_then_what_to_change(monkeypatch):
     d = sheet()
     monkeypatch.setattr("paf.optimize.plan_moments",
                         lambda plan, fight, names: [(20, ["Ascendance"]), (80, ["Stormkeeper"]), (200, ["Ascendance"])])
     page = render(d)
-    assert page.index('id="simple"') < page.index('id="overview"')  # shown by default
+    assert page.index('id="fight"') < page.index('id="change"') < page.index('id="deeper"')  # the fight by default
+    assert "Nothing to change" in page.split('id="change"', 1)[1]
     view = simple.simple_html(d)
     assert "Your cooldowns" in view and "Hold them for these moments." in view
     assert re.search(r"<b>Ascendance</b><span class='times'><time>0:20</time><time>3:20</time>", view)
     assert "Nothing to change" in view  # no talents nor gear worth it
     assert "See all the details" in view
-    assert "&larr; Simple view" in page  # the way back from the details
     assert "{" not in view
 
 

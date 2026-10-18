@@ -1,0 +1,55 @@
+import json
+import re
+
+from paf import fightview
+from paf.actions import Action
+from paf.fight import Fight
+from paf.optimize import Plan, Rule
+from paf.prep_report import PrepData
+
+
+def sheet(monkeypatch):
+    d = PrepData("Boss", "heroic", "Subtlety", "Char", kills=40, duration=300)
+    d.phases = [("Stage One", 0.0), ("Stage Two", 150.0)]
+    d.fight = Fight("B", 300)
+    d.cd_names = {"shadow_blades": "Shadow Blades", "potion": "Potion"}
+    d.icons = {"Shadow Blades": "inv_knife_1h_grimbatolraid_d_03"}
+    d.links = {"Shadow Blades": "spell=121471"}
+    d.boss_casts = [("Soul Transfer", [21.0, 160.0])]
+    d.waves = [(50.0, 4, 20.0, "Amani")]
+    d.actions = [Action("kill", "Amani", "Kill the Amani (~4 per kill)")]
+    d.optimized = [Plan("boss", {"shadow_blades": Rule("hold_adds_45", "", None)}, 4.0, 0.2)]
+    presses = [(0.2, ["Potion"]), (52, ["Shadow Blades"]), (200, ["Shadow Blades"])]
+    monkeypatch.setattr("paf.optimize.plan_moments", lambda plan, fight, names: presses)
+    monkeypatch.setattr("paf.gamedata.spell_durations", lambda: {121471: 16.0})
+    return d
+
+
+def test_moments_put_the_boss_and_you_together(monkeypatch):
+    d = sheet(monkeypatch)
+    ms = fightview.moments(d)
+    first = ms[0]
+    assert first.t < 0 and first.title == "Before the pull" and first.you[0].kind == "pot"  # a pre-pot
+    adds = next(m for m in ms if m.t == 50.0)
+    assert adds.title == "4 × Amani" and adds.anchor.kind == "adds"
+    assert [y.text for y in adds.you] == ["Kill Amani", "Shadow Blades"]  # 52 s shares the adds' moment
+    assert next(y for y in adds.you if y.text == "Shadow Blades").dur == 16.0  # its aura, from the game data
+    two = next(m for m in ms if m.t == 150.0)
+    assert two.title == "Stage Two"  # a phase always opens its own moment
+
+
+def test_the_page_carries_its_data_and_one_script(monkeypatch):
+    d = sheet(monkeypatch)
+    page = fightview.html(d)
+    data = json.loads(re.search(r"var FV=(\{.*?\});</script>", page).group(1))
+    assert data["end"] == 300 and [p[0] for p in data["phases"]] == ["Stage One", "Stage Two"]
+    assert any(s["k"] == "cd" and s["d"] == 16.0 for s in data["strips"])
+    assert page.count("id='c-sync'") == 1 and "aria-keyshortcuts='Control+Shift+Space'" in page
+    assert "Your job on this boss" in page and "<b>Kill the Amani</b>" in page
+    assert "<b>Shadow Blades</b> at 0:52, 3:20." in page and "<b>Potion</b> before the pull." in page
+    assert "role='dialog'" in page and "Dig deeper" in page
+    assert fightview.JS.strip().startswith("/*") and "</script" not in fightview.JS
+
+
+def test_no_fight_no_view():
+    assert fightview.html(PrepData("Boss", "heroic", "Subtlety", "Char")) == ""
