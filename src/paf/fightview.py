@@ -158,9 +158,13 @@ def items(d) -> list[tuple[float, Item]]:
         at = next((s for s in starts if abs(s - w.start) <= 3), w.start)  # an intermission: on its phase's row
         add(at, Item("boss", "immune", "Boss immune", f"The boss is immune for {w.duration:.0f} s", IMMUNE_ICON,
                      float(w.duration)))
+    roles = getattr(d, "ability_roles", None) or {}
+    hits_you = {why for _t, _s, why in _defensives(d)}
     for name, times in d.boss_casts:
+        # the journal flags it for the tank only (and you need no defensive for it): shown dimmed, never confirmed
+        tank = roles.get(name) == ["tank"] and name not in hits_you
         for t in times:
-            add(t, Item("boss", "cast", name, name, _icon(d, name)))
+            add(t, Item("boss", "tank" if tank else "cast", name, f"{name} (tank)" if tank else name, _icon(d, name)))
             if name in act:
                 add(t, Item("you", "do", name, act[name].format(name), _icon(d, name)))
     for t, count, life, name in d.waves:
@@ -244,6 +248,7 @@ def _row(m: Moment, i: int, gap: float = 0.0) -> str:
     when = "Before the pull" if m.t < 0 else ("Pull" if m.t < 1 else _mmss(m.t))
     label = f"{when}, {m.title}: show this moment"
     quiet = not m.you and not any(x.kind in ("phase", "immune", "adds", "move", "lust", "kill") for x in m.boss)
+    quiet = quiet or (not m.you and all(x.kind == "tank" for x in m.boss))
     cls = "fm quiet" if quiet else ("fm kill" if any(x.kind == "kill" for x in m.boss) else "fm")
     room = f" style='min-height:{min(110, max(0, (gap - ROW_GAP) * 2.2)) + 34:.0f}px'" if gap > ROW_GAP else ""
     return (f"<div class='{cls}{' has-boss' if boss else ''}' data-i='{i}' data-t='{m.t:g}' data-title='{e(m.title)}'"

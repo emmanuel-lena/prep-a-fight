@@ -56,6 +56,12 @@ def spell_refs(sections: list[Section]) -> dict[str, str]:
     return {s.title: f"spell={s.spell_id}" for _, s in walk(sections) if s.spell_id and s.title}
 
 
+def ability_roles(sections: list[Section]) -> dict[str, list[str]]:
+    """Ability name -> the roles the journal flags it for (tank, healer, damage); none when it flags no role."""
+    return {s.title: [f for f in s.flags if f in ("tank", "healer", "damage")] for _, s in walk(sections)
+            if s.kind == "ability" and s.title and any(f in ("tank", "healer", "damage") for f in s.flags)}
+
+
 def role_bullets(sections: list[Section], role: str = "damage") -> list[str]:
     """What the journal tells your role to do, as short points."""
     over = next((s for s in sections if s.kind == "overview"), None)

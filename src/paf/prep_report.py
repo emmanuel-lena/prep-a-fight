@@ -101,6 +101,7 @@ class PrepData:
     guide_abilities: str = ""  # html: every ability phase by phase, with what the logs add
     role_bullets: list[str] = field(default_factory=list)  # what the journal tells your role to do
     actions: list = field(default_factory=list)  # paf.actions.Action: what the top players do, from their logs
+    ability_roles: dict[str, list[str]] = field(default_factory=dict)  # boss ability -> roles the journal flags
     export: dict[str, str] = field(default_factory=dict)  # plan label ('' = fight only) -> simc lines (Raidbots)
 
 

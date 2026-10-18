@@ -70,3 +70,13 @@ def test_movement_is_a_bar_not_an_event(monkeypatch):
 
 def test_no_fight_no_view():
     assert fightview.html(PrepData("Boss", "heroic", "Subtlety", "Char")) == ""
+
+
+def test_a_tank_only_cast_is_dimmed_and_never_confirmed(monkeypatch):
+    d = sheet(monkeypatch)
+    d.ability_roles = {"Soul Transfer": ["tank"]}
+    ms = fightview.moments(d)
+    first = next(m for m in ms if m.t == 21.0)
+    assert first.boss[0].kind == "tank" and first.boss[0].text == "Soul Transfer (tank)" and first.anchor is None
+    data = json.loads(re.search(r"var FV=(\{.*?\});</script>", fightview.html(d)).group(1))
+    assert "Soul Transfer" not in [a["n"] for a in data["anchors"]]

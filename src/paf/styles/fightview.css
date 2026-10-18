@@ -464,3 +464,4 @@ dialog.ss::backdrop{background:var(--bg)}
 .fv .keys .ic.none{visibility:hidden}
 .fv .call.fv-next{min-height:0;height:auto;align-self:start}
 .fv .call.fv-next .pend{margin:4px 0 0}
+.fv .ev.ek-tank .main{color:var(--muted)} .fv .ev.ek-tank .ic{opacity:.7}

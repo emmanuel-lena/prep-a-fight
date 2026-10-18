@@ -1785,6 +1785,7 @@ def _boss_guide(d, con, enc, diff: int, diff_name: str, spec: str, tl, fight, pk
     d.icons.update(gicons)
     d.guide_summary = bossguide.summary_html(sections, "damage", "#boss")
     d.role_bullets = bossguide.role_bullets(sections, "damage")
+    d.ability_roles = bossguide.ability_roles(sections)
     if pk is not None:
         d.actions = pk.actions
     else:
