@@ -226,7 +226,8 @@ def settings_page(message: str = "") -> str:
     account = (f"<h2>Warcraft Logs</h2><div class='card'>{account}</div>" if wcllogin.available() else "")
     return f"""<h1>Settings</h1><p class="lead">Your raid, the app, your Warcraft Logs access and where things stand.
 </p>{msg}<div class="set-cols"><div>
-<form method="post" action="/settings" class="card settings">{settings_form()}
+<form method="post" action="/settings" class="card settings"><div class="cta cta-top"><button class="btn go">Save
+</button></div>{settings_form()}
 <div class="cta"><button class="btn go">Save</button></div></form></div><div>
 {account}<h2>Warcraft Logs key</h2><div class="card"><p class="small measure">{current} To use another one (a new
 client, or a regenerated secret): create or open it on <a href="https://www.warcraftlogs.com/api/clients"

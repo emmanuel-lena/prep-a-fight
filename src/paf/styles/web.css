@@ -200,8 +200,8 @@ h2 .btn.copy{margin-left:8px;vertical-align:middle;text-transform:none;letter-sp
 .rq-list,.rq-when,.rq-when+p{max-width:72ch}
 .set-cols td{vertical-align:middle}
 .boss-guide>h2:first-child{margin-top:4px}
-@media (min-width:1000px){.boss-main{position:sticky;top:24px;align-self:start}}
-.settings .cta{position:sticky;bottom:0;background:var(--surface);padding:12px 0;border-top:1px solid var(--line)}
+
+.settings .cta-top{display:flex;justify-content:flex-end;margin:-6px 0 6px}
 
 .bcards{grid-template-columns:repeat(auto-fill,minmax(380px,1fr))}
 .ccard.on{border-color:var(--fg)} .ccard .cc-txt>b{font:600 18px var(--font-reading)} .ccard .cc-spec{font-weight:500}
@@ -209,3 +209,9 @@ h2 .btn.copy{margin-left:8px;vertical-align:middle;text-transform:none;letter-sp
 .set-cols td:first-child{width:150px}
 form.settings{padding-bottom:0}
 .ob-actions .btn.ghost{padding:11px 20px;font-size:17px;min-height:46px}
+/* the boss page: the journal under the form, its stages side by side on a wide window */
+.boss-journal{margin-top:34px}
+.boss-journal .stages{display:grid;gap:16px;align-items:start}
+@media (min-width:1300px){.boss-journal .stages{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.boss-journal .stage{margin:0}
+.boss-main{position:static}

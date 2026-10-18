@@ -751,7 +751,7 @@ def render(d: PrepData) -> str:
         tabs["boss"].append(defensives_html(d))
         tabs["boss"].append("<h2>Every ability, phase by phase</h2><p class='small muted'>From the in-game "
                             "Encounter Journal; timings and how many players are hit come from the ranked kills.</p>"
-                            + bossguide.modernize(d.guide_abilities))
+                            + f"<div class='stages'>{bossguide.modernize(d.guide_abilities)}</div>")
     else:
         tabs["boss"].append(defensives_html(d))
     if d.timeline_file:
@@ -802,7 +802,8 @@ def render(d: PrepData) -> str:
                   "night": "This boss in your raid's night"}
         for kind in ("comp", "wipe", "night"):
             if tools.get(kind):
-                tabs["raid"].append(f"<h2>{e(titles[kind])}</h2><div class='ws-answer'>"
+                head = "" if kind == "comp" else f"<h2>{e(titles[kind])}</h2>"  # comp's answer opens on its own title
+                tabs["raid"].append(f"{head}<div class='ws-answer'>"
                                     f"{workshop_views.render({'kind': kind, **tools[kind]})}</div>")
         tabs["raid"].append(workshop_views.CSS)
     if d.raid:

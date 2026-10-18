@@ -1141,7 +1141,7 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
     from paf.icons import icons_for
 
     sections = bossguide.load(enc.id, difficulty)
-    guide = ""
+    guide = journal = ""
     from paf import i18n
 
     if sections and i18n.language() != "en":  # the journal in the player's language, before the first prep too
@@ -1153,9 +1153,10 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
             pass
     if sections:
         gicons = icons_for(bossguide.spell_refs(sections))
-        guide = (f"<h2>The boss in 60 seconds</h2>{bossguide.summary_html(sections, 'damage')}"
-                 f"<details class='card' open><summary>Every ability, phase by phase (Encounter Journal)</summary>"
-                 f"{bossguide.abilities_html(sections, mechanics=mechs, icon_map=gicons)}</details>")
+        guide = f"<h2>The boss in 60 seconds</h2>{bossguide.summary_html(sections, 'damage')}"
+        journal = (f"<section class='boss-journal'><h2>Every ability, phase by phase</h2><p class='small muted'>From "
+                   f"the in-game Encounter Journal.</p><div class='stages'>"
+                   f"{bossguide.abilities_html(sections, mechanics=mechs, icon_map=gicons)}</div></section>")
     try:  # where the data will come from, and how long: from what will really happen (paf.estimate)
         from paf import estimate
 
@@ -1208,7 +1209,7 @@ placeholder="Link to one of your raid's logs: https://www.warcraftlogs.com/repor
 <div class="ob-actions">{back}<button class="btn go">Prepare this fight &rarr;</button></div>
 <p class="small muted">Runs on your computer; you can follow it live.</p></section>
 </form></div>
-{(f"<aside class='boss-guide'>{guide}</aside>") if guide else ""}</div>
+{(f"<aside class='boss-guide'>{guide}</aside>") if guide else ""}</div>{journal}
 {_story_css()}{STORY_JS}
 <h2>Advanced</h2>
 <details class="card" open><summary>Your fight plan: your own movements, Bloodlust, Power Infusion</summary>

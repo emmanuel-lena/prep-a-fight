@@ -29,7 +29,7 @@ class Tool:
     needs_prep: bool = True  # reads the data of a prep of this boss (its corpus)
 
 
-GROUPS = (("gear", "Your gear and talents"), ("cds", "Your cooldowns"), ("raid", "Your raid"), ("boss", "The boss"))
+GROUPS = (("gear", "Your gear and talents"), ("cds", "Your cooldowns and rotation"), ("raid", "Your raid"), ("boss", "The boss"))
 
 TOOLS: tuple[Tool, ...] = (
     Tool("topgear", "Best gear from your bags", "Which combination of your items does the most damage on this boss?",
@@ -76,7 +76,7 @@ TOOLS: tuple[Tool, ...] = (
          "Both pulls' boss health, deaths, damage per target, and your damage, casts and buffs in each.",
          needs_prep=False),
     Tool("rotation", "Your rotation, spell by spell", "In single target, cleave and AoE: do you cast what the best "
-         "rotation casts, with your gear and talents?", "ability_rogue_rollthebones", "raid", "1-2",
+         "rotation casts, with your gear and talents?", "ability_rogue_rollthebones", "cds", "1-2",
          ("boss", "difficulty", "raid"), "The points to work on, your share of each spell next to the rotation's, "
          "your DoTs and your cooldowns.", needs_prep=False),
     Tool("mechanics", "The boss's mechanics", "Every ability from the Encounter Journal, by role: what concerns you?",
