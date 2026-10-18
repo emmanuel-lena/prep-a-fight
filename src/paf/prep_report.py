@@ -115,8 +115,17 @@ def _key(label: str) -> str:
     return "".join(ch if ch.isalnum() else "_" for ch in label.lower()).strip("_")
 
 
+def alive(fight, t: float, life: float) -> float:
+    """How long an add wave lives: its lifetime in the logs, cut at the end of an intermission it belongs to (several
+    successive adds of an intermission can merge into one long window in the corpus)."""
+    for w in (fight.invulnerable if fight is not None else []):
+        if w.start - 3 <= t <= w.start + w.duration:
+            return min(life, w.start + w.duration - t)
+    return life
+
+
 def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: int, px: float = 1.4,
-                      names: dict[str, str] | None = None) -> str:
+                      names: dict[str, str] | None = None, phases: list | None = None) -> str:
     """Lorrgs-like strip for a plan: the fight (phases, add waves, vulnerability windows, lust) then one row per
     cooldown with the plan's casts (dots) over the top players' casts of the same cooldown (bars)."""
     if fight is None or not plan.timeline:
@@ -139,8 +148,11 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
         f'<text x="{x(dur) - 2}" y="11" font-size="10" fill="var(--muted)" text-anchor="end">kill {_mmss(dur)}</text>')
     # fight strip
     fight_row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">Fight</text>']
+    for name, s in sorted(phases or [], key=lambda p: p[1])[1:]:  # the stages, where raiders think in them
+        axis += (f'<line x1="{x(s)}" y1="14" x2="{x(s)}" y2="100%" stroke="var(--fg)" stroke-opacity=".35" '
+                 f'stroke-dasharray="2 4"><title>{e(name)} {_mmss(s)}</title></line>')
     for w in fight.add_waves:
-        fight_row.append(f'<rect x="{x(w.time)}" y="{y}" width="{max(2, w.lifetime * px):.1f}" height="16" '
+        fight_row.append(f'<rect x="{x(w.time)}" y="{y}" width="{max(2, alive(fight, w.time, w.lifetime) * px):.1f}" height="16" '
                          f'fill="#6c9a5b" opacity="0.4"><title>{_mmss(w.time)} adds x{w.count}</title></rect>')
     for v in fight.vulnerable:
         fight_row.append(f'<rect x="{x(v.start)}" y="{y}" width="{max(2, v.duration * px):.1f}" height="16" '
@@ -532,9 +544,13 @@ def suggestions(d: PrepData) -> list[Suggestion]:
                               None, ic(held[0].ability)))
     order = {"info": 0}
     # your raid's verdict first, then the gains, biggest first, the situational ones last
-    return sorted(out, key=lambda s: (order.get(s.severity, 1) if s.title.startswith("With your raid") else
-                                      2 if s.severity == "info" and s.gain is not None else 1,
-                                      -(s.gain if s.gain is not None else -1)))
+    def rank(s: Suggestion) -> tuple:
+        if s.title.startswith("With your raid"):
+            return (order.get(s.severity, 1), 0)
+        mine = "recommended for your raid" in s.title or "your choice" in s.title  # the plan the sheet plays
+        return (2 if s.severity == "info" and s.gain is not None else 1, 0 if mine else 1,
+                -(s.gain if s.gain is not None else -1))
+    return sorted(out, key=rank)
 
 
 def checklist_html(d: PrepData) -> str:
@@ -809,8 +825,8 @@ def render(d: PrepData) -> str:
 
     # the fight
     rows = "".join(f"<tr><td>{_mmss(t)}</td><td>{e(n)}</td></tr>" for n, t in d.phases)
-    waves = "".join(f"<tr><td>{_mmss(t)}</td><td class='n'>{c or '-'}</td><td class='n'>{life:.0f}s</td>"
-                    f"<td>{e(names)}</td></tr>" for t, c, life, names in d.waves)
+    waves = "".join(f"<tr><td>{_mmss(t)}</td><td class='n'>{c or '-'}</td>"
+                    f"<td class='n'>{alive(d.fight, t, life):.0f}s</td><td>{e(names)}</td></tr>" for t, c, life, names in d.waves)
     extra = []
     if d.lust is not None:
         extra.append(f"Bloodlust at {_mmss(d.lust)}")
@@ -833,7 +849,9 @@ def render(d: PrepData) -> str:
     tabs["fight"].append(f"""<h2>The fight</h2><div class="card"><p>Typical duration {_mmss(d.duration)}; {"; ".join(extra)}.</p>
 <div class="scroll"><table class="fit">{rows}</table></div>
 <h3 class="small muted" style="margin-top:14px">Add waves (typical timeline across kills)</h3>
-<div class="scroll"><table class="fit"><tr><th>Time</th><th class="n">Adds</th><th class="n">Alive</th><th>Types</th></tr>{waves}</table></div>
+<p class="small muted">"Simmed": the adds of the wave in the sims, counted at {d.add_scale:g} of their real number so that
+the sims put as much on the boss as the top players do (SimC hits every add in range).</p>
+<div class="scroll"><table class="fit"><tr><th>Time</th><th class="n">Simmed</th><th class="n">Alive</th><th>Types</th></tr>{waves}</table></div>
 {focus}{f'<p><a href="{e(d.timeline_file)}">Cooldown timelines of the top players</a></p>' if d.timeline_file else ''}
 </div>""")
     if d.export:
@@ -949,7 +967,7 @@ for reference: a build can be worse there and much better on this fight. Error a
                 checks += "<ul class='small'>" + "".join(f"<li class='warn'>&#9888; {e(f)}</li>" for f in p.flags) + "</ul>"
             blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, err=1e9 if p.objective == "secondary" else 0.0)}
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span></h3>
-{checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names)}
+{checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases)}
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
 <div class="pp-grid"><div><h4>Play-by-play of one simulated pull</h4><div class="scroll pp"><table>
 <tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></div>
@@ -965,8 +983,12 @@ for reference: a build can be worse there and much better on this fight. Error a
             held = []
             if a.in_adds > a.adds_cover * 1.5 and a.in_adds - a.adds_cover > 0.1:
                 held.append("held for adds")
+            elif a.in_adds > a.adds_cover * 1.25 and a.in_adds - a.adds_cover > 0.1:
+                held.append("leans to the adds")
             if a.units_cover and a.in_units > a.units_cover * 1.5 and a.in_units - a.units_cover > 0.1:
                 held.append("held for burst targets")
+            elif a.units_cover and a.in_units > a.units_cover * 1.25 and a.in_units - a.units_cover > 0.1:
+                held.append("leans to burst targets")
             rows += (f"<tr><td>{icons.img(d.icons.get(a.ability, ''), 'small')} {lk(a.ability)}</td>"
                      f"<td class='n'>{a.in_adds:.0%}</td><td class='n'>{a.in_units:.0%}</td>"
                      f"<td>{e(' / '.join(held) or 'no clear hold')}</td></tr>")
