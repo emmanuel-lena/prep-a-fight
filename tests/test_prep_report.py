@@ -95,3 +95,18 @@ def test_a_damage_taken_window_the_sims_leave_out_is_said():
                       "Corroding Venom increases the tank's damage taken."]  # a player's damage taken: not a window
     assert unsimmed_amps(d) == ["Dig In"]
     assert "Dig In is not in the sims" in render(d)
+
+
+def test_a_long_cooldown_off_the_top_players_moment_is_flagged():
+    from types import SimpleNamespace
+
+    from paf.prep_report import off_tops
+
+    d = PrepData("Nek'zali", "heroic", "Subtlety", "X", duration=240)
+    d.tops_players = 20
+    d.tops_casts = {"shadow_blades": [0.5] * 20 + [96 + i % 5 for i in range(15)] + [190] * 18,
+                    "symbols_of_death": [t + i for t in range(0, 240, 30) for i in range(20)]}
+    p = SimpleNamespace(timeline=[(0, "shadow blades"), (90, "shadow blades"), (180, "shadow blades"),
+                                  (2, "symbols of death"), (40, "symbols of death"), (70, "symbols of death")])
+    assert off_tops(d, p) == ["Shadow Blades: the plan presses it at 1:30, 75% of the top players at about 1:38.",
+                              "Shadow Blades: the plan presses it at 3:00, 90% of the top players at about 3:10."]

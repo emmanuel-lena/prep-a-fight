@@ -478,6 +478,31 @@ def simple_plan(d):
     return simple._plan(d)
 
 
+def off_tops(d, p) -> list[str]:
+    """The plan's cooldown casts that most top players make at another moment, close by: a sign the rebuilt fight
+    misses what they wait for (a unit that comes up earlier, an immunity...). Any spec, any boss."""
+    out, seen, by = [], {}, {}
+    for t, label in p.timeline:
+        by.setdefault(label, []).append(t)
+    short = {k for k, ts in by.items()  # a short cooldown drifts with the rotation: its moment says nothing
+             if len(ts) > 1 and sorted(b - a for a, b in zip(ts, ts[1:], strict=False))[(len(ts) - 1) // 2] < 60}
+    for t, label in p.timeline:
+        key = label.lower().replace(" ", "_")
+        ts, n = d.tops_casts.get(key), d.tops_players
+        if not ts or not n or t <= 5 or label in short or seen.get(key, 0) >= 2:
+            continue
+        if sum(abs(x - t) <= 4 for x in ts) / n >= 0.25:  # a fair share of them press it then too
+            continue
+        peak = max(((sum(abs(x - c) <= 4 for x in ts), c) for c in ts if 6 <= abs(c - t) <= 30), default=None)
+        if peak is None or peak[0] / n < 0.5:
+            continue
+        around = sorted(x for x in ts if abs(x - peak[1]) <= 4)
+        seen[key] = seen.get(key, 0) + 1
+        out.append(f"{cd_name(d, key)}: the plan presses it at {_mmss(t)}, {min(1, peak[0] / n):.0%} of the top "
+                   f"players at about {_mmss(around[len(around) // 2])}.")
+    return out
+
+
 def _stall(d, p) -> str:
     """A plan that holds a cooldown and loses far more boss damage than any cooldown is worth: SimC's default rotation
     ties other spells to that cooldown, so they stop while it is held (Subtlety: Shadow Dance waits on Shadow Blades)."""
@@ -1263,6 +1288,9 @@ for reference: a build can be worse there and much better on this fight. Each ru
                 checks += "<p class='small'>Not checked on pessimistic variants of the fight.</p>"
             if _stall(d, p):
                 checks += f"<p class='small warn'>&#9888; {e(_stall(d, p))}</p>"
+            if off := off_tops(d, p):
+                checks += ("<p class='small warn'>&#9888; Not when the top players press it: " + e(" ".join(off))
+                           + "</p>")
             if p.flags:
                 checks += "<ul class='small'>" + "".join(f"<li class='warn'>&#9888; {e(re.sub(r'[-+]0[.]0%', 'about 0%', f))}</li>"
                                                          for f in p.flags) + "</ul>"
