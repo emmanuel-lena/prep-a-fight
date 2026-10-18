@@ -91,6 +91,21 @@ def page_body() -> str:
     regions = "".join(f"<option>{r}</option>" for r in settings.SETTINGS["guild_region"].choices)
     key_done = has_credentials()
     skip = "<button type='button' class='btn ghost skip'>Skip</button>"
+    key_form = f"""{connect_block() + "<div class='ob-actions'>" + skip + "</div><details class='ob-own'><summary>Or use your own API key</summary>"
+ if wcllogin.available() else ""}
+<p>The app reads the top players' logs with <b>your own</b> free Warcraft Logs API key (each player has an hourly quota, so the key is not shared).</p>
+<ol class="small"><li>Log in on <a href="https://www.warcraftlogs.com/api/clients" target="_blank" rel="noopener">warcraftlogs.com/api/clients</a> and click <b>Create Client</b>.</li>
+<li>Name: anything (e.g. <code>prep-a-fight</code>). Redirect URL: <code>http://localhost</code>. Leave "Public Client" unticked.</li>
+<li>Copy the <b>Client ID</b> and the <b>Client Secret</b> here.</li></ol>
+<form class="ob-form" data-to="/onboard/key" method="post" action="/credentials">
+<input name="id" placeholder="Client ID" required autocomplete="off"><input name="secret" placeholder="Client Secret" required autocomplete="off">
+<p class="ob-err" role="alert"></p>
+<div class="ob-actions"><button class="btn go">Save and test</button>{skip}</div></form>
+{"</details>" if wcllogin.available() else ""}
+"""
+    via = "your Warcraft Logs account" if wcllogin.logged_in() else "your own API key"
+    done_html = (f"<p>Connected: the app reads the logs with {via}. Nothing to do here.</p>"  # no connect button then
+                 "<div class='ob-actions'><button type='button' class='btn go next'>Next &rarr;</button></div>")
     return f"""<div class="ob" data-key="{'1' if key_done else ''}">
 <p class="ob-brand">prep-a-<b>fight</b></p>
 <ol class="ob-dots" aria-hidden="true">{''.join('<li></li>' for _ in STEPS[1:])}</ol>
@@ -106,18 +121,7 @@ def page_body() -> str:
 
 <section class="ob-step" data-step="key">
 <h1>{'Connect to Warcraft Logs' if wcllogin.available() else 'Your Warcraft Logs key'}</h1>
-{connect_block() + "<div class='ob-actions'>" + skip + "</div><details class='ob-own'><summary>Or use your own API key</summary>"
- if wcllogin.available() else ""}
-<p>The app reads the top players' logs with <b>your own</b> free Warcraft Logs API key (each player has an hourly quota, so the key is not shared).</p>
-<ol class="small"><li>Log in on <a href="https://www.warcraftlogs.com/api/clients" target="_blank" rel="noopener">warcraftlogs.com/api/clients</a> and click <b>Create Client</b>.</li>
-<li>Name: anything (e.g. <code>prep-a-fight</code>). Redirect URL: <code>http://localhost</code>. Leave "Public Client" unticked.</li>
-<li>Copy the <b>Client ID</b> and the <b>Client Secret</b> here.</li></ol>
-<form class="ob-form" data-to="/onboard/key" method="post" action="/credentials">
-<input name="id" placeholder="Client ID" required autocomplete="off"><input name="secret" placeholder="Client Secret" required autocomplete="off">
-<p class="ob-err" role="alert"></p>
-<div class="ob-actions"><button class="btn go">Save and test</button>{skip}</div></form>
-{"</details>" if wcllogin.available() else ""}
-<p class="ob-ok-note muted small">{'Already connected: you can go on.' if key_done else ''}</p></section>
+{done_html if key_done else key_form}</section>
 
 <section class="ob-step" data-step="character">
 <h1>Your character</h1>

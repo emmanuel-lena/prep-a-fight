@@ -540,6 +540,8 @@ def boss_cards(items: list[dict], limit: int = 6) -> str:
 
 
 TABS = (("prep", "Prep sheet"), ("timeline", "Top players' timelines"))
+# a report shown in the app: its own brand bar goes (the sidebar carries the brand)
+NO_TOPBAR = "try{var b=this.contentDocument.querySelector('.topbar');if(b)b.remove()}catch(x){}"
 
 
 def view_page(key: str, tab: str) -> bytes:
@@ -561,7 +563,7 @@ def view_page(key: str, tab: str) -> bytes:
     others = "".join(
         f'<optgroup label="{e(g)}">' + "".join(
             f'<option value="/view/{e(x["key"])}"{" selected" if x["key"] == key else ""}>'
-            f'{e(x["name"])} · {e(x["difficulty"][:1].upper())}</option>' for x in xs) + "</optgroup>"
+            f'{e(x["name"])} · {e(x["difficulty"].capitalize())}</option>' for x in xs) + "</optgroup>"
         for g, xs in sorted(groups.items(), key=lambda kv: (kv[0] != spec_of(item), kv[0])))
     src = f'/report/{e(item["files"][tab])}'
     boss_link = _boss_link(item)
@@ -587,7 +589,7 @@ def view_page(key: str, tab: str) -> bytes:
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"<title>{e(item['name'])}</title>{theme.HEAD}<style>{CSS}{css}</style>{_class_style()}</head>"
             f"<body class='has-side'>{theme.sidebar(nav + '</div>', who=character_menu(), foot=lang_switch())}"
-            f'<iframe src="{src}" title="{e(item["name"])}"></iframe>{watch}</body></html>').encode()
+            f'<iframe src="{src}" title="{e(item["name"])}" onload="{NO_TOPBAR}"></iframe>{watch}</body></html>').encode()
 
 
 def _boss_link(item: dict) -> str:
@@ -1224,7 +1226,7 @@ placeholder="Link to one of your raid's logs: https://www.warcraftlogs.com/repor
 <fieldset class="what-sim"><legend>What to sim</legend>
 <label><input type="checkbox" name="gear" checked> Best gear from your bags, and what this boss drops for you</label>
 <label><input type="checkbox" name="optimize" checked> Ideal cooldown plan per objective
-<span class="muted small">(the slowest part: 20 to 40 min)</span></label></fieldset>
+<span class="muted small">(the slowest part; counted in the estimate above, measured on this computer)</span></label></fieldset>
 <div class="ob-actions">{back}<button class="btn go">Prepare this fight &rarr;</button></div>
 <p class="small muted ob-note">Runs on your computer; you can follow it live.</p></section>
 </form></div>
@@ -1282,8 +1284,12 @@ def prepared_link(enc, difficulty: str) -> str:
     from paf.corpus.template import report_key
 
     key = report_key(enc.name, difficulty)
-    return f' <a href="/view/{e(key)}">Open the last prep sheet &rarr;</a>' if any(
-        x["key"] == key and "prep" in x["files"] for x in prepared()) else ""  # a timeline alone is no sheet
+    item = next((x for x in prepared() if x["key"] == key), None)
+    if item is None:
+        return ""
+    if "prep" in item["files"]:
+        return f' <a href="/view/{e(key)}">Open the last prep sheet &rarr;</a>'
+    return f' <a href="/view/{e(key)}">Open the top players&#39; timelines &rarr;</a>'  # a timeline alone: said so
 
 
 def _plan_path(enc, difficulty: str) -> Path:

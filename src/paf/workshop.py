@@ -119,8 +119,8 @@ def index() -> str:
             f"</header>{groups}</div>{CSS}")
 
 
-def _prepared_ids(encounters: list) -> set:
-    """The bosses with a prep sheet of your spec at your difficulty (the data a tool reads)."""
+def _prepared_ids(encounters: list, diff: str | None = None) -> set:
+    """The bosses with a prep sheet of your spec at a difficulty (yours by default): the data a tool reads."""
     try:
         from paf import settings
         from paf.corpus.template import _slug
@@ -128,10 +128,19 @@ def _prepared_ids(encounters: list) -> set:
 
         mine = f"{settings.get('spec')}-{settings.get('class')}".lower().replace(" ", "-")
         keys = {x["key"] for x in prepared() if "prep" in x["files"]}
-        diff = settings.get("difficulty")
+        diff = diff or settings.get("difficulty")
         return {x.id for x in encounters if f"{_slug(x.name)}-{diff}-{mine}" in keys}
     except Exception:  # noqa: BLE001 - no data: no marks
         return set()
+
+
+# the "· prepared" marks follow the difficulty picked in the same form
+READY_JS = ("<script>(function(s){var f=s&&s.form;if(!f)return;function up(){var c=f.querySelector("
+            "'[name=difficulty]:checked')||f.querySelector('select[name=difficulty]');if(!c)return;"
+            "[].forEach.call(s.options,function(o){if(o.dataset.n==null)return;o.textContent=o.dataset.n+((' '+"
+            "o.dataset.r+' ').indexOf(' '+c.value+' ')>=0?' · prepared':'')})}f.addEventListener('change',"
+            "function(ev){if(ev.target.name==='difficulty')up()});up()})(document.currentScript.previousElementSibling"
+            ".querySelector('select'))</script>")
 
 
 def _boss_select(encounters: list, optional: str = "", last: bool = False) -> str:
@@ -140,10 +149,12 @@ def _boss_select(encounters: list, optional: str = "", last: bool = False) -> st
     extra = f"<option value=''>{e(optional)}</option>" if optional else ""
     ready = _prepared_ids(encounters)  # the bosses with a sheet: said, and the first of them picked
     first = next((x.id for x in encounters if x.id in ready), None) if not optional else None
-    opts = "".join(f"<option value='{x.id}'{' selected' if x.id == first else ''}>{e(x.name)}"
-                   f"{' · prepared' if x.id in ready else ''}</option>" for x in encounters)
+    by_diff = {d: _prepared_ids(encounters, d) for d in ("normal", "heroic", "mythic")}
+    opts = "".join(f"<option value='{x.id}' data-n='{e(x.name)}' data-r='{' '.join(d for d, s in by_diff.items() if x.id in s)}'"
+                   f"{' selected' if x.id == first else ''}>{e(x.name)}{' · prepared' if x.id in ready else ''}</option>"
+                   for x in encounters)
     body = opts + extra if last else extra + opts
-    return f"<label class='ws-f'><span>Boss</span><select name='boss' class='big'>{body}</select></label>"
+    return f"<label class='ws-f'><span>Boss</span><select name='boss' class='big'>{body}</select></label>{READY_JS}"
 
 
 def _segs(name: str, label: str, options: list[tuple[str, str, str]], checked: str) -> str:
