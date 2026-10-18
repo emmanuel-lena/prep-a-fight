@@ -1240,7 +1240,7 @@ placeholder="Link to one of your raid's logs: https://www.warcraftlogs.com/repor
 </ul>
 <fieldset class="what-sim"><legend>What to sim</legend>
 <label><input type="checkbox" name="gear" checked> Best gear from your bags, and what this boss drops for you</label>
-<label><input type="checkbox" name="optimize" checked> Ideal cooldown plan per objective
+<label><input type="checkbox" name="optimize" checked> Ideal cooldown plan{" for boss damage" if no_adds else " per objective"}
 <span class="muted small">(the slowest part: 20 to 40 min the first time; the estimate above comes from this computer's last preps, faster when their sims are reused)</span></label></fieldset>
 <div class="ob-actions">{back}<button class="btn go">Prepare this fight &rarr;</button></div>
 <p class="small muted ob-note">Runs on your computer; you can follow it live.</p></section>
@@ -1268,7 +1268,7 @@ var steps = [].slice.call(f.querySelectorAll('.ob-step')), dots = [].slice.call(
 var key = 'paf-goal:' + f.dataset.boss, at = 0;
 try { var g = localStorage.getItem(key); var r = g && f.querySelector('input[name=goal][value=' + g + ']'); if (r) r.checked = true; } catch (e) {}
 function recap(){
-  var goal = (f.querySelector('input[name=goal]:checked') || {}).value || 'auto';
+  var goal = (f.querySelector('input[name=goal]:checked') || f.querySelector('input[name=goal][type=hidden]') || {}).value || 'auto';
   var picked = [].slice.call(f.querySelectorAll('input[name=assign]:checked')).map(function(i){
     var t = i.parentNode.cloneNode(true); var m = t.querySelector('.meta'); if (m) m.remove(); return t.textContent.trim(); });
   var raid = (f.querySelector('input[name=raid]') || {}).value || '';

@@ -136,12 +136,31 @@ def _prepared_ids(encounters: list, diff: str | None = None) -> set:
 
 
 # the "· has a sheet" marks follow the difficulty picked in the same form
-READY_JS = ("<script>(function(s){var f=s&&s.form;if(!f)return;function up(){var c=f.querySelector("
+READY_JS = ("<script>(function(s){var f=s&&s.form;if(!f)return;function goal(){var na=(s.options[s.selectedIndex]"
+            "||{}).dataset;na=na&&na.na;f.querySelectorAll('[name=objective]').forEach(function(r){var l=r.closest('label')"
+            "||r;if(r.value==='total'||r.value==='all'){l.hidden=!!na;if(na&&r.checked){var b=f.querySelector("
+            "'[name=objective][value=boss]');if(b)b.checked=true}}})}s.addEventListener('change',goal);document.addEventListener('DOMContentLoaded',goal);goal();function up(){var c=f.querySelector("
             "'[name=difficulty]:checked')||f.querySelector('select[name=difficulty]');if(!c)return;"
             "[].forEach.call(s.options,function(o){if(o.dataset.n==null)return;o.textContent=o.dataset.n+((' '+"
             "o.dataset.r+' ').indexOf(' '+c.value+' ')>=0?' · has a sheet':'')})}f.addEventListener('change',"
             "function(ev){if(ev.target.name==='difficulty')up()});up()})(document.currentScript.previousElementSibling"
             ".querySelector('select'))</script>")
+
+
+def _no_adds(encounters: list) -> set:
+    """The bosses whose prep pack has no add wave."""
+    try:
+        from paf import pack, settings
+
+        diff = settings.DIFFICULTIES.get(settings.get("difficulty"), 4)
+        out = set()
+        for x in encounters:
+            pk = pack.load(x.id, diff, settings.get("class"), settings.get("spec"))
+            if pk is not None and not pk.fight.add_waves:
+                out.add(x.id)
+        return out
+    except Exception:  # noqa: BLE001 - no packs: every choice stays
+        return set()
 
 
 def _boss_select(encounters: list, optional: str = "", last: bool = False) -> str:
@@ -151,7 +170,9 @@ def _boss_select(encounters: list, optional: str = "", last: bool = False) -> st
     ready = _prepared_ids(encounters)  # the bosses with a sheet: said, and the first of them picked
     first = next((x.id for x in encounters if x.id in ready), None) if not optional else None
     by_diff = {d: _prepared_ids(encounters, d) for d in ("normal", "heroic", "mythic")}
-    opts = "".join(f"<option value='{x.id}' data-n='{e(x.name)}' data-r='{' '.join(d for d, s in by_diff.items() if x.id in s)}'"
+    flat = _no_adds(encounters)  # nothing to pad on these: the goal choice leaves only boss damage
+    opts = "".join(f"<option value='{x.id}' data-n='{e(x.name)}'{' data-na=1' if x.id in flat else ''} "
+                   f"data-r='{' '.join(d for d, s in by_diff.items() if x.id in s)}'"
                    f"{' selected' if x.id == first else ''}>{e(x.name)}{' · has a sheet' if x.id in ready else ''}</option>"
                    for x in encounters)
     body = opts + extra if last else extra + opts
