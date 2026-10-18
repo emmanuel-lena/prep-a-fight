@@ -990,7 +990,7 @@ for reference: a build can be worse there and much better on this fight. Error a
         note = d.mrt.get(p.objective, "")
         tabs["cooldowns"].append(
             "<h2>Ideal cooldown play-by-play</h2><div class='card'><p><b>The default priority list is already right "
-            "on this fight:</b> press your cooldowns as soon as they are ready. No other plan beats it for boss, total "
+            "on this fight:</b> play it as it is. No other plan beats it for boss, total "
             f"or burst damage (all within the noise, ±{max(p.error, 0.01):.2f}%).</p>"
             f"{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases)}"
             + (f"<h4>MRT note {copy_button(note, 'Copy the MRT note')}</h4><pre class='small note-pre'>{e(note)}</pre>"
@@ -1036,7 +1036,8 @@ for reference: a build can be worse there and much better on this fight. Error a
 <tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></div>
 {(f'<div><h4>MRT note {copy_button(note, "Copy the MRT note")}</h4><pre class="small note-pre">{e(note)}</pre>'
   + nsrt_block(d.nsrt.get(p.objective, "")) + "</div>") if changed else
- "<div><p class='small muted'>The default priority list as it is: no note to paste, press your cooldowns as soon as they are ready.</p></div>"}</div>
+ "<div><p class='small muted'>The default priority list as it is: no note to paste. The fight tab's note has its "
+ "presses and your defensives.</p></div>"}</div>
 </div>""")
         tabs["cooldowns"].append("<h2>Ideal cooldown play-by-play, per objective</h2>" + "".join(blocks))
 

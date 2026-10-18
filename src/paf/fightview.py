@@ -133,7 +133,7 @@ def _defensives(d) -> list[tuple[float, str, str]]:
         hits = [c for c in casts.get(m.boss_ability, []) if t - 3 <= c <= t + DEF_SNAP] if m.boss_ability else []
         if hits:
             t = max(0.0, min(hits, key=lambda c: abs(c - t)) - 1)
-        why = m.boss_ability if hits or any(abs(c - t) <= 15 for c in casts.get(m.boss_ability, [])) else ""
+        why = m.boss_ability  # the logs tie it to that ability (a hit that can come long after its cast)
         out.append((t, m.spells[0][0], why))
     return out
 
@@ -291,12 +291,16 @@ def job_html(d) -> str:
     if defs:
         s, why = defs[0][1], defs[0][2]
         rows.append((s, f"<b>{e(s)}</b>{' for ' + e(why) if why else ''}, the top players' defensive."))
-    names, order, _held = simple._pressed(d)
+    names, _order, _held = simple._pressed(d)
+    order: dict[str, list[float]] = {}  # the times the fight view calls (a burst moved onto its adds included)
+    for t, it in items(d):
+        if it.side == "you" and it.kind in ("cd", "pot") and it.name in names:
+            order.setdefault(it.name, []).append(0.0 if t < 0 else t)
     plan = simple._plan(d)
     rules = {d.cd_names.get(k, k): r.name for k, r in (plan.choice.items() if plan else []) if r.name != "default"}
     if d.lust is not None and d.lust < 5 and names:
         rows.append(("Bloodlust", "<b>Bloodlust at the pull</b>: your opener goes inside it."))
-    for n in sorted(names, key=lambda n: min(order[n])):  # in the order you first press them
+    for n in sorted((n for n in names if n in order), key=lambda n: min(order[n])):  # in the order you first press them
         pre = [t for t in order[n] if t < 0.5 and (n in d.precast or "potion" in n.lower())]
         rest = [_mmss(t) for t in order[n] if t not in pre]
         when = ", ".join(rest[:5]) + ("…" if len(rest) > 5 else "")
@@ -362,12 +366,25 @@ def data(d, ms: list[Moment], dur: float) -> dict:
 
 
 def mrt(d) -> str:
+    """The MRT note of what the fight view calls: the same presses at the same times, from the same source."""
     plan = simple._plan(d)
     want = plan.objective if plan is not None else "boss"
     note = d.mrt.get(want) or next(iter(d.mrt.values()), "")
+    if not note:
+        return ""
+    head = note.splitlines()[0]
     if plan is not None and not any(r.name != "default" for r in plan.choice.values()):  # the default list's timings
-        note = re.sub(r"cooldowns for [^\n]*\(\+?-?0\.0%\)", "cooldowns: SimC's default priority list", note, count=1)
-    return note
+        head = re.sub(r"cooldowns for .*\(\+?-?0\.0%\)", "cooldowns: SimC's default priority list", head)
+    its = items(d)
+    lines = []
+    for t, it in its:
+        if it.side != "you" or it.kind not in ("cd", "pot", "def"):
+            continue
+        c = _ctx(t, its)
+        said = c.replace("on the ", "").replace("on ", "") if c else ""
+        why = " - " + c if c and c not in ("on the pull", "just after the pull") and said not in it.text else ""
+        lines.append(f"{{time:{_mmss(max(0.0, t))}}} {it.text}{why}")
+    return "\n".join([head, *lines])
 
 
 def _btn(id_: str, label: str, keys: str = "", cls: str = "btn", hidden: bool = False, more: str = "") -> str:
