@@ -1257,10 +1257,10 @@ def cmd_prep(args: argparse.Namespace) -> int:
         spell_ids = {n.lower(): int(r.split("=", 1)[1]) for n, r in d.links.items()
                      if r.startswith("spell=") and r.split("=", 1)[1].isdigit()}
         player = profile.name or "everyone"
-        d.nsrt = {p.objective: nsrt_note(enc.id, p, fight, d.phases, player, spell_ids, d.cd_names)
+        d.nsrt = {p.objective: nsrt_note(enc.id, p, fight, d.game_phases or d.phases, player, spell_ids, d.cd_names)
                   for p in d.optimized}
         if d.defensives and d.defensives.moments:
-            extra = defensives.nsrt_lines(d.defensives, enc.id, d.phases, player)
+            extra = defensives.nsrt_lines(d.defensives, enc.id, d.game_phases or d.phases, player)
             d.nsrt = {o: n + ("\n" + "\n".join(extra) if extra else "") for o, n in d.nsrt.items()}
         raid_notes = [n for o, n in d.mrt.items() if o != "adds"]  # "damage to adds" is not a raid plan
         (reports / f"mrt-{report_key(enc.name, diff_name)}.txt").write_text("\n\n".join(raid_notes) + "\n",
@@ -1793,6 +1793,10 @@ def _boss_guide(d, con, enc, diff: int, diff_name: str, spec: str, tl, fight, pk
     journal = set(bossguide.spell_refs(sections)) if sections else set()
     d.boss_casts = [(n, ts) for n, ts in (tl.boss_casts if tl is not None else [])
                     if (n in journal if journal else len(ts) <= 12)]
+    from paf.corpus.timeline import looped_phases
+
+    if tl is not None:  # a stage that loops back is shown as windows; NSRT counts the game's own stages
+        d.game_phases, d.phases = d.phases, looped_phases(d.phases, tl.boss_casts, d.duration)
     if not sections:
         return mechs
     burst = {v.name.split(" (")[0]: v.multiplier for v in fight.vulnerable}

@@ -143,3 +143,14 @@ def test_a_held_cooldown_reads_as_on_cooldown_for_the_other_lines():
     assert any(want in x for x in held)
     plain = apply_rules(apl, {"shadow_blades": Rule("default", "", None)})
     assert any("shadow_dance,if=cooldown.shadow_blades.remains>=35" in x for x in plain)  # no hold: untouched
+
+
+def test_discovery_leaves_on_use_items_to_their_slot(monkeypatch, tmp_path):
+    """The log names an on-use trinket use_item_<item>: taken for a spec cooldown, it hid that an item was used,
+    so no trinket was ever tuned (Vile Vial at 2:00 while the top players press it at the pull)."""
+    from paf import optimize
+
+    events = [(t, "ascendance") for t in (5, 185)] + [(t, "vile vial of volatile venom") for t in (122, 242)]
+    monkeypatch.setattr(optimize, "play_by_play", lambda *a, **k: events)
+    apl = OrderedDict([("", ["ascendance", "use_item,slot=trinket1", "lightning_bolt"])])
+    assert optimize.discover_cooldowns("", apl, tmp_path) == {"ascendance"}

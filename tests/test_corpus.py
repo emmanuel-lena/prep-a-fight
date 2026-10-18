@@ -85,3 +85,30 @@ def test_a_phase_that_comes_back_is_stored_once(tmp_path):
     con.execute("INSERT INTO fight(report, fight_id, encounter_id, difficulty) VALUES('R', 7, 99, 4)")
     write_kill(con, "R", 7, p, [], [])
     assert con.execute("SELECT COUNT(*) FROM phase").fetchone()[0] == 2
+
+
+def test_a_boss_unit_is_up_from_the_ranked_players_first_hit():
+    """Nek'zali's Echo of Jawae: the top players hit it from 1:32 while the cast that spawns it ends at 1:42."""
+    import sqlite3
+
+    from paf.corpus.analyze import kills_filter
+    from paf.corpus.template import first_hit
+
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(
+        "CREATE TABLE fight(report, fight_id, encounter_id, difficulty, status, cohort);"
+        "CREATE TABLE ranked(report, fight_id, actor_id, spec);"
+        "CREATE TABLE player_cast(report, fight_id, actor_id, ability_id, type, t, target_id);"
+        "CREATE TABLE add_instance(report, fight_id, actor_id, game_id);"
+        "CREATE TABLE npc(game_id, name, is_boss);"
+        "INSERT INTO npc VALUES (7, 'Echo', 1);")
+    for k, t in enumerate([90, 91, 92, 93, 95]):
+        con.execute("INSERT INTO fight VALUES (?, 1, 3470, 4, 'done', NULL)", (f"r{k}",))
+        con.execute("INSERT INTO ranked VALUES (?, 1, 5, 'Subtlety')", (f"r{k}",))
+        con.execute("INSERT INTO add_instance VALUES (?, 1, 40, 7)", (f"r{k}",))
+        for x in (t, t + 3):
+            con.execute("INSERT INTO player_cast VALUES (?, 1, 5, 1, 'cast', ?, 40)", (f"r{k}", x))
+    where, params = kills_filter(3470, 4)
+    assert first_hit(con, where, params, "Subtlety", "Echo") == 92
+    assert first_hit(con, where, params, "Subtlety", "Nobody") is None

@@ -122,6 +122,18 @@ def attack_windows(con: sqlite3.Connection, where: str, params: tuple, spec: str
     return [AddWave(w.t, 1, w.lifetime, ", ".join(w.types), scalable=False) for w in waves if w.lifetime >= 5]
 
 
+def first_hit(con: sqlite3.Connection, where: str, params: tuple, spec: str, unit: str) -> float | None:
+    """Median time of the ranked players' first cast at a unit, per kill: when it is really up and attackable."""
+    rows = con.execute(
+        f"SELECT c.report, c.fight_id, MIN(c.t) AS t FROM player_cast c JOIN fight f USING(report, fight_id) "
+        f"JOIN ranked r USING(report, fight_id) "
+        f"JOIN add_instance a ON a.report=c.report AND a.fight_id=c.fight_id AND a.actor_id=c.target_id "
+        f"JOIN npc n ON n.game_id=a.game_id "
+        f"WHERE {where} AND c.actor_id=r.actor_id AND r.spec=? AND c.type='cast' AND n.name=? "
+        f"GROUP BY c.report, c.fight_id", (*params, spec, unit)).fetchall()
+    return round(st.median(r["t"] for r in rows), 1) if len(rows) >= 5 else None
+
+
 def council_focus(con: sqlite3.Connection, where: str, params: tuple, spec: str, members: list[str],
                   duration: float) -> list[Focus]:
     """Which council member the ranked players hit along the fight: per slice of FOCUS_STEP s, the member most
@@ -334,6 +346,9 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
             if trig:  # the window opens when the boss's cast ends (more precise than the damage graph)
                 start = trig[1]
                 label += f" (after {trig[0]})"
+            hit = first_hit(con, where, params, spec, w.types[0])
+            if hit is not None and hit < start - 2:  # the ranked players hit it earlier: it is up from then
+                end, start = max(end, hit + 1), hit  # (Nek'zali's Echo: hit from 1:32, the cast ends at 1:42)
             amp, source = game_amp(encounter_id, w.types[0], diff_name or "heroic")
             if amp is None:
                 # no damage amp in the game data: a second boss with its own health (e.g. a council member),

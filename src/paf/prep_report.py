@@ -54,6 +54,7 @@ class PrepData:
     kills: int = 0
     duration: float = 0.0
     phases: list[tuple[str, float]] = field(default_factory=list)
+    game_phases: list[tuple[str, float]] = field(default_factory=list)  # Warcraft Logs' own, for NSRT's counter
     waves: list[tuple[float, int, float, str]] = field(default_factory=list)
     lust: float | None = None
     pi: list[float] = field(default_factory=list)
@@ -948,7 +949,7 @@ def onto_adds(d: PrepData) -> None:
         enc = re.match(r"EncounterID:(\d+)", old)
         tag = re.search(r";tag:([^;]+);", old)
         if enc and tag:
-            d.nsrt[p.objective] = nsrt_note(int(enc[1]), p, d.fight, d.phases, tag[1], spell_ids, d.cd_names)
+            d.nsrt[p.objective] = nsrt_note(int(enc[1]), p, d.fight, getattr(d, "game_phases", None) or d.phases, tag[1], spell_ids, d.cd_names)
 
 
 def render(d: PrepData) -> str:
@@ -999,7 +1000,7 @@ def render(d: PrepData) -> str:
                 return v
             lines = [x for x in lines if not re.search(rf";spellid:({'|'.join(ids)});", x)
                      and not x.startswith("-- prep-a-fight: defensives not placed")]
-            return in_time_order("\n".join(lines + nsrt_lines(kept, int(enc[1]), d.phases, tag)
+            return in_time_order("\n".join(lines + nsrt_lines(kept, int(enc[1]), getattr(d, "game_phases", None) or d.phases, tag)
                                             + move_lines(int(enc[1]), tag)))
         from paf.optimize import NSRT_UNSURE_AFTER, nsrt_phase
 
@@ -1010,7 +1011,7 @@ def render(d: PrepData) -> str:
                     continue
                 ref = d.links.get(it.name, "")
                 sid = ref[6:].split("&")[0] if ref.startswith("spell=") else ""
-                ph, since = nsrt_phase(enc, d.phases, t)
+                ph, since = nsrt_phase(enc, getattr(d, "game_phases", None) or d.phases, t)
                 limit = NSRT_UNSURE_AFTER.get((enc, ph))
                 if ph == 0 or (limit is not None and since > limit):
                     dropped.append(f"{it.name} {_mmss(t)}")

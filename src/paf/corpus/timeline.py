@@ -5,7 +5,7 @@ from __future__ import annotations
 import html
 import sqlite3
 import statistics as st
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
 from paf import theme
@@ -150,10 +150,11 @@ def build_timeline(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
     waves = [(w.t, w.count, w.lifetime, ", ".join(w.types))
              for w in canonical_waves([fight_waves(spawns.get(k, [])) for k in keys])]
 
-    # main boss abilities: enemy casts from units that are not tracked as adds
+    # main boss abilities: enemy casts from units that are not tracked as adds (a boss unit that comes and goes,
+    # like Nek'zali's Echo of Jawae, is tracked too but its casts are the boss's: two of the three Soul Transfers)
     add_actors = {(r[0], r[1], r[2]) for r in con.execute(
-        f"SELECT a.report, a.fight_id, a.actor_id FROM add_instance a JOIN fight f USING(report, fight_id) "
-        f"WHERE {where}", params)}
+        f"SELECT a.report, a.fight_id, a.actor_id FROM add_instance a JOIN npc n USING(game_id) "
+        f"JOIN fight f USING(report, fight_id) WHERE {where} AND NOT n.is_boss", params)}
     per_ab: dict[str, dict[tuple[str, int], list[float]]] = defaultdict(lambda: defaultdict(list))
     spell_ids: dict[str, int] = {}
     for c in con.execute(
@@ -167,14 +168,62 @@ def build_timeline(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
     for a, per_kill in per_ab.items():
         if len(per_kill) / max(1, len(keys)) < 0.8:
             continue
-        cw = canonical_waves([[(t, 1, 0.0, [""]) for t in ts] for ts in per_kill.values()])
-        times = [w.t for w in cw]
+        times = ordinal_times(list(per_kill.values()))
+        if times is None:
+            cw = canonical_waves([[(t, 1, 0.0, [""]) for t in ts] for ts in per_kill.values()])
+            times = [w.t for w in cw]
         if 1 <= len(times) <= 40:
             boss_casts.append((a, times))
     boss_casts.sort(key=lambda x: x[1][0])
 
     return Timeline(boss_name, diff_name, spec, len(keys), duration, phase_rows, waves, abilities, players,
                     boss_casts, main, spell_ids)
+
+
+def ordinal_times(per_kill: list[list[float]]) -> list[float] | None:
+    """Typical times of a cast that comes the same number of times in most kills: median of the 1st, the 2nd...
+    Clustering the raw times fails when the kills drift apart (Soul Transfer at 1:28 to 2:04, then 8 s and 40 s
+    later: one cluster); None when the count varies."""
+    if not per_kill:
+        return None
+    per_kill = [[t for i, t in enumerate(sorted(ts)) if i == 0 or t - sorted(ts)[i - 1] > 3.0] for ts in per_kill]
+    counts = Counter(len(ts) for ts in per_kill)
+    m, n = counts.most_common(1)[0]
+    if n / len(per_kill) < 0.8:
+        return None
+    same = [sorted(ts) for ts in per_kill if len(ts) == m]
+    return [round(st.median(ts[i] for ts in same), 1) for i in range(m)]
+
+
+def looped_phases(phases: list[tuple[str, float]], boss_casts: list[tuple[str, list[float]]],
+                  duration: float) -> list[tuple[str, float]]:
+    """Stages as raiders live them. Warcraft Logs opens a last stage on a boss cast and never closes it; when that
+    cast comes back later and the boss restarts its cycle in between, the stage is a window that loops (Sszorak's
+    Howling Maelstrom: Dig In at 1:51, quiet for 27 s, the cycle again from its start, Dig In again at 4:09)."""
+    ph = sorted(phases, key=lambda p: p[1])
+    if len(ph) < 2:
+        return ph
+    (before, s0), (name, s) = ph[-2], ph[-1]
+    trigger = min(((min(abs(t - s) for t in ts), n, ts) for n, ts in boss_casts), default=None)
+    if trigger is None or trigger[0] > 3:
+        return ph
+    again = [t for t in trigger[2] if t > s + 30]
+    shifts = []  # each other spell: its first cast after the window against its first cast in the stage before
+    for n, ts in boss_casts:
+        first, after = [t for t in ts if s0 <= t < s], [t for t in ts if t > s]
+        if n != trigger[1] and first and after:
+            shifts.append(after[0] - (first[0] - s0))
+    if not again or len(shifts) < 2:
+        return ph
+    back = st.median(shifts)
+    if not s + 5 <= back <= again[0] - 5 or abs(again[0] - (back + s - s0)) > 10:  # not the same cycle again
+        return ph
+    out = [*ph[:-1], (name, s), (before, round(back, 1))]
+    for t in again:
+        out.append((name, t))
+        if t + back - s < duration:
+            out.append((before, round(t + back - s, 1)))
+    return out
 
 
 def _mmss(s: float) -> str:

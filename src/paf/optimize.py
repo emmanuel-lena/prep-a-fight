@@ -74,6 +74,8 @@ def discover_cooldowns(profile_text: str, apl: OrderedDict[str, list[str]], run_
     precombat = {action_name(a) for a in apl.get("precombat", [])}
     found = set()
     for n, ts in by.items():
+        if n not in names:  # an on-use item (the log names it use_item_<item>): tuned per slot, not here
+            continue
         if n in precombat and len(ts) <= 1:  # a buff applied before the pull (weapon imbue, shield...)
             continue
         gaps = [b - a for a, b in zip(ts, ts[1:], strict=False)]
