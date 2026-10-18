@@ -283,7 +283,8 @@ def headline(d: PrepData) -> list[str]:
             if r.name != "default":
                 by_rule.setdefault(rule_phrase(d, r.name), []).append(cd_name(d, k))
         others = ", ".join(f"{short.get(o, o)} {v:+.1f}%" for o, v in p.totals.items() if o not in (p.objective, "adds"))
-        trust = ("holds up on pessimistic variants of the fight" if p.robust and not p.flags
+        trust = ("not checked on harder variants of the fight" if not p.sensitivity else
+                 "holds up on pessimistic variants of the fight" if p.robust and not p.flags
                  else "check the warnings in its plan below")
         lines = [f"{objective_name(d, p.objective)}: {p.gain:+.1f}% vs SimC's default priority list"
                  + (f" ({others})" if others else "") + f"; {trust}."]
@@ -720,7 +721,7 @@ def defensives_html(d: PrepData) -> str:
     casts = dict(d.boss_casts)
 
     def cast_note(m) -> str:  # the ability's cast long before the defensive: a hit that lands later, said with its cast
-        near = [c for c in casts.get(m.boss_ability, []) if abs(c - m.time) <= 8]
+        near = [c for c in casts.get(m.boss_ability, []) if m.time - 8 <= c <= m.time + 12]  # its hit, around
         before = [c for c in casts.get(m.boss_ability, []) if c < m.time]
         return "" if near or not before else f" <span class='muted small'>(its damage; cast at {_mmss(max(before))})</span>"
     rows = "".join(
@@ -1117,7 +1118,7 @@ and the gear for that.</p></div>""")
     # talents
     if d.talents:
         tc = d.talents
-        names = {"boss fight": "This fight", "patchwerk": "Single target (reference)"}
+        names = {"boss fight": "This fight (total damage)", "patchwerk": "Single target (reference)"}
         head = "".join(f"<th class='n'>{e(names.get(f, f))}</th>" for f in tc.fights)
         body = f"<tr><td>your talents</td>{''.join('<td class=n>ref</td>' for _ in tc.fights)}<td></td></tr>"
         first = tc.fights[0]
@@ -1143,7 +1144,8 @@ and the gear for that.</p></div>""")
                    f"<p><b>{e(best_g[1])} beats yours by {best_g[0]:+.1f}%</b> on this fight.</p>")
         tabs["gear"].append(f"""<h2>Talents of the top players, on your character</h2><div class="card scroll">
 {verdict}<p class="small muted">Each build of the top players simmed on your character. "Single target" is a plain dummy fight,
-for reference: a build can be worse there and much better on this fight. Error about &plusmn;{tc.error:.2f}%.</p>
+for reference: a build can be worse there and much better on this fight. Each run's statistical error is about
+&plusmn;{tc.error:.2f}%: a gap under {2 * tc.error:.1f}% between two builds is noise.</p>
 <table><tr><th>Build</th>{head}<th>Changes vs your talents</th></tr>{body}</table></div>""")
 
     # cooldown plans
@@ -1202,6 +1204,8 @@ for reference: a build can be worse there and much better on this fight. Error a
                 checks += ("<p class='small'>Sensitivity (pessimistic variants of the fight): "
                            + ", ".join(f"{e(v)} {_pct(g, 1)}" for v, g in p.sensitivity.items())
                            + (" &rarr; <b>robust</b>" if p.robust else " &rarr; <b>not robust</b>") + "</p>")
+            elif p.gain > 2 * p.error:  # said, never left out in silence
+                checks += "<p class='small'>Not checked on pessimistic variants of the fight.</p>"
             if _stall(d, p):
                 checks += f"<p class='small warn'>&#9888; {e(_stall(d, p))}</p>"
             if p.flags:
@@ -1243,7 +1247,7 @@ for reference: a build can be worse there and much better on this fight. Error a
                      f"<td class='n'>{a.in_adds:.0%}</td><td class='n'>{a.in_units:.0%}</td>"
                      f"<td>{e(' / '.join(held) or 'no clear hold')}</td></tr>")
         tabs["cooldowns"].append(f"""<h2>What the top players do with their cooldowns</h2><div class="card scroll">
-<p class="small">Share of their casts (after the opener) during add waves, which cover {a0.adds_cover:.0%} of the fight,
+<p class="small">Share of their casts (after the opener) during add waves, which cover {a0.adds_cover:.0%} of the fight in the top kills,
 and on the burst targets{f" ({e(burst_names(d)[1])})" if burst_names(d)[1] else ""}, which cover {a0.units_cover:.0%}. Much more
 than the coverage means they hold the cooldown. SimC does not know that a burst target must die fast, so compare with
 the simulated plans above.</p>

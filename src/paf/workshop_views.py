@@ -320,8 +320,9 @@ def comp(d: dict) -> str:
                    "</p>")
         elif t["players"]:
             kind = "Whole raid" if t["whole_raid"] else "Assigned"
-            say = (f"<p><span>{'The whole raid hits it, and in the top raids' if t['whole_raid'] else 'In the top raids,'}"
-                   f"</span> <b class='num'>{t['players']}</b> <span>players stay on it</span></p>"
+            say = (f"<p><span>{'Everyone hits it while it is up; in the top raids,' if t['whole_raid'] else 'In the top raids,'}"
+                   f"</span> <b class='num'>{t['players']}</b> <span>players {'also ' if t['whole_raid'] else ''}"
+                   "stay on it the whole time</span></p>"
                    "<p class='lab'>The specs of your raid that do the most damage on it</p>")
         else:
             kind = "Whole raid"
@@ -334,7 +335,9 @@ def comp(d: dict) -> str:
             block += (f"<details class='more' open><summary>On it in your pull ({len(t['pulled'])})</summary>"
                       f"<div class='whos'>{names(t['pulled'])}</div></details>")
         if t["missed"]:
-            block += (f"<p class='lab warn'>Hardly hit it in your pull</p><div class='whos'>{names(t['missed'])}</div>")
+            both = {p["name"] for p in t["missed"]} & {p["name"] for p in t["proposed"] or []}
+            block += (f"<p class='lab warn'>Hardly hit it in your pull{' (some of those put on it above)' if both else ''}"
+                      f"</p><div class='whos'>{names(t['missed'])}</div>")
         cards += (f"<div class='job'><div class='j-head'><b>{e(t['name'])}</b><small>{kind}</small></div>{say}{block}"
                   "</div>")
     both = (" (those assigned to it for an assigned target" if any(t["players"] and not t["whole_raid"] for t in targets)
