@@ -1226,9 +1226,9 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
 <p class="small muted ob-note">Each assignment is simulated: its moves and its downtime change your cooldown plan and your gear.</p>
 <div class="ob-actions">{back}{nxt}</div></section>
 <section class="ob-step" data-step="raid"><h2><span class="vh">Step 3 of 4: </span>Your raid</h2>
-<label class="ob-field">Your raid's log<input name="raid" style="width:100%" value="{e(raid_now)}"
+<label class="ob-field">Your raid's log<input name="raid" type="url" value="{e(raid_now)}" aria-describedby="raid-help"
 placeholder="https://www.warcraftlogs.com/reports/..."></label>
-<p class="small muted" style="margin-top:6px">{e(raid_hint(no_adds))}</p>
+<p class="small muted raid-help" id="raid-help" aria-live="polite">{e(raid_hint(no_adds))}</p>
 <div class="ob-actions">{back}{nxt}</div></section>
 <section class="ob-step" data-step="go"><h2><span class="vh">Step 4 of 4: </span>Ready to prepare</h2>
 <ul class="recap">
@@ -1273,7 +1273,7 @@ function recap(){
   var picked = [].slice.call(f.querySelectorAll('input[name=assign]:checked')).map(function(i){
     var t = i.parentNode.cloneNode(true); var m = t.querySelector('.meta'); if (m) m.remove(); return t.textContent.trim(); });
   var raid = (f.querySelector('input[name=raid]') || {}).value || '';
-  if (raid && raid.indexOf('warcraftlogs.com/reports/') < 0) raid += ' (not a Warcraft Logs report link: fix it or leave it empty)';
+  if (raid && !/warcraftlogs[.]com[/]reports[/][A-Za-z0-9]{16}/.test(raid)) raid += ' (not a Warcraft Logs report link: fix it or leave it empty)';
   f.querySelector('.recap-assigns').textContent = picked.join(', ');
   f.querySelector('.recap-raid').textContent = raid;
   f.querySelectorAll('.recap [data-if]').forEach(function(li){
@@ -1287,15 +1287,17 @@ function show(i, back){
   dots.forEach(function(d, j){ d.classList.toggle('on', j <= at); });
   if (steps[at].dataset.step === 'go') recap();
   var h2 = steps[at].querySelector('h2'); if (h2) { h2.tabIndex = -1; h2.focus({preventScroll: true}); }  // keep the place
+  var cur = steps[at]; cur.classList.add('arriving');  // a double click on Next must not tick what lands under it
+  setTimeout(function(){ cur.classList.remove('arriving'); }, 450);
 }
 f.querySelectorAll('.next').forEach(function(b){ b.addEventListener('click', function(){ show(at + 1); }); });
 f.addEventListener('keydown', function(ev){  // Enter in a field moves on a step; only the last step's button prepares
   if (ev.key === 'Enter' && ev.target.tagName === 'INPUT' && steps[at].dataset.step !== 'go') { ev.preventDefault(); show(at + 1); } });
 var rl = f.querySelector('input[name=raid]'), go = f.querySelector('.ob-step[data-step=go] .btn.go');
 if (rl) rl.addEventListener('input', function(){  // a link that is not a report: said at once, and no prep from it
-  var bad = rl.value.trim() && rl.value.indexOf('warcraftlogs.com/reports/') < 0;
-  rl.classList.toggle('bad', !!bad); if (go) go.disabled = !!bad;
-  var h = rl.closest('.ob-step').querySelector('p.small'); if (h) { if (h.dataset.t == null) h.dataset.t = h.textContent;
+  var bad = rl.value.trim() && !/warcraftlogs[.]com[/]reports[/][A-Za-z0-9]{16}/.test(rl.value);
+  rl.classList.toggle('bad', !!bad); rl.setAttribute('aria-invalid', bad ? 'true' : 'false'); if (go) go.disabled = !!bad;
+  var h = document.getElementById('raid-help'); if (h) h.classList.toggle('err', !!bad); if (h) { if (h.dataset.t == null) h.dataset.t = h.textContent;
     h.textContent = bad ? 'Not a Warcraft Logs report link: paste one like https://www.warcraftlogs.com/reports/..., or leave it empty.' : (rl.value.trim() ? 'This log is read for your raid.' : h.dataset.t); } });
 f.querySelectorAll('.prev').forEach(function(b){ b.addEventListener('click', function(){ show(at - 1, true); }); });
 f.querySelectorAll('input[name=goal]').forEach(function(r){ r.addEventListener('change', function(){
@@ -1340,7 +1342,7 @@ def raid_hint(no_adds: bool = False) -> str:
     if no_adds:  # nothing to pad: the log says how your last pull compares
         return (f"Empty: the latest public log of {g} is used" if g else "Optional") + (
             ": it shows how your last pull compares with the top players'.")
-    what = ("it shows who plays what in your raid and how your last pull compares with the top players'; with "
+    what = ("it shows who plays what in your raid and how your last pull compares with the top players' pulls; with "
             "\"Let my raid decide\", it also decides between padding the adds and the boss.")
     if g:
         return f"Empty: the latest public log of {g} is used: {what}"

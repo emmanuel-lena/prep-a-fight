@@ -41,3 +41,5 @@ body:has(.ob:not(.story))>main{grid-column:1;display:grid;align-content:start;pa
 .ob-field{display:grid;gap:6px;font-weight:600;font-size:14px}
 .ob-field input{font-weight:400} .ob-field input::placeholder{color:var(--muted);font-weight:400}
 .ob input.bad{border-color:var(--neg);box-shadow:0 0 0 2px color-mix(in srgb,var(--neg) 30%,transparent)} .ob h2:focus{outline:none}
+.ob-step.arriving{pointer-events:none} /* a double click on Next lands on nothing */
+.ob-field input{width:100%} .raid-help{margin-top:6px;font-size:13.5px} .raid-help.err{color:var(--neg)}
