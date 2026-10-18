@@ -73,3 +73,5 @@ pre,.note-pre{font-family:var(--font-data)}
 .note-pre{max-height:none}
 .sugg.info .gain{color:var(--muted)}
 th.n{text-align:right}
+/* a card of prose only is as wide as its text (tables and charts keep the full width) */
+.panel>.card:not(:has(table)):not(:has(svg)):not(.suggs):not(.guide){max-width:88ch}

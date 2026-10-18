@@ -1170,10 +1170,9 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
     raid_said = f"the latest public log of {g}" if g else ""
     nxt = "<button type='button' class='btn go next'>Next &rarr;</button>"
     back = "<button type='button' class='btn ghost prev'>&larr; Back</button>"
-    body = f"""<p class="small"><a href="/">&larr; Home</a></p>
-<h1>{e(enc.name)} {diff_pill(difficulty)}</h1>
+    body = f"""<div class="boss-cols"><div class="boss-main"><h1>{e(enc.name)} {diff_pill(difficulty)}</h1>
 <p class="lead">{last.strip() or ""}</p>{est_html}
-<div class="boss-cols"><form method="post" action="/prep" class="ob story" data-boss="{enc.id}-{e(difficulty)}">
+<form method="post" action="/prep" class="ob story" data-boss="{enc.id}-{e(difficulty)}">
 <input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
 <ol class="ob-dots" aria-hidden="true"><li></li><li></li><li></li><li></li></ol>
 <section class="ob-step" data-step="goal"><h2>What do you want from this boss?</h2>
@@ -1209,7 +1208,7 @@ placeholder="Link to one of your raid's logs: https://www.warcraftlogs.com/repor
 <p class="est-again">{e(est.sentence) if est else ""}</p>
 <div class="ob-actions">{back}<button class="btn go">Prepare this fight &rarr;</button></div>
 <p class="small muted">Runs on your computer; you can follow it live.</p></section>
-</form>
+</form></div>
 {(f"<aside class='boss-guide'>{guide}</aside>") if guide else ""}</div>
 {_story_css()}{STORY_JS}
 <h2>Advanced</h2>

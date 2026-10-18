@@ -166,7 +166,7 @@ def tool_page(cmd: str, encounters: list) -> str | None:
     adv = advanced_fields(cmd, encounters, CURATED_FIELDS)
     note = ("<p class='ws-note'>It reads the data of a prep of this boss: prepare the boss first if you have not "
             "(Home, then the boss).</p>" if t.needs_prep else "")
-    return (f"<div class='ws'><p class='small'><a href='/tools'>&larr; Tools</a></p>"
+    return (f"<div class='ws'>"
             f"<header class='ws-tool'>{_icon(t.icon, 'ws-big')}<div><h1>{e(t.title)}</h1><p class='lead'>{e(t.question)}"
             f"</p></div></header>"
             f"<form method='post' action='/tool/{e(cmd)}' class='ws-form'><input type='hidden' name='_curated' value='1'>"
