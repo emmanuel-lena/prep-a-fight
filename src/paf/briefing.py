@@ -80,7 +80,8 @@ def _moves(d) -> list[tuple[float, str, str, str]]:
         plan = max((p for p in plans if p.gain > 2 * p.error), key=lambda p: p.gain, default=None)
     if plan is not None:
         rules = [(cd_name(d, k), rule_phrase(d, r.name)) for k, r in plan.choice.items() if r.name != "default"]
-        say = "; ".join(f"{n}: {r}" for n, r in rules)
+        say = "; ".join(f"{n}: {r}" for n, r in rules) + ("" if getattr(plan, "robust", True) else
+                                                          " Not robust: the gain can vanish on a harder fight.")
         out.append((plan.gain, f"Play your cooldowns for {e(_goal(plan.objective))} damage.", e(say),
                     copy_button(d.mrt[plan.objective], "Copy the MRT note") if d.mrt.get(plan.objective) else ""))
     elif plans:
@@ -112,7 +113,7 @@ def moves_html(d) -> str:
                                               if (more or button) else "")
         items.append(f"<li class='rv'><span class='n'>{i}</span><div class='mv'>{body}</div>{tag}</li>")
     top = moves[0][0]
-    note = ("" if top >= 1 else "<p class='aside rv'>You are already close to what the best players do here: the changes "
+    note = ("" if top >= 1 else "<p class='aside rv'>Your setup is already right here: the changes "
                                 "below are small.</p>")
     return f"<h2 class='rv'>What matters for you</h2>{note}<ol class='moves'>{''.join(items)}</ol>"
 

@@ -106,3 +106,8 @@ th.n{text-align:right}
 .pp-grid .pp{max-height:none}
 /* the plan the sheet plays carries the emphasis, not the biggest number */
 .sugg.major:not(.rec){border-left-color:var(--line)!important} .sugg.rec{border-left:3px solid var(--accent)!important}
+/* one column for every suggestion; the plan the sheet plays marked by an inset rule and the strongest chip */
+.sugg,.sugg.major,.sugg.rec{margin-left:0!important;padding-left:12px!important;border-left:0!important}
+.sugg.rec{box-shadow:inset 3px 0 0 var(--bronze)}
+.sugg:not(.rec) .sev{background:transparent!important;color:var(--fg)!important;border:1px solid var(--line)!important}
+.sugg.rec .sev{background:var(--fg)!important;color:var(--bg)!important;border-color:var(--fg)!important}

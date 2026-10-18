@@ -147,7 +147,7 @@ def change_card(d) -> str:
                     "prep finds the best gear in them and what this boss drops for you.</span></div></li>")
     if not rows:
         rows.append("<li><span class='ok' aria-hidden='true'>&#10003;</span><div><b>Nothing to change</b>"
-                    "<span class='what'>Your talents and gear are already right for this boss.</span></div></li>")
+                    f"<span class='what'>{'Your talents, gear and cooldowns are' if d.gear else 'No talent, spec or cooldown change beats yours: your setup is'} already right for this boss.</span></div></li>")
     return f"<article class='card s-change'><h2>Before the pull</h2><ul>{''.join(rows)}</ul></article>"
 
 

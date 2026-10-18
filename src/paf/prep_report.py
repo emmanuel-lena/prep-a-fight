@@ -522,8 +522,9 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         if stall:
             lines.append(f"<div class='why'>&#9888; {e(stall)}</div>")
         if p.flags:  # shown, not folded; a sign under the shown precision says nothing
-            lines.append("<div class='why'>&#9888; To double-check: " + "; ".join(
-                e(re.sub(r"[-+]0\.0%", "about 0%", f)) for f in p.flags) + "</div>")
+            lines.append("<div class='why'>&#9888; " + "; ".join(
+                e(re.sub(r"[-+]0\.0%", "about 0%", f)[:1].upper() + re.sub(r"[-+]0\.0%", "about 0%", f)[1:])
+                for f in p.flags) + "</div>")
         first = next(iter(p.choice), "")
         goal = {"boss": "if you focus the boss", "total": "if you pad the adds",
                 "secondary": f"to burst {burst_names(d)[1] or 'the secondary targets'}"}.get(p.objective, p.objective)
@@ -687,7 +688,7 @@ def suggestions_html(d: PrepData) -> str:
         rows.append(f'<div class="sugg {s.severity}{rec}">{pic}<div><div class="t"><span class="sev">{label}</span> '
                     f'{s.title}</div><div class="d">{details}</div></div>{gain}</div>')
     if not rows:
-        return '<p class="muted">Nothing to change: your character already plays this fight well.</p>'
+        return '<p class="muted">Nothing to change: no talent, gear or cooldown change beats yours here.</p>'
     return f'<div class="card suggs">{"".join(rows)}</div>'
 
 
@@ -927,7 +928,7 @@ and the gear for that.</p></div>""")
             cells = ""
             for f in tc.fights:
                 tot, boss = r.per_fight.get(f, (None, None))
-                cells += f"<td class='n'>{_pct(tot, err=tc.error)}{'<br><span class=small>boss ' + _pct(boss, 1, err=tc.error) + '</span>' if boss is not None else ''}</td>"
+                cells += f"<td class='n'>{_pct(tot, err=tc.error)}{'<br><span class=small>boss ' + _pct(boss, 1, err=2 * tc.error) + '</span>' if boss is not None else ''}</td>"
             both = set(r.add) & set(r.drop)
             add = [t for t in dict.fromkeys(r.add) if t not in both]
             drop = [t for t in dict.fromkeys(r.drop) if t not in both]
@@ -939,7 +940,8 @@ and the gear for that.</p></div>""")
                      f"{r.build.median_rank:.0f}</span></td>{cells}<td class='small'>{diff}</td></tr>")
         best_g = max((((r.per_fight.get(first, (0.0, None))[0] or 0.0), r.build.label) for r in tc.rows),
                      default=(0.0, ""))
-        verdict = ("<p><b>Keep your talents:</b> no build of the top players beats yours on this fight.</p>"
+        verdict = (f"<p><b>Keep your talents:</b> no build of the top players beats yours by more than "
+                   f"{2 * tc.error:.1f}% on this fight.</p>"
                    if best_g[0] <= 2 * tc.error else
                    f"<p><b>{e(best_g[1])} beats yours by {best_g[0]:+.1f}%</b> on this fight.</p>")
         tabs["gear"].append(f"""<h2>Talents of the top players, on your character</h2><div class="card scroll">
@@ -1102,7 +1104,7 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
     sections: dict[str, list[str]] = {
         "fight": notices + [fightview.html(d)],
         "change": [f"<div class='simple change-top'><div class='cards'>{simple.change_card(d)}</div></div>",
-                   briefing.spec_html(d), "<h2>Everything worth changing, by gain</h2>" + suggestions_html(d)]
+                   briefing.spec_html(d), "<h2>Everything worth changing</h2>" + suggestions_html(d)]
         + tabs["gear"],
         "boss": tabs["boss"],
         "deeper": tabs["overview"] + [f"<div class='simple'>{simple.review_card(d)}</div>"] + tabs["cooldowns"] + tabs["raid"] + tabs["fight"]
