@@ -47,7 +47,7 @@ details.why summary{color:var(--warn);font-size:13px;margin:4px 0} details.why d
 .conf{margin:-2px 0 4px}
 .tabs-in{scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent)}
 .tabs-in::-webkit-scrollbar{display:none}
-a:focus-visible,button:focus-visible,.chip:focus-within,.tabs a:focus-visible{outline:2px solid var(--accent);
+a:focus-visible,button:focus-visible,.chip:has(input:focus-visible),.tabs a:focus-visible{outline:2px solid var(--accent);
   outline-offset:2px;border-radius:6px}
 .gearset div{margin:2px 0} tr.noise td{color:var(--muted)}
 @media (max-width:640px){.sugg{grid-template-columns:36px 1fr auto;gap:10px}.sugg .gain{font-size:15px}

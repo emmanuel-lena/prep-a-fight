@@ -19,3 +19,4 @@
 .recap li::before{content:"\2713";color:var(--pos);font-weight:700;margin-right:10px}
 .recap li[hidden]{display:none}
 .what-sim{margin:6px 0 0} .what-sim label{display:block;margin:6px 0}
+.what-sim label{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start}

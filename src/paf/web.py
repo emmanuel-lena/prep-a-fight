@@ -1240,9 +1240,9 @@ placeholder="https://www.warcraftlogs.com/reports/..."></label>
 <li data-if="no-raid">Your raid: <b>{e(raid_said) if raid_said else "none (the prep shows both plans)"}</b></li>
 </ul>
 <fieldset class="what-sim"><legend>What to sim</legend>
-<label><input type="checkbox" name="gear" checked> Best gear from your bags, and what this boss drops for you</label>
-<label><input type="checkbox" name="optimize" checked> Ideal cooldown plan{" for boss damage" if no_adds else " for your goal"}
-<span class="muted small">(the slowest part: 20 to 40 min the first time; the estimate above comes from this computer's last preps, faster when their sims are reused)</span></label><p class="small muted sim-none" hidden>Both off: the prep still gives the fight view, the boss journal and your talents, without a gear or cooldown plan.</p></fieldset>
+<label><input type="checkbox" name="gear" checked><span>Best gear from your bags, and what this boss drops for you</span></label>
+<label><input type="checkbox" name="optimize" checked><span>Ideal cooldown plan{" for boss damage" if no_adds else " for your goal"}
+<span class="muted small">(the slowest part: 20 to 40 min the first time; the estimate above comes from this computer's last preps, faster when their sims are reused)</span></span></label><p class="small muted sim-none" hidden>Both off: the prep still gives the fight view, the boss journal and your talents, without a gear or cooldown plan.</p></fieldset>
 <div class="ob-actions">{back}<button class="btn go" aria-describedby="go-why">Prepare this fight &rarr;</button><span class="go-why" id="go-why" hidden>Fix
 the raid log link (step 3) or leave it empty first.</span></div>
 <p class="small muted ob-note">Runs on your computer; you can follow it live.</p></section>
@@ -1294,7 +1294,12 @@ function show(i, back){
   dots.forEach(function(d, j){ d.classList.toggle('on', j <= at); });
   if (steps[at].dataset.step === 'go') recap();
   var hp = steps[at].querySelector('#raid-help');  // measured once shown: it keeps that height, no button moves under a click
-  if (hp && !hp.dataset.h) { hp.dataset.h = '1'; hp.style.minHeight = hp.offsetHeight + 'px'; }
+  if (hp) {  // the help speaks of the goal picked: the 'Let my raid decide' clause only for that goal
+    if (hp.dataset.full == null) hp.dataset.full = hp.textContent;
+    var g = (f.querySelector('input[name=goal]:checked') || f.querySelector('input[name=goal][type=hidden]') || {}).value || 'auto';
+    var base = g === 'auto' ? hp.dataset.full : hp.dataset.full.replace(/; with "Let my raid decide".*$/, '.');
+    hp.dataset.t = base; if (!f.querySelector('input[name=raid]').value.trim()) hp.textContent = base;
+    if (!hp.dataset.h) { hp.dataset.h = '1'; hp.style.minHeight = hp.offsetHeight + 'px'; } }
   var h2 = steps[at].querySelector('[aria-invalid=true]') || steps[at].querySelector('h2');  // a field in error first
   if (h2) { if (h2.tagName === 'H2') h2.tabIndex = -1; h2.focus({preventScroll: true}); }  // keep the place
   var cur = steps[at]; cur.classList.add('arriving');  // a double click on Next must not tick what lands under it
@@ -1307,7 +1312,8 @@ function next(){  // a field in error keeps the player on its step, with the foc
 f.querySelectorAll('.next').forEach(function(b){ b.addEventListener('mousedown', function(ev){ ev.preventDefault(); });  // no blur shift
   b.addEventListener('click', next); });
 f.addEventListener('keydown', function(ev){  // Enter in a field moves on a step; only the last step's button prepares
-  if (ev.key === 'Enter' && ev.target.tagName === 'INPUT' && steps[at].dataset.step !== 'go') { ev.preventDefault(); next(); } });
+  if (ev.key !== 'Enter' || ev.target.tagName !== 'INPUT') return;
+  ev.preventDefault(); if (steps[at].dataset.step !== 'go') next(); });  // on the last step, Enter in a box does nothing
 var rl = f.querySelector('input[name=raid]'), go = f.querySelector('.ob-step[data-step=go] .btn.go');
 f.querySelectorAll('input[name=gear],input[name=optimize]').forEach(function(c){ c.addEventListener('change', function(){
   var none = !f.querySelector('input[name=gear]:checked') && !f.querySelector('input[name=optimize]:checked');
@@ -1323,7 +1329,10 @@ f.querySelectorAll('.prev').forEach(function(b){ b.addEventListener('mousedown',
 
 f.querySelectorAll('input[name=goal]').forEach(function(r){ r.addEventListener('change', function(){
   try { localStorage.setItem(key, r.value); } catch (e) {} }); });  // a goal is picked; Next moves on (keyboard-safe)
-f.addEventListener('submit', function(){ var r = f.querySelector('input[name=goal]:checked');
+f.addEventListener('submit', function(ev){  // only the Prepare button starts a prep: never Enter in a field or box
+  var go = f.querySelector('.ob-step[data-step=go] .btn.go');
+  if (ev.submitter !== go || steps[at].dataset.step !== 'go' || go.disabled) { ev.preventDefault(); return; }
+  var r = f.querySelector('input[name=goal]:checked');
   try { if (r) localStorage.setItem(key, r.value); } catch (e) {} });
 show(0);
 })();
