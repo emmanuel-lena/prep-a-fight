@@ -1224,9 +1224,9 @@ for reference: a build can be worse there and much better on this fight. Each ru
             if p.flags:
                 checks += "<ul class='small'>" + "".join(f"<li class='warn'>&#9888; {e(re.sub(r'[-+]0[.]0%', 'about 0%', f))}</li>"
                                                          for f in p.flags) + "</ul>"
-            blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, err=1e9 if p.objective == "secondary" or _stall(d, p) else 0.0)}
+            blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, 1, err=1e9 if p.objective == "secondary" or _stall(d, p) else 0.0)}
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span>{" <span class='pill gold'>the sheet plays this plan</span>" if p.objective == first else ""}</h3>
-{("<p class='small'>Played because " + ("your raid pads the adds" if p.objective == "total" else "your raid stays on the boss" if p.objective == "boss" else "it is your choice") + " (see Your raid, in this section)." + (" When the plan presses a burst while the boss is immune, the fight tab moves it onto the adds that spawn then." if d.fight is not None and d.fight.invulnerable else "") + "</p>") if p.objective == first and p.objective in ("boss", "total") else ""}
+{("<p class='small'>Played because " + ("your raid pads the adds" if p.objective == "total" else "your raid stays on the boss" if p.objective == "boss" else "it is your choice") + " (see Your raid and the adds, below)." + (" When the plan presses a burst while the boss is immune, the fight tab moves it onto the adds that spawn then." if d.fight is not None and d.fight.invulnerable else "") + "</p>") if p.objective == first and p.objective in ("boss", "total") else ""}
 {"<p class='small muted'>Burst damage counts only the damage on " + e(burst_names(d)[1] or "the burst targets") + ": worth it only if your raid needs " + e(burst_names(d)[1] or "them") + " dead fast" + ("." if _stall(d, p) else ", at the cost of the boss and total damage above.") + "</p>" if p.objective == "secondary" else ""}
 {checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases, links=d.links)}
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>

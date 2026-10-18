@@ -112,7 +112,7 @@ def _hint(d) -> str:
     """The sim's distance from the top players' real damage, said where the verdict rests on it."""
     v = getattr(d, "validation", None)
     gap = abs(v[1] - 1) if v else 0
-    return (f" The sim is {gap:.0%} off the top players' real damage on this fight: read it as a strong hint."
+    return (f" On this fight the sim does {v[1]:.0%} of the top players' real damage: read the numbers as hints."
             if gap > 0.12 else "")
 
 

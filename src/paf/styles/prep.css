@@ -114,3 +114,4 @@ th.n{text-align:right}
 .sugg:not(.rec){box-shadow:none!important}
 .gen{margin-top:28px}
 .pp td{vertical-align:baseline} /* the small context text on the line of its time */
+.card>h4:has(+pre.note-pre),.card h4:has(.copy){margin:0 0 6px;font:600 13px var(--font-display);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);display:flex;align-items:center;gap:8px} /* every note heading as the plans' */
