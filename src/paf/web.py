@@ -1243,7 +1243,7 @@ placeholder="https://www.warcraftlogs.com/reports/..."></label>
 <label><input type="checkbox" name="gear" checked> Best gear from your bags, and what this boss drops for you</label>
 <label><input type="checkbox" name="optimize" checked> Ideal cooldown plan{" for boss damage" if no_adds else " for your goal"}
 <span class="muted small">(the slowest part: 20 to 40 min the first time; the estimate above comes from this computer's last preps, faster when their sims are reused)</span></label><p class="small muted sim-none" hidden>Both off: the prep still gives the fight view, the boss journal and your talents, without a gear or cooldown plan.</p></fieldset>
-<div class="ob-actions">{back}<button class="btn go">Prepare this fight &rarr;</button><span class="go-why" hidden>Fix
+<div class="ob-actions">{back}<button class="btn go" aria-describedby="go-why">Prepare this fight &rarr;</button><span class="go-why" id="go-why" hidden>Fix
 the raid log link (step 3) or leave it empty first.</span></div>
 <p class="small muted ob-note">Runs on your computer; you can follow it live.</p></section>
 </form></div>
@@ -1279,6 +1279,7 @@ function recap(){
   else if (raid) { var m = raid.match(/reports[/]([A-Za-z0-9]{16})/), fi = raid.match(/fight=([0-9]+)/);
     raid = 'report ' + m[1].slice(0, 6) + '\u2026' + (fi ? ', pull ' + fi[1] : ''); }  // short, not the raw link
   var rli = f.querySelector('.recap-raid'); if (rli && rli.closest('li')) rli.closest('li').classList.toggle('bad', !!badraid);
+  var why = f.querySelector('.go-why'); if (why) why.hidden = !badraid;  // the disabled Prepare says why, beside it
   f.querySelector('.recap-assigns').textContent = picked.join(', ');
   f.querySelector('.recap-raid').textContent = raid;
   f.querySelectorAll('.recap [data-if]').forEach(function(li){
@@ -1291,14 +1292,19 @@ function show(i, back){
   steps.forEach(function(s, j){ s.classList.toggle('on', j === at); s.classList.toggle('back', !!back); });
   dots.forEach(function(d, j){ d.classList.toggle('on', j <= at); });
   if (steps[at].dataset.step === 'go') recap();
-  var h2 = steps[at].querySelector('h2'); if (h2) { h2.tabIndex = -1; h2.focus({preventScroll: true}); }  // keep the place
+  var h2 = steps[at].querySelector('[aria-invalid=true]') || steps[at].querySelector('h2');  // a field in error first
+  if (h2) { if (h2.tagName === 'H2') h2.tabIndex = -1; h2.focus({preventScroll: true}); }  // keep the place
   var cur = steps[at]; cur.classList.add('arriving');  // a double click on Next must not tick what lands under it
   setTimeout(function(){ cur.classList.remove('arriving');
     if (document.activeElement === document.body && h2) h2.focus({preventScroll: true}); }, 450);
 }
-f.querySelectorAll('.next').forEach(function(b){ b.addEventListener('click', function(){ show(at + 1); }); });
+function next(){  // a field in error keeps the player on its step, with the focus on it
+  var rl = steps[at].querySelector('input[name=raid]'); if (rl) rl.dispatchEvent(new Event('change'));
+  var bad = steps[at].querySelector('[aria-invalid=true]'); if (bad) { bad.focus(); return; } show(at + 1); }
+f.querySelectorAll('.next').forEach(function(b){ b.addEventListener('mousedown', function(ev){ ev.preventDefault(); });  // no blur shift
+  b.addEventListener('click', next); });
 f.addEventListener('keydown', function(ev){  // Enter in a field moves on a step; only the last step's button prepares
-  if (ev.key === 'Enter' && ev.target.tagName === 'INPUT' && steps[at].dataset.step !== 'go') { ev.preventDefault(); show(at + 1); } });
+  if (ev.key === 'Enter' && ev.target.tagName === 'INPUT' && steps[at].dataset.step !== 'go') { ev.preventDefault(); next(); } });
 var rl = f.querySelector('input[name=raid]'), go = f.querySelector('.ob-step[data-step=go] .btn.go');
 f.querySelectorAll('input[name=gear],input[name=optimize]').forEach(function(c){ c.addEventListener('change', function(){
   var none = !f.querySelector('input[name=gear]:checked') && !f.querySelector('input[name=optimize]:checked');
@@ -1349,13 +1355,13 @@ def current_raid(enc, difficulty: str) -> str:
 def raid_hint(no_adds: bool = False) -> str:
     g = settings.get("guild")
     if no_adds:  # nothing to pad: the log says how your last pull compares
-        return (f"Empty: the latest public log of {g} is used" if g else "Optional") + (
-            ": it shows how your last pull compares with the top players'.")
-    what = ("it shows who plays what in your raid and how your last pull compares with the top players' pulls; with "
-            "\"Let my raid decide\", it also decides between padding the adds and the boss.")
+        return ((f"Left empty, the latest public log of {g} is used. " if g else "Optional. ")
+                + "The log shows how your last pull compares with the top players' pulls.")
+    what = ("The log shows who plays what in your raid and how your last pull compares with the top players' pulls; "
+            "with \"Let my raid decide\", it also decides between padding the adds and the boss.")
     if g:
-        return f"Empty: the latest public log of {g} is used: {what}"
-    return f"Optional: {what} Or set your guild once on the home page."
+        return f"Left empty, the latest public log of {g} is used. {what}"
+    return f"Optional. {what} Or set your guild once on the home page."
 
 
 def write_raid(boss_id: int, difficulty: str, url: str) -> None:
