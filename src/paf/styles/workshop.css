@@ -1,6 +1,6 @@
 .ws{max-width:1400px}
-.ws h1{font:600 34px/1.15 var(--font-reading);margin:0 0 6px;letter-spacing:0;text-transform:none}
-.ws h2{font:600 22px/1.2 var(--font-reading);text-transform:none;letter-spacing:0;color:var(--fg);margin:34px 0 14px}
+.ws h1{font:600 30px/1.15 var(--font-reading);margin:0 0 6px;letter-spacing:0;text-transform:none}
+.ws h2{margin:34px 0 14px}
 .ws-head,.ws-tool{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
 .ws-head>div{flex:1;min-width:260px} .ws-tool>div{flex:1;min-width:240px}
 .ws-me{display:flex;gap:10px;align-items:center;padding:8px 14px 8px 8px;border-radius:14px;border:1px solid var(--line);
@@ -28,7 +28,7 @@
 .ws-note{margin:0;font-size:14px;color:var(--muted)}
 .ws-adv>summary{cursor:pointer;color:var(--muted)} .ws-adv label{display:block;margin:10px 0}
 .ws-go{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:6px}
-.ws .btn.go{font-size:17px;padding:11px 24px;border-radius:12px}
+
 .ws-run{display:flex;gap:14px;align-items:flex-start;margin:24px 0 12px;padding:16px 18px;border-radius:14px;
   border:1px solid var(--line);background:var(--surface);max-width:720px}
 .ws-run .pl-spin{margin-top:2px}

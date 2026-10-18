@@ -7,11 +7,11 @@
 .ob-step.back.on{animation-name:ob-back}
 @keyframes ob-in{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
 @keyframes ob-back{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
-.ob h1{font:600 32px/1.15 var(--font-reading);margin:0 0 14px}
+.ob h1{font:600 30px/1.15 var(--font-reading);margin:0 0 14px}
 .ob p,.ob li{font-size:16.5px;line-height:1.55}
 .ob-points{padding-left:20px;display:grid;gap:8px;margin:0 0 16px}
 .ob-actions{display:flex;gap:10px;align-items:center;margin-top:18px;flex-wrap:wrap}
-.ob .btn.go{font-size:17px;padding:11px 24px;border-radius:12px}
+
 .ob form input,.ob form select{font-size:16px;padding:10px 12px}
 .ob form .row{display:flex;gap:8px;flex-wrap:wrap} .ob form .row input{flex:1;min-width:140px}
 .ob form>input{display:block;width:100%;margin:0 0 8px;box-sizing:border-box}
@@ -24,3 +24,5 @@
 .ob .busy{opacity:.6;pointer-events:none}
 .ob-summary{font-size:18px}
 @media (prefers-reduced-motion:reduce){.ob-step.on{animation:none}}
+/* the first run is its own moment: no side bar yet */
+body.has-side:has(.ob){grid-template-columns:minmax(0,1fr)} body:has(.ob)>.side{display:none}

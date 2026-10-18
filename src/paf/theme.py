@@ -76,7 +76,9 @@ BACK_ICON = ("<button type='button' class='side-back' hidden aria-label='Go back
 # the place the page belongs to, lit in the side bar
 SIDE_JS = ("<script>(function(){var p=location.pathname,best=null;document.querySelectorAll('.side-nav a').forEach("
            "function(a){var h=a.getAttribute('href');if(p===h||(h!=='/'&&p.indexOf(h)===0)){best=a}});"
-           "if(!best&&(p.indexOf('/view/')===0||p.indexOf('/boss')===0||p.indexOf('/job/')===0||p.indexOf('/raid/')===0))"
+           "var fb=document.querySelector('.side-fb');if(!best&&fb&&p.indexOf('/feedback')===0)best=fb;"
+           "if(!best&&(p.indexOf('/view/')===0||p.indexOf('/boss')===0||p.indexOf('/job/')===0||p.indexOf('/raid/')===0"
+           "||p.indexOf('/share/')===0))"
            "best=document.querySelector(\".side-nav a[href='/']\");if(best){best.classList.add('on');"
            "best.setAttribute('aria-current','page')}})();</script>")
 

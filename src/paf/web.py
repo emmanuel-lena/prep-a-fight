@@ -813,7 +813,7 @@ def characters_page() -> str:
                 f'<form method="post" action="/character/select"><input type="hidden" name="slug" value="{e(c.slug)}">'
                 f'<button class="btn ghost">Play this character</button></form>')
         cards += (f'<div class="ccard{" on" if c.current else ""}">{ic}<div class="cc-txt"><b>{e(c.name)}</b>'
-                  f'<span>{e(c.spec.title())} {e(c.class_name.title())}</span><span>{badge} '
+                  f'<span class="cc-spec">{e(c.spec.title())} {e(c.class_name.title())}</span><span>{badge} '
                   f'<span class="muted small">updated <span>{ago(c.mtime)}</span></span></span></div><div class="cc-act">{play}'
                   f'<a class="btn ghost" href="#add">Update</a>'
                   f'<details class="rm"><summary class="btn ghost danger">Remove</summary><div class="rm-ask">'
@@ -1049,7 +1049,7 @@ def raid_board(encs, class_name: str, spec: str) -> str:
                   f"<div class='rb-ds'>{states}</div></div></div>")
     return (f"<h2 class='h-mine'>Your raid, boss by boss</h2>{queue_strip(settings.get('difficulty'))}"
             f"<div class='rb-row'>{items}</div>{QUEUE_JS}{RB_JS}"
-            "<p class='small muted rb-legend'><span>Point at or tap a boss: its three difficulties, and a click to "
+            "<p class='small muted rb-legend'><span>Point at a boss: its three difficulties, and a click to "
             "the sheet or the prep.</span> <span>A grey boss is not prepared for this week yet.</span></p>")
 
 
@@ -1096,10 +1096,7 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
 <select name="boss" aria-label="Boss" class="big">{options}</select>
 <div class="segs" role="radiogroup" aria-label="Difficulty">{diffs}</div>
 <button class="btn go">Let's go &rarr;</button></form></section>
-{board}{last}{mine}
-<details class="home-more"><summary>Change your character, your raid or your Warcraft Logs key</summary>
-<div class="card step"><div class="num">1</div><div class="body"><h3>Your character</h3>{character}</div></div>
-{guild}{creds}</details>"""
+{board}{last}{mine}"""
 
 
 def boss_page(boss_id: str, difficulty: str) -> bytes:

@@ -17,7 +17,7 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .seg input:checked+span{background:var(--surface-2);border-color:var(--fg);color:var(--fg)}
 .seg input:checked+span::before{content:"";display:inline-block;width:12px;height:12px;margin:0 6px -1px -2px;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3 3L13 4.5' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3 3L13 4.5' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
 .seg input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
-.btn.go{justify-self:start;font-size:18px;padding:12px 26px;border-radius:12px}
+.btn.go{justify-self:start}
 .h-mine{margin-top:0}
 .chars{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
 .chars .ch button{display:flex;gap:8px;align-items:center;padding:5px 12px 5px 5px;border-radius:999px;cursor:pointer;
@@ -89,7 +89,7 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .rm>summary{list-style:none;cursor:pointer} .rm>summary::-webkit-details-marker{display:none}
 .rm[open]>summary{display:none} .rm-ask{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .rm-ask span{color:var(--neg);font-size:14px}
-.btn.danger{color:var(--neg)}
+.btn.danger{color:var(--neg)} .btn.danger:not(.ghost){background:var(--neg);color:var(--bg);border-color:var(--neg)}
 .add-form textarea{width:100%;min-height:160px;box-sizing:border-box}
 .bcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
 .bcard{display:flex;gap:12px;align-items:center;padding:14px 16px;border-radius:12px;border:1px solid var(--line);
@@ -149,7 +149,7 @@ ol.steps{list-style:none;margin:0;padding:0} .st{padding:7px 0;border-bottom:1px
 /* the raid lead (paf.raidlead) */
 .rl-wait,.rl-start{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0;padding:14px 18px;
   border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
-.rl-start p{margin:0;flex:1;min-width:260px}
+.rl-start p{margin:0;flex:1 1 100%;max-width:68ch}
 .rl-roster{margin:18px 0}
 .rl-chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
 .rl-p{margin:0} .rl-p button{display:inline-flex;flex-direction:column;align-items:flex-start;gap:0;padding:5px 12px;
@@ -190,3 +190,6 @@ h2 .btn.copy{margin-left:8px;vertical-align:middle;text-transform:none;letter-sp
   .home-hero{grid-template-columns:minmax(0,620px) minmax(0,1fr);grid-template-areas:"start me" "start chars";
     column-gap:40px;align-items:start}
   .home-hero .start{grid-area:start;max-width:none} .home-hero .me{grid-area:me} .home-hero .chars{grid-area:chars}}
+.ccard .cc-spec{font-weight:600;color:var(--fg)}
+/* settings: the groups titled like the other sections of the app */
+.set-group>legend,.set-group>summary{font:600 15px var(--font-display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}

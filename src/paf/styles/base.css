@@ -23,7 +23,8 @@ td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 button,.btn{font:inherit;font-weight:600;background:var(--primary);color:var(--on-primary);border:0;border-radius:10px;
   padding:9px 16px;cursor:pointer;display:inline-block;text-decoration:none}
 button:hover,.btn:hover{filter:brightness(1.08);text-decoration:none}
-.btn.big{padding:12px 22px;font-size:16px}
+/* the page's one main action: a bigger button (go); big is the same */
+.btn.go,.btn.big{font-size:17px;padding:11px 24px;border-radius:12px}
 .btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
 input,select,textarea{font:inherit;color:var(--fg);background:var(--surface-2);border:1px solid var(--line);
   border-radius:8px;padding:8px 10px}
@@ -106,17 +107,17 @@ table.fit{width:auto;min-width:min(100%,520px)} /* a short table: its columns cl
 body.has-side{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
 .side{position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:16px 12px;
   background:color-mix(in srgb,var(--surface) 70%,var(--bg));border-right:1px solid var(--line);z-index:50}
-.side-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 6px 12px}
+.side-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 6px 12px;min-height:46px}
 .side .brand{color:var(--fg);font-size:17px} .side .brand b{color:var(--accent)} .side .brand:hover{text-decoration:none}
 .side-back{display:inline-flex;align-items:center;gap:4px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;
   background:none;color:var(--muted);font:inherit;font-size:13px;cursor:pointer}
-.side-back:hover{color:var(--fg);filter:none;box-shadow:none} .side-back[hidden]{display:none} .side-back span{display:none}
+.side-back:hover{color:var(--fg);filter:none;box-shadow:none} .side-back[hidden]{display:none}
 .side-nav{display:flex;flex-direction:column;gap:2px}
 .side-nav a,.side-links a{display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:8px;color:var(--muted);
   font-weight:600;font-size:14.5px;text-decoration:none}
 .side-nav a svg{flex:none}
 .side-nav a:hover,.side-links a:hover{background:var(--surface-2);color:var(--fg);text-decoration:none}
-.side-nav a.on{background:var(--surface-2);color:var(--fg);box-shadow:inset 0 -2px 0 var(--accent)}
+.side-nav a.on,.side-fb.on{background:var(--surface-2);color:var(--fg);box-shadow:inset 3px 0 0 var(--accent)}
 .side-extra{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
 .side-lab{font:600 11px var(--font-display);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:0 10px}
 .side-extra select{width:100%;font-size:13.5px}

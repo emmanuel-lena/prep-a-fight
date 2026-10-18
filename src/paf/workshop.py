@@ -96,17 +96,6 @@ def _icon(name: str, cls: str = "") -> str:
     return icons.img(name, "large", cls)
 
 
-def _character() -> str:
-    from paf import characters, icons
-
-    c = next((c for c in characters.all_characters() if c.current), None)
-    if c is None:
-        return "<a class='ws-me none' href='/characters'>Add your character first &rarr;</a>"
-    ic = icons.img(icons.CLASS_ICON.format(cls=c.class_name.lower()), "medium", "ws-me-ic")
-    return (f"<a class='ws-me' href='/characters' title='Change'>{ic}<span><b>{e(c.name)}</b>"
-            f"<small>{e(c.spec.title())} {e(c.class_name.title())}</small></span></a>")
-
-
 def cards(cmds: tuple[str, ...] | list[str], target: str = "") -> str:
     """The tools' cards, each a link to its page; `target` for a page shown in a frame (the sheet)."""
     tgt = f" target='{target}'" if target else ""
@@ -125,14 +114,17 @@ def index() -> str:
 
     return (f"<div class='ws'><header class='ws-head'><div><h1>Tools</h1><p class='lead'>Each tool answers one "
             f"question. The prep of a boss already runs them all: here, run one again to dig further.</p></div>"
-            f"{_character()}</header>{groups}<details class='ws-raw'><summary>For the curious: every command, with all "
+            f"</header>{groups}<details class='ws-raw'><summary>For the curious: every command, with all "
             f"its options</summary>{raw_index()}</details></div>{CSS}")
 
 
-def _boss_select(encounters: list, optional: str = "") -> str:
-    first = f"<option value=''>{e(optional)}</option>" if optional else ""
+def _boss_select(encounters: list, optional: str = "", last: bool = False) -> str:
+    """The raid's bosses; `optional` an empty choice, first (every boss) or `last` (the training dummy: the real fight
+    comes first, it is the point of the app)."""
+    extra = f"<option value=''>{e(optional)}</option>" if optional else ""
     opts = "".join(f"<option value='{x.id}'>{e(x.name)}</option>" for x in encounters)
-    return f"<label class='ws-f'><span>Boss</span><select name='boss' class='big'>{first}{opts}</select></label>"
+    body = opts + extra if last else extra + opts
+    return f"<label class='ws-f'><span>Boss</span><select name='boss' class='big'>{body}</select></label>"
 
 
 def _segs(name: str, label: str, options: list[tuple[str, str, str]], checked: str) -> str:
@@ -146,7 +138,7 @@ def _field(kind: str, encounters: list) -> str:
 
     if kind in ("boss", "boss?", "boss~"):
         return _boss_select(encounters, {"boss?": "Every boss of the raid",
-                                          "boss~": "A training dummy (no boss)"}.get(kind, ""))
+                                          "boss~": "A training dummy (no boss)"}.get(kind, ""), last=kind == "boss~")
     if kind == "difficulty":
         return _segs("difficulty", "Difficulty", [(d, DIFF_LABELS.get(d, d), "") for d in settings.DIFFICULTIES
                                                   if d != "lfr"], settings.get("difficulty"))
@@ -176,7 +168,7 @@ def tool_page(cmd: str, encounters: list) -> str | None:
             "(Home, then the boss).</p>" if t.needs_prep else "")
     return (f"<div class='ws'><p class='small'><a href='/tools'>&larr; Tools</a></p>"
             f"<header class='ws-tool'>{_icon(t.icon, 'ws-big')}<div><h1>{e(t.title)}</h1><p class='lead'>{e(t.question)}"
-            f"</p></div>{_character()}</header>"
+            f"</p></div></header>"
             f"<form method='post' action='/tool/{e(cmd)}' class='ws-form'><input type='hidden' name='_curated' value='1'>"
             f"{fields}<p class='ws-gives'><b>You get:</b> {e(t.gives)}</p>{note}"
             + (f"<details class='ws-adv'><summary>More options</summary>{adv}</details>" if adv else "")
