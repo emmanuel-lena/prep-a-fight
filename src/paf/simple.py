@@ -155,12 +155,10 @@ def change_card(d) -> str:
                         f"{e(best[0])} players are ahead too.</span></div></li>")
     plan = _plan(d)
     if plan is not None and plan.gain > 2 * plan.error and any(r.name != "default" for r in plan.choice.values()):
-        from paf.prep_report import rule_phrase
-
         held = [(d.cd_names.get(k, k), r.name) for k, r in plan.choice.items() if r.name != "default"]
-        what = "; ".join(f"{n}: {rule_phrase(d, r)}" for n, r in held)
         rows.append(f"<li>{_ic(d, held[0][0])}<div><b>Play your cooldowns this way</b><span class='sz "
-                    f"{_size(plan.gain)}'>{SIZE_WORDS[_size(plan.gain)]}, {plan.gain:+.1f}% vs SimC's default list</span><span class='what'>{e(what)}. The fight "
+                    f"{_size(plan.gain)}'>{SIZE_WORDS[_size(plan.gain)]}, {plan.gain:+.1f}% vs SimC's default list</span><span class='what'>"
+                    f"{e(held[0][0])}{' and more' if len(held) > 1 else ''}: its rules and its MRT note just below; the fight "
                     f"tab calls them at their times."
                     + ("" if getattr(plan, "robust", True) else " Not robust: the gain can vanish on a harder fight "
                        "(see its checks in Dig deeper).") + "</span></div></li>")

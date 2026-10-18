@@ -29,9 +29,10 @@ def _pct(t: float, dur: float) -> float:
 
 def lede_html(d) -> str:
     dur = d.duration or 0
-    waves = [w for w in d.waves if w[1]]
+    units = {w.name for w in (d.fight.add_waves if getattr(d, "fight", None) is not None else []) if not w.scalable}
+    waves = [w for w in d.waves if w[1] and not any(u.startswith(w[3]) or w[3].startswith(u) for u in units)]
     parts = [f"A {_mmss(dur)} fight" if dur else "This fight"]
-    if waves:
+    if waves:  # the add waves; a boss unit played as a wave (an Echo) is not one of them
         parts.append(f"with {len(waves)} waves of adds" if len(waves) > 1 else "with one wave of adds")
     lust = ""
     if d.lust is not None:
@@ -394,9 +395,6 @@ def confidence_pill(d) -> str:
                 f"gear puts {share[1]}% of its damage on the boss, they put {share[2]}%"
                 + ("; the plan you play pads the adds, so your own figure puts less on the boss." if
                    getattr(d, "aim_plan", False) and _wanted(d) == "total" else "."))
-    if overshoot(d):  # your character's total above what the best really do: the adds weigh more in SimC
-        say += (" Here SimC's area damage makes the total run high: trust the boss figures and which option wins "
-                "more than the exact total.")
     return f"<p class='trust {level} rv'><span>How much to trust this:</span> {e(say)}</p>"
 
 
