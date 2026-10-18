@@ -752,7 +752,7 @@ def defensives_html(d: PrepData) -> str:
     usage = ", ".join(f"{link(n, f'spell={sid}')} {per:.1f} per kill ({share:.0%} of the kills)"
                       for n, sid, per, share in df.usage[:6])
     return (f"<h2>Defensives</h2><div class='card'><p class='small'>When the top players of your spec press a "
-            f"defensive on this boss ({df.kills} kills), and the boss ability it answers (cast just before or after, or "
+            f"defensive on this boss ({df.kills} kills), and the boss ability it answers (cast within about 10 s, or "
             f"long before for damage that lands later). SimC does not "
             f"simulate survival: this is advice, not a gain. The fight tab and the notes call the moments where "
             f"{fightview_support():.0%} or more of the top players press one.</p>{table}"
@@ -851,7 +851,7 @@ def gate_kills(d: PrepData) -> list[tuple[str, str]]:
         for t, c, _life, names in d.waves:
             if c and w.start - 2 <= t <= w.start + w.duration:
                 name = re.sub(r"\s*\([^)]*\)", "", names).strip()
-                out.append((name, f"Kill the {name}: the boss is immune from {_mmss(w.start)} until it dies (it comes at "
+                out.append((names, f"Kill the {name}: the boss is immune from {_mmss(w.start)} until it dies (it comes at "
                                   f"{_mmss(t)}; the top raids take about {w.duration - (t - w.start):.0f} s)."))
                 break
     return out

@@ -306,8 +306,7 @@ def _row(m: Moment, i: int, gap: float = 0.0) -> str:
     you = "".join(_ev(x, m.t) for x in m.you)
     when = "Before the pull" if m.t < 0 else ("Pull" if m.t < 1 else _mmss(m.t))
     label = f"{when}, {m.title}: show this moment"
-    quiet = not m.you and not any(x.kind in ("phase", "immune", "adds", "move", "lust", "kill", "mech") for x in m.boss)
-    quiet = quiet or (not m.you and all(x.kind == "tank" for x in m.boss))
+    quiet = not m.you and all(x.kind == "tank" for x in m.boss)  # grey: only the tank's, nothing for you
     cls = "fm quiet" if quiet else ("fm kill" if any(x.kind == "kill" for x in m.boss) else "fm")
     room = f" style='min-height:{min(110, max(0, (gap - ROW_GAP) * 2.2)) + 34:.0f}px'" if gap > ROW_GAP else ""
     return (f"<div class='{cls}{' has-boss' if boss else ''}' data-i='{i}' data-t='{m.t:g}' data-title='{e(m.title)}'"
@@ -500,7 +499,7 @@ def legend(its: list) -> str:
     kinds = {x.kind for _t, x in its if x.dur}
     spans = "".join(f"<span><i class='s-{k}'></i>{label}</span>" for k, label in LEGEND_KINDS if k in kinds)
     return (f"<div class='fv-legend' aria-hidden='true'>{spans}<span>bar length = how long it lasts</span>"
-            "<span>grey row = nothing for you to press</span></div>")
+            "<span>grey row = the tank's, nothing for you</span></div>")
 
 
 def _side(d) -> str:

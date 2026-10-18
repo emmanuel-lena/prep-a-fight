@@ -161,7 +161,9 @@
   }
   /* the you line: the press due now, else the adds still to kill, else what the boss being immune leaves you */
   function youNow(t, cc) {
-    if (cc.state === 'go') return names(cc.g);
+    var alive = B.filter(function (b) { return b.k === 'adds' && !gone(b.t) && eff(b.t) <= t && t < until(b); })[0];
+    var still = alive ? ' · then kill the ' + alive.n.replace(/^\d+ × /, '') + ' (' + secs(until(alive) - t) + ' left)' : '';
+    if (cc.state === 'go') return names(cc.g) + still;  // the press now, and the adds still up after it
     if (!st.playing && t === 0 && cc.g) return names(cc.g);
     if (t < 0) return 'Pull in ' + secs(-t);
     var adds = B.filter(function (b) { return b.k === 'adds' && !gone(b.t) && eff(b.t) <= t && t < until(b); })[0];
@@ -276,7 +278,11 @@
     st.lastPhase = pn;
     txt($('c-title'), title(t, cc));
     var bl = bossNow(t); txt($('c-boss'), bl); txt($('ss-boss'), bl === '—' ? '' : bl);
-    var yn = youNow(t, cc); txt($('c-you'), yn); txt($('ss-you'), yn === 'Your rotation' || cc.state === 'go' ? '' : yn);
+    var yn = youNow(t, cc); txt($('c-you'), yn);
+    var sy = cc.state === 'go' ? (yn.split(' · then ')[1] || '') : yn;  // the second screen: what the card does not say
+    var lab = (cc.html || '').replace(/<[^>]+>/g, ' ');  // the card being drawn now
+    if (sy === 'Your rotation' || (sy && lab.toLowerCase().indexOf(sy.toLowerCase()) >= 0)) sy = '';
+    txt($('ss-you'), sy ? sy.charAt(0).toUpperCase() + sy.slice(1) : '');
     if (cc.state === 'go' && cc.g && st.called[gkey(cc.g)] == null) st.called[gkey(cc.g)] = st.cur;
     ['c-call', 'ss-call'].forEach(function (id) { var el = $(id); set(el, cc.html); el.className = cc.cls; });
     var th = then(t, cc); txt($('c-then'), th); txt($('ss-then'), th);
