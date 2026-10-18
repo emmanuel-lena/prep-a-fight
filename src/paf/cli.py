@@ -880,27 +880,6 @@ def calibration_note(got: float, target: float, scale: float = 0.1) -> str:
             "Boss-only numbers are pessimistic, add damage optimistic.")
 
 
-def _pickle_sheet(d) -> bytes:
-    """The sheet's data as a pickle: database rows become dicts, functions made on the fly (the plans' rules, the
-    compared plans) are dropped; nothing on the sheet reads them."""
-    import io
-    import pickle
-    import sqlite3
-    import types
-
-    class Sheet(pickle.Pickler):
-        def reducer_override(self, obj):
-            if isinstance(obj, sqlite3.Row):
-                return dict, (dict(zip(obj.keys(), tuple(obj), strict=True)),)
-            if isinstance(obj, types.FunctionType | types.MethodType) and "<" in getattr(obj, "__qualname__", "<"):
-                return type(None), ()
-            return NotImplemented
-
-    buf = io.BytesIO()
-    Sheet(buf).dump(d)
-    return buf.getvalue()
-
-
 def cmd_prep(args: argparse.Namespace) -> int:
     import statistics as st
     import webbrowser
@@ -915,7 +894,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
     from paf.corpus.timeline import build_timeline, render_html
     from paf.droptimizer import run_droptimizer, usable_loot
     from paf.gamedata import encounter_loot, item_classes, item_inventory_types, item_names, item_sets
-    from paf.prep_report import PrepData, render
+    from paf.prep_report import PrepData, render, sheet_pickle
     from paf.profile import parse_simc_export
     from paf.talent_sim import compare as compare_builds
     from paf.topgear import FightProfile, GearPool, run_topgear
@@ -1361,7 +1340,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
     out = reports / f"prep-{report_key(enc.name, diff_name)}.html"
     out.write_text(render(d), encoding="utf-8")
     try:  # the sheet's data, to render it again (design work) without a new prep; local only, never shared
-        (root / "prepdata.pickle").write_bytes(_pickle_sheet(d))
+        (root / "prepdata.pickle").write_bytes(sheet_pickle(d))
     except Exception as exc:  # noqa: BLE001 - only a convenience
         print(f"  (the sheet's data was not saved for a later render: {str(exc)[:120]})")
     import json

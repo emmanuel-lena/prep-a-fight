@@ -977,10 +977,33 @@ def onto_adds(d: PrepData) -> None:
             d.nsrt[p.objective] = nsrt_note(int(enc[1]), p, d.fight, getattr(d, "game_phases", None) or d.phases, tag[1], spell_ids, d.cd_names)
 
 
-def render(d: PrepData) -> str:
-    import copy
+def sheet_pickle(d) -> bytes:
+    """The sheet's data as a pickle: database rows become dicts, functions made on the fly (the plans' rules, the
+    compared plans) are dropped; nothing on the sheet reads them."""
+    import io
+    import pickle
+    import sqlite3
+    import types
 
-    d = copy.deepcopy(d)  # the sheet's words are set here; the data saved after it (and rendered again) stays as simmed
+    class Sheet(pickle.Pickler):
+        def reducer_override(self, obj):
+            if isinstance(obj, sqlite3.Row):
+                return dict, (dict(zip(obj.keys(), tuple(obj), strict=True)),)
+            if isinstance(obj, types.FunctionType | types.MethodType) and "<" in getattr(obj, "__qualname__", "<"):
+                return type(None), ()
+            return NotImplemented
+
+    buf = io.BytesIO()
+    Sheet(buf).dump(d)
+    return buf.getvalue()
+
+
+def render(d: PrepData) -> str:
+    import pickle
+
+    # the sheet's words are set on a copy: the data saved after it (and rendered again) stays as simmed. Copied as
+    # it is saved: a fresh prep holds database rows, which deepcopy cannot copy (every new prep failed to render)
+    d = pickle.loads(sheet_pickle(d))
     onto_adds(d)
     from paf import simple as _simple
 
