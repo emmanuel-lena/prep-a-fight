@@ -1048,8 +1048,8 @@ def raid_board(encs, class_name: str, spec: str) -> str:
                   f"<div class='rb-ds'>{states}</div></div></div>")
     return (f"<h2 class='h-mine'>Your raid, boss by boss</h2>{queue_strip(settings.get('difficulty'))}"
             f"<div class='rb-row'>{items}</div>{QUEUE_JS}{RB_JS}"
-            "<p class='small muted rb-legend'><span>Point at a boss to see its three difficulties; click one to open its sheet or "
-            "the sheet or the prep.</span> <span>A grey boss is not prepared for this week yet.</span></p>")
+            "<p class='small muted rb-legend'><span>Point at a boss to see its three difficulties; click one to open "
+            "its sheet or start its prep.</span> <span>A grey boss is not prepared for this week yet.</span></p>")
 
 
 def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
