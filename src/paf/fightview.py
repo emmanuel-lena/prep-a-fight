@@ -340,6 +340,11 @@ def _ctx(t: float, its: list[tuple[float, Item]]) -> str:
 PULL = {"t": 0, "n": "The pull", "k": "pull", "p": 0, "ic": ""}  # a pull timer that runs late: confirm the pull
 
 
+def _t1(t: float) -> float:
+    """A time to a tenth, cut and not rounded: 201.98 s stays 3:21 on every surface (MRT note, job card, page)."""
+    return int(t * 10) / 10
+
+
 def data(d, ms: list[Moment], dur: float) -> dict:
     """What the page's script needs, each event at its own time on the plan's clock."""
     its = items(d)
@@ -349,21 +354,21 @@ def data(d, ms: list[Moment], dur: float) -> dict:
         return max((i for i, p in enumerate(phases) if t >= p[1] - 0.5), default=0)
 
     phase_starts = [s for _n, s, _e in phases[1:]]
-    acts = [{"t": round(t, 1), "n": x.text, "k": x.kind, "ic": x.icon, "d": round(x.dur, 1),
+    acts = [{"t": _t1(t), "n": x.text, "k": x.kind, "ic": x.icon, "d": round(x.dur, 1),
              "c": "" if x.kind == "move" else (_ctx(t, its) or ("default list timing" if x.kind == "cd" else ""))}
             for t, x in its if x.side == "you"]
     acts.sort(key=lambda a: (a["t"], YOU_ORDER.index(a["k"])))
     return {
         "end": round(dur, 1),
-        "phases": [[n, round(s, 1), round(t, 1)] for n, s, t in phases],
-        "rows": [round(m.t, 1) for m in ms],
+        "phases": [[n, _t1(s), _t1(t)] for n, s, t in phases],
+        "rows": [_t1(m.t) for m in ms],
         "acts": acts,
-        "anchors": [PULL] + [{"t": round(t, 1), "n": x.name if x.kind in ("phase", "immune") else x.text, "k": x.kind,
+        "anchors": [PULL] + [{"t": _t1(t), "n": x.name if x.kind in ("phase", "immune") else x.text, "k": x.kind,
                      "p": ph(t), "ic": x.icon} for t, x in its if x.side == "boss" and x.kind in ANCHORS and t >= 1
                     and not (x.kind != "phase" and any(abs(t - s) <= 1 for s in phase_starts))],
-        "boss": [{"t": round(t, 1), "d": round(x.dur, 1), "n": x.text, "k": x.kind, "ic": x.icon} for t, x in its
+        "boss": [{"t": _t1(t), "d": round(x.dur, 1), "n": x.text, "k": x.kind, "ic": x.icon} for t, x in its
                  if x.side == "boss" and x.kind not in ("phase",)],
-        "strips": [{"t": round(t, 1), "d": round(x.dur, 1), "k": x.kind, "side": x.side, "n": x.name}
+        "strips": [{"t": _t1(t), "d": round(x.dur, 1), "k": x.kind, "side": x.side, "n": x.name}
                    for t, x in its if x.dur and x.kind in ("cd", "pot", "def", "lust", "adds", "move", "immune")],
     }
 

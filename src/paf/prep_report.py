@@ -824,7 +824,13 @@ def in_time_order(note: str) -> str:
 
 
 def render(d: PrepData) -> str:
-    d.mrt = {k: in_time_order(v) for k, v in d.mrt.items()}
+    pre = {n for n in d.precast} | {n for n in d.links if "potion" in n.lower()} | {"Potion"}
+
+    def before_pull(note: str) -> str:  # a press cast before the pull says so, as the fight tab's note does
+        return "\n".join(line + " - before the pull" if line.startswith("{time:0:00}") and any(
+            re.search(rf"\b{re.escape(n)}\b", line) for n in pre) and " - " not in line else line
+            for line in note.splitlines())
+    d.mrt = {k: before_pull(in_time_order(v)) for k, v in d.mrt.items()}
     d.nsrt = {k: in_time_order(v) for k, v in d.nsrt.items()}
     from dataclasses import replace as _replace
 

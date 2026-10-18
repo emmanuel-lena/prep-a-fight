@@ -15,3 +15,7 @@
 .guide .other-role{font-size:14px;color:var(--muted);margin:14px 0 4px}
 .ics{vertical-align:-4px;margin-right:6px}
 .stage>.abg:first-child>.ab:first-child{border-top:0;padding-top:0}
+/* each ability group separated by a line under it, so a column never starts on a stray rule */
+.stage>.abg>.ab:first-child{border-top:0;padding-top:0}
+.stage>.abg{border-bottom:1px solid var(--line);padding-bottom:4px;margin-bottom:8px}
+.stage>.abg:last-child{border-bottom:0}
