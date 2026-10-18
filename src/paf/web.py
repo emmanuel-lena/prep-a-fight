@@ -1208,7 +1208,7 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
                      '<input type="hidden" name="goal" value="boss">'
                      f'<div class="ob-actions">{nxt}</div></section>')
     else:
-        goal_html = ('<section class="ob-step" data-step="goal"><h2><span class="vh">Step 1 of 4: </span>What do you want from this boss?</h2>'
+        goal_html = ('<section class="ob-step" data-step="goal"><h2><span class="vh">Step 1 of 4: </span>Your goal on this boss</h2>'
                      '<div class="goals">' + """<label class="goal"><input type="radio" name="goal" value="boss"><span><b>Boss damage</b>
 <small>Progress: your raid lead wants everyone on the boss. Cooldowns and gear aim at the boss.</small></span></label>
 <label class="goal"><input type="radio" name="goal" value="total"><span><b>Pad the adds</b>
@@ -1286,8 +1286,17 @@ function show(i, back){
   steps.forEach(function(s, j){ s.classList.toggle('on', j === at); s.classList.toggle('back', !!back); });
   dots.forEach(function(d, j){ d.classList.toggle('on', j <= at); });
   if (steps[at].dataset.step === 'go') recap();
+  var h2 = steps[at].querySelector('h2'); if (h2) { h2.tabIndex = -1; h2.focus({preventScroll: true}); }  // keep the place
 }
 f.querySelectorAll('.next').forEach(function(b){ b.addEventListener('click', function(){ show(at + 1); }); });
+f.addEventListener('keydown', function(ev){  // Enter in a field moves on a step; only the last step's button prepares
+  if (ev.key === 'Enter' && ev.target.tagName === 'INPUT' && steps[at].dataset.step !== 'go') { ev.preventDefault(); show(at + 1); } });
+var rl = f.querySelector('input[name=raid]'), go = f.querySelector('.ob-step[data-step=go] .btn.go');
+if (rl) rl.addEventListener('input', function(){  // a link that is not a report: said at once, and no prep from it
+  var bad = rl.value.trim() && rl.value.indexOf('warcraftlogs.com/reports/') < 0;
+  rl.classList.toggle('bad', !!bad); if (go) go.disabled = !!bad;
+  var h = rl.closest('.ob-step').querySelector('p.small'); if (h) { if (h.dataset.t == null) h.dataset.t = h.textContent;
+    h.textContent = bad ? 'Not a Warcraft Logs report link: paste one like https://www.warcraftlogs.com/reports/..., or leave it empty.' : (rl.value.trim() ? 'This log is read for your raid.' : h.dataset.t); } });
 f.querySelectorAll('.prev').forEach(function(b){ b.addEventListener('click', function(){ show(at - 1, true); }); });
 f.querySelectorAll('input[name=goal]').forEach(function(r){ r.addEventListener('change', function(){
   try { localStorage.setItem(key, r.value); } catch (e) {}  // on to the step after the goal, once, however fast the clicks
@@ -1974,17 +1983,18 @@ class Handler(BaseHTTPRequestHandler):
 
                 boss_id = int(form["boss"][0])
                 difficulty = form.get("difficulty", ["heroic"])[0]
-                write_assigns(boss_id, difficulty, form.get("assign", []))
                 raid = (form.get("raid") or [""])[0]
-                if raid.strip():
+                if raid.strip():  # checked before anything is written
                     from paf.raidneed import report_code
 
                     try:
                         report_code(raid)
                     except ValueError as ex:
-                        self._send(page("Invalid log link", f"<p>{e(str(ex))}. "
-                                                            f"<a href='javascript:history.back()'>Back</a></p>"), 400)
+                        self._send(page("Invalid log link", f"<p>{e(str(ex))}: nothing was started or saved. "
+                                                            f"<a href='javascript:history.back()'>Back to the "
+                                                            f"form</a></p>"), 400)
                         return
+                write_assigns(boss_id, difficulty, form.get("assign", []))
                 write_raid(boss_id, difficulty, raid)
                 enc = next(x for x in raid_encounters(WCLClient()) if x.id == boss_id)
                 args = ["prep", str(boss_id), "--difficulty", difficulty]

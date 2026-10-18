@@ -40,3 +40,4 @@ body:has(.ob:not(.story))>main{grid-column:1;display:grid;align-content:start;pa
 .ob textarea{font-size:15px} .ob select[name=region]{min-width:120px}
 .ob-field{display:grid;gap:6px;font-weight:600;font-size:14px}
 .ob-field input{font-weight:400} .ob-field input::placeholder{color:var(--muted);font-weight:400}
+.ob input.bad{border-color:var(--neg);box-shadow:0 0 0 2px color-mix(in srgb,var(--neg) 30%,transparent)} .ob h2:focus{outline:none}
