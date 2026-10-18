@@ -303,6 +303,12 @@ def aim_html(d) -> str:
     return f"<div class='aim rv'>{cells}</div>{note}"
 
 
+def _wanted(d):
+    from paf.prep_report import wanted
+
+    return wanted(d) if hasattr(d, "goal") else None
+
+
 def _profile(d):
     """Your spec's total vs boss DPS rankings on this boss (read with your raid's log)."""
     raid = getattr(d, "raid", None)
@@ -385,7 +391,9 @@ def confidence_pill(d) -> str:
     if share and int(share[1]) != int(share[2]):  # the total is right, the split between boss and adds is not
         low = int(share[1]) < int(share[2])
         say += (f" The split leans {'to the adds' if low else 'to the boss'}: SimC's default list in the top players' "
-                f"gear puts {share[1]}% of its damage on the boss, they put {share[2]}%.")
+                f"gear puts {share[1]}% of its damage on the boss, they put {share[2]}%"
+                + ("; the plan you play pads the adds, so your own figure puts less on the boss." if
+                   getattr(d, "aim_plan", False) and _wanted(d) == "total" else "."))
     if overshoot(d):  # your character's total above what the best really do: the adds weigh more in SimC
         say += (" Here SimC's area damage makes the total run high: trust the boss figures and which option wins "
                 "more than the exact total.")
