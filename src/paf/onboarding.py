@@ -90,6 +90,22 @@ def page_body() -> str:
 
     regions = "".join(f"<option value='{r}'>{r.upper()}</option>" for r in settings.SETTINGS["guild_region"].choices)
     key_done = has_credentials()
+    from html import escape as esc
+
+    from paf.profile import parse_simc_export
+    from paf.web import _profile_path
+
+    prof = _profile_path()
+    char = parse_simc_export(prof.read_text(encoding="utf-8-sig")) if prof.is_file() else None
+    have_char = (f"<p class='ob-have'>Loaded now: <b>{esc(char.name)}, {esc(char.spec.title())} "
+                 f"{esc(char.class_name.title())}</b>. Paste another export only to change it.</p>") if char else ""
+    guild, gserver, greg = settings.get("guild") or "", settings.get("guild_server") or "", settings.get("guild_region")
+    regions_g = "".join(f"<option value='{r}'{' selected' if r == greg else ''}>{r.upper()}</option>"
+                        for r in settings.SETTINGS["guild_region"].choices)
+    summary = "; ".join(x for x in (
+        "Warcraft Logs connected" if key_done else "",
+        f"character {char.name}" if char else "",
+        f"guild {guild}" if guild else "") if x)  # what is set already, said on the last step
     skip = "<button type='button' class='btn ghost skip'>Skip</button>"
     key_form = f"""{connect_block() + "<div class='ob-actions'>" + skip + "</div><details class='ob-own' open><summary>Or use your own API key</summary>"
  if wcllogin.available() else ""}
@@ -120,11 +136,11 @@ def page_body() -> str:
 <a class="btn ghost" href="/onboard/skip">Skip all</a></div></section>
 
 <section class="ob-step" data-step="key">
-<h1>{'Connect to Warcraft Logs' if wcllogin.available() else 'Your Warcraft Logs key'}</h1>
+<h1>{'Warcraft Logs: connected' if key_done else 'Connect to Warcraft Logs' if wcllogin.available() else 'Your Warcraft Logs key'}</h1>
 {done_html if key_done else key_form}</section>
 
 <section class="ob-step" data-step="character">
-<h1>Your character</h1>
+<h1>Your character</h1>{have_char}
 <div class="ob-tabs" role="tablist"><button type="button" role="tab" class="on" data-tab="simc">Paste /simc (recommended)</button>
 <button type="button" role="tab" data-tab="wcl">Quick: from Warcraft Logs</button></div>
 <form class="ob-form ob-tab" data-tab="wcl" data-to="/onboard/character" hidden>
@@ -144,14 +160,15 @@ def page_body() -> str:
 <p>Your guild's latest public log tells the prep who plays what in your raid: whether the others cover the adds
 (stay on the boss) or you should pad them, and how your last pull compares with the top players'.</p>
 <form class="ob-form" data-to="/onboard/raid" method="post" action="/guild">
-<div class="row"><input name="guild" placeholder="Guild name"><input name="server" placeholder="Server">
-<select name="region" aria-label="Region">{regions}</select></div>
+<div class="row"><input name="guild" placeholder="Guild name" value="{esc(guild)}"><input name="server" placeholder="Server"
+ value="{esc(gserver)}"><select name="region" aria-label="Region">{regions_g}</select></div>
 <p class="ob-err" role="alert"></p>
 <div class="ob-actions"><button class="btn go">Save</button>{skip}</div></form></section>
 
 <section class="ob-step" data-step="done">
 <h1>Ready</h1>
 <p class="ob-summary" data-title="your raid is saved" data-text="You can set the rest later in Settings."></p>
+{f"<p class='muted'>Already set: {esc(summary)}.</p>" if summary else ""}
 <div class="ob-actions"><a class="btn go finish" href="/onboard/finish">Prepare a boss &rarr;</a></div></section>
 </div>"""
 

@@ -16,7 +16,7 @@
 .ob form .row{display:flex;gap:8px;flex-wrap:wrap} .ob form .row input{flex:1;min-width:140px}
 .ob form>input{display:block;width:100%;margin:0 0 8px;box-sizing:border-box}
 .ob textarea{width:100%;min-height:160px;box-sizing:border-box}
-.ob-err{color:var(--neg);min-height:1.2em;margin:8px 0 0}
+.ob-err{color:var(--neg);margin:8px 0 0} .ob-err:empty{display:none}
 .ob-tabs{display:flex;gap:6px;margin:0 0 14px}
 .ob-tabs button{border:1.5px solid var(--line);background:none;color:var(--fg);border-radius:999px;padding:8px 16px;
   cursor:pointer;font:inherit;font-weight:600}
@@ -26,7 +26,7 @@
 @media (prefers-reduced-motion:reduce){.ob-step.on{animation:none}}
 /* the first run is its own moment: no side bar yet */
 body.has-side:has(.ob:not(.story)){grid-template-columns:minmax(0,1fr)} body:has(.ob:not(.story))>.side{display:none}
-body:has(.ob:not(.story))>main{grid-column:1;display:grid;align-content:center;min-height:100vh}
+body:has(.ob:not(.story))>main{grid-column:1;display:grid;align-content:start;padding-top:12vh;min-height:100vh} /* a fixed top: the brand and dots never move */
 .ob .btn:focus:not(:focus-visible){outline:none} .ob-actions .btn{min-height:46px}
 .ob-brand{font:600 18px var(--font-display);margin:0 0 18px;color:var(--fg)} .ob-brand b{color:var(--accent)}
 .ob-note{margin-top:14px} .ob-actions .btn{box-sizing:border-box;height:46px} /* notes off the controls; buttons one height */

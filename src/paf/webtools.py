@@ -132,9 +132,9 @@ SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
         ("guild_region", "Guild's region", ""),
     ]),
     ("The app", False, [
-        ("language", "Language", "Of the app and the prep sheets."),
         ("refresh_after_reset", "Prepare again after the weekly reset",
-         "The bosses \"Prepare the whole raid\" prepared last week, by themselves."),
+         "After the weekly reset, the app prepares again by itself the bosses you prepared last week with "
+         "\"Prepare the whole raid\"."),
         ("share_packs", "Share the prep packs you compute",
          "Fight data only, no names: the next player of your spec skips the log download."),
         ("check_updates", "Look for new versions", "Every 10 minutes, on GitHub."),
@@ -144,7 +144,7 @@ SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
         ("corpus_points", "Quota for background reading",
          "Warcraft Logs points per hour (of 3600) the reading in the background may use; a prep you wait for "
          "uses the whole quota."),
-        ("region", "Rankings from one region only", "EU, US, KR, TW or CN; empty for all regions."),
+        ("region", "Rankings from one region only", "All regions unless you pick one."),
         ("cache_max_mb", "Disk cache cap (MB)", "Sim results and Warcraft Logs answers; the oldest go first."),
         ("onboarded", "First-run steps done", "Off: the welcome steps show again."),
     ]),
@@ -153,6 +153,11 @@ SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
 
 def _setting_control(key: str) -> str:
     s, cur = settings.SETTINGS[key], settings.get(key)
+    if key == "region":  # a dropdown, as the guild's region above it
+        regs = ("",) + tuple(settings.SETTINGS["guild_region"].choices)
+        return "<select name='region' id='s-region'>" + "".join(
+            f"<option value='{e(r)}'{' selected' if r == (cur or '') else ''}>{e(r.upper() or 'All regions')}</option>"
+            for r in regs) + "</select>"
     if key == "language":  # the languages the app has a catalog for
         from paf.i18n import available
 
@@ -176,7 +181,8 @@ def settings_form() -> str:
     """The settings, grouped and in words, with one Save."""
     # set elsewhere, never typed: the class and spec follow the active character, the last raids read are ticked
     # per character in Characters
-    listed = {k for _g, _f, rows in SETTINGS_FORM for k, _l, _h in rows} | {"class", "spec", "auto_logs"}
+    listed = {k for _g, _f, rows in SETTINGS_FORM for k, _l, _h in rows}
+    listed |= {"class", "spec", "auto_logs", "language"}  # set elsewhere; the language: English only before 1.0
     groups = [(g, folded, [r for r in rows if r[0] in settings.SETTINGS]) for g, folded, rows in SETTINGS_FORM]
     groups[-1][2].extend((k, k.replace("_", " ").capitalize(), s.help) for k, s in settings.SETTINGS.items()
                          if k not in listed)
@@ -238,15 +244,15 @@ It is tested before it replaces the old one.</p>
 autocomplete="off">
 <button class="btn ghost">Save and test</button></form>
 <p class="tiny muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p></div>
-<h2>Status</h2><div class="card"><table>
-<tr><td>SimulationCraft</td><td class="small">{simc}</td><td class="act"><form method="post" action="/tool/setup">
-<button class="btn ghost">Update</button></form></td></tr>
-<tr><td>prep-a-fight</td><td class="small">version {e(__version__)}</td><td class="act">
-<form method="post" action="/update/check"><button class="btn ghost">Check for updates</button></form></td></tr>
-<tr><td>Warcraft Logs</td><td class="small">{quota}</td><td class="act"></td></tr>
-<tr><td class="nw">Caches (sims, logs)</td><td class="small">{size(cache_root()) / 1e6:,.0f} MB
-(cap {settings.get('cache_max_mb')} MB)</td><td class="act"></td></tr>
-<tr><td>Data folder</td><td class="small">{e(str(data_dir()))}</td><td class="act"></td></tr></table></div>
+<h2>Status</h2><div class="card"><table class="status">
+<tr><td>SimulationCraft</td><td class="small"><div class="val"><span>{simc}</span><form method="post" action="/tool/setup">
+<button class="btn ghost">Update</button></form></div></td></tr>
+<tr><td>prep-a-fight</td><td class="small"><div class="val"><span>version {e(__version__)}</span>
+<form method="post" action="/update/check"><button class="btn ghost">Check for updates</button></form></div></td></tr>
+<tr><td>Warcraft Logs</td><td class="small">{quota}</td></tr>
+<tr><td>Caches (sims, logs)</td><td class="small">{size(cache_root()) / 1e6:,.0f} MB
+(cap {settings.get('cache_max_mb')} MB)</td></tr>
+<tr><td>Data folder</td><td class="small">{e(str(data_dir()))}</td></tr></table></div>
 <h2>Every tool</h2><div class="card"><p class="small">The prep of a boss runs them all; each one is also on its own
-page, to dig further: <a href="/tools">see every tool</a>.</p></div>
+page, to dig further.</p><p><a class="btn ghost" href="/tools">See every tool &rarr;</a></p></div>
 </div></div>"""

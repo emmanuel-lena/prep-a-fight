@@ -193,7 +193,7 @@ h2 .btn.copy{margin-left:8px;vertical-align:middle;text-transform:none;letter-sp
 .ccard .cc-spec{font-weight:600;color:var(--fg)}
 /* settings: the groups titled like the other sections of the app */
 .set-group>legend,.set-group>summary{font:600 15px var(--font-display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
-.set-cols td.act{text-align:right;white-space:nowrap} .set-cols td.act form{margin:0}
+.set-cols td.act{text-align:right;white-space:nowrap;width:1%} .set-cols td.act form{margin:0} /* the buttons column only as wide as its buttons */
 .crumb{margin:0 0 8px;font-size:14px} .crumb a{color:var(--muted);text-decoration:none} .crumb a:hover{color:var(--fg)}
 .est-line{margin:-4px 0 18px;color:var(--muted);font-size:14px;max-width:80ch} .est-line b{color:var(--fg)} .est-line .nw{white-space:nowrap}
 .rl-start p{flex:1 1 320px} .rl-start form{margin-left:auto}
@@ -227,3 +227,6 @@ textarea[name=plan],textarea[name=notes]{font-family:var(--font-data);font-size:
   .boss-journal .stage>h3{column-span:all} .boss-journal .unit{break-after:avoid} .boss-journal .ab,.boss-journal .unit,.boss-journal .unit-d{break-inside:avoid}}
 .boss-journal .abg{break-inside:avoid}
 .set-cols .card>table{width:100%;max-width:100%} .set-cols td.small{overflow-wrap:anywhere} /* a long path wraps inside its card */
+.set-row input[type=checkbox]{margin-left:0;justify-self:start} /* on the inputs' left edge */
+.set-cols .card>table td:first-child{width:1%;white-space:nowrap;padding-right:18px} /* label and buttons tight, the value takes the room */
+.status .val{display:flex;align-items:center;justify-content:space-between;gap:12px} .status .val form{margin:0;flex:none} /* a button beside its value, not a column of its own */
