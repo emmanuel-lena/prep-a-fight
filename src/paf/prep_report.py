@@ -446,7 +446,8 @@ def suggestions(d: PrepData) -> list[Suggestion]:
     if d.raid and d.raid.verdicts:
         v = d.raid.verdicts[0]
         what = "stay on the boss" if d.raid.objective == "boss" else "pad the adds"
-        out.append(Suggestion("info", f"With your raid, <b>{what}</b>", [e(raidneed.readable(v.reason))]))
+        why = raidneed.readable(v.reason)
+        out.append(Suggestion("info", f"With your raid, <b>{what}</b>", [e(why[:1].upper() + why[1:])]))
     if d.talents and d.talents.rows:
         best = best_build(d)
         g = best.per_fight.get(d.talents.fights[0], (0.0, None))[0] if best else 0.0
@@ -714,6 +715,30 @@ def _tools_html() -> str:
                               "mechanics"), target="_top"))
 
 
+def stage_times(html: str, phases: list[tuple[str, float]], duration: float) -> str:
+    """The journal's 'around m:ss' timings, each stage keeping only the casts that fall in it."""
+    ph = sorted(phases, key=lambda p: p[1])
+    spans = {n: (s, ph[i + 1][1] if i + 1 < len(ph) else (duration or 1e9)) for i, (n, s) in enumerate(ph)}
+
+    def secs(x: str) -> int:
+        m, s = x.split(":")
+        return int(m) * 60 + int(s)
+
+    def one(sec: re.Match) -> str:
+        span = spans.get(re.sub(r"<[^>]+>", "", sec.group(2)).strip())
+        if span is None:
+            return sec.group(0)
+
+        def keep(m: re.Match) -> str:
+            ts = [t for t in re.findall(r"\d+:\d\d", m.group(1)) if span[0] - 2 <= secs(t) < span[1]]
+            return f"around {', '.join(ts)}" if ts else ""
+        body = re.sub(r"around ((?:\d+:\d\d(?:, )?)+)(?:…)?", keep, sec.group(3))
+        body = re.sub(r"<div class='small muted'>(?: &middot; )?</div>", "", body.replace(">&middot; ", ">"))
+        return sec.group(1) + body + "</section>"
+
+    return re.sub(r'(<section class="card stage"><h3>(.*?)</h3>)(.*?)</section>', one, html, flags=re.S)
+
+
 def in_time_order(note: str) -> str:
     """An MRT note ({time:m:ss}) or NSRT reminders (time:s;ph:n) with the defensives merged in time order (the
     player reads it before pasting it); the lines without a time keep their place on top."""
@@ -774,7 +799,8 @@ def render(d: PrepData) -> str:
         tabs["boss"].append(defensives_html(d))
         tabs["boss"].append("<h2>Every ability, phase by phase</h2><p class='small muted'>From the in-game "
                             "Encounter Journal; timings and how many players are hit come from the ranked kills.</p>"
-                            + f"<div class='stages'>{bossguide.modernize(d.guide_abilities)}</div>")
+                            + f"<div class='stages'>{stage_times(bossguide.modernize(d.guide_abilities), d.phases, d.duration)}"
+                            "</div>")
     else:
         tabs["boss"].append(defensives_html(d))
     if d.timeline_file:
@@ -841,11 +867,13 @@ and the gear for that.</p></div>""")
     if d.sim_dps and d.patchwerk_dps:
         boss = ""
         if d.sim_boss_dps:
-            boss = f", {d.sim_boss_dps:,.0f} of it on the boss ({d.sim_boss_dps / d.sim_dps:.0%})"
+            boss = (f", {d.sim_boss_dps:,.0f} of it on the boss ({d.sim_boss_dps / d.sim_dps:.0%}: your character's own "
+                    f"share in this sim, with its talents and plan)")
         cal = ""
         if d.boss_share_real is not None:
-            cal = (f" The fight is calibrated so that your share of damage on the boss matches the top players' "
-                   f"logs ({d.boss_share_real:.0%}); add counts scaled by {d.add_scale:g}.")
+            cal = (f" The top players put {d.boss_share_real:.0%} of their damage on the boss in their logs: the rebuilt "
+                   f"fight is tuned toward that by counting each add wave at {d.add_scale:g} of its size (SimC hits every "
+                   f"add in range, real players do not).")
         tabs["fight"].append(f"""<h2>Your character on this fight</h2><div class="card">
 <p>{d.sim_dps:,.0f} DPS on the rebuilt fight{boss}, vs {d.patchwerk_dps:,.0f} on a Patchwerk of the same length
 ({(d.sim_dps / d.patchwerk_dps - 1):+.0%}).{cal}</p></div>""")
@@ -938,15 +966,16 @@ for reference: a build can be worse there and much better on this fight. Error a
             if a.in_adds > a.adds_cover * 1.5 and a.in_adds - a.adds_cover > 0.1:
                 held.append("held for adds")
             if a.units_cover and a.in_units > a.units_cover * 1.5 and a.in_units - a.units_cover > 0.1:
-                held.append("held for secondary targets")
+                held.append("held for burst targets")
             rows += (f"<tr><td>{icons.img(d.icons.get(a.ability, ''), 'small')} {lk(a.ability)}</td>"
                      f"<td class='n'>{a.in_adds:.0%}</td><td class='n'>{a.in_units:.0%}</td>"
                      f"<td>{e(' / '.join(held) or 'no clear hold')}</td></tr>")
         tabs["cooldowns"].append(f"""<h2>What the top players do with their cooldowns</h2><div class="card scroll">
 <p class="small">Share of their casts (after the opener) during add waves, which cover {a0.adds_cover:.0%} of the fight,
-and on the secondary targets, which cover {a0.units_cover:.0%}. Much more than the coverage means they hold the cooldown.
-SimC does not know that a secondary target must die fast, so compare with the simulated plans above.</p>
-<table class="fit"><tr><th>Cooldown</th><th class="n">During adds</th><th class="n">Secondary targets</th><th>Reading</th></tr>{rows}</table></div>""")
+and on the burst targets{f" ({e(burst_names(d)[1])})" if burst_names(d)[1] else ""}, which cover {a0.units_cover:.0%}. Much more
+than the coverage means they hold the cooldown. SimC does not know that a burst target must die fast, so compare with
+the simulated plans above.</p>
+<table class="fit"><tr><th>Cooldown</th><th class="n">During adds</th><th class="n">On burst targets</th><th>Reading</th></tr>{rows}</table></div>""")
 
     # gear
     if d.gear:
@@ -985,7 +1014,7 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
     if d.validation:
         lo, med, hi = d.validation
         notes.insert(0, f"Validation: the top players' own characters simmed on this rebuilt fight give {med:.0%} of "
-                        f"their real DPS (range {lo:.0%}-{hi:.0%}).")
+                        f"their real DPS for the median one (the lowest {lo:.0%}, the highest {hi:.0%}).")
     notes += [
         "A rebuilt fight is an approximation: good to choose between builds, items and plans, not a prediction "
         "of your exact DPS.",
@@ -1007,6 +1036,9 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
         + [_tools_html()],
     }
     sections["deeper"] = [_contents("".join(sections["deeper"]))]
+    b = sections["boss"]  # the boss tab opens on what the top players do beside the boss in 60 seconds
+    if len(b) >= 2 and b[0].startswith("<h2>What the top players do") and b[1].startswith("<h2>The boss in 60"):
+        sections["boss"] = [f"<div class='boss-top'><div>{b[0]}</div><div>{b[1]}</div></div>"] + b[2:]
     cls_icon = icons.img(icons.CLASS_ICON.format(cls=d.class_name.lower()), "large", "hero-ic") if d.class_name else ""
     header = f"""<header class="sheet-hero"><div class="in">{cls_icon}<div class="txt">
 <h1>{e(d.boss)} {diff_pill(d.difficulty)}</h1>

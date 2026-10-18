@@ -36,6 +36,46 @@ def readable(text: str) -> str:
     return t if t == text else re.sub(r"\s{2,}", " ", t)
 
 
+def _blocks(html: str, start: int) -> list[tuple[int, int, int]]:
+    """(start, end, indent px) of each ability or unit row from `start`, by balancing the divs."""
+    out = []
+    for m in re.finditer(r'<div class="(ab|unit)" style="margin-left:(\d+)px">', html[start:]):
+        s = start + m.start()
+        if out and s < out[-1][1]:
+            continue  # inside the previous row
+        depth, i = 0, s
+        for t in re.finditer(r"<div\b|</div>", html[s:]):
+            depth += 1 if t.group(0) == "<div" else -1
+            if depth == 0:
+                i = s + t.end()
+                break
+        end = i
+        if m.group(1) == "unit":  # a unit's description follows it
+            d = re.match(r"\s*<p class='small muted unit-d'[^>]*>.*?</p>", html[end:], re.S)
+            if d:
+                end += d.end()
+        out.append((s, end, int(m.group(2))))
+    return out
+
+
+def grouped(html: str) -> str:
+    """Each top-level ability (or unit) with its children in one block, so two columns never split a parent from
+    the abilities under it."""
+    rows = _blocks(html, 0)
+    if not rows:
+        return html
+    out, pos, i = [], 0, 0
+    while i < len(rows):
+        s, e0, ind = rows[i]
+        j = i + 1
+        while j < len(rows) and rows[j][2] > ind and rows[j][0] - rows[j - 1][1] < 40:
+            j += 1
+        out.append(html[pos:s] + "<div class='abg'>" + html[s:rows[j - 1][1]] + "</div>")
+        pos = rows[j - 1][1]
+        i = j
+    return "".join(out) + html[pos:]
+
+
 def modernize(html: str) -> str:
     """A guide stored by an older prep, as the current builder writes it: nothing folded, the journal's variables as
     words (the sheet is rendered again from the prep's data without its game data)."""
@@ -50,6 +90,8 @@ def modernize(html: str) -> str:
     h = re.sub(r"(<div class=\"unit\" style=\"[^\"]*\">)([^<]*) <span class='muted small clamp'>(.*?)</span></div>",
                r"\1\2</div><p class='small muted unit-d'>\3</p>", h, flags=re.S)
     h = re.sub(r'class="pill gold">(deadly|interrupt)', r'class="pill warn">\1', h)
+    if "class='abg'" not in h:
+        h = grouped(h)
     h = re.sub(r"<h3>What you do \(([^)]*)\)</h3>", r"<h3>What the journal tells \1</h3>", h)
     return readable(h)
 
@@ -166,7 +208,7 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
         intro = f"<p class='small muted'>{e(readable(top.text)[:300])}</p>" if top.text and top.kind != "stage" else ""
         if top.kind == "ability":
             rows.insert(0, _ability(top, 0, ctx))
-        cards.append(f'<section class="card stage"><h3>{head}</h3>{intro}{"".join(rows)}</section>')
+        cards.append(f'<section class="card stage"><h3>{head}</h3>{intro}{grouped("".join(rows))}</section>')
     return "".join(cards)
 
 
