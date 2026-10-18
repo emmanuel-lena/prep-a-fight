@@ -29,6 +29,7 @@ POTION_SECONDS = 30.0
 DEF_SUPPORT = 0.4  # a defensive is shown when at least this share of the top players press one there
 DEF_SNAP = 10.0  # a defensive this close before its boss ability is moved to just before it
 MOVE_CUE = 10.0  # a movement window this long gets a "keep up" cue (with the spell the top players use)
+MOVE_LONG = 20.0  # longer: a stretch of moving around, not one move
 MOVE_ICON = "inv_misc_map_01"  # a neutral picture: no spell of yours
 IMMUNE_ICON = "spell_holy_divineshield"
 
@@ -106,6 +107,18 @@ def _durations(d) -> dict[str, float]:
             sid = ref[6:].split("&")[0]
             if sid.isdigit() and 0 < table.get(int(sid), 0) <= 60:
                 out[name] = table[int(sid)]
+    missing = {d.cd_names.get(k, k) for k in d.cd_names} - set(out)
+    if missing:  # a cooldown the sheet does not link: its name in the game's spell table
+        try:
+            from paf import gamedata
+
+            seen: dict[str, set[float]] = {}
+            for sid, name in gamedata.spell_names().items():
+                if name in missing and 0 < table.get(sid, 0) <= 60:
+                    seen.setdefault(name, set()).add(table[sid])
+            out.update({n: next(iter(v)) for n, v in seen.items() if len(v) == 1})  # only when the name is clear
+        except Exception:  # noqa: BLE001 - no names: no bar for it
+            pass
     return out
 
 
@@ -120,7 +133,8 @@ def _defensives(d) -> list[tuple[float, str, str]]:
         hits = [c for c in casts.get(m.boss_ability, []) if t - 3 <= c <= t + DEF_SNAP] if m.boss_ability else []
         if hits:
             t = max(0.0, min(hits, key=lambda c: abs(c - t)) - 1)
-        out.append((t, m.spells[0][0], m.boss_ability))
+        why = m.boss_ability if hits or any(abs(c - t) <= 15 for c in casts.get(m.boss_ability, [])) else ""
+        out.append((t, m.spells[0][0], why))
     return out
 
 
@@ -155,13 +169,16 @@ def items(d) -> list[tuple[float, Item]]:
         shown = _clean(name)
         label = f"{count} × {shown}" if count > 1 else shown
         stop = d.duration or (d.fight.duration if d.fight else 0) or t + life
+        for w in (d.fight.invulnerable if d.fight is not None else []):  # adds of an intermission die with it
+            if w.start - 3 <= t <= w.start + w.duration:
+                stop = min(stop, w.start + w.duration)
         add(t, Item("boss", "adds", name, label, _icon(d, name), float(min(life or 0, max(0.0, stop - t)))))
         if name not in skip and _clean(name) not in skip:
             add(t, Item("you", "do", name, act.get(name, "Kill {}").format(shown), _icon(d, name)))
     for f in (d.fight.focus if d.fight is not None else []):
         add(f.start, Item("you", "do", f.name, f"Hit {f.name}", _icon(d, f.name)))
     if d.lust is not None:
-        add(d.lust, Item("boss", "lust", "Bloodlust", "Bloodlust", _icon(d, "Bloodlust"), LUST_SECONDS))
+        add(d.lust, Item("boss", "lust", "Bloodlust", "Your raid's Bloodlust", _icon(d, "Bloodlust"), LUST_SECONDS))
     names, order, _ = simple._pressed(d)
     dur = _durations(d)
     for n in names:
@@ -174,12 +191,16 @@ def items(d) -> list[tuple[float, Item]]:
     end = d.duration or (d.fight.duration if d.fight else 0)
     if end:
         add(end, Item("boss", "kill", "The kill", f"The kill, around {_mmss(end)}"))
+    cuts = sorted(s for _n, s in d.phases if s >= 1)
     for w in (d.movement.windows if d.movement else []):  # the strategy's movement: a bar, never an event
-        add(w.start, Item("boss", "move", "Movement", f"Everyone moves for {w.duration:.0f} s", MOVE_ICON,
-                          float(w.duration)))
-        if w.duration >= MOVE_CUE and w.spells:
-            s = w.spells[0][0]
-            add(w.start, Item("you", "move", s, f"{s} for the move", _icon(d, s)))
+        a, b = w.start, w.start + w.duration
+        for s0, s1 in zip([a] + [c for c in cuts if a < c < b], [c for c in cuts if a < c < b] + [b], strict=True):
+            long = s1 - s0 > MOVE_LONG
+            add(s0, Item("boss", "move", "Movement", f"Lots of movement until {_mmss(s1)}" if long else
+                         f"Everyone moves for {s1 - s0:.0f} s", MOVE_ICON, float(s1 - s0)))
+            if MOVE_CUE <= s1 - s0 <= MOVE_LONG and w.spells:
+                s = w.spells[0][0]
+                add(s0, Item("you", "move", s, f"{s} for the move", _icon(d, s)))
     return sorted(out, key=lambda x: x[0])
 
 
@@ -196,6 +217,8 @@ def moments(d) -> list[Moment]:
 
 def _phases(d, dur: float) -> list[tuple[str, float, float]]:
     ph = sorted(d.phases, key=lambda p: p[1]) or [("The fight", 0.0)]
+    if ph[0][0].strip().lower() in ("", d.boss.lower()):  # a first phase named after the boss: say what it is
+        ph[0] = ("Stage One" if len(ph) > 1 else "The fight", ph[0][1])
     return [(n, 0.0 if i == 0 else s, ph[i + 1][1] if i + 1 < len(ph) else dur) for i, (n, s) in enumerate(ph)]
 
 
@@ -239,7 +262,7 @@ def job_html(d) -> str:
     for w in (d.fight.invulnerable if d.fight is not None else [])[:1]:
         adds = [_clean(x[3]) for x in d.waves if w.start - 2 <= x[0] <= w.start + w.duration and x[1]]
         what = f": kill the {e(adds[0])} to bring it back" if adds else ""
-        rows.append(("", f"<b>The boss is immune at {_mmss(w.start)}</b> for {w.duration:.0f} s{what}."))
+        rows.append((IMMUNE_ICON, f"<b>The boss is immune at {_mmss(w.start)}</b> for {w.duration:.0f} s{what}."))
     defs = _defensives(d)
     if defs:
         s, why = defs[0][1], defs[0][2]
@@ -261,13 +284,16 @@ def job_html(d) -> str:
         rows.append((n, f"<b>{e(n)}</b> {e(when)}{e(why)}."))
     if not rows:
         return ""
-    lis = "".join(f"<li>{_ic(_icon(d, ic) if ic else '')}<span>{txt}</span></li>" for ic, txt in rows[:7])
+    lis = "".join(f"<li>{_ic(ic if ic == IMMUNE_ICON else _icon(d, ic) if ic else '')}<span>{txt}</span></li>"
+                  for ic, txt in rows[:7])
     return f"<section class='fbox job'><h2>Your job on this boss</h2><ul class='keys'>{lis}</ul></section>"
 
 
 def _ctx(t: float, its: list[tuple[float, Item]]) -> str:
     """What a press is for, in a few words: on the pull, on the boss event it answers, inside Bloodlust."""
-    if t < 1:
+    if t < 0:
+        return "before the pull"
+    if t < 5:
         return "on the pull"
     near = [x for at, x in its if x.side == "boss" and x.kind in ANCHORS and t - 8 <= at <= t + 1]
     if near:
@@ -275,6 +301,9 @@ def _ctx(t: float, its: list[tuple[float, Item]]) -> str:
         x = min(near, key=lambda x: (order.index(x.kind), abs(x.t - t)))
         return "on the " + x.text if x.kind == "adds" else ("when it starts" if x.kind == "phase" else "on " + x.text)
     return ""
+
+
+PULL = {"t": 0, "n": "The pull", "k": "pull", "p": 0, "ic": ""}  # a pull timer that runs late: confirm the pull
 
 
 def data(d, ms: list[Moment], dur: float) -> dict:
@@ -285,18 +314,16 @@ def data(d, ms: list[Moment], dur: float) -> dict:
     def ph(t: float) -> int:
         return max((i for i, p in enumerate(phases) if t >= p[1] - 0.5), default=0)
 
-    row = {id(x): i for i, m in enumerate(ms) for x in m.items}
     phase_starts = [s for _n, s, _e in phases[1:]]
     acts = [{"t": round(t, 1), "n": x.text, "k": x.kind, "ic": x.icon, "d": round(x.dur, 1),
-             "c": "" if x.kind == "move" else _ctx(t, its),
-             "r": row.get(id(x), 0)} for t, x in its if x.side == "you"]
+             "c": "" if x.kind == "move" else _ctx(t, its)} for t, x in its if x.side == "you"]
     acts.sort(key=lambda a: (a["t"], YOU_ORDER.index(a["k"])))
     return {
         "end": round(dur, 1),
         "phases": [[n, round(s, 1), round(t, 1)] for n, s, t in phases],
         "rows": [round(m.t, 1) for m in ms],
         "acts": acts,
-        "anchors": [{"t": round(t, 1), "n": x.name if x.kind in ("phase", "immune") else x.text, "k": x.kind,
+        "anchors": [PULL] + [{"t": round(t, 1), "n": x.name if x.kind in ("phase", "immune") else x.text, "k": x.kind,
                      "p": ph(t), "ic": x.icon} for t, x in its if x.side == "boss" and x.kind in ANCHORS and t >= 1
                     and not (x.kind == "immune" and any(abs(t - s) < 0.01 for s in phase_starts))],
         "boss": [{"t": round(t, 1), "d": round(x.dur, 1), "n": x.text, "k": x.kind} for t, x in its

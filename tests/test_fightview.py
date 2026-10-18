@@ -51,7 +51,7 @@ def test_the_page_carries_its_data_and_one_script(monkeypatch):
             "it." in page) and "<b>Potion</b> before the pull." in page
     blades = [a for a in data["acts"] if a["n"] == "Shadow Blades"]
     assert blades[0]["t"] == 52 and blades[0]["c"] == "on the 4 × Amani"  # called at its own time, not the row's
-    assert [a["k"] for a in data["anchors"]] == ["cast", "adds", "phase", "cast"]  # what a press can confirm
+    assert [a["k"] for a in data["anchors"]] == ["pull", "cast", "adds", "phase", "cast"]  # what a press can confirm
     assert "<dialog class='ss' id='ss'" in page and "Dig deeper" in page
     assert fightview.JS.strip().startswith("/*") and "</script" not in fightview.JS
 
@@ -60,7 +60,7 @@ def test_movement_is_a_bar_not_an_event(monkeypatch):
     from paf.movement import Movement, Window
 
     d = sheet(monkeypatch)
-    d.movement = Movement(windows=[Window(100.0, 30.0, [("Shadowstep", 0.8)])])
+    d.movement = Movement(windows=[Window(100.0, 15.0, [("Shadowstep", 0.8)])])
     ms = fightview.moments(d)
     row = next(m for m in ms if m.t == 100.0)
     assert row.anchor is None and [y.text for y in row.you] == ["Shadowstep for the move"]

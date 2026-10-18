@@ -456,7 +456,11 @@ dialog.ss::backdrop{background:var(--bg)}
 .fv .ss .then{display:block;text-align:center;font-size:17px;color:var(--muted);margin:0}
 .fv .fbar.boss{--c:var(--muted);box-shadow:inset 3px 0 0 var(--line)}
 .fv .fbar.boss b{font-weight:500;color:var(--muted)}
-.on-fight main{max-width:none}
+
 @media (max-width:1000px){body.playing{scroll-padding-bottom:calc(55vh + 16px)}}
 .fv .fbar .vh{position:absolute}
 .fv .fbar b{justify-self:start}
+.fv .ev .ic.none,.fv .fbar .ic.none{visibility:hidden}
+.fv .keys .ic.none{visibility:hidden}
+.fv .call.fv-next{min-height:0;height:auto;align-self:start}
+.fv .call.fv-next .pend{margin:4px 0 0}

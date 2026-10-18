@@ -7,7 +7,7 @@
   if (!root || typeof FV === 'undefined') return;
   var A = FV.acts, N = FV.anchors, B = FV.boss, $ = function (id) { return document.getElementById(id); };
   var LEAD = 5, NOW_FOR = 3, SAME = 1, BOUNCE = 3, QUIET = 1.5, LAST_PUSH = 30;
-  var WIN = { phase: [-30, 40], immune: [-30, 40], adds: [-10, 12], cast: [-10, 12] };
+  var WIN = { pull: [-5, 10], phase: [-30, 40], immune: [-30, 40], adds: [-10, 12], cast: [-10, 12] }, FIRST = [-10, 40], FAR = 30;
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   var st = { cur: 0, playing: false, speed: 1, sound: false, conf: [], key: '', curRow: -1, target: -1, lastPress: -1e9,
              quietUntil: 0, userScroll: 0, last: null, ssFrom: null, sq: [], sqAt: 0, said: {} };
@@ -26,16 +26,29 @@
     return s;
   }
   function eff(pt) { return pt + shift(pt); }
+  /* an event before a confirmed phase that would only come after that phase started: the raid skipped it */
+  function gone(pt) {
+    return st.conf.some(function (c) { return c.big && c.pt > pt + 0.01 && eff(pt) >= c.at - 0.01; });
+  }
+  function lastPt() { return st.conf.reduce(function (m, c) { return Math.max(m, c.pt); }, -1e9); }
+  /* a boss item lasts until the next confirmed phase starts at the latest */
+  function until(b) {
+    var e = eff(b.t), end = e + Math.max(b.d, 6);
+    st.conf.forEach(function (c) { if (c.big && c.pt > b.t + 0.01 && c.at > e) end = Math.min(end, c.at); });
+    return end;
+  }
+  var byEff = function () { return A.filter(function (a) { return !gone(a.t); }).sort(function (a, b) { return eff(a.t) - eff(b.t); }); };
   function confirmed(i) { return st.conf.some(function (c) { return c.i === i; }); }
 
   /* what you press: the next group (presses within a second of each other) still to come or just due */
   function group(t, after) {
-    for (var i = 0; i < A.length; i++) {
-      var e = eff(A[i].t);
+    var L = byEff();
+    for (var i = 0; i < L.length; i++) {
+      var e = eff(L[i].t);
       if (e >= t - NOW_FOR && (after == null || e > after + 0.5)) {
-        var g = [A[i]];
-        for (var j = i + 1; j < A.length && eff(A[j].t) - e <= SAME; j++) g.push(A[j]);
-        return { at: e, acts: g };
+        var g = [L[i]];
+        for (var j = i + 1; j < L.length && eff(L[j].t) - e <= SAME; j++) g.push(L[j]);
+        return { at: e, last: eff(g[g.length - 1].t), acts: g };
       }
     }
     return null;
@@ -50,12 +63,16 @@
     var g = group(t);
     if (!g) {
       if (t >= FV.end - LAST_PUSH) {
-        return { key: 'end', cls: 'call fv-soon fv-end', state: 'end', say: '', html: '<span class="lab">Last push <span class="cd">' +
+        return { key: 'end', cls: 'call fv-next fv-end', state: 'end', say: '', html: '<span class="lab">Last push <span class="cd">' +
           (t < FV.end ? 'kill around ' + mmss(FV.end) : 'any moment') + '</span></span><p class="pend">Everything on the boss until it drops.</p>' };
       }
-      return { key: 'none', cls: 'call fv-soon', state: 'none', say: '', html: '<span class="lab">Your rotation</span><p class="pend">Nothing to press before the kill.</p>' };
+      return { key: 'none', cls: 'call fv-next', state: 'none', say: '', html: '<span class="lab">Your rotation</span><p class="pend">Nothing to press before the kill.</p>' };
     }
     var dt = g.at - t, c = g.acts[0].c;
+    if (dt > FAR) {
+      return { key: 'far' + g.at.toFixed(0), g: g, cls: 'call fv-next', state: 'far', say: '',
+               html: '<span class="lab">Your rotation</span><p class="pend">Next: ' + esc(names(g)) + ' at ' + mmss(g.at) + (c ? ', ' + esc(c) : '') + '</p>' };
+    }
     var state = dt <= 0.5 ? 'go' : dt <= LEAD ? 'ready' : 'soon';
     var kick = state === 'go' ? (cap(c) || 'Press') : (state === 'ready' ? 'Get ready' : 'Next') + (c ? ', ' + c : '');
     var lab = state === 'go' ? 'Now' : state === 'ready' ? secs(dt) : 'in ' + secs(dt);
@@ -63,13 +80,14 @@
     var rows = g.acts.map(function (a) {
       return '<div class="a">' + icon(a.ic) + '<div><b>' + esc(a.n) + '</b>' + (a.d && a.k !== 'move' ? '<small>lasts ' + Math.round(a.d) + ' s</small>' : '') + '</div></div>';
     }).join('');
-    return { key: g.at.toFixed(1) + ':' + state, g: g, state: state, cls: 'call fv-' + state,
+    return { key: g.at.toFixed(1) + ':' + state, g: g, state: state, cls: 'call ' + { go: 'fv-go', ready: 'fv-soon', soon: 'fv-next' }[state],
              say: state === 'go' ? names(g, ', then ') + ', now' : state === 'ready' ? 'Get ready: ' + names(g, ', then ') + (c ? ', ' + c : '') : '',
              html: '<span class="lab">' + esc(kick) + ' <span class="cd">' + esc(lab) + '</span></span><div class="acts">' + rows + '</div>' + win };
   }
   function then(t, cc) {
     if (!cc.g) return '';
-    var n = group(t, cc.g.at);
+    if (cc.state === 'far') return '';
+    var n = group(t, cc.g.last);
     if (!n) return '';
     var c = n.acts[0].c, said = names(n);
     return 'Then ' + said + ' at ' + mmss(n.at) + (c && said.indexOf(c.replace(/^on (the )?/, '')) < 0 ? ' · ' + c : '');
@@ -77,15 +95,18 @@
 
   /* the boss line: what is running now (adds alive, the boss immune, Bloodlust) or was just cast */
   function bossNow(t) {
-    var on = B.filter(function (b) { var e = eff(b.t); return b.k !== 'move' && e <= t && t < e + Math.max(b.d, 6); });
+    var on = B.filter(function (b) { var e = eff(b.t); return b.k !== 'move' && !gone(b.t) && e <= t && t < until(b); });
     return on.length ? on.map(function (b) { return b.n; }).join('; ') : '—';
   }
   function title(t, cc) {
     if (t < 0) return 'Before the pull';
     if (cc.state === 'end') return 'Last push';
-    var cur = 'The pull';
-    N.forEach(function (a) { if (eff(a.t) <= t) cur = a.n; });
-    return cur;
+    var cur = '';
+    N.forEach(function (a) {
+      var e = eff(a.t), b = B.filter(function (x) { return Math.abs(x.t - a.t) < 0.01 && x.n === a.n; })[0];
+      if (!gone(a.t) && e <= t && t < (b ? until(b) : e + 6)) cur = a.n;
+    });
+    return cur || (t < 6 ? 'The pull' : phaseAt(t));
   }
   function phaseAt(t) {
     var p = FV.phases[0][0];
@@ -96,14 +117,14 @@
     });
     return p;
   }
-  function nextAnchor(t) { for (var i = 0; i < N.length; i++) if (eff(N[i].t) > t) return i; return -1; }
+  function nextAnchor(t) { for (var i = 0; i < N.length; i++) if (N[i].k !== 'pull' && !gone(N[i].t) && eff(N[i].t) > t) return i; return -1; }
 
   /* the boss event a press now confirms: a phase start first (they move with the boss's health), else the closest */
   function syncTarget(t) {
-    var best = -1, bd = 1e9, phase = false;
+    var best = -1, bd = 1e9, phase = false, past = lastPt();
     N.forEach(function (a, i) {
-      if (confirmed(i)) return;
-      var w = WIN[a.k] || WIN.cast, d = t - eff(a.t), big = a.k === 'phase' || a.k === 'immune';
+      if (confirmed(i) || a.t < past || gone(a.t)) return;
+      var w = WIN[a.k] || WIN.cast, d = t - eff(a.t), big = (a.k === 'phase' || a.k === 'immune') && d >= FIRST[0] && d <= FIRST[1];
       if (d < w[0] || d > w[1]) return;
       if (big && !phase) { phase = true; bd = 1e9; }
       if (phase && !big) return;
@@ -168,6 +189,8 @@
         b.setAttribute('aria-label', 'Confirm ' + N[st.target].n + ' started now (Control Shift Space)');
       }
     });
+    if (st.target >= 0 && st.target !== st.saidTarget && st.playing) say('Control Shift Space confirms ' + N[st.target].n + '.');
+    st.saidTarget = st.target;
     if (cc.key !== st.key && performance.now() >= st.quietUntil) {
       if (st.playing && cc.say) { say(cc.say, true); if (cc.state === 'go') beep(); }
       st.key = cc.key;
@@ -201,12 +224,18 @@
   function bars(t) {
     if (!$('ss').open) return;
     var out = [], seen = {};
-    A.forEach(function (a) {
+    var mine = [];
+    byEff().forEach(function (a) {
       var e = eff(a.t), k = e.toFixed(0) + a.n;
       if (e < t - 0.5 || e > t + 60 || seen[k]) return;
-      seen[k] = 1; out.push(bar(e, t, 'mine', a.ic, 'You', a.n));
+      seen[k] = 1; mine.push([e, a.n]); out.push(bar(e, t, 'mine', a.ic, 'You', a.n));
     });
-    N.forEach(function (a) { var e = eff(a.t); if (e >= t - 0.5 && e <= t + 60) out.push(bar(e, t, 'boss', a.ic, 'Boss', a.n)); });
+    N.forEach(function (a) {
+      var e = eff(a.t);
+      if (a.k === 'pull' || gone(a.t) || e < t - 0.5 || e > t + 60) return;
+      if (mine.some(function (m) { return Math.abs(m[0] - e) <= 1 && m[1].indexOf(a.n) >= 0; })) return;  // "Kill X" says it
+      out.push(bar(e, t, 'boss', a.ic, 'Boss', a.n));
+    });
     out.sort(function (a, b) { return a[0] - b[0]; });
     set($('ss-bars'), out.slice(0, 7).map(function (x) { return x[1]; }).join('') || '<p class="pend">Nothing in the next minute: your rotation.</p>');
   }
@@ -249,7 +278,7 @@
     if (i < 0) { say('Nothing to confirm right now.', true); return; }
     var a = N[i], late = Math.round(st.cur - a.t);
     st.conf = st.conf.filter(function (c) { return c.pt < a.t; });  // what came after it is timed from it now
-    st.conf.push({ i: i, pt: a.t, at: st.cur });
+    st.conf.push({ i: i, pt: a.t, at: st.cur, big: a.k === 'phase' || a.k === 'immune' });
     st.lastPress = now; st.quietUntil = now + QUIET * 1000; st.key = '';
     var how = Math.abs(late) <= 2 ? 'on time' : 'boss ' + Math.abs(late) + ' s ' + (late > 0 ? 'behind' : 'ahead of') + ' the plan';
     say(a.n + ' confirmed, ' + how + '.', true);
@@ -265,7 +294,7 @@
   function closeSS() {
     var dlg = $('ss');
     if (dlg.close && dlg.open) dlg.close(); else dlg.removeAttribute('open');
-    dlg.classList.remove('open'); document.body.classList.remove('ss-on'); (st.ssFrom || $('ss-open')).focus();
+    dlg.classList.remove('open'); document.body.classList.remove('ss-on'); st.curRow = -1; (st.ssFrom || $('ss-open')).focus(); render();
   }
 
   /* bars along the clock and the "now" marker, from the rows' positions */
@@ -322,7 +351,7 @@
       say('At ' + clock(t) + ', ' + (r.dataset.title || b.textContent));
     });
     b.addEventListener('keydown', function (ev) {
-      var n = { ArrowDown: 1, ArrowUp: -1 }[ev.key]; if (!n) return;
+      var n = { ArrowDown: 1, ArrowUp: -1, Home: -1e9, End: 1e9 }[ev.key]; if (!n) return;
       ev.preventDefault(); var to = pills[Math.max(0, Math.min(pills.length - 1, k + n))]; roving(to); to.focus();
     });
   });
