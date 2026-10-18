@@ -377,6 +377,15 @@ def _goal(objective: str) -> str:
     return {"boss": "boss", "total": "total (pad)", "secondary": "burst"}.get(objective, objective)
 
 
+def simmed_note(d: PrepData) -> str:
+    """What the "Simmed" column of the add waves is, in the direction the calibration went."""
+    if (d.add_scale or 1) >= 1:
+        return ('"Simmed": the adds of the wave in the sims, at their real number (the logs\' count). SimC still puts '
+                "more of its damage on the boss than the top players do: see the Notes.")
+    return (f'"Simmed": the adds of the wave in the sims, counted at ×{d.add_scale:g} of their real number to bring '
+            "the sims' boss share toward the top players' (SimC hits every add in range).")
+
+
 def raid_section(r: RaidInfo, gear: bool = True) -> str:
     you = (f"you ({e(r.you[0])}, {r.you[1] / 1000:,.0f}k DPS)" if r.you_found else
            f"{'an' if r.you[0][:1].lower() in 'aeiou' else 'a'} {e(r.you[0])} at your raid's median DPS ({r.you[1] / 1000:,.0f}k; you are not in that log)")
@@ -527,7 +536,10 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         for k, r in p.choice.items():
             if r.name != "default":
                 by_rule.setdefault(rule_phrase(d, r.name), []).append(k)
-        lines = [", ".join(icons.img(d.icons.get(k, ""), "small") + link(cd_name(d, k), d.links.get(k))
+        from paf.simple import _fallback
+
+        lines = [", ".join(icons.img(d.icons.get(k, "") or _fallback(d, cd_name(d, k)), "small")
+                           + link(cd_name(d, k), d.links.get(k))
                            for k in ks) + f": {e(phrase)}" for phrase, ks in by_rule.items()]
         others = ", ".join(f"{_goal(o)} damage {v:+.1f}%" for o, v in p.totals.items()
                            if o not in (p.objective, "adds"))
@@ -587,7 +599,7 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         vuln, units = burst_names(d)
         played = simple_plan(d)
         rules = {cd_name(d, k): rule_phrase(d, r.name) for k, r in (played.choice.items() if played else [])}
-        said = [f"Your plan: {a.ability} {rules[a.ability]} (SimC finds it worth more that way for your character)."
+        said = [f"Your plan: {a.ability}: {rules[a.ability]} (SimC finds it worth more that way for your character)."
                 for a in held if a.ability in rules and "only on" not in rules[a.ability].replace("only on add", "")
                 and not rules[a.ability].startswith("as SimC's default")]
         tried = {cd_name(d, k) for p in d.optimized for k in p.choice}
@@ -1016,7 +1028,8 @@ def render(d: PrepData) -> str:
     moving = rv.tops_moving if rv is not None and rv.tops_moving is not None else d.moving_share
     extra.append(f"top {e(d.spec)} players move {moving:.0%} of the fight")
     if d.add_share_spec:
-        extra.append(f"and do {d.add_share_spec:.0%} of their damage to adds")
+        off = 1 - d.boss_share_real if d.boss_share_real is not None else d.add_share_spec  # one figure, as the lede
+        extra.append(f"and do {off:.0%} of their damage off the boss")
     focus = ""
     if d.fight is not None and d.fight.focus:
         n = d.fight.targets
@@ -1029,8 +1042,7 @@ def render(d: PrepData) -> str:
                  + "".join(f"<tr><td>{_mmss(f.start)}-{_mmss(f.start + f.duration)}</td><td>{e(f.name)}</td>"
                            f"<td class='n'>{f.support:.0%}</td></tr>" for f in d.fight.focus) + "</table></div>")
     adds_block = (f"""<h3 class="small muted" style="margin-top:14px">Add waves (typical timeline across kills)</h3>
-<p class="small muted">"Simmed": the adds of the wave in the sims, counted at {d.add_scale:g} of their real number so that
-the sims put as much on the boss as the top players do (SimC hits every add in range).</p>
+<p class="small muted">{simmed_note(d)}</p>
 <div class="scroll"><table class="fit"><tr><th>Time</th><th class="n">Simmed</th><th class="n">Alive</th><th>Types</th></tr>{waves}</table></div>
 """ if waves else "")
     tabs["fight"].append(f"""<h2>The fight</h2><div class="card"><p>Typical duration {_mmss(d.duration)}; {"; ".join(extra)}.</p>
@@ -1056,7 +1068,7 @@ the sims put as much on the boss as the top players do (SimC hits every add in r
                 tabs["raid"].append(f"{head}<div class='ws-answer'>"
                                     f"{workshop_views.render({'kind': kind, **tools[kind]})}</div>")
         tabs["raid"].append(workshop_views.CSS)
-    if d.raid:
+    if d.raid and (d.raid.verdicts or any(c for _t, c, _l, _n in d.waves)):  # no adds: nothing to decide, no section
         tabs["raid"].append(raid_section(d.raid, bool(d.gear or d.loot)))
     else:
         tabs["raid"].append("""<h2>Your raid and the adds</h2><div class="card"><p>Not set for this prep. Set your guild
@@ -1150,7 +1162,9 @@ for reference: a build can be worse there and much better on this fight. Error a
             if p.objective in twins:
                 continue
             changed = {k: r for k, r in p.choice.items() if r.name != "default"}
-            rules = "".join(f"<tr><td>{icons.img(d.icons.get(k, ''), 'small')} {link(cd_name(d, k), d.links.get(k))}</td>"
+            from paf.simple import _fallback
+            rules = "".join(f"<tr><td>{icons.img(d.icons.get(k, '') or _fallback(d, cd_name(d, k)), 'small')} "
+                            f"{link(cd_name(d, k), d.links.get(k))}</td>"
                             f"<td>{e(rule_phrase(d, r.name))}</td></tr>"
                             for k, r in changed.items()) or "<tr><td>Every cooldown</td><td>as SimC's default priority list casts it</td></tr>"
             others = ", ".join(f"{_goal(o)} {_pct(v, 1)}" for o, v in p.totals.items() if o != p.objective)
@@ -1178,6 +1192,7 @@ for reference: a build can be worse there and much better on this fight. Error a
 {"<p class='small muted'>Burst damage counts only the damage on " + e(burst_names(d)[1] or "the burst targets") + ": worth it only if your raid needs them dead fast" + ("." if _stall(d, p) else ", at the cost of the boss and total damage above.") + "</p>" if p.objective == "secondary" else ""}
 {checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases, links=d.links)}
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
+{"<p class='small muted'>The cooldowns not listed follow SimC's default priority list: their times can move with the ones the plan holds.</p>" if changed else ""}
 <div class="pp-grid"><div><h4>Play-by-play of one simulated pull</h4><div class="scroll pp"><table>
 <tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></div>
 {(f'<div><h4>MRT note {copy_button(note, "Copy the MRT note")}</h4><pre class="small note-pre">{e(note)}</pre>'
@@ -1265,6 +1280,9 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
 
         return calibration_note(int(m[1]) / 100, int(m[2]) / 100)
     notes = [direction(n) for n in notes]
+    if (d.add_scale or 1) >= 1:  # the adds at full size: "at the minimum" said otherwise
+        notes = [n.replace("Even with the add waves counted at the minimum, ", "With every add wave at its full size, ")
+                 for n in notes]
     if d.validation:
         lo, med, hi = d.validation
         notes.insert(0, f"Validation: the top players' own characters simmed on this rebuilt fight give {med:.0%} of "

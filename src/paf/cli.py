@@ -868,9 +868,10 @@ def cmd_raidqueue(args: argparse.Namespace) -> int:
     return raidqueue.run()
 
 
-def calibration_note(got: float, target: float) -> str:
+def calibration_note(got: float, target: float, scale: float = 0.1) -> str:
     """What a boss share the sims cannot reach means for the numbers, in the direction it really goes."""
-    head = (f"Even with the add waves counted at the minimum, SimC's default priority list, in the top "
+    where = "With every add wave at its full size" if scale >= 1 else "Even with the add waves counted at the minimum"
+    head = (f"{where}, SimC's default priority list, in the top "
             f"players' gear, puts {got:.0%} of its damage on the boss vs {target:.0%} in their logs: ")
     if got > target:
         return (head + "SimC keeps single-target spells on the boss while real players also spend them on adds and "
@@ -1034,7 +1035,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
         print(f"  top players: {target:.0%} of damage on the boss; add counts x{cal.scale:g}"
               + (f" (simulated: {got:.0%})" if got is not None else ""))
         if got is not None and abs(got - target) > 0.05:
-            d.notes.append(calibration_note(got, target))
+            d.notes.append(calibration_note(got, target, cal.scale))
     if pk is not None:  # the pack's validation: the top players' characters were simmed when it was made
         fight.movement_scale = pk.fight.movement_scale
         d.validation = pk.validation

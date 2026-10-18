@@ -57,7 +57,8 @@ class Moment:
 
     @property
     def you(self) -> list[Item]:
-        return sorted((i for i in self.items if i.side == "you"), key=lambda i: (YOU_ORDER.index(i.kind), i.t))
+        return sorted((i for i in self.items if i.side == "you"),  # in time order, then by kind
+                      key=lambda i: (int(max(i.t, -1)), YOU_ORDER.index(i.kind)))
 
     @property
     def anchor(self) -> Item | None:
@@ -185,6 +186,7 @@ def items(d) -> list[tuple[float, Item]]:
                      float(w.duration)))
     roles = getattr(d, "ability_roles", None) or {}
     hits_you = {why.removesuffix("'s damage") for _t, _s, why in _defensives(d)}
+    hits_you |= {m.boss_ability for m in (d.defensives.moments if d.defensives else []) if m.boss_ability}  # any
     for name, times in d.boss_casts:
         # the journal flags it for the tank only (and you need no defensive for it): shown dimmed, never confirmed
         tank = roles.get(name) == ["tank"] and name not in hits_you
