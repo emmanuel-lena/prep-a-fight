@@ -1234,7 +1234,7 @@ placeholder="https://www.warcraftlogs.com/reports/..."></label>
 <ul class="recap">
 <li data-if="goal=boss">For <b>boss damage</b>.</li><li data-if="goal=total">For <b>total damage</b> (pad the adds).</li>
 <li data-if="goal=auto">Your raid's log decides between boss damage and padding.</li>
-<li data-if="assigns"><span>With your assignments:</span> <b class="recap-assigns"></b></li>
+<li data-if="assigns"><span class="recap-assigns-lab">With your assignments:</span> <b class="recap-assigns"></b></li>
 <li data-if="no-assigns">No assignment.</li>
 <li data-if="raid">Your raid: <b class="recap-raid"></b></li>
 <li data-if="no-raid">Your raid: <b>{e(raid_said) if raid_said else "none (the prep shows both plans)"}</b></li>
@@ -1281,6 +1281,7 @@ function recap(){
   var rli = f.querySelector('.recap-raid'); if (rli && rli.closest('li')) rli.closest('li').classList.toggle('bad', !!badraid);
   var why = f.querySelector('.go-why'); if (why) why.hidden = !badraid;  // the disabled Prepare says why, beside it
   f.querySelector('.recap-assigns').textContent = picked.join(', ');
+  f.querySelector('.recap-assigns-lab').textContent = picked.length === 1 ? 'With your assignment:' : 'With your assignments:';
   f.querySelector('.recap-raid').textContent = raid;
   f.querySelectorAll('.recap [data-if]').forEach(function(li){
     var c = li.dataset.if;
@@ -1292,6 +1293,8 @@ function show(i, back){
   steps.forEach(function(s, j){ s.classList.toggle('on', j === at); s.classList.toggle('back', !!back); });
   dots.forEach(function(d, j){ d.classList.toggle('on', j <= at); });
   if (steps[at].dataset.step === 'go') recap();
+  var hp = steps[at].querySelector('#raid-help');  // measured once shown: it keeps that height, no button moves under a click
+  if (hp && !hp.dataset.h) { hp.dataset.h = '1'; hp.style.minHeight = hp.offsetHeight + 'px'; }
   var h2 = steps[at].querySelector('[aria-invalid=true]') || steps[at].querySelector('h2');  // a field in error first
   if (h2) { if (h2.tagName === 'H2') h2.tabIndex = -1; h2.focus({preventScroll: true}); }  // keep the place
   var cur = steps[at]; cur.classList.add('arriving');  // a double click on Next must not tick what lands under it
@@ -1314,8 +1317,10 @@ if (rl) ['change', 'input'].forEach(function(ev){ rl.addEventListener(ev, functi
   var bad = rl.value.trim() && !/warcraftlogs[.]com[/]reports[/][A-Za-z0-9]{16}/.test(rl.value);
   rl.classList.toggle('bad', !!bad); rl.setAttribute('aria-invalid', bad ? 'true' : 'false'); if (go) go.disabled = !!bad;
   var h = document.getElementById('raid-help'); if (h) h.classList.toggle('err', !!bad); if (h) { if (h.dataset.t == null) h.dataset.t = h.textContent;
-    h.textContent = bad ? 'Not a Warcraft Logs report link: paste one like https://www.warcraftlogs.com/reports/..., or leave it empty.' : h.dataset.t; } }); });  // a good link keeps the help as it is: the buttons below do not move under the click
-f.querySelectorAll('.prev').forEach(function(b){ b.addEventListener('click', function(){ show(at - 1, true); }); });
+    h.textContent = bad ? 'Not a Warcraft Logs report link: paste one like https://www.warcraftlogs.com/reports/..., or leave it empty.' : (rl.value.trim() ? 'This report is read for your raid: ' + rl.value.replace(/^.*reports[/]([A-Za-z0-9]{6})[A-Za-z0-9]*/, 'report $1\u2026').replace(/[?#].*fight=([0-9]+).*/, ', pull $1').replace(/[?#].*$/, '') + '.' : h.dataset.t); } }); });
+f.querySelectorAll('.prev').forEach(function(b){ b.addEventListener('mousedown', function(ev){ ev.preventDefault(); });
+  b.addEventListener('click', function(){ show(at - 1, true); }); });
+
 f.querySelectorAll('input[name=goal]').forEach(function(r){ r.addEventListener('change', function(){
   try { localStorage.setItem(key, r.value); } catch (e) {} }); });  // a goal is picked; Next moves on (keyboard-safe)
 f.addEventListener('submit', function(){ var r = f.querySelector('input[name=goal]:checked');
