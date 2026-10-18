@@ -8,6 +8,7 @@ Everything is readable without JavaScript and without motion.
 from __future__ import annotations
 
 import html
+import re
 
 from paf import icons, theme
 
@@ -321,8 +322,9 @@ def spec_html(d) -> str:
     notes = " ".join(s.get("notes") or [])
 
     def short(name: str) -> str:  # simmed one item short (too new for this simc build): said on its tile
-        return (" <small>one item short</small>" if f"{name}: the top players'" in notes and "unknown to this SimC"
-                in notes else "")
+        m = re.search(rf"{re.escape(name)}: the top players' (\w+) is unknown to this SimC", notes)
+        slot = re.sub(r"\d$", "", m[1]).replace("_", " ") if m else ""
+        return f" <small>simmed without its {e(slot)} (too new for SimC)</small>" if m else ""
     tiles = "".join(
         f"<div class='spt {kind}'><span class='spt-n'>{e(name)}</span><span class='spt-v'>"
         f"{'your spec' if gap is None else 'same' if kind == 'same' else f'{gap:+.0f}%'}{short(name)}</span></div>"

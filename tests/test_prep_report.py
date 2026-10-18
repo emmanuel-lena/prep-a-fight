@@ -85,3 +85,13 @@ def test_notes_read_in_time_order():
     nsrt = "EncounterID:1\ntime:90.7;ph:1;tag:x\ntime:28.6;ph:2;tag:x\ntime:9.2;ph:1;tag:x\ntime:13.9;ph:1.5;tag:x"
     assert in_time_order(nsrt).splitlines()[1:] == ["time:9.2;ph:1;tag:x", "time:90.7;ph:1;tag:x",
                                                      "time:13.9;ph:1.5;tag:x", "time:28.6;ph:2;tag:x"]
+
+
+def test_a_damage_taken_window_the_sims_leave_out_is_said():
+    from paf.prep_report import unsimmed_amps
+
+    d = PrepData("Sszorak", "heroic", "Elemental", "Char")
+    d.role_bullets = ["Dig In increases Sszorak's damage taken during Howling Maelstrom.",
+                      "Corroding Venom increases the tank's damage taken."]  # a player's damage taken: not a window
+    assert unsimmed_amps(d) == ["Dig In"]
+    assert "Dig In is not in the sims" in render(d)

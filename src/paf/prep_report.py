@@ -148,7 +148,8 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
         f'<line x1="{x(dur)}" y1="14" x2="{x(dur)}" y2="100%" stroke="var(--muted)" stroke-dasharray="3 3"/>'
         f'<text x="{x(dur) - 2}" y="11" font-size="10" fill="var(--muted)" text-anchor="end">kill {_mmss(dur)}</text>')
     # fight strip
-    fight_row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">Fight</text>']
+    bare = not (fight.add_waves or fight.vulnerable or fight.invulnerable)  # only Bloodlust to draw: say so
+    fight_row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">{"Bloodlust" if bare else "Fight"}</text>']
     for name, s in sorted(phases or [], key=lambda p: p[1])[1:]:  # the stages, where raiders think in them
         axis += (f'<line x1="{x(s)}" y1="14" x2="{x(s)}" y2="100%" stroke="var(--fg)" stroke-opacity=".35" '
                  f'stroke-dasharray="2 4"><title>{e(name)} {_mmss(s)}</title></line>')
@@ -379,7 +380,7 @@ def _goal(objective: str) -> str:
 
 def raid_section(r: RaidInfo) -> str:
     you = (f"you ({e(r.you[0])}, {r.you[1] / 1000:,.0f}k DPS)" if r.you_found else
-           f"a {e(r.you[0])} at your raid's median DPS ({r.you[1] / 1000:,.0f}k; you are not in that log)")
+           f"{'an' if r.you[0][:1].lower() in 'aeiou' else 'a'} {e(r.you[0])} at your raid's median DPS ({r.you[1] / 1000:,.0f}k; you are not in that log)")
     head = (f"<p class='small'>From your raid's log <a href='https://www.warcraftlogs.com/reports/{e(r.report)}' "
             f"target='_blank' rel='noopener'>{e(r.report)}</a> ({e(r.fight)}, {r.players} players), with {you}.</p>")
     if not r.verdicts:
@@ -829,6 +830,15 @@ def in_time_order(note: str) -> str:
     return "\n".join(head + timed) + ("\n" if note.endswith("\n") else "")
 
 
+def unsimmed_amps(d: PrepData) -> list[str]:
+    """Journal abilities that raise the boss's damage taken while the rebuilt fight has no window for them."""
+    text = " ".join(d.role_bullets) + " " + re.sub(r"<[^>]+>", " ", d.guide_summary or "")
+    boss = re.escape(d.boss.split(",")[0])  # the boss's own damage taken, not a player's (a tank debuff)
+    names = re.findall(rf"\b([A-Z][\w']*(?: [A-Z][\w']*)*) increases (?:{boss}'s|his|her|its) damage taken", text)
+    known = " ".join(v.name for v in (d.fight.vulnerable if d.fight is not None else []))
+    return [n for n in dict.fromkeys(names) if n not in known]
+
+
 def render(d: PrepData) -> str:
     pre = {n for n in d.precast} | {n for n in d.links if "potion" in n.lower()} | {"Potion"}
 
@@ -844,6 +854,10 @@ def render(d: PrepData) -> str:
         f0 = d.talents.fights[0]
         for i, r in enumerate(sorted(d.talents.rows, key=lambda r: -(r.per_fight.get(f0, (0.0, None))[0] or 0.0))):
             r.build.label = f"top build {chr(65 + i)}"
+    if d.mrt:  # every plan's note says the defensives the fight tab calls, not the logs' longer list
+        defs = fightview.note_lines(d, ("def", "move"))
+        d.mrt = {k: in_time_order("\n".join([x for x in v.splitlines() if " Defensive: " not in x] + defs))
+                 for k, v in d.mrt.items()}
     played = simple._plan(d)
     if played is not None and d.mrt.get(played.objective):  # the plan you play: one note, the fight tab's, everywhere
         d.mrt[played.objective] = fightview.mrt(d)
@@ -868,6 +882,11 @@ def render(d: PrepData) -> str:
             "corpora: the fight is within about 2% of the full corpus and the talent pick rates within about 3 points. "
             "The full analysis runs in the background: this sheet refreshes by itself when it is done.</span></div>")
     tabs["overview"].append(briefing.lede_html(d) + briefing.aim_html(d) + briefing.confidence_pill(d))
+    for name in unsimmed_amps(d):
+        notices.append(
+            f'<p class="notice small"><b>{e(name)} is not in the sims:</b> the Encounter Journal says it raises the '
+            f"boss's damage taken, but not by how much, so the sims leave it out and no plan saves a cooldown for it. "
+            f"If your raid holds burst for {e(name)}, hold yours too.</p>")
     if d.kills and d.kills < THIN_CORPUS:
         notices.append(
             f'<p class="notice small"><b>Thin data:</b> only {d.kills} ranked kills of your spec on this boss and '
@@ -1030,7 +1049,9 @@ for reference: a build can be worse there and much better on this fight. Error a
         tabs["cooldowns"].append(
             "<h2>Ideal cooldown play-by-play</h2><div class='card'><p><b>The default priority list is already right "
             "on this fight:</b> play it as it is. No other plan beats it for boss, total "
-            f"or burst damage (all within the noise, ±{max(p.error, 0.01):.2f}%).</p>"
+            f"or burst damage (all within the noise, ±{max(p.error, 0.01):.2f}%)."
+            + (f" The sims leave out {e(', '.join(unsimmed_amps(d)))}: see the fight tab." if unsimmed_amps(d) else "")
+            + "</p>"
             f"{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases, links=d.links)}"
             + (f"<h4>MRT note {copy_button(note, 'Copy the MRT note')}</h4><pre class='small note-pre'>{e(note)}</pre>"
                if note else "") + "</div>")
@@ -1101,7 +1122,7 @@ for reference: a build can be worse there and much better on this fight. Error a
 and on the burst targets{f" ({e(burst_names(d)[1])})" if burst_names(d)[1] else ""}, which cover {a0.units_cover:.0%}. Much more
 than the coverage means they hold the cooldown. SimC does not know that a burst target must die fast, so compare with
 the simulated plans above.</p>
-<table class="fit"><tr><th>Cooldown</th><th class="n">During adds</th><th class="n">On burst targets</th><th>Reading</th></tr>{rows}</table></div>""")
+<table><tr><th>Cooldown</th><th class="n">During adds</th><th class="n">On burst targets</th><th>Reading</th></tr>{rows}</table></div>""")
 
     # gear
     if d.gear:

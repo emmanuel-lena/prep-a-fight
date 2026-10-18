@@ -205,7 +205,7 @@ def items(d) -> list[tuple[float, Item]]:
         a, b = w.start, w.start + w.duration
         for s0, s1 in zip([a] + [c for c in cuts if a < c < b], [c for c in cuts if a < c < b] + [b], strict=True):
             long = s1 - s0 > MOVE_LONG
-            add(s0, Item("boss", "move", "Movement", f"Movement until {_mmss(s1)}" if long else
+            add(s0, Item("boss", "move", "Movement", f"Movement from {_mmss(s0)} to {_mmss(s1)}" if long else
                          f"Movement, {s1 - s0:.0f} s", MOVE_ICON, float(s1 - s0)))
             if MOVE_CUE <= s1 - s0 <= MOVE_LONG and w.spells:
                 s = w.spells[0][0]
@@ -256,7 +256,8 @@ def _ev(it: Item, row_t: float | None = None) -> str:
     bold = it.side == "you" and it.kind in ("cd", "pot", "def")
     text = f"<b>{e(it.text)}</b>" if bold else e(it.text)
     # any time its row does not show says so: the page never snaps an event to a time it does not have
-    notes = [f"at {_mmss(it.t)}"] if row_t is not None and it.t >= 1 and _mmss(it.t) != _mmss(row_t) else []
+    notes = [f"at {_mmss(it.t)}"] if (row_t is not None and it.t >= 1 and _mmss(it.t) != _mmss(row_t)
+                                      and f"from {_mmss(it.t)}" not in it.text) else []
     if it.dur and it.kind not in ("move", "immune"):
         notes.append(f"lasts {it.dur:.0f} s")
     small = f"<small>{', '.join(notes)}</small>" if notes else ""
@@ -332,7 +333,9 @@ def _ctx(t: float, its: list[tuple[float, Item]]) -> str:
         return "on the pull"
     if t < 5:
         return "just after the pull"
-    near = [x for at, x in its if x.side == "boss" and x.kind in ANCHORS and t - 8 <= at <= t + 1]
+    # a press answers an add wave, an immunity or a stage up to 8 s after it starts, a boss cast only within 3 s
+    near = [x for at, x in its if x.side == "boss" and x.kind in ANCHORS
+            and t - (3 if x.kind == "cast" else 8) <= at <= t + 1]
     if near:
         order = ("adds", "cast", "immune", "phase")  # what you press it for, the most concrete first
         x = min(near, key=lambda x: (order.index(x.kind), abs(x.t - t)))
@@ -387,16 +390,21 @@ def mrt(d) -> str:
     head = note.splitlines()[0]
     if plan is not None and (not any(r.name != "default" for r in plan.choice.values()) or plan.gain <= 2 * plan.error):
         head = re.sub(r"cooldowns for .*\(\+?-?\d+\.\d%\)", "cooldowns: SimC's default priority list", head)
+    return "\n".join([head, *note_lines(d)])
+
+
+def note_lines(d, kinds: tuple[str, ...] = ("cd", "pot", "def", "move")) -> list[str]:
+    """The MRT lines of the presses the fight tab shows (of these kinds), each with what it is for."""
     its = items(d)
     lines = []
     for t, it in its:
-        if it.side != "you" or it.kind not in ("cd", "pot", "def"):
+        if it.side != "you" or it.kind not in kinds:
             continue
         c = _ctx(t, its)
         said = c.replace("on the ", "").replace("on ", "") if c else ""
         why = " - " + c if c and c not in ("on the pull", "just after the pull") and said not in it.text else ""
         lines.append(f"{{time:{_mmss(max(0.0, t))}}} {it.text}{why}")
-    return "\n".join([head, *lines])
+    return lines
 
 
 def _btn(id_: str, label: str, keys: str = "", cls: str = "btn", hidden: bool = False, more: str = "") -> str:
@@ -413,6 +421,10 @@ def _phase_html(name: str, start: float, end: float, pi: int, rows: str, its: li
     mine = [(t, x) for t, x in its if start - 0.5 <= t < end - 0.5 and x.side == "boss"]
     said = [x.text[0].lower() + x.text[1:] for _t, x in mine if x.kind == "immune"]
     said += [f"{x.text} at {_mmss(t)}" for t, x in mine if x.kind == "adds"]
+    said += [f"everyone moves from {_mmss(t)} to {_mmss(t + x.dur)}" for t, x in mine
+             if x.kind == "move" and x.dur > MOVE_LONG]  # the stage's long movement, said with its times
+    said.sort(key=lambda s: [int(v) for v in re.findall(r"(\d+):(\d\d)", s)[:1][0]] if re.search(r"\d+:\d\d", s)
+              else [0, 0])
     lust = [t for t, x in mine if x.kind == "lust"]
     if lust:
         said.insert(0, "Bloodlust " + ("at the pull" if lust[0] < 5 else f"at {_mmss(lust[0])}"))

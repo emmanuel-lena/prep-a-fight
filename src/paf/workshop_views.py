@@ -55,7 +55,7 @@ def _img(icon: str, cls: str = "it-ic") -> str:
 
 
 def _verdict(kind: str, title: str, text: str = "", big: str = "") -> str:
-    mark = {"go": "&#8593;", "ok": "&#10003;", "warn": "!"}[kind]
+    mark = {"go": "&#10140;", "ok": "&#10003;", "warn": "!"}[kind]
     return (f"<div class='verdict {kind}'><span class='v-mark' aria-hidden='true'>{mark}</span><div><b>{title}</b>"
             + (f"<p>{text}</p>" if text else "") + "</div>" + (f"<span class='v-big'>{big}</span>" if big else "")
             + "</div>")

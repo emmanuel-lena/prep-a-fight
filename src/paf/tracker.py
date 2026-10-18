@@ -22,6 +22,10 @@ ABILITIES = """query($c:String!){ reportData { report(code:$c) {
   fights(killType: Encounters) { id encounterID name difficulty kill startTime endTime bossPercentage
     friendlyPlayers } } } }"""
 DEATHS = """query($c:String!,$f:[Int]!){ reportData { report(code:$c) { table(fightIDs:$f, dataType:Deaths) } } }"""
+PREPULL = """query($c:String!,$s:Float!,$e:Float!,$x:String!){ reportData { report(code:$c) {
+  events(startTime:$s, endTime:$e, dataType:Casts, hostilityType:Friendlies, filterExpression:$x, limit:200)
+  { data } } } }"""
+PREPULL_S = 10  # a damage potion pressed this long before the pull is the pre-pot the plans call
 CASTS = """query($c:String!,$f:[Int]!,$x:String!,$s:Float){ reportData { report(code:$c) {
   events(fightIDs:$f, dataType:Casts, hostilityType:Friendlies, filterExpression:$x, startTime:$s, limit:10000)
   { data nextPageTimestamp } } } }"""
@@ -142,6 +146,15 @@ def night(client, code: str, encounter_id: int | None = None, live: bool = False
             start = ev.get("nextPageTimestamp")
             if not start:
                 break
+        pots = sorted(i for i, k in kinds.items() if k == "damage")
+        if pots:  # the pre-pot: cast before the pull, outside the fight's own events
+            pre = client.query(PREPULL, {"c": code, "s": t0 - PREPULL_S * 1000, "e": t0,
+                                         "x": f"ability.id in ({', '.join(map(str, pots))})"},
+                               cache_ttl=86400)["reportData"]["report"]["events"]
+            for e in pre.get("data") or []:
+                who = actors.get(e.get("sourceID"))
+                if who and e.get("type") == "cast" and who["name"] in players:
+                    players[who["name"]].damage.append((e["timestamp"] - t0) / 1000)
         row.players = dict(players)
         rows.append(row)
     return rows, icons
