@@ -1243,7 +1243,8 @@ placeholder="https://www.warcraftlogs.com/reports/..."></label>
 <label><input type="checkbox" name="gear" checked> Best gear from your bags, and what this boss drops for you</label>
 <label><input type="checkbox" name="optimize" checked> Ideal cooldown plan{" for boss damage" if no_adds else " for your goal"}
 <span class="muted small">(the slowest part: 20 to 40 min the first time; the estimate above comes from this computer's last preps, faster when their sims are reused)</span></label></fieldset>
-<div class="ob-actions">{back}<button class="btn go">Prepare this fight &rarr;</button></div>
+<div class="ob-actions">{back}<button class="btn go">Prepare this fight &rarr;</button><span class="go-why" hidden>Fix
+the raid log link (step 3) or leave it empty first.</span></div>
 <p class="small muted ob-note">Runs on your computer; you can follow it live.</p></section>
 </form></div>
 {(f"<aside class='boss-guide'>{guide}</aside>") if guide else ""}</div>{journal}
@@ -1273,7 +1274,9 @@ function recap(){
   var picked = [].slice.call(f.querySelectorAll('input[name=assign]:checked')).map(function(i){
     var t = i.parentNode.cloneNode(true); var m = t.querySelector('.meta'); if (m) m.remove(); return t.textContent.trim(); });
   var raid = (f.querySelector('input[name=raid]') || {}).value || '';
-  if (raid && !/warcraftlogs[.]com[/]reports[/][A-Za-z0-9]{16}/.test(raid)) raid += ' (not a Warcraft Logs report link: fix it or leave it empty)';
+  var badraid = raid && !/warcraftlogs[.]com[/]reports[/][A-Za-z0-9]{16}/.test(raid);
+  if (badraid) raid += ' (not a Warcraft Logs report link: fix it or leave it empty)';
+  var rli = f.querySelector('.recap-raid'); if (rli && rli.closest('li')) rli.closest('li').classList.toggle('bad', !!badraid);
   f.querySelector('.recap-assigns').textContent = picked.join(', ');
   f.querySelector('.recap-raid').textContent = raid;
   f.querySelectorAll('.recap [data-if]').forEach(function(li){
@@ -1288,7 +1291,8 @@ function show(i, back){
   if (steps[at].dataset.step === 'go') recap();
   var h2 = steps[at].querySelector('h2'); if (h2) { h2.tabIndex = -1; h2.focus({preventScroll: true}); }  // keep the place
   var cur = steps[at]; cur.classList.add('arriving');  // a double click on Next must not tick what lands under it
-  setTimeout(function(){ cur.classList.remove('arriving'); }, 450);
+  setTimeout(function(){ cur.classList.remove('arriving');
+    if (document.activeElement === document.body && h2) h2.focus({preventScroll: true}); }, 450);
 }
 f.querySelectorAll('.next').forEach(function(b){ b.addEventListener('click', function(){ show(at + 1); }); });
 f.addEventListener('keydown', function(ev){  // Enter in a field moves on a step; only the last step's button prepares
@@ -1297,12 +1301,12 @@ var rl = f.querySelector('input[name=raid]'), go = f.querySelector('.ob-step[dat
 if (rl) rl.addEventListener('input', function(){  // a link that is not a report: said at once, and no prep from it
   var bad = rl.value.trim() && !/warcraftlogs[.]com[/]reports[/][A-Za-z0-9]{16}/.test(rl.value);
   rl.classList.toggle('bad', !!bad); rl.setAttribute('aria-invalid', bad ? 'true' : 'false'); if (go) go.disabled = !!bad;
+  var why = f.querySelector('.go-why'); if (why) why.hidden = !bad;
   var h = document.getElementById('raid-help'); if (h) h.classList.toggle('err', !!bad); if (h) { if (h.dataset.t == null) h.dataset.t = h.textContent;
     h.textContent = bad ? 'Not a Warcraft Logs report link: paste one like https://www.warcraftlogs.com/reports/..., or leave it empty.' : (rl.value.trim() ? 'This log is read for your raid.' : h.dataset.t); } });
 f.querySelectorAll('.prev').forEach(function(b){ b.addEventListener('click', function(){ show(at - 1, true); }); });
 f.querySelectorAll('input[name=goal]').forEach(function(r){ r.addEventListener('change', function(){
-  try { localStorage.setItem(key, r.value); } catch (e) {}  // on to the step after the goal, once, however fast the clicks
-  var from = at; setTimeout(function(){ if (at === from) show(from + 1); }, 200); }); });
+  try { localStorage.setItem(key, r.value); } catch (e) {} }); });  // a goal is picked; Next moves on (keyboard-safe)
 f.addEventListener('submit', function(){ var r = f.querySelector('input[name=goal]:checked');
   try { if (r) localStorage.setItem(key, r.value); } catch (e) {} });
 show(0);
