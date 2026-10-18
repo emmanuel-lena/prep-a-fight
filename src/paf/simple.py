@@ -108,6 +108,14 @@ def swaps_html(d, swaps: list) -> str:
     return f"<li class='sw-list'><ul class='swaps'>{lines}</ul></li>"
 
 
+def _hint(d) -> str:
+    """The sim's distance from the top players' real damage, said where the verdict rests on it."""
+    v = getattr(d, "validation", None)
+    gap = abs(v[1] - 1) if v else 0
+    return (f" The sim is {gap:.0%} off the top players' real damage on this fight: read it as a strong hint."
+            if gap > 0.12 else "")
+
+
 def _role(d) -> str:
     """For which goal the sheet's verdicts hold: your raid's call (another goal can have its own plan)."""
     from paf.prep_report import wanted
@@ -162,7 +170,7 @@ def change_card(d) -> str:
                     "prep finds the best gear in them and what this boss drops for you.</span></div></li>")
     if not rows:
         rows.append("<li><span class='ok' aria-hidden='true'>&#10003;</span><div><b>Nothing to change</b>"
-                    f"<span class='what'>{'Your talents, gear and cooldowns are' if d.gear else 'No talent, spec or cooldown change beats yours: your setup is'} already right for this boss{_role(d)}.</span></div></li>")
+                    f"<span class='what'>{'Your talents, gear and cooldowns are' if d.gear else 'No talent, spec or cooldown change beats yours: your setup is'} already right for this boss{_role(d)}.{_hint(d)}</span></div></li>")
     return f"<article class='card s-change'><h2>Before the pull</h2><ul>{''.join(rows)}</ul></article>"
 
 

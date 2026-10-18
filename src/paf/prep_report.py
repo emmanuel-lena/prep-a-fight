@@ -1118,7 +1118,9 @@ and the gear for that.</p></div>""")
     # talents
     if d.talents:
         tc = d.talents
-        names = {"boss fight": "This fight (total damage)", "patchwerk": "Single target (reference)"}
+        adds = any(c for _t, c, _l, _n in d.waves)  # with adds the metric matters; without, it is boss damage
+        names = {"boss fight": "This fight (total damage)" if adds else "This fight (boss damage)",
+                 "patchwerk": "Single target (reference)"}
         head = "".join(f"<th class='n'>{e(names.get(f, f))}</th>" for f in tc.fights)
         body = f"<tr><td>your talents</td>{''.join('<td class=n>ref</td>' for _ in tc.fights)}<td></td></tr>"
         first = tc.fights[0]

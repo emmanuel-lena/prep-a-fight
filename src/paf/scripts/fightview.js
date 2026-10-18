@@ -184,6 +184,7 @@
       var e = eff(a.t), b = B.filter(function (x) { return Math.abs(x.t - a.t) < 0.01 && x.n === a.n; })[0];
       if (!gone(a.t) && e <= t && t < (b ? until(b) : e + 6)) cur = a.n;
     });
+    if (!cur && cc.g && (cc.state === 'go' || cc.state === 'ready')) return cc.state === 'go' ? 'Press now' : 'Get ready';
     return cur || (t < 6 ? 'The pull' : 'Your rotation');
   }
   function phaseAt(t) {
@@ -372,7 +373,10 @@
       out.push(bar(e, t, 'boss', b.ic || '', 'Boss', b.n));
     });
     out.sort(function (a, b) { return a[0] - b[0]; });
-    set($('ss-bars'), out.slice(0, 7).map(function (x) { return x[1]; }).join('') || '<p class="pend">Nothing in the next minute: your rotation.</p>');
+    var shown = out.slice(0, 5);  // what fits above the controls; a stage change or an immunity always among them
+    var key = out.slice(5).filter(function (x) { return /Stage|Intermission|immune|Phase/i.test(x[1]); })[0];
+    if (key) shown[shown.length - 1] = key;
+    set($('ss-bars'), shown.map(function (x) { return x[1]; }).join('') || '<p class="pend">Nothing in the next minute: your rotation.</p>');
   }
 
   function playBtn() {

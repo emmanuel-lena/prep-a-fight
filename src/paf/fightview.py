@@ -325,7 +325,9 @@ def job_html(d) -> str:
     defs = _defensives(d)
     if defs:
         s, why = defs[0][1], defs[0][2]
-        rows.append((s, f"<b>{e(s)}</b>{' for ' + e(why) if why else ''}, the top players' defensive."))
+        at = ", ".join(_mmss(t) for t, x, _w in defs if x == s)  # every time the fight tab calls it
+        rows.append((s, f"<b>{e(s)}</b> at {at}{' for ' + e(why.removesuffix(chr(39) + 's damage')) if why else ''}, "
+                        "the top players' defensive."))
     wins = d.movement.windows if d.movement else []
     for t, it in items(d):  # a mobility spell the fight tab calls for a move: said, with who presses it
         if it.side == "you" and it.kind == "move":
