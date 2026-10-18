@@ -1226,8 +1226,8 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
 <p class="small muted ob-note">Each assignment is simulated: its moves and its downtime change your cooldown plan and your gear.</p>
 <div class="ob-actions">{back}{nxt}</div></section>
 <section class="ob-step" data-step="raid"><h2><span class="vh">Step 3 of 4: </span>Your raid</h2>
-<input name="raid" style="width:100%" value="{e(raid_now)}"
-placeholder="Link to one of your raid's logs: https://www.warcraftlogs.com/reports/..." aria-label="Raid log link">
+<label class="ob-field">Your raid's log<input name="raid" style="width:100%" value="{e(raid_now)}"
+placeholder="https://www.warcraftlogs.com/reports/..."></label>
 <p class="small muted" style="margin-top:6px">{e(raid_hint(no_adds))}</p>
 <div class="ob-actions">{back}{nxt}</div></section>
 <section class="ob-step" data-step="go"><h2><span class="vh">Step 4 of 4: </span>Ready to prepare</h2>

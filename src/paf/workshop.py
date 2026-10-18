@@ -135,22 +135,24 @@ def _prepared_ids(encounters: list, diff: str | None = None) -> set:
         return set()
 
 
-# the "· has a sheet" marks follow the difficulty picked in the same form
-READY_JS = ("<script>(function(s){var f=s&&s.form;if(!f)return;function goal(init){var na=(s.options[s.selectedIndex]"
-            "||{}).dataset;na=na&&na.na;f.querySelectorAll('[name=objective]').forEach(function(r){var l=r.closest('label')"
-            "||r;if(r.value==='total'||r.value==='all'){l.hidden=!!na;if(na&&r.checked){var b=f.querySelector("
-            "'[name=objective][value=boss]');if(b)b.checked=true}}});if(f.dataset.addsOnly){var n=f.querySelector('.ws-noadds'),"
-            "g=f.querySelector('.ws-go .btn');if(na&&init===1){var o=[].filter.call(s.options,function(o){return !o.dataset.na})[0];"
-            "if(o){s.value=o.value;na=null}}if(n)n.hidden=!na;if(g)g.disabled=!!na}prep()}"
-            "function prep(){if(!f.dataset.needsPrep)return;var c=f.querySelector('[name=difficulty]:checked');"
-            "var o=s.options[s.selectedIndex],ok=!c||!o||(' '+o.dataset.r+' ').indexOf(' '+c.value+' ')>=0,"
-            "p=f.querySelector('.ws-noprep'),g=f.querySelector('.ws-go .btn');if(p)p.hidden=ok;"
-            "if(g&&!f.dataset.addsOnly)g.disabled=!ok}f.addEventListener('change',prep);s.addEventListener('change',function(){goal()});document.addEventListener('DOMContentLoaded',function(){goal(1)});goal(1);function up(){var c=f.querySelector("
-            "'[name=difficulty]:checked')||f.querySelector('select[name=difficulty]');if(!c)return;"
-            "[].forEach.call(s.options,function(o){if(o.dataset.n==null)return;o.textContent=o.dataset.n+((' '+"
-            "o.dataset.r+' ').indexOf(' '+c.value+' ')>=0?' · has a sheet':'')})}f.addEventListener('change',"
-            "function(ev){if(ev.target.name==='difficulty')up()});up()})(document.currentScript.previousElementSibling"
-            ".querySelector('select'))</script>")
+# the form follows the boss and difficulty picked: the "· has a sheet" marks, the goals a boss without adds leaves,
+# and whether the tool can run (an adds tool needs adds, a tool that reads a prep needs a sheet), with one note why not
+READY_JS = """<script>(function(s){var f=s&&s.form;if(!f)return;
+function diff(){var c=f.querySelector('[name=difficulty]:checked')||f.querySelector('select[name=difficulty]');return c&&c.value}
+function opt(){return s.options[s.selectedIndex]||{dataset:{}}}
+function sheet(o,d){return !d||(' '+(o.dataset.r||'')+' ').indexOf(' '+d+' ')>=0}
+function update(init){
+  var d=diff();
+  [].forEach.call(s.options,function(o){if(o.dataset.n!=null)o.textContent=o.dataset.n+(d&&sheet(o,d)?' \u00b7 has a sheet':'')});
+  if(init&&f.dataset.addsOnly&&opt().dataset.na){var w=[].filter.call(s.options,function(o){return !o.dataset.na})[0];if(w)s.value=w.value}
+  var o=opt(),na=!!o.dataset.na;
+  f.querySelectorAll('[name=objective]').forEach(function(r){var l=r.closest('label')||r;
+    if(r.value==='total'||r.value==='all'){l.hidden=na;if(na&&r.checked){var b=f.querySelector('[name=objective][value=boss]');if(b)b.checked=true}}});
+  var why=f.dataset.addsOnly&&na?'noadds':(f.dataset.needsPrep&&!sheet(o,d)?'noprep':'');
+  f.querySelectorAll('.ws-noadds,.ws-noprep').forEach(function(n){n.hidden=n.className.indexOf('ws-'+why)<0||!why});
+  var g=f.querySelector('.ws-go .btn');if(g)g.disabled=!!why}
+f.addEventListener('change',function(){update()});document.addEventListener('DOMContentLoaded',function(){update(1)});update(1)
+})(document.currentScript.previousElementSibling.querySelector('select'))</script>"""
 
 
 def _no_adds(encounters: list) -> set:
@@ -222,8 +224,7 @@ def tool_page(cmd: str, encounters: list) -> str | None:
     if t is None:
         return None
     fields = "".join(_field(k, encounters) for k in t.fields)  # the CLI's other options: ?raw=1, for developers
-    note = ("<p class='ws-note'>It reads the data of a prep of the boss you pick: a boss not prepared yet is prepared "
-            "from <a href='/'>Home</a> first.</p>" if t.needs_prep else "")
+    note = ""  # said only when it matters: the boss picked has no sheet (ws-noprep)
     return (f"<div class='ws'>"
             f"<header class='ws-tool'>{_icon(t.icon, 'ws-big')}<div><h1>{e(t.title)}</h1><p class='lead'>{e(t.question)}"
             f"</p></div></header>"
