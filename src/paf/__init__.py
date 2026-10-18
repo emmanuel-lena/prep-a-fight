@@ -1,6 +1,6 @@
 """prep-a-fight (paf): analyze top logs and adapt gear and cooldowns to a specific boss fight."""
 
-__version__ = "0.8.1"
+__version__ = "0.8.2"
 
 from paf import net as _net  # noqa: E402
 
