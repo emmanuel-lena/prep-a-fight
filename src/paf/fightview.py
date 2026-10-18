@@ -201,8 +201,8 @@ def items(d) -> list[tuple[float, Item]]:
         a, b = w.start, w.start + w.duration
         for s0, s1 in zip([a] + [c for c in cuts if a < c < b], [c for c in cuts if a < c < b] + [b], strict=True):
             long = s1 - s0 > MOVE_LONG
-            add(s0, Item("boss", "move", "Movement", f"Lots of movement until {_mmss(s1)}" if long else
-                         f"Everyone moves for {s1 - s0:.0f} s", MOVE_ICON, float(s1 - s0)))
+            add(s0, Item("boss", "move", "Movement", f"Movement until {_mmss(s1)}" if long else
+                         f"Movement, {s1 - s0:.0f} s", MOVE_ICON, float(s1 - s0)))
             if MOVE_CUE <= s1 - s0 <= MOVE_LONG and w.spells:
                 s = w.spells[0][0]
                 add(s0, Item("you", "move", s, f"{s} for the move", _icon(d, s)))

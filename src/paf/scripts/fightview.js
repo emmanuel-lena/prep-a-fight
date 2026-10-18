@@ -283,7 +283,7 @@
     });
     B.forEach(function (b) {  // the moves to come: a boss mod shows them too
       var e = eff(b.t);
-      if (b.k === 'move' && b.d >= 5 && !gone(b.t) && e >= t - 0.5 && e <= t + 60) out.push(bar(e, t, 'boss', '', 'Boss', 'Everyone moves for ' + Math.round(b.d) + ' s'));
+      if (b.k === 'move' && b.d >= 5 && !gone(b.t) && e >= t - 0.5 && e <= t + 60) out.push(bar(e, t, 'boss', '', 'Boss', 'Movement, ' + Math.round(b.d) + ' s'));
     });
     N.forEach(function (a) {
       var e = eff(a.t);

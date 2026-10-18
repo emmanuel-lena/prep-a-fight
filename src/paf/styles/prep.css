@@ -79,3 +79,5 @@ th.n{text-align:right}
 .sev{background:transparent!important;border:1px solid var(--line)!important;color:var(--muted)!important}
 .major .sev,.moderate .sev{border-color:var(--fg)!important;color:var(--fg)!important}
 .major .sev{background:var(--fg)!important;color:var(--bg)!important}
+.sugg .gain small{display:block;font:500 11px var(--font-body);color:var(--muted);text-align:right;text-transform:none}
+@media (min-width:1400px){#boss .stage{break-inside:avoid}}

@@ -93,7 +93,8 @@ def apply_notes(fight: Fight, notes: Notes) -> tuple[Fight, list[str]]:
 
 
 def notes_template(fight: Fight) -> str:
-    lines = [f"# Boss notes for {fight.name}: correct what the logs cannot tell. Uncomment / edit, then rerun.",
+    lines = [f"# Boss notes for {fight.name}: correct what the logs cannot tell.",
+             "# Remove the # of a line to use it, save, then prepare the fight again.",
              "#   amp <unit> <x>      the boss takes x times the damage while this unit is up",
              "#   separate <unit>     an independent priority target (its own health)",
              "#   ignore <unit>       a mechanic, not a target",

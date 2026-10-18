@@ -1085,11 +1085,10 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
         last = last + lastraid.CARD_JS if last else ""
     except Exception:  # noqa: BLE001 - the home always shows
         last = ""
-    mine = f'<h2>Every prep sheet ({len(items)})</h2>{boss_cards(items)}' if items else ""
+    mine = f'<h2>Every prep sheet ({len(items)})</h2>{boss_cards(items, limit=len(items))}' if items else ""
     g = settings.get("guild")
     return f"""<section class="home-hero"><div class="me">{ic}<div><b>{e(loaded.name)}</b>
 <span>{e(loaded.spec.title())} {e(loaded.class_name.title())}{(" &middot; " + e(g)) if g else ""}</span></div></div>
-{characters_strip()}
 <form method="get" action="/boss" class="start"><h1>Prepare a boss</h1>{week}
 <select name="boss" aria-label="Boss" class="big">{options}</select>
 <div class="segs" role="radiogroup" aria-label="Difficulty">{diffs}</div>

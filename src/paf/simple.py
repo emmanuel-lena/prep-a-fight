@@ -111,14 +111,14 @@ def change_card(d) -> str:
             spec_ic = icons.img(icons.CLASS_ICON.format(cls=d.class_name.lower()), "medium") if d.class_name else ""
             button = copy_button(best.build.code, "Copy the talents") if best.build.code else ""
             rows.append(f"<li>{spec_ic}<div><b>Change your talents</b><span class='sz {_size(g)}'>"
-                        f"{SIZE_WORDS[_size(g)]}</span></div></li>{swaps_html(d, getattr(best, 'swaps', []))}"
+                        f"{SIZE_WORDS[_size(g)]}, {g:+.1f}%</span></div></li>{swaps_html(d, getattr(best, 'swaps', []))}"
                         f"<li class='sw-copy'>{button}</li>")
     if d.gear and d.gear[0][2] > 2 * d.gear_error:
         changes, _, w = d.gear[0]
         items = [c.split(": ", 1)[-1].rsplit(" (", 1)[0] for c in changes.split("; ")]
         pics = "".join(_ic(d, it) for it in items[:3])
         rows.append(f"<li><span class='pics'>{pics}</span><div><b>Swap some gear</b><span class='sz {_size(w)}'>"
-                    f"{SIZE_WORDS[_size(w)]}</span><span class='what'>{'; '.join(linkify(c, d.links) for c in changes.split('; '))}"
+                    f"{SIZE_WORDS[_size(w)]}, {w:+.1f}%</span><span class='what'>{'; '.join(linkify(c, d.links) for c in changes.split('; '))}"
                     f"</span></div></li>")
     s = getattr(d, "specs", None)
     if s and s.get("verdict") == "go":  # another spec of your class does clearly more here, sim and logs agree
@@ -137,7 +137,7 @@ def change_card(d) -> str:
         held = [(d.cd_names.get(k, k), r.name) for k, r in plan.choice.items() if r.name != "default"]
         what = "; ".join(f"{n}: {rule_phrase(d, r)}" for n, r in held)
         rows.append(f"<li>{_ic(d, held[0][0])}<div><b>Play your cooldowns this way</b><span class='sz "
-                    f"{_size(plan.gain)}'>{SIZE_WORDS[_size(plan.gain)]}</span><span class='what'>{e(what)}. The fight "
+                    f"{_size(plan.gain)}'>{SIZE_WORDS[_size(plan.gain)]}, {plan.gain:+.1f}%</span><span class='what'>{e(what)}. The fight "
                     f"tab calls them at their times.</span></div></li>")
     if getattr(d, "imported", False):  # no bags: the best gear and the loot need the /simc export
         rows.append("<li><span class='ok bad' aria-hidden='true'>!</span><div><b>Paste your /simc export</b>"

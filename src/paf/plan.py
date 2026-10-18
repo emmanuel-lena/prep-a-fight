@@ -151,7 +151,7 @@ def describe_plan(plan: Plan) -> list[str]:
 def plan_template(fight: Fight) -> str:
     """Starting plan file: instructions plus the fight's events as comments."""
     lines = [
-        f"# Personal plan for {fight.name}. Edit, save, then run `paf plan \"<boss>\" --optimize`.",
+        f"# Personal plan for {fight.name}. Edit and save: the next prep of this boss uses it.",
         "# One action per line:",
         "#   2:45 move 6                 6 s of movement at 2:45 (soak, dodge, assignment...)",
         "#   5:30 move 8 shift -5..+5    same, can happen up to 5 s earlier or later: the optimizer picks",

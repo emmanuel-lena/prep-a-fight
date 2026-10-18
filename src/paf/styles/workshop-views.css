@@ -139,3 +139,4 @@ table.night td.pos{color:var(--pos)} table.night td.neg{color:var(--neg)}
 .ws-answer .sw .tal:first-child{opacity:.75} .ws-answer .sw .tal:first-child span{text-decoration:line-through;text-decoration-color:var(--neg)}
 .ws-answer .sw .arr{color:var(--pos);font-weight:700;text-align:center}
 .ws-answer .tal.none{color:var(--muted);justify-content:center}
+table.night th.n{text-align:right}

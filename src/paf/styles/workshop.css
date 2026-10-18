@@ -49,3 +49,5 @@
 .ws-fine{font-size:13px;color:var(--muted);margin:10px 0 0}
 @media (max-width:640px){.ws h1{font-size:28px}.ws-form{padding:16px}}
 .ws-cards{grid-template-columns:repeat(auto-fill,minmax(380px,1fr))}
+.ws-cards{grid-template-columns:repeat(auto-fill,minmax(min(380px,100%),1fr))}
+@media (min-width:1200px){.ws-cards{grid-template-columns:repeat(3,minmax(0,1fr))} .ws-cards.c2{grid-template-columns:repeat(2,minmax(0,1fr))}}

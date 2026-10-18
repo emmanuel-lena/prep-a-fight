@@ -149,3 +149,10 @@ body.has-side>.side{grid-column:1;grid-row:1} body.has-side>main,body.has-side>i
 .pill.warn{background:transparent;color:var(--neg);border:1px solid currentColor}
 .side-top{height:46px}
 .ics.ics-ph{display:none}
+/* a disclosure the app shows open (DESIGN.md: show, don't fold) reads as a heading, not as something to unfold */
+details.card[open]>summary,details.more[open]>summary,details.set-group[open]>summary,details.bc-more[open]>summary,
+details.ws-adv[open]>summary{list-style:none;cursor:default;pointer-events:none}
+details.card[open]>summary::-webkit-details-marker,details.more[open]>summary::-webkit-details-marker,
+details.set-group[open]>summary::-webkit-details-marker,details.bc-more[open]>summary::-webkit-details-marker{display:none}
+details.card[open]>summary::before,details.more[open]>summary::before,details.set-group[open]>summary::before,
+details.bc-more[open]>summary::before{content:none}

@@ -175,7 +175,8 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
                            f'<title>{e(label)} {_mmss(t)}</title></circle>')
         rows.append("".join(row))
         y += 22
-    return (f'<div class="scroll"><svg width="{W}" height="{y + 4}" style="font-family:system-ui">{axis}'
+    return (f'<div class="scroll"><svg class="plan-tl" viewBox="0 0 {W} {y + 4}" width="100%" '
+            f'style="font-family:system-ui;max-height:{(y + 4) * 2}px">{axis}'
             f'{"".join(rows)}</svg></div><p class="small muted">Dots: this plan (one simulated pull). Pale bars: '
             f'when the top players cast the same cooldown. Green: add waves; gold: boss vulnerability windows '
             f'(x = damage taken); grey: boss away; pink line: Bloodlust.</p>')
@@ -404,6 +405,7 @@ class Suggestion:
     details: list[str] = field(default_factory=list)  # html lines
     gain: float | None = None
     icon: str = ""  # game icon file name
+    metric: str = ""  # what the gain is of ("boss", "total", "burst"), when it is not your plain damage
 
 
 THIN_CORPUS = 50  # fewer ranked kills than this: say the data is thin
@@ -503,7 +505,8 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         elif costly(p):
             tag = " <span class='pill'>only if your raid needs it dead fast</span>"
         out.append(Suggestion("info" if costly(p) else _severity(p.gain), f"Cooldown plan <b>{e(goal)}</b>{tag}", lines, p.gain,
-                              d.icons.get(first, "")))
+                              d.icons.get(first, ""), {"boss": "boss damage", "total": "total damage",
+                                                       "secondary": "burst damage"}.get(p.objective, "")))
     if d.gear:
         changes, _, w = d.gear[0]
         if w > 2 * d.gear_error:
@@ -639,7 +642,8 @@ def suggestions_html(d: PrepData) -> str:
         label = {"major": "Major", "moderate": "Moderate", "minor": "Minor", "info": "Info"}[s.severity]
         if s.severity == "info" and s.gain is not None:  # a gain only for some raids (a burst they may not need)
             label = "Situational"
-        gain = f'<div class="gain">{s.gain:+.1f}%</div>' if s.gain is not None else '<div class="gain"></div>'
+        unit = f"<small>{e(s.metric)}</small>" if s.metric else ""
+        gain = f'<div class="gain">{s.gain:+.1f}%{unit}</div>' if s.gain is not None else '<div class="gain"></div>'
         pic = icons.img(s.icon or "inv_misc_groupneedmore", "medium")
         details = "".join(f"<div>{x}</div>" for x in s.details)
         rows.append(f'<div class="sugg {s.severity}">{pic}<div><div class="t"><span class="sev">{label}</span> '
@@ -833,7 +837,7 @@ and the gear for that.</p></div>""")
             cells = ""
             for f in tc.fights:
                 tot, boss = r.per_fight.get(f, (None, None))
-                cells += f"<td class='n'>{_pct(tot, err=tc.error)}{'<br><span class=small>boss ' + _pct(boss, 1) + '</span>' if boss is not None else ''}</td>"
+                cells += f"<td class='n'>{_pct(tot, err=tc.error)}{'<br><span class=small>boss ' + _pct(boss, 1, err=tc.error) + '</span>' if boss is not None else ''}</td>"
             both = set(r.add) & set(r.drop)
             add = [t for t in dict.fromkeys(r.add) if t not in both]
             drop = [t for t in dict.fromkeys(r.drop) if t not in both]
@@ -875,8 +879,9 @@ for reference: a build can be worse there and much better on this fight. Error a
             if p.timeline and d.fight is not None:
                 from paf.optimize import fight_context
 
-                steps = "".join(f"<tr><td>{_mmss(t)}</td><td>{e(label[:1].upper() + label[1:])}</td><td class='small muted'>"
-                                f"{e(fight_context(d.fight, t))}</td></tr>" for t, label in p.timeline)
+                steps = "".join(f"<tr><td>{_mmss(t)}</td><td>{e(cd_name(d, label.lower().replace(' ', '_')))}</td>"
+                                f"<td class='small muted'>{e(fight_context(d.fight, t).replace('lust', 'Bloodlust'))}"
+                                "</td></tr>" for t, label in p.timeline)
             note = d.mrt.get(p.objective, "")
             checks = ""
             if p.sensitivity:
