@@ -365,8 +365,8 @@ def confidence_pill(d) -> str:
                  None)
     if share and int(share[1]) != int(share[2]):  # the total is right, the split between boss and adds is not
         low = int(share[1]) < int(share[2])
-        say += (f" In the top players' gear its boss share is {share[1]}% vs their {share[2]}%: boss-only numbers run "
-                f"{'low' if low else 'high'}, add damage {'high' if low else 'low'}.")
+        say += (f" The split leans {'to the adds' if low else 'to the boss'}: SimC's default list in the top players' "
+                f"gear puts {share[1]}% of its damage on the boss, they put {share[2]}%.")
     return f"<p class='trust {level} rv'><span>How much to trust this:</span> {e(say)}</p>"
 
 

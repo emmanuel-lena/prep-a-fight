@@ -482,7 +482,8 @@ def legend(its: list) -> str:
     """The legend of the bars this fight has, none other."""
     kinds = {x.kind for _t, x in its if x.dur}
     spans = "".join(f"<span><i class='s-{k}'></i>{label}</span>" for k, label in LEGEND_KINDS if k in kinds)
-    return f"<div class='fv-legend' aria-hidden='true'>{spans}<span>bar length = how long it lasts</span></div>"
+    return (f"<div class='fv-legend' aria-hidden='true'>{spans}<span>bar length = how long it lasts</span>"
+            "<span>grey row = nothing for you to press</span></div>")
 
 
 def _side(d) -> str:

@@ -408,7 +408,8 @@ def fight_context(fight: Fight, t: float) -> str:
     for pi in fight.power_infusion:
         if pi <= t <= pi + 15:
             notes.append("PI")
-    for m in fight.movement + fight.personal_movement:
+    simmed = (fight.movement if fight.movement_scale > 0 else []) + fight.personal_movement  # moves the sims play
+    for m in simmed:
         if m.start - 4 <= t < m.start:
             notes.append("move soon")
     for w in fight.invulnerable:

@@ -152,7 +152,7 @@ def change_card(d) -> str:
         held = [(d.cd_names.get(k, k), r.name) for k, r in plan.choice.items() if r.name != "default"]
         what = "; ".join(f"{n}: {rule_phrase(d, r)}" for n, r in held)
         rows.append(f"<li>{_ic(d, held[0][0])}<div><b>Play your cooldowns this way</b><span class='sz "
-                    f"{_size(plan.gain)}'>{SIZE_WORDS[_size(plan.gain)]}, {plan.gain:+.1f}%</span><span class='what'>{e(what)}. The fight "
+                    f"{_size(plan.gain)}'>{SIZE_WORDS[_size(plan.gain)]}, {plan.gain:+.1f}% vs SimC's default list</span><span class='what'>{e(what)}. The fight "
                     f"tab calls them at their times."
                     + ("" if getattr(plan, "robust", True) else " Not robust: the gain can vanish on a harder fight "
                        "(see its checks in Dig deeper).") + "</span></div></li>")

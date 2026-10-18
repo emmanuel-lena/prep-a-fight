@@ -112,3 +112,4 @@ th.n{text-align:right}
 .sugg:not(.rec) .sev{background:transparent!important;color:var(--fg)!important;border:1px solid var(--line)!important}
 .sugg.rec .sev{background:var(--fg)!important;color:var(--bg)!important;border-color:var(--fg)!important}
 .sugg:not(.rec){box-shadow:none!important}
+.gen{margin-top:28px}

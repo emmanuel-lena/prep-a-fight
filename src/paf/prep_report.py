@@ -545,11 +545,10 @@ def suggestions(d: PrepData) -> list[Suggestion]:
                            if o not in (p.objective, "adds"))
         played_p = simple_plan(d)
         if played_p is not None and played_p is not p and played_p.gain > 2 * played_p.error:  # the real cost
-            for o in ("total", "boss"):
-                if o in p.totals and o in played_p.totals and o != p.objective:
-                    rel = 100 * ((1 + p.totals[o] / 100) / (1 + played_p.totals[o] / 100) - 1)
-                    others += f"; {_goal(o)} damage {rel:+.1f}% vs the plan the sheet plays"
-                    break
+            rel = [f"{_goal(o)} damage {100 * ((1 + p.totals[o] / 100) / (1 + played_p.totals[o] / 100) - 1):+.1f}%"
+                   for o in ("boss", "total") if o in p.totals and o in played_p.totals]
+            if rel:
+                others += "; vs the plan the sheet plays: " + ", ".join(rel)
         if others:
             lines.append(f"<span class='muted small'>Also: {e(others)}.</span>")
         if d.mrt.get(p.objective):
@@ -695,11 +694,11 @@ def export_html(d: PrepData) -> str:
     """The rebuilt fight as simc lines, to sim it on Raidbots or anywhere else."""
     buttons = " ".join(copy_button(text, "Copy the fight" if not label else f"Copy the fight + plan for {label}")
                        for label, text in d.export.items())
-    fi = d.fight
-    has = ["duration"] + [w for w, on in (("add waves", fi and fi.add_waves), ("immune windows", fi and fi.invulnerable),
-                                          ("damage windows", fi and fi.vulnerable), ("movement", fi and fi.movement),
-                                          ("Bloodlust", fi and fi.lust_time is not None),
-                                          ("Power Infusion", fi and fi.power_infusion)) if on]  # only what it holds
+    lines = d.export.get("", next(iter(d.export.values()), ""))
+    has = ["duration"] + [w for w, key in (("add waves", "/adds,"), ("immune windows", "/invulnerable,"),
+                                           ("damage windows", "/vulnerable,"), ("movement", "/movement,"),
+                                           ("Bloodlust", "bloodlust_time="), ("Power Infusion", "power_infusion="))
+                          if key in lines]  # what the copied lines hold, none other
     return f'''<h2>Sim this fight on Raidbots</h2><div class="card"><p class="small">The fight above as SimulationCraft
 lines: {e(", ".join(has))}. On
 <a href="https://www.raidbots.com/simbot/advanced" target="_blank" rel="noopener">Raidbots, Advanced</a>: paste your
@@ -718,20 +717,27 @@ def defensives_html(d: PrepData) -> str:
     df = d.defensives
     if not df or not (df.moments or df.usage):
         return ""
+    casts = dict(d.boss_casts)
+
+    def cast_note(m) -> str:  # the ability's cast long before the defensive: a hit that lands later, said with its cast
+        near = [c for c in casts.get(m.boss_ability, []) if abs(c - m.time) <= 8]
+        before = [c for c in casts.get(m.boss_ability, []) if c < m.time]
+        return "" if near or not before else f" <span class='muted small'>(its damage; cast at {_mmss(max(before))})</span>"
     rows = "".join(
         f"<tr><td class='n'>{_mmss(m.time)}</td><td>{m.share:.0%}</td><td>"
         + ", ".join(f"{icons.img(d.icons.get(n, ''), 'small')}{link(n, f'spell={sid}')} "
                     f"<span class='muted small'>{s:.0%}</span>" for n, sid, s in m.spells)
-        + f"</td><td>{link(m.boss_ability, f'spell={m.boss_spell_id}') if m.boss_ability else '<span class=muted>-</span>'}"
+        + f"</td><td>{link(m.boss_ability, f'spell={m.boss_spell_id}') + cast_note(m) if m.boss_ability else '<span class=muted>-</span>'}"
         + "</td></tr>" for m in df.moments)
-    table = (f"<div class='scroll'><table><tr><th>When</th><th>Top players</th><th>Defensive</th><th>Just before or "
-             f"after</th></tr>{rows}</table></div>") if df.moments else (
+    table = (f"<div class='scroll'><table><tr><th>When</th><th>Top players</th><th>Defensive</th><th>The boss "
+             f"ability it answers</th></tr>{rows}</table></div>") if df.moments else (
         "<p class='small'>The top players do not press their defensives at one shared moment on this boss: use them "
         "when you take damage.</p>")
     usage = ", ".join(f"{link(n, f'spell={sid}')} {per:.1f} per kill ({share:.0%} of the kills)"
                       for n, sid, per, share in df.usage[:6])
     return (f"<h2>Defensives</h2><div class='card'><p class='small'>When the top players of your spec press a "
-            f"defensive on this boss ({df.kills} kills), and the boss ability cast just before or after. SimC does not "
+            f"defensive on this boss ({df.kills} kills), and the boss ability it answers (cast just before or after, or "
+            f"long before for damage that lands later). SimC does not "
             f"simulate survival: this is advice, not a gain. The fight tab and the notes call the moments where "
             f"{fightview_support():.0%} or more of the top players press one.</p>{table}"
             + (f"<p class='small muted'>Used: {usage}.</p>" if usage else "") + "</div>")
@@ -751,7 +757,7 @@ def suggestions_html(d: PrepData) -> str:
                  "alt": "Alternative"}[s.severity]
         if s.severity == "info" and s.gain is not None:  # a gain only for some raids (a burst they may not need)
             label = "Situational"
-        unit = f"<small>{e(s.metric)}</small>" if s.metric else ""
+        unit = f"<small>{e(s.metric)}, vs SimC's default list</small>" if s.metric else ""  # the baseline, said
         gain = f'<div class="gain">{s.gain:+.1f}%{unit}</div>' if s.gain is not None else '<div class="gain"></div>'
         pic = icons.img(s.icon or "inv_misc_groupneedmore", "medium")
         details = "".join(f"<div>{x}</div>" for x in s.details)
@@ -1343,5 +1349,5 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"<title>{e(d.boss)} prep</title><script>document.documentElement.classList.add('js')</script>"
             f"{WH_SCRIPT}{theme.HEAD}{briefing.FONTS}<style>{CSS}{briefing.CSS}{simple.CSS}{fightview.CSS}{WS_CSS}</style>{theme.class_accent(d.class_name)}</head><body>{header}<main>{panels}"
-            f'<p class="small muted">Generated by prep-a-fight.</p></main>{TAB_JS}{briefing.JS}'
+            f'<p class="small muted gen">Generated by prep-a-fight.</p></main>{TAB_JS}{briefing.JS}'
             f"</body></html>")
