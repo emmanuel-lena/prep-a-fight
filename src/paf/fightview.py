@@ -205,7 +205,13 @@ def items(d) -> list[tuple[float, Item]]:
             if MOVE_CUE <= s1 - s0 <= MOVE_LONG and w.spells:
                 s = w.spells[0][0]
                 add(s0, Item("you", "move", s, f"{s} for the move", _icon(d, s)))
-    return sorted(out, key=lambda x: x[0])
+    starts = sorted(s for _n, s in d.phases if s >= 1)
+    for k, (t, it) in enumerate(out):  # a boss event logged just before a phase starts belongs to that phase
+        s = next((s for s in starts if s - 1.0 <= t < s), None)
+        if s is not None and it.side == "boss" and it.kind != "phase":
+            it.t = s
+            out[k] = (s, it)
+    return sorted(out, key=lambda x: (x[0], x[1].kind != "phase"))
 
 
 def moments(d) -> list[Moment]:
@@ -280,7 +286,7 @@ def job_html(d) -> str:
     rules = {d.cd_names.get(k, k): r.name for k, r in (plan.choice.items() if plan else []) if r.name != "default"}
     if d.lust is not None and d.lust < 5 and names:
         rows.append(("Bloodlust", "<b>Bloodlust at the pull</b>: your opener goes inside it."))
-    for n in names:
+    for n in sorted(names, key=lambda n: min(order[n])):  # in the order you first press them
         pre = [t for t in order[n] if t < 0.5 and (n in d.precast or "potion" in n.lower())]
         rest = [_mmss(t) for t in order[n] if t not in pre]
         when = ", ".join(rest[:5]) + ("…" if len(rest) > 5 else "")
