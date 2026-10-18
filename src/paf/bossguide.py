@@ -13,13 +13,27 @@ e = html.escape
 ROLE_TITLES = {"damage": "Damage Dealers", "healer": "Healers", "tank": "Tank"}
 SHOWN_FLAGS = {"tank": "tank", "healer": "healer", "damage": "dps", "interruptible": "interrupt", "deadly": "deadly",
                "mythic": "mythic", "important": "important"}
-SHORT = 220  # characters of an ability's description shown before "more"
 
 
 def bullets(text: str) -> list[str]:
     """The journal's "- a. - b." role summaries as a list."""
     parts = re.split(r"(?:^|\s)-\s*", text)
     return [p.strip() for p in parts if p.strip()]
+
+
+def readable(text: str) -> str:
+    """The journal's text without its unresolved game variables: [Name] links become the name, "X Shadow damage"
+    reads "Shadow damage", "by X%" reads "by a share", a lost target name ("fixate on the .") reads "a player"."""
+    t = re.sub(r"\[([^\]]+)\]", r"\1", text or "")
+    t = re.sub(r"\bby X%", "by a share", t)
+    t = re.sub(r"\bX% of\b", "a share of", t)
+    t = re.sub(r"\bX%", "some", t)
+    t = re.sub(r"\bX (yards?|yd)\b", r"a few \1", t)
+    t = re.sub(r"\bX (sec|seconds?)\b", r"a few \1", t)
+    t = re.sub(r"\b(?:inflicting|deals?|dealing) X\b", lambda m: m.group(0)[:-2], t)
+    t = re.sub(r"\bX (\w+ damage)", r"\1", t)
+    t = re.sub(r"\bthe \.", "a player.", t)
+    return t if t == text else re.sub(r"\s{2,}", " ", t)
 
 
 def _mmss(t: float) -> str:
@@ -56,13 +70,13 @@ def summary_html(sections: list[Section], role: str = "damage", full_link: str =
         return ""
     mine = next((c for c in over.children if c.title == ROLE_TITLES.get(role)), None)
     others = [c for c in over.children if c is not mine and c.text]
-    out = [f"<p>{e(over.text)}</p>" if over.text else ""]
+    out = [f"<p>{e(readable(over.text))}</p>" if over.text else ""]
     if mine and mine.text:
         out.append(f"<h3>What you do ({e(mine.title.lower())})</h3><ul>"
-                   + "".join(f"<li>{e(b)}</li>" for b in bullets(mine.text)) + "</ul>")
-    for c in others:
-        out.append(f"<details><summary>{e(c.title)}</summary><ul class='small'>"
-                   + "".join(f"<li>{e(b)}</li>" for b in bullets(c.text)) + "</ul></details>")
+                   + "".join(f"<li>{e(readable(b))}</li>" for b in bullets(mine.text)) + "</ul>")
+    for c in others:  # the other roles: shown, smaller (what the raid around you does)
+        out.append(f"<h3 class='other-role'>{e(c.title)}</h3><ul class='small muted'>"
+                   + "".join(f"<li>{e(readable(b))}</li>" for b in bullets(c.text)) + "</ul>")
     if full_link:
         out.append(f'<p class="small"><a href="{e(full_link)}">Every ability, phase by phase &rarr;</a></p>')
     return f'<div class="guide">{"".join(out)}</div>'
@@ -95,11 +109,8 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
         facts.append(who + (f", ~{m.cost:g} s of movement for you" if m.cost else ""))
     if s.title.lower() in ctx["burst"]:
         facts.append(f"<b>burst window: the boss takes x{ctx['burst'][s.title.lower()]:g} damage</b>")
-    text = s.text or ctx["describe"](s.spell_id)
-    body = ""
-    if text:
-        body = (f"<div class='small'>{e(text)}</div>" if len(text) <= SHORT else
-                f"<details class='small fold'><summary><span>{e(text)}</span></summary></details>")
+    text = readable(s.text or ctx["describe"](s.spell_id))
+    body = f"<div class='small ab-d'>{e(text)}</div>" if text else ""
     pic = icons.img(ctx["icons"].get(s.title, ""), "small")
     fact = f"<div class='small muted'>{' &middot; '.join(facts)}</div>" if facts else ""
     return (f'<div class="ab" style="margin-left:{min(depth, 3) * 14}px"><div>{pic}<b>{e(s.title)}</b> {tags}</div>'
@@ -123,16 +134,15 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
             if s.kind == "ability":
                 rows.append(_ability(s, depth, ctx))
             elif s.kind == "creature":
-                rows.append(f'<div class="unit" style="margin-left:{min(depth, 3) * 14}px">{e(s.title)}'
-                            # the whole text (the translation matches whole texts), folded by CSS when long
-                            + (f" <span class='muted small clamp'>{e(s.text)}</span>" if s.text else "") + "</div>")
+                rows.append(f'<div class="unit" style="margin-left:{min(depth, 3) * 14}px">{e(s.title)}</div>'
+                            + (f"<p class='small muted unit-d' style='margin-left:{min(depth, 3) * 14}px'>"
+                               f"{e(readable(s.text))}</p>" if s.text else ""))
         head = e(top.title) + "".join(f' <span class="pill">{SHOWN_FLAGS[f]}</span>'
                                        for f in top.flags if f in SHOWN_FLAGS)
-        intro = f"<p class='small muted'>{e(top.text[:300])}</p>" if top.text and top.kind != "stage" else ""
+        intro = f"<p class='small muted'>{e(readable(top.text)[:300])}</p>" if top.text and top.kind != "stage" else ""
         if top.kind == "ability":
             rows.insert(0, _ability(top, 0, ctx))
-        cards.append(f'<details class="card stage" {"open" if top.kind == "stage" else ""}><summary><h3>{head}</h3>'
-                     f"</summary>{intro}{''.join(rows)}</details>")
+        cards.append(f'<section class="card stage"><h3>{head}</h3>{intro}{"".join(rows)}</section>')
     return "".join(cards)
 
 

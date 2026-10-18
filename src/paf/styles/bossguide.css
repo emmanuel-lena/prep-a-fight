@@ -8,3 +8,8 @@
 .ab{padding:8px 0;border-top:1px solid var(--line)} .ab .pill{font-size:11px;padding:1px 7px;margin-left:4px}
 .unit{padding:10px 0 2px;font-weight:700;color:var(--muted);text-transform:uppercase;font-size:12px;
   letter-spacing:.04em}
+/* every ability shown, nothing folded (DESIGN.md): the unit's description reads as text, not as a label */
+.stage>h3{font-size:17px;margin:0 0 6px}
+.unit-d{margin:2px 0 6px;max-width:80ch}
+.ab-d{max-width:80ch;margin-top:2px}
+.guide .other-role{font-size:14px;color:var(--muted);margin:14px 0 4px}

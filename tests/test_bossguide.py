@@ -20,7 +20,7 @@ def test_summary_and_abilities():
         sec(5, "Venomous Heart", "ability", "The heart is exposed.", ["damage"], 1299526),
         sec(6, "Malice", "ability", "A bolt.", ["interruptible", "deadly"], 1290779)])
     s = summary_html([over, stage], "damage")
-    assert "She splashes venom." in s and "<li>Burst the Heart.</li>" in s and "<summary>Tank</summary>" in s
+    assert "She splashes venom." in s and "<li>Burst the Heart.</li>" in s and "other-role'>Tank</h3>" in s
 
     class Mech:
         name, kind, players_per_kill, cost = "Malice", "interrupt", 0, 1.0
