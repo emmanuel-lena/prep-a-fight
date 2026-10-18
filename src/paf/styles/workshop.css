@@ -51,3 +51,6 @@
 .ws-cards{grid-template-columns:repeat(auto-fill,minmax(380px,1fr))}
 .ws-cards{grid-template-columns:repeat(auto-fill,minmax(min(380px,100%),1fr))}
 @media (min-width:1200px){.ws-cards{grid-template-columns:repeat(3,minmax(0,1fr))} .ws-cards.c2{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:1200px){
+  .ws-cards.c5{grid-template-columns:repeat(6,minmax(0,1fr))} .ws-cards.c5>*{grid-column:span 2} .ws-cards.c5>:nth-child(n+4){grid-column:span 3}
+  .ws-cards.c4{grid-template-columns:repeat(4,minmax(0,1fr))}}

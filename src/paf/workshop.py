@@ -100,7 +100,7 @@ def cards(cmds: tuple[str, ...] | list[str], target: str = "") -> str:
     """The tools' cards, each a link to its page; `target` for a page shown in a frame (the sheet)."""
     tgt = f" target='{target}'" if target else ""
     n = sum(1 for c in cmds if c in BY_CMD)
-    cols = " c2" if n in (2, 4) else ""  # two or four: two to a row, never one alone
+    cols = {2: " c2", 4: " c2", 5: " c5", 8: " c4"}.get(n, "")  # rows that close: never one card alone
     return f"<div class='ws-cards{cols}'>" + "".join(
         f"<a class='ws-card' href='/tool/{t.cmd}'{tgt}>{_icon(t.icon, 'ws-ic')}<span class='ws-txt'><b>{e(t.title)}</b>"
         f"<span class='ws-q'>{e(t.question)}</span><span class='ws-meta'><span class='pill'>~{e(t.minutes)} min</span>"

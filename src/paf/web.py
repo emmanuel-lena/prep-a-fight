@@ -970,7 +970,7 @@ def raid_prepare_page(difficulty: str) -> bytes:
     body = (f"<h1>Prepare the whole raid</h1><p class='lead'>Every boss for {e(spec)} {e(cls)}, one after the other. "
             f"The bosses already prepared this week are kept.</p><form method='get' action='/raid/prepare' "
             f"class='segs' role='radiogroup' aria-label='Difficulty'>{diffs}</form>"
-            f"<ol class='rq-list'>{rows}</ol>{plan}")
+            f"<div class='rq-cols'><ol class='rq-list'>{rows}</ol><div class='rq-plan'>{plan}</div></div>")
     return page("Prepare the whole raid", body)
 
 
@@ -1330,7 +1330,7 @@ def plan_block(enc, difficulty: str) -> str:
 
     p = _plan_path(enc, difficulty)
     if p.is_file():
-        text = p.read_text(encoding="utf-8-sig")
+        text = _fresh_header(p.read_text(encoding="utf-8-sig"))
     elif template_path(enc.name, difficulty).is_file():
         text = plan_template(Fight.load(template_path(enc.name, difficulty)))
     else:
@@ -1345,6 +1345,18 @@ Every sim of the prep (gear, talents, cooldowns) runs on this fight.</p>
 <p><button class="btn ghost">Save the plan</button></p></form>"""
 
 
+def _fresh_header(text: str) -> str:
+    """A plan or notes file saved by an older version: its first comment line as the current template words it
+    (they said to run a command)."""
+    lines = text.splitlines()
+    if lines and lines[0].startswith("# Personal plan for ") and "paf plan" in lines[0]:
+        lines[0] = lines[0].split(". Edit", 1)[0] + ". Edit and save: the next prep of this boss uses it."
+    elif lines and lines[0].startswith("# Boss notes for ") and "rerun" in lines[0]:
+        lines[0:1] = [lines[0].split(" Uncomment", 1)[0],
+                      "# Remove the # of a line to use it, save, then prepare the fight again."]
+    return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+
+
 def notes_block(enc, difficulty: str) -> str:
     """What the player knows about the boss: the detected mechanics with their evidence, editable."""
     from paf.corpus.template import template_path
@@ -1354,7 +1366,7 @@ def notes_block(enc, difficulty: str) -> str:
     if not p.is_file():
         return ('<p class="muted small">Available after the first prep: the detected mechanics (units sharing the '
                 "boss's health, damage amps...) with their evidence.</p>")
-    text = p.read_text(encoding="utf-8-sig")
+    text = _fresh_header(p.read_text(encoding="utf-8-sig"))
     return f"""<p class="small muted">Detected in the logs, with the evidence. Correct what the logs cannot tell (e.g. the
 real damage amp of a heart: <code>amp Venomous Heart 2.0</code>), save, then prepare the fight again.</p>
 <form method="post" action="/notes"><input type="hidden" name="boss" value="{enc.id}">

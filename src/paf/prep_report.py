@@ -155,8 +155,8 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
     for _, label in plan.timeline:
         if label not in labels:
             labels.append(label)
-    for i, label in enumerate(labels):
-        color = PALETTE[i % len(PALETTE)]
+    for label in labels:
+        color = PALETTE[sum(map(ord, _key(label))) % len(PALETTE)]  # one color per cooldown, the same in every chart
         shown = (names or {}).get(_key(label)) or label.title()
         row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">{e(shown[:24])}</text>']
         tt = tops.get(_key(label)) or []
@@ -176,7 +176,7 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
         rows.append("".join(row))
         y += 22
     return (f'<div class="scroll"><svg class="plan-tl" viewBox="0 0 {W} {y + 4}" width="100%" '
-            f'style="font-family:system-ui;max-height:{(y + 4) * 2}px">{axis}'
+            f'style="font-family:system-ui;max-width:{W * 1.35:.0f}px">{axis}'
             f'{"".join(rows)}</svg></div><p class="small muted">Dots: this plan (one simulated pull). Pale bars: '
             f'when the top players cast the same cooldown. Green: add waves; gold: boss vulnerability windows '
             f'(x = damage taken); grey: boss away; pink line: Bloodlust.</p>')
@@ -746,7 +746,7 @@ def render(d: PrepData) -> str:
                 if rows:
                     blocks += (f"<h3>{e(title)}</h3><ul>" + "".join(
                         f"<li>{icons.img(d.icons.get(a.name, ''), 'small')}{e(a.text)}</li>" for a in rows) + "</ul>")
-            tabs["boss"].append("<h2>What the top players do, from their logs</h2><div class='card guide'>"
+            tabs["boss"].insert(0, "<h2>What the top players do, from their logs</h2><div class='card guide'>"
                                 f"{blocks}</div>")
         tabs["boss"].append(defensives_html(d))
         tabs["boss"].append("<h2>Every ability, phase by phase</h2><p class='small muted'>From the in-game "
@@ -842,14 +842,19 @@ and the gear for that.</p></div>""")
             both = set(r.add) & set(r.drop)
             add = [t for t in dict.fromkeys(r.add) if t not in both]
             drop = [t for t in dict.fromkeys(r.drop) if t not in both]
-            diff = ""
+            diff = "<span class='muted'>only ranks or a choice node differ from yours</span>"
             if add or drop:
                 diff = (f"<span class='plus'>+</span> {e(', '.join(add) or '-')}<br>"
                         f"<span class='minus'>&minus;</span> <span class='muted'>{e(', '.join(drop) or '-')}</span>")
             body += (f"<tr><td>{e(r.build.label)}<br><span class='small muted'>{r.build.count} players, median rank "
                      f"{r.build.median_rank:.0f}</span></td>{cells}<td class='small'>{diff}</td></tr>")
+        best_g = max((((r.per_fight.get(first, (0.0, None))[0] or 0.0), r.build.label) for r in tc.rows),
+                     default=(0.0, ""))
+        verdict = ("<p><b>Keep your talents:</b> no build of the top players beats yours on this fight.</p>"
+                   if best_g[0] <= 2 * tc.error else
+                   f"<p><b>{e(best_g[1])} beats yours by {best_g[0]:+.1f}%</b> on this fight.</p>")
         tabs["gear"].append(f"""<h2>Talents of the top players, on your character</h2><div class="card scroll">
-<p class="small muted">Each build of the top players simmed on your character. "Single target" is a plain dummy fight,
+{verdict}<p class="small muted">Each build of the top players simmed on your character. "Single target" is a plain dummy fight,
 for reference: a build can be worse there and much better on this fight. Error about &plusmn;{tc.error:.2f}%.</p>
 <table><tr><th>Build</th>{head}<th>Changes vs your talents</th></tr>{body}</table></div>""")
 

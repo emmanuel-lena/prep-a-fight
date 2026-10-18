@@ -84,3 +84,4 @@ th.n{text-align:right}
 /* the sheet's boss tab: the journal's stages side by side on a wide window */
 .panel .stages{display:grid;gap:16px;align-items:start}
 @media (min-width:1300px){.panel .stages{grid-template-columns:repeat(2,minmax(0,1fr))} .panel .stages .stage{margin:0}}
+@media (min-width:1300px){.panel .stages{display:block;column-count:2;column-gap:16px} .panel .stages .stage{break-inside:avoid;margin:0 0 16px}}

@@ -226,14 +226,14 @@ def verdicts(types: list[AddType], comp: list[tuple[str, float]], you: tuple[str
         with_you = (t.rate(comp) + you[1] * t.focus.get(you[0], t.default_focus)) / t.tops_rate
         low = t.tops_low / t.tops_rate
         if others >= low:
-            v, why = "boss", (f"without you, your raid already puts {others:.0%} of the top raids' damage on them "
-                              f"(their weakest quarter: {low:.0%}): the others cover them, stay on the boss")
+            v, why = "boss", (f"stay on the boss: without you, your raid already does {others:.0%} of the top raids' "
+                              f"damage on them (the weakest top raids do {low:.0%})")
         elif with_you >= low:
-            v, why = "pad", (f"you make the difference: {others:.0%} of the top raids' damage on them without you, "
-                             f"{with_you:.0%} with you (their weakest quarter: {low:.0%})")
+            v, why = "pad", (f"pad them, you make the difference: your raid does {others:.0%} of the top raids' damage "
+                             f"on them without you, {with_you:.0%} with you (the weakest top raids do {low:.0%})")
         else:
-            v, why = "pad", (f"even with you, your raid puts {with_you:.0%} of the top raids' damage on them (their "
-                             f"weakest quarter: {low:.0%}): pad them, your raid lacks cleave")
+            v, why = "pad", (f"pad them: your raid does {with_you:.0%} of the top raids' damage on them, even counting "
+                             f"you (the weakest top raids do {low:.0%}); it lacks cleave")
         out.append(AddVerdict(t, others, with_you, low, v, why))
     return out
 

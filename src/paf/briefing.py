@@ -315,6 +315,9 @@ def spec_html(d) -> str:
         f"<div class='spt {kind}'><span class='spt-n'>{e(name)}</span><span class='spt-v'>"
         f"{'your spec' if gap is None else 'same' if kind == 'same' else f'{gap:+.0f}%'}</span></div>"
         for name, gap, kind in gaps)
+    tiles += "".join(f"<div class='spt low'><span class='spt-n'>{e(r.get('label', r.get('spec', '')))}</span>"
+                     "<span class='spt-v'>not simmed</span></div>"
+                     for r in s.get("rows") or [] if not r.get("sim"))  # said, never silently dropped
     return (f"<div class='specs rv'><p class='specs-head'><b>We simmed your character in each spec of your class"
             f"</b> <span class='muted'>for {e(spec_role(s))}, on this fight</span></p>"
             f"<div class='spt-row'>{tiles}</div></div>")

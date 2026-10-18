@@ -94,7 +94,7 @@ def summary_html(sections: list[Section], role: str = "damage", full_link: str =
     others = [c for c in over.children if c is not mine and c.text]
     out = [f"<p>{e(readable(over.text))}</p>" if over.text else ""]
     if mine and mine.text:
-        out.append(f"<h3>What you do ({e(mine.title.lower())})</h3><ul>"
+        out.append(f"<h3>What the journal tells {e(mine.title.lower())}</h3><ul>"
                    + "".join(f"<li>{e(readable(b))}</li>" for b in bullets(mine.text)) + "</ul>")
     for c in others:  # the other roles: shown, smaller (what the raid around you does)
         out.append(f"<h3 class='other-role'>{e(c.title)}</h3><ul class='small muted'>"
