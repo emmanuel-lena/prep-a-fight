@@ -52,7 +52,12 @@
       if (e >= t - NOW_FOR && (after == null || e > after + 0.5)) {
         var g = [L[i]];
         for (var j = i + 1; j < L.length && eff(L[j].t) - e <= SAME; j++) g.push(L[j]);
-        return { at: e, last: eff(g[g.length - 1].t), acts: g };
+        var out = { at: e, last: eff(g[g.length - 1].t), acts: g };
+        if (after == null && e < t - 0.5) {  // already pressed: the next press takes over as soon as it is near
+          var n = group(t, out.last);
+          if (n && n.at - t <= LEAD) return n;
+        }
+        return out;
       }
     }
     return null;
@@ -100,6 +105,8 @@
   /* the boss line: what is running now (adds alive, the boss immune, Bloodlust) or was just cast */
   function bossNow(t) {
     var on = B.filter(function (b) { var e = eff(b.t); return !gone(b.t) && e <= t && t < until(b); });
+    var moves = on.filter(function (b) { return b.k === 'move'; }).sort(function (a, b) { return until(b) - until(a); });
+    on = on.filter(function (b) { return b.k !== 'move' || b === moves[0]; });  // overlapping moves: the longest
     return on.length ? on.map(function (b) {
       if (b.k === 'move') return 'Moving until ' + mmss(until(b));
       if (b.k === 'immune') return 'Boss immune, back in ' + secs(until(b) - t);
@@ -143,7 +150,9 @@
     var big = function (x) { return x.k === 'phase' || x.k === 'immune'; };
     var near = c.some(function (x) { return !big(x) && x.k !== 'pull' && Math.abs(x.d) <= NEAR; });
     var ph = c.filter(function (x) { return big(x) && Math.abs(x.d) <= FIRST; }).sort(function (a, b) { return Math.abs(a.d) - Math.abs(b.d); })[0];
-    if (ph && !near) return ph.i;
+    // before its time, a phase waits for an earlier boss event still in its window (a late cast is not the phase)
+    var earlier = ph && ph.d < 0 && c.some(function (x) { return !big(x) && x.k !== 'pull' && N[x.i].t < N[ph.i].t; });
+    if (ph && !near && !earlier) return ph.i;
     c.sort(function (a, b) { return Math.abs(a.d) - Math.abs(b.d); });
     return c[0].i;
   }
@@ -184,7 +193,7 @@
     var ph = phaseAt(t) + (st.conf.length && Math.abs(Math.round(sh)) >= 2 ? ' · boss ' + Math.abs(Math.round(sh)) + ' s ' + (sh > 0 ? 'behind' : 'ahead') : '');
     txt($('c-phase'), ph); txt($('ss-phase'), ph);
     txt($('c-title'), title(t, cc));
-    txt($('c-boss'), bossNow(t));
+    var bl = bossNow(t); txt($('c-boss'), bl); txt($('ss-boss'), bl === '—' ? '' : bl);
     txt($('c-you'), cc.state === 'go' ? names(cc.g) : 'Your rotation');
     ['c-call', 'ss-call'].forEach(function (id) { var el = $(id); set(el, cc.html); el.className = cc.cls; });
     var th = then(t, cc); txt($('c-then'), th); txt($('ss-then'), th);
@@ -193,6 +202,8 @@
       txt($('c-next'), N[n].n + ' '); txt($('c-in'), 'in ' + secs(eff(N[n].t) - t));
       var prev = n > 0 ? eff(N[n - 1].t) : 0;
       $('c-meter').style.transform = 'scaleX(' + Math.min(1, Math.max(0, (t - prev) / Math.max(1, eff(N[n].t) - prev))).toFixed(3) + ')';
+    } else if (t < FV.end) {
+      txt($('c-next'), 'The kill '); txt($('c-in'), 'around ' + mmss(FV.end)); $('c-meter').style.transform = 'scaleX(0)';
     } else { txt($('c-next'), ''); txt($('c-in'), ''); $('c-meter').style.transform = 'scaleX(0)'; }
     st.target = st.playing ? syncTarget(t) : -1;
     ['c-sync', 'ss-sync'].forEach(function (id) {
@@ -200,7 +211,7 @@
       if (hide && !b.hidden && document.activeElement === b) $(id === 'c-sync' ? 'play' : 'ss-play').focus();
       b.hidden = hide;
       if (!hide) {
-        txt(b.firstChild, N[st.target].n + ' started? Press');
+        txt(b.firstChild, N[st.target].n + ' started?');
         b.setAttribute('aria-label', N[st.target].n + ' started? Press Control Shift Space');
       }
     });

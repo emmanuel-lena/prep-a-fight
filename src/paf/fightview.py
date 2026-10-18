@@ -80,8 +80,8 @@ class Moment:
 
 
 def _mmss(t: float) -> str:
-    t = max(0.0, t)
-    return f"{int(t // 60)}:{int(t % 60):02d}"
+    s = round(max(0.0, t))  # rounded, as the page's script shows it
+    return f"{s // 60}:{s % 60:02d}"
 
 
 def _icon(d, name: str) -> str:
@@ -233,18 +233,21 @@ def _ic(icon: str, cls: str = "ic") -> str:
             f"{icons.CDN.format(size='medium', icon=icon)}')\"></i>")
 
 
-def _ev(it: Item) -> str:
+def _ev(it: Item, row_t: float | None = None) -> str:
     bold = it.side == "you" and it.kind in ("cd", "pot", "def")
     text = f"<b>{e(it.text)}</b>" if bold else e(it.text)
-    small = f"<small>lasts {it.dur:.0f} s</small>" if it.dur and it.kind not in ("move", "immune") else ""
+    notes = [f"at {_mmss(it.t)}"] if row_t is not None and it.t >= 0 and abs(it.t - row_t) > 2 else []
+    if it.dur and it.kind not in ("move", "immune"):
+        notes.append(f"lasts {it.dur:.0f} s")
+    small = f"<small>{', '.join(notes)}</small>" if notes else ""
     return (f"<div class='ev ek-{it.kind}'>{_ic(it.icon)}<div class='x'><span class='main'>{text}</span>{small}"
             "</div></div>")
 
 
 def _row(m: Moment, i: int, gap: float = 0.0) -> str:
     shown = [x for x in m.boss if x.kind != "phase"] or m.boss  # the phase's band says it, unless it is alone
-    boss = "".join(_ev(x) for x in shown)
-    you = "".join(_ev(x) for x in m.you)
+    boss = "".join(_ev(x, m.t) for x in shown)
+    you = "".join(_ev(x, m.t) for x in m.you)
     when = "Before the pull" if m.t < 0 else ("Pull" if m.t < 1 else _mmss(m.t))
     label = f"{when}, {m.title}: show this moment"
     quiet = not m.you and not any(x.kind in ("phase", "immune", "adds", "move", "lust", "kill") for x in m.boss)
@@ -330,7 +333,7 @@ def data(d, ms: list[Moment], dur: float) -> dict:
         "acts": acts,
         "anchors": [PULL] + [{"t": round(t, 1), "n": x.name if x.kind in ("phase", "immune") else x.text, "k": x.kind,
                      "p": ph(t), "ic": x.icon} for t, x in its if x.side == "boss" and x.kind in ANCHORS and t >= 1
-                    and not (x.kind == "immune" and any(abs(t - s) < 0.01 for s in phase_starts))],
+                    and not (x.kind != "phase" and any(abs(t - s) <= 1 for s in phase_starts))],
         "boss": [{"t": round(t, 1), "d": round(x.dur, 1), "n": x.text, "k": x.kind} for t, x in its
                  if x.side == "boss" and x.kind not in ("phase",)],
         "strips": [{"t": round(t, 1), "d": round(x.dur, 1), "k": x.kind, "side": x.side, "n": x.name}
@@ -404,6 +407,7 @@ def _second_screen(d) -> str:
     return (f"<dialog class='ss' id='ss' aria-label='{e(d.boss)}, second screen' tabindex='-1'>"
             f"<div class='ss-top'><h2><span id='ss-h'>{e(d.boss)}</span> {theme.diff_pill(d.difficulty)}</h2>"
             "<span class='ss-clock' id='ss-clock'>0:00</span><span class='ss-phase' id='ss-phase'></span>"
+            "<span class='ss-boss' id='ss-boss' aria-label='Boss'></span>"
             f"{_btn('ss-close', 'Back to the plan', 'Escape')}</div>"
             "<div class='ss-mid'><div class='call' id='ss-call'></div><p class='then' id='ss-then'></p>"
             "<div class='bars' id='ss-bars' role='list' aria-label='Coming up'></div></div>"

@@ -468,3 +468,5 @@ dialog.ss::backdrop{background:var(--bg)}
 .fv .fside #c-call{min-height:150px}
 .fv .ss .call.fv-next .lab{min-height:0}
 .fv .ss .call.fv-next{min-height:0}
+.fv .ss-boss{font-size:15px;color:var(--muted);margin-left:8px} .fv .ss-boss:empty{display:none}
+.fv .ev small{display:block}
