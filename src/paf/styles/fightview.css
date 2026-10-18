@@ -474,3 +474,4 @@ dialog.ss::backdrop{background:var(--bg)}
 .fv .tl-end{height:12vh}
 .fv .fbar.boss b{color:var(--fg)}
 .fv .ss .ss-you{margin:0 auto;text-align:center}
+.fv .call .ic.none{visibility:hidden}

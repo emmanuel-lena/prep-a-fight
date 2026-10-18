@@ -1154,7 +1154,7 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
     if sections:
         gicons = icons_for(bossguide.spell_refs(sections))
         guide = f"<h2>The boss in 60 seconds</h2>{bossguide.summary_html(sections, 'damage')}"
-        journal = (f"<section class='boss-journal'><h2>Every ability, phase by phase</h2><p class='small muted'>From "
+        journal = (f"<section class='boss-journal'><h2>Every ability, from the Encounter Journal</h2><p class='small muted'>From "
                    f"the in-game Encounter Journal.</p><div class='stages'>"
                    f"{bossguide.abilities_html(sections, mechanics=mechs, icon_map=gicons)}</div></section>")
     try:  # where the data will come from, and how long: from what will really happen (paf.estimate)

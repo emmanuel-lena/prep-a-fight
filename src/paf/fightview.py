@@ -294,8 +294,9 @@ def job_html(d) -> str:
     names, _order, _held = simple._pressed(d)
     order: dict[str, list[float]] = {}  # the times the fight view calls (a burst moved onto its adds included)
     for t, it in items(d):
-        if it.side == "you" and it.kind in ("cd", "pot") and it.name in names:
+        if it.side == "you" and it.kind in ("cd", "pot"):  # every press of the plan, as the fight tab calls them
             order.setdefault(it.name, []).append(0.0 if t < 0 else t)
+    names = list(order)
     plan = simple._plan(d)
     rules = {d.cd_names.get(k, k): r.name for k, r in (plan.choice.items() if plan else []) if r.name != "default"}
     if d.lust is not None and d.lust < 5 and names:
@@ -308,12 +309,14 @@ def job_html(d) -> str:
             when = "before the pull" + (f", then {when}" if rest else "")
         elif rest:
             when = f"at {when}"
+        if all(t < 5 for t in order[n]) and "potion" not in n.lower():  # a short cooldown: the opener, then rotation
+            when += ", then with your rotation"
         why = f": {rule_phrase(d, rules[n])}" if n in rules else ""
         rows.append((n, f"<b>{e(n)}</b> {e(when)}{e(why)}."))
     if not rows:
         return ""
     lis = "".join(f"<li>{_ic(ic if ic == IMMUNE_ICON else _icon(d, ic) if ic else '')}<span>{txt}</span></li>"
-                  for ic, txt in rows[:7])
+                  for ic, txt in rows[:9])
     return f"<section class='fbox job'><h2>Your job on this boss</h2><ul class='keys'>{lis}</ul></section>"
 
 
@@ -373,8 +376,8 @@ def mrt(d) -> str:
     if not note:
         return ""
     head = note.splitlines()[0]
-    if plan is not None and not any(r.name != "default" for r in plan.choice.values()):  # the default list's timings
-        head = re.sub(r"cooldowns for .*\(\+?-?0\.0%\)", "cooldowns: SimC's default priority list", head)
+    if plan is not None and (not any(r.name != "default" for r in plan.choice.values()) or plan.gain <= 2 * plan.error):
+        head = re.sub(r"cooldowns for .*\(\+?-?\d+\.\d%\)", "cooldowns: SimC's default priority list", head)
     its = items(d)
     lines = []
     for t, it in its:

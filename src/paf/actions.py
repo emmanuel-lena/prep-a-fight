@@ -118,7 +118,8 @@ def actions(con: sqlite3.Connection, encounter_id: int, difficulty: int, spec: s
                                                     f"assignment{cost}. Tick it on the boss page if it is yours."))
         elif m.spec_share >= max(KICK_SHARE, 3 * RANDOM_SHARE):
             out.append(Action("mechanic", m.name, f"{m.name}: hits ~{m.players_per_kill:.0f} players per kill; "
-                                                  f"{who} take it in {m.spec_share:.0%} of the kills: expect it."))
+                                                  f"{who} take it in {m.spec_share:.0%} of the kills: "
+                                                  f"{'expect it' if m.spec_share >= 0.6 else 'it can be you'}."))
     order = {"kill": 0, "contact": 1, "interrupt": 2, "assignment": 3, "mechanic": 4, "ignore": 5}
     seen: set[str] = set()
     unique = []

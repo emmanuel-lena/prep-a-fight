@@ -103,6 +103,11 @@ def modernize(html: str, difficulty: str = "heroic") -> str:
     h = re.sub(r'class="pill gold">(deadly|interrupt)', r'class="pill warn">\1', h)
     if "class='abg'" not in h:
         h = grouped(h)
+    # an ability card titled by the ability it opens with: the title once (the ability row carries it)
+    h = re.sub(r'<section class="card stage"><h3>([^<]+)(?:<span[^>]*>[^<]*</span>)*</h3>'
+               r'(\s*<div class=\'abg\'><div class="ab" style="margin-left:0px"><div>'
+               r'(?:<img[^>]*>|<span class="ics[^"]*"></span>)?<b>\1</b>)',
+               r'<section class="card stage">\2', h)
     h = re.sub(r"<h3>What you do \(([^)]*)\)</h3>", r"<h3>What the journal tells \1</h3>", h)
     return readable(h, difficulty)
 
@@ -219,7 +224,8 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
         intro = f"<p class='small muted'>{e(readable(top.text)[:300])}</p>" if top.text and top.kind != "stage" else ""
         if top.kind == "ability":
             rows.insert(0, _ability(top, 0, ctx))
-        cards.append(f'<section class="card stage"><h3>{head}</h3>{intro}{grouped("".join(rows))}</section>')
+        title = "" if top.kind == "ability" else f"<h3>{head}</h3>"  # an ability's card: its row names it
+        cards.append(f'<section class="card stage">{title}{intro}{grouped("".join(rows))}</section>')
     return "".join(cards)
 
 

@@ -173,8 +173,9 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
             labels.append(label)
     for label in labels:
         color = PALETTE[sum(map(ord, _key(label))) % len(PALETTE)]  # one color per cooldown, the same in every chart
-        shown = (names or {}).get(_key(label)) or label.title()
-        row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">{e(shown[:24])}</text>']
+        shown = (names or {}).get(_key(label)) or label[:1].upper() + label[1:]
+        shown = shown if len(shown) <= 24 else shown[:23] + "…"
+        row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">{e(shown)}</text>']
         tt = tops.get(_key(label)) or []
         if tt and tops_players:
             bins: dict[int, int] = {}
@@ -194,8 +195,11 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
     return (f'<div class="scroll"><svg class="plan-tl" viewBox="0 0 {W} {y + 4}" width="100%" '
             f'style="font-family:system-ui;max-width:{W * 1.15:.0f}px">{axis}'
             f'{"".join(rows)}</svg></div><p class="small muted">Dots: this plan (one simulated pull). Pale bars: '
-            f'when the top players cast the same cooldown. Green: add waves; gold: boss vulnerability windows '
-            f'(x = damage taken); grey: boss away; pink line: Bloodlust.</p>')
+            f'when the top players cast the same cooldown.'
+            + (" Green: add waves." if fight.add_waves else "")
+            + (" Gold: boss vulnerability windows (x = damage taken)." if fight.vulnerable else "")
+            + (" Grey: boss away." if fight.invulnerable else "")
+            + (" Pink line: Bloodlust." if fight.lust_time is not None else "") + "</p>")
 
 
 def _base(name: str) -> str:
@@ -817,6 +821,11 @@ def in_time_order(note: str) -> str:
 def render(d: PrepData) -> str:
     d.mrt = {k: in_time_order(v) for k, v in d.mrt.items()}
     d.nsrt = {k: in_time_order(v) for k, v in d.nsrt.items()}
+    from dataclasses import replace as _replace
+
+    d.actions = [_replace(a, text=re.sub(r"(take it in (\d+)% of the kills): expect it\.",
+                                                 lambda m: m[1] + (": expect it." if int(m[2]) >= 60 else ": it can be you."),
+                                             a.text)) for a in d.actions] if d.actions else d.actions
     tabs: dict[str, list[str]] = {k: [] for k, _ in TABS}
 
     def lk(text: str) -> str:
@@ -854,7 +863,7 @@ def render(d: PrepData) -> str:
             tabs["boss"].insert(0, "<h2>What the top players do, from their logs</h2><div class='card guide'>"
                                 f"{blocks}</div>")
         tabs["boss"].append(defensives_html(d))
-        tabs["boss"].append("<h2>Every ability, phase by phase</h2><p class='small muted'>From the in-game "
+        tabs["boss"].append("<h2>Every ability, from the Encounter Journal</h2><p class='small muted'>From the in-game "
                             "Encounter Journal; timings and how many players are hit come from the ranked kills.</p>"
                             + f"<div class='stages'>{stage_times(bossguide.modernize(d.guide_abilities, d.difficulty), d.phases, d.duration)}"
                             "</div>")
