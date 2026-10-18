@@ -982,6 +982,7 @@ for reference: a build can be worse there and much better on this fight. Error a
                 checks += "<ul class='small'>" + "".join(f"<li class='warn'>&#9888; {e(f)}</li>" for f in p.flags) + "</ul>"
             blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, err=1e9 if p.objective == "secondary" else 0.0)}
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span></h3>
+{"<p class='small muted'>Burst damage counts only the damage on " + e(burst_names(d)[1] or "the burst targets") + ": worth it only if your raid needs them dead fast, at the cost of the boss and total damage above.</p>" if p.objective == "secondary" else ""}
 {checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases)}
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
 <div class="pp-grid"><div><h4>Play-by-play of one simulated pull</h4><div class="scroll pp"><table>
