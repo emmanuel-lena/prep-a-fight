@@ -1142,15 +1142,16 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
                 continue
             seen.add(m.name.lower())
             when = ", ".join(f"{int(t // 60)}:{int(t % 60):02d}" for t in m.times[:4]) + ("…" if len(m.times) > 4 else "")
-            what = "interrupt" if m.kind == "interrupt" else f"{m.players_per_kill:.0f} players per kill"
+            what = "interrupt" if m.kind == "interrupt" else f"{m.players_per_kill:.0f} players hit per kill"
             cost = f", ~{m.cost:g} s of movement" if m.cost else ""
             checked = " checked" if m.name.lower() in current or m.key in current else ""
-            chips += (f'<label class="chip" title="{e(when)}"><input type="checkbox" name="assign" value="{e(m.name)}"'
-                      f'{checked}>{e(m.name)} <span class="meta">{what}{cost}</span></label>')
+            at = f", around {e(when)}" if when else ""  # the times shown, not hidden in a tooltip
+            chips += (f'<label class="chip"><input type="checkbox" name="assign" value="{e(m.name)}"'
+                      f'{checked}>{e(m.name)} <span class="meta">{what}{cost}{at}</span></label>')
         label = f"{spec} {settings.get('class') or ''}".strip()  # "Subtlety Rogue", as everywhere else
         article = "an" if label[:1].lower() in "aeiou" else "a"
         assigns = (f'<p class="small muted">Tick what you handle on this fight. Timings and the movement it costs '
-                   f'{article} {e(label)} come from the logs; hover a mechanic to see when it happens.</p>'
+                   f'{article} {e(label)} come from the logs, with when each one happens.</p>'
                    f'<div class="chips">{chips}</div>')
     elif kills:
         assigns = ('<p class="muted small">The mechanics are collected during the first prep (about 2 quota points '
@@ -1186,7 +1187,7 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
     except Exception:  # noqa: BLE001 - an estimate never breaks the page
         est = None
     est_html = (f"<p class='est-line'><b>{'Ready fast' if est.source != 'collect' else 'First prep'}:</b> "
-                + re.sub(r"(About [^.]*\.)$", r"<span class='nw'>\1</span>", e(est.sentence))  # never "min." alone
+                + re.sub(r"(About [^.]*\.)$", r"<span class='nw'>\1</span>", e(est.sentence[:1].lower() + est.sentence[1:]))
                 + "</p>") if est else ""
     raid_now = current_raid(enc, difficulty)
     g = settings.get("guild")

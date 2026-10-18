@@ -48,9 +48,9 @@ TOOLS: tuple[Tool, ...] = (
     Tool("talents", "The top players' talents, on you", "Which talent build of the best players does the most "
          "damage with your character, on this fight?", "inv_misc_book_11", "gear", "3-6", ("boss", "difficulty"),
          "The builds compared on your character, with their gain and the talents to change."),
-    Tool("optimize", "When to press your cooldowns", "Hold a cooldown for the adds or press it on cooldown: what "
-         "does the most damage on this fight?", "spell_holy_borrowedtime", "cds", "20-40",
-         ("boss", "difficulty", "goal3"), "The best cooldown plan per goal, and the pull played with it."),
+    Tool("optimize", "When to press your cooldowns", "Hold a cooldown for a moment of the fight or press it on "
+         "cooldown: what does the most damage on this fight?", "spell_holy_borrowedtime", "cds", "20-40",
+         ("boss", "difficulty", "goal3"), "The best cooldown plan for each goal you pick, and the pull played with it."),
     Tool("timeline", "The top players' cooldowns, minute by minute", "When do the best players of your spec press "
          "each cooldown on this boss?", "inv_misc_pocketwatch_01", "cds", "1", ("boss", "difficulty"),
          "A page with the cooldown timeline of each top player, side by side."),
@@ -139,7 +139,8 @@ def _prepared_ids(encounters: list, diff: str | None = None) -> set:
 READY_JS = ("<script>(function(s){var f=s&&s.form;if(!f)return;function goal(){var na=(s.options[s.selectedIndex]"
             "||{}).dataset;na=na&&na.na;f.querySelectorAll('[name=objective]').forEach(function(r){var l=r.closest('label')"
             "||r;if(r.value==='total'||r.value==='all'){l.hidden=!!na;if(na&&r.checked){var b=f.querySelector("
-            "'[name=objective][value=boss]');if(b)b.checked=true}}})}s.addEventListener('change',goal);document.addEventListener('DOMContentLoaded',goal);goal();function up(){var c=f.querySelector("
+            "'[name=objective][value=boss]');if(b)b.checked=true}}});if(f.dataset.addsOnly){var n=f.querySelector('.ws-noadds'),"
+            "g=f.querySelector('.ws-go .btn');if(n)n.hidden=!na;if(g)g.disabled=!!na}}s.addEventListener('change',goal);document.addEventListener('DOMContentLoaded',goal);goal();function up(){var c=f.querySelector("
             "'[name=difficulty]:checked')||f.querySelector('select[name=difficulty]');if(!c)return;"
             "[].forEach.call(s.options,function(o){if(o.dataset.n==null)return;o.textContent=o.dataset.n+((' '+"
             "o.dataset.r+' ').indexOf(' '+c.value+' ')>=0?' · has a sheet':'')})}f.addEventListener('change',"
@@ -208,6 +209,9 @@ def _field(kind: str, encounters: list) -> str:
     return ""
 
 
+ADDS_ONLY = ("comp",)  # tools about the adds: off on a boss without any
+
+
 def tool_page(cmd: str, encounters: list) -> str | None:
     t = BY_CMD.get(cmd)
     if t is None:
@@ -218,8 +222,11 @@ def tool_page(cmd: str, encounters: list) -> str | None:
     return (f"<div class='ws'>"
             f"<header class='ws-tool'>{_icon(t.icon, 'ws-big')}<div><h1>{e(t.title)}</h1><p class='lead'>{e(t.question)}"
             f"</p></div></header>"
-            f"<form method='post' action='/tool/{e(cmd)}' class='ws-form'><input type='hidden' name='_curated' value='1'>"
+            f"<form method='post' action='/tool/{e(cmd)}' class='ws-form'{' data-adds-only=1' if cmd in ADDS_ONLY else ''}>"
+            f"<input type='hidden' name='_curated' value='1'>"
             f"{fields}<p class='ws-gives'><b>You get:</b> {e(t.gives)}</p>{note}"
+            "<p class='ws-note ws-noadds' hidden>No adds on this boss: nothing for this tool to read. Pick a boss with "
+            "adds.</p>"
             f"<div class='ws-go'><button class='btn go'>Run it &rarr;</button><span class='muted small'>About "
             f"{e(t.minutes)} min, on your computer. You can leave the page: it keeps running.</span></div></form></div>{CSS}")
 
