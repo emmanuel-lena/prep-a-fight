@@ -75,3 +75,7 @@ pre,.note-pre{font-family:var(--font-data)}
 th.n{text-align:right}
 /* a card of prose only is as wide as its text (tables and charts keep the full width) */
 .panel>.card:not(:has(table)):not(:has(svg)):not(.suggs):not(.guide){max-width:88ch}
+/* severity chips: one outline style, ink for what matters, muted for the rest */
+.sev{background:transparent!important;border:1px solid var(--line)!important;color:var(--muted)!important}
+.major .sev,.moderate .sev{border-color:var(--fg)!important;color:var(--fg)!important}
+.major .sev{background:var(--fg)!important;color:var(--bg)!important}

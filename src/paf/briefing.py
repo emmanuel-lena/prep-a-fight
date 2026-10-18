@@ -104,8 +104,8 @@ def moves_html(d) -> str:
             tag = f"<span class='gain tiny' title='barely matters'>{gain:+.1f}%</span>"
         else:
             tag = "<span class='gain ok'>&#10003;</span>"
-        body = (f"<details><summary>{say}</summary><div class='why'>{more}{(' ' + button) if button else ''}</div>"
-                f"</details>" if (more or button) else f"<p class='say'>{say}</p>")
+        body = f"<p class='say'>{say}</p>" + (f"<div class='why'>{more}{(' ' + button) if button else ''}</div>"
+                                              if (more or button) else "")
         items.append(f"<li class='rv'><span class='n'>{i}</span><div class='mv'>{body}</div>{tag}</li>")
     top = moves[0][0]
     note = ("" if top >= 1 else "<p class='aside rv'>You are already close to what the best players do here: the changes "

@@ -21,8 +21,9 @@ def _mmss(s: float) -> str:
 def _pct(v: float | None, digits: int = 2) -> str:
     if v is None:
         return "-"
-    cls = "pos" if v > 0.0001 else "neg" if v < -0.0001 else ""
-    return f'<span class="{cls}">{v:+.{digits}f}%</span>'
+    v = round(v, digits) + 0.0  # a gain under the shown precision is none: "0.0%", neutral, never "-0.0%"
+    cls = "pos" if v > 0 else "neg" if v < 0 else ""
+    return f'<span class="{cls}">{v:+.{digits}f}%</span>' if v else f"<span>{0:.{digits}f}%</span>"
 
 
 @dataclass
@@ -329,7 +330,7 @@ def kpi_tiles(d: PrepData) -> str:
                    f"the sim is off by {gap:.0%}: trust which option wins more than the exact %." if level == "medium"
                    else f"the sim is off by {gap:.0%}: this fight is badly rebuilt for your spec, use the gains as "
                         f"hints only.")
-        conf = (f'<p class="conf small"><span class="pill {"gold" if level == "high" else ""}">Confidence: {level} '
+        conf = (f'<p class="conf small"><span class="pill {"on" if level == "high" else ""}">Confidence: {level} '
                 f'&middot; sim {med:.0%} of real</span> <b>{e(meaning)}</b> <span class="muted">The top players, simmed '
                 f'on this rebuilt fight with their own gear, get {med:.0%} of the DPS they really did (100% = perfect). '
                 f'Gains are % of your DPS.</span></p>')

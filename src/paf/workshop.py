@@ -102,7 +102,7 @@ def cards(cmds: tuple[str, ...] | list[str], target: str = "") -> str:
     return "<div class='ws-cards'>" + "".join(
         f"<a class='ws-card' href='/tool/{t.cmd}'{tgt}>{_icon(t.icon, 'ws-ic')}<span class='ws-txt'><b>{e(t.title)}</b>"
         f"<span class='ws-q'>{e(t.question)}</span><span class='ws-meta'><span class='pill'>~{e(t.minutes)} min</span>"
-        + ("<span class='pill gold'>after a prep</span>" if t.needs_prep else "") + "</span></span></a>"
+        + ("<span class='pill'>after a prep</span>" if t.needs_prep else "") + "</span></span></a>"
         for c in cmds if (t := BY_CMD.get(c))) + "</div>"
 
 
@@ -171,7 +171,7 @@ def tool_page(cmd: str, encounters: list) -> str | None:
             f"</p></div></header>"
             f"<form method='post' action='/tool/{e(cmd)}' class='ws-form'><input type='hidden' name='_curated' value='1'>"
             f"{fields}<p class='ws-gives'><b>You get:</b> {e(t.gives)}</p>{note}"
-            + (f"<details class='ws-adv'><summary>More options</summary>{adv}</details>" if adv else "")
+            + (f"<details class='ws-adv' open><summary>More options</summary>{adv}</details>" if adv else "")
             + f"<div class='ws-go'><button class='btn go'>Run it &rarr;</button><span class='muted small'>About "
             f"{e(t.minutes)} min, on your computer. You can leave the page: it keeps running.</span></div></form></div>{CSS}")
 

@@ -144,3 +144,8 @@ body.has-side>.side{grid-column:1;grid-row:1} body.has-side>main,body.has-side>i
   .side-top,.side-extra,.side-fb{display:none} .side-nav{flex-direction:row;flex:1;justify-content:space-around}
   .side-nav a{min-width:44px;min-height:44px} .side-foot{margin:0;padding:0;flex-direction:row}
   .side .who-menu{right:0;left:auto}}
+/* pills: gold is for the recommendation only (DESIGN.md); "on" marks a state, "warn" a danger */
+.pill.on{background:var(--surface-2);color:var(--fg);border:1px solid var(--fg)}
+.pill.warn{background:transparent;color:var(--neg);border:1px solid currentColor}
+.side-top{height:46px}
+.ics.ics-ph{display:none}

@@ -57,7 +57,7 @@ def share_page(key: str, error: str = "") -> str:
     if item is None:
         return "<h1>Not found</h1><p>Nothing prepared for this boss yet.</p>"
     info = share.current(key)
-    head = (f"<p class='crumb'><a href='/view/{e(key)}'>&larr; Back to the prep sheet</a></p><h1>Share this prep</h1>"
+    head = (f"<h1>Share this prep</h1>"
             f"<p class='lead'>{e(item['name'])} {theme.diff_pill(item['difficulty'])}"
             + (f" &middot; {e(item['spec'])}" if item.get("spec") else "") + "</p>")
     err = f"<p class='notice'>{e(error)}</p>" if error else ""
@@ -532,7 +532,7 @@ def boss_cards(items: list[dict], limit: int = 6) -> str:
                 f' {e(x["spec"] or "")}</span></span><span class="bc-when">{ago(x["mtime"])}</span></a>')
     head = "".join(card(x) for x in items[:limit])
     rest = items[limit:]
-    more = (f'<details class="bc-more"><summary>{len(rest)} more</summary><div class="bcards">'
+    more = (f'<details class="bc-more" open><summary>{len(rest)} more</summary><div class="bcards">'
             + "".join(card(x) for x in rest) + "</div></details>") if rest else ""
     return f'<div class="bcards">{head}</div>{more}'
 
@@ -552,7 +552,7 @@ def view_page(key: str, tab: str) -> bytes:
         f'<a class="{"on" if k == tab else ""}" href="/view/{e(key)}?tab={k}">{e(label)}</a>'
         for k, label in TABS if k in item["files"])
     others = "".join(f'<option value="/view/{e(x["key"])}"{" selected" if x["key"] == key else ""}>'
-                     f'{e(x["name"])} ({e(" ".join(filter(None, (x["difficulty"], x["spec"]))))})</option>'
+                     f'{e(x["name"])} ({e(x["difficulty"])})</option>'
                      for x in prepared())
     src = f'/report/{e(item["files"][tab])}'
     boss_link = _boss_link(item)
@@ -695,7 +695,7 @@ placeholder="In game: type /simc, then Ctrl+A, Ctrl+C, and paste here"></textare
                 f'logs of the top {role(loaded)}s (what they face, when they press their cooldowns, their talents and '
                 f'trinkets); SimulationCraft does not sim {"healing" if role(loaded) == "healer" else "survival"}, '
                 f'so there are no gear sims.</p>')
-        character = (f"""<p><b>{e(loaded.name)}</b> <span class="pill gold">{e(loaded.spec)} {e(loaded.class_name)}</span>
+        character = (f"""<p><b>{e(loaded.name)}</b> <span class="pill">{e(loaded.spec)} {e(loaded.class_name)}</span>
 <span class="pill">{len(loaded.candidates)} items in bags</span></p>{warn}
 <details><summary>Load another character or an updated export</summary>{paste}</details>""")
     else:
@@ -713,7 +713,7 @@ placeholder="In game: type /simc, then Ctrl+A, Ctrl+C, and paste here"></textare
     g, gs, gr = settings.get("guild"), settings.get("guild_server"), settings.get("guild_region")
     regions = "".join(f'<option{" selected" if r == gr else ""}>{r}</option>'
                       for r in settings.SETTINGS["guild_region"].choices)
-    guild_state = f'<span class="pill gold">{e(g)}</span>' if g else '<span class="pill">optional</span>'
+    guild_state = f'<span class="pill">{e(g)}</span>' if g else '<span class="pill">optional</span>'
     guild_step = f"""<div class="card step"><div class="num">{{n}}</div><div class="body">
 <h3>Your raid {guild_state}</h3>
 <p class="small muted">Your guild's latest public log gives your raid's composition and DPS: the prep then tells you
@@ -808,7 +808,7 @@ def characters_page() -> str:
         ic = icons.img(icons.CLASS_ICON.format(cls=c.class_name.lower()), "large", "cc-ic")
         badge = ('<span class="pill">from a log: no bags</span>' if c.imported else
                  f'<span class="pill">{c.bags} items in bags</span>')
-        play = ('<span class="pill gold">active</span>' if c.current else
+        play = ('<span class="pill on">active</span>' if c.current else
                 f'<form method="post" action="/character/select"><input type="hidden" name="slug" value="{e(c.slug)}">'
                 f'<button class="btn ghost">Play this character</button></form>')
         cards += (f'<div class="ccard{" on" if c.current else ""}">{ic}<div class="cc-txt"><b>{e(c.name)}</b>'
@@ -1507,7 +1507,7 @@ def prep_live(jid: str, job: dict, log: str, elapsed: int) -> str:
     icon = {"done": "&#10003;", "now": "&#9679;", "next": "&#9675;"}
     items = "".join(
         f"<li class='st {state}'><span>{icon[state]}</span> <div><b>{e(label)}</b>"
-        + (" <span class='pill gold'>in progress</span>" if state == "now" else "")
+        + (" <span class='pill on'>in progress</span>" if state == "now" else "")
         + (f"<div class='small muted'>{e(why)}</div>" if state != "done" else "") + "</div></li>"
         for label, why, state in rows)
     if status == "running":
@@ -1660,7 +1660,8 @@ class Handler(BaseHTTPRequestHandler):
                 name = url.path.rsplit("/", 1)[1]
                 body = (None if q.get("raw") else workshop.tool_page(name, _encounters())) or \
                     tool_page(name, _encounters())
-                self._send(page("Tool", body) if body else page("Not found", "<p>Unknown tool.</p>"),
+                tool = workshop.BY_CMD.get(name)
+                self._send(page(tool.title if tool else "Tool", body) if body else page("Not found", "<p>Unknown tool.</p>"),
                            200 if body else 404)
             elif url.path == "/characters":
                 self._send(page("Characters", characters_page()))

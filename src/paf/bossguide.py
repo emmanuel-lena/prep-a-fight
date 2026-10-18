@@ -119,7 +119,7 @@ def describe(spell_id: int, locale: str = "") -> str:
 
 
 def _ability(s: Section, depth: int, ctx: dict) -> str:
-    tags = "".join(f'<span class="pill {"gold" if f in ("deadly", "interruptible") else ""}">{SHOWN_FLAGS[f]}</span>'
+    tags = "".join(f'<span class="pill {"warn" if f in ("deadly", "interruptible") else ""}">{SHOWN_FLAGS[f]}</span>'
                    for f in s.flags if f in SHOWN_FLAGS)
     facts = []
     times = ctx["timings"].get(s.title.lower())
