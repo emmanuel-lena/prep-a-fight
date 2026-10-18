@@ -1164,8 +1164,8 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
         est = estimate.plan(con, enc.id, diff, settings.get("class"), spec, WCLClient())
     except Exception:  # noqa: BLE001 - an estimate never breaks the page
         est = None
-    est_html = (f"<div class='est {e(est.source)}'><b>{'Ready fast' if est.source != 'collect' else 'First prep'}"
-                f"</b><span>{e(est.sentence)}</span></div>") if est else ""
+    est_html = (f"<p class='est-line'><b>{'Ready fast' if est.source != 'collect' else 'First prep'}:</b> "
+                f"{e(est.sentence)}</p>") if est else ""
     raid_now = current_raid(enc, difficulty)
     g = settings.get("guild")
     raid_said = f"the latest public log of {g}" if g else ""
