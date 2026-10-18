@@ -130,3 +130,16 @@ def test_mrt_note_keeps_what_matters():
     assert lines[1] == "{time:0:00} Ascendance, Stormkeeper"  # the second Stormkeeper charge is merged
     assert lines[2] == "{time:2:00} Ascendance, Vile Vial of Volatile Venom, Potion - Venomous Heart x2, lust"
     assert "Ancestral Swiftness" not in note and "move soon" not in note and "(after" not in note
+
+
+def test_a_held_cooldown_reads_as_on_cooldown_for_the_other_lines():
+    from collections import OrderedDict
+
+    from paf.optimize import Rule, apply_rules
+
+    apl = OrderedDict({"cds": ["shadow_blades,if=variable.x", "shadow_dance,if=cooldown.shadow_blades.remains>=35"]})
+    held = apply_rules(apl, {"shadow_blades": Rule("hold_adds_30", "", lambda old: "raid_event.adds.in>30")})
+    want = "shadow_dance,if=(cooldown.shadow_blades.remains+cooldown.shadow_blades.ready*999)>=35"
+    assert any(want in x for x in held)
+    plain = apply_rules(apl, {"shadow_blades": Rule("default", "", None)})
+    assert any("shadow_dance,if=cooldown.shadow_blades.remains>=35" in x for x in plain)  # no hold: untouched

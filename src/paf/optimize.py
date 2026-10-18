@@ -152,8 +152,19 @@ def find_cooldowns(apl: OrderedDict[str, list[str]], fight: Fight, cd_durations:
     return out
 
 
+def _unheld(action: str, held: set[str]) -> str:
+    """Another line's checks on a held cooldown read it as on cooldown while it waits ready: the default list ties
+    spells to it (Subtlety: Shadow Dance only when cooldown.shadow_blades.remains is high), so holding it ready
+    stopped them for the whole hold (issue #29)."""
+    for k in held:
+        action = re.sub(rf"\bcooldown\.{k}\.remains\b",
+                        f"(cooldown.{k}.remains+cooldown.{k}.ready*999)", action)
+    return action
+
+
 def apply_rules(apl: OrderedDict[str, list[str]], choice: dict[str, Rule]) -> list[str]:
     """Profile lines of the APL with every chosen rule applied (whole APL, to be used as base or profileset)."""
+    held = {k for k, r in choice.items() if r.name != "default"}
     new_apl: OrderedDict[str, list[str]] = OrderedDict()
     for lst, acts in apl.items():
         new = []
@@ -164,6 +175,8 @@ def apply_rules(apl: OrderedDict[str, list[str]], choice: dict[str, Rule]) -> li
                 head, old = split_if(a)
                 cond = rule.condition(old)
                 a = f"{head},if={cond}" if cond else head
+            elif held:
+                a = _unheld(a, held - ({k} if k else set()))
             new.append(a)
         new_apl[lst] = new
     return apl_lines(new_apl)
