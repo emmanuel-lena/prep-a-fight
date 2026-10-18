@@ -250,6 +250,13 @@ def text(sh: dict, difficulty: str, mrt: bool = False) -> str:
     return "\n".join(lines)
 
 
+def _tools() -> str:
+    from paf import workshop
+
+    return (f"<h2>Dig deeper</h2>{workshop.cards(('review', 'comp', 'raid', 'night', 'assigns', 'mechanics'))}"
+            f"{workshop.CSS}")
+
+
 def page_body(difficulty: str) -> str:
     from paf import settings
     from paf.prep_report import copy_button
@@ -274,7 +281,8 @@ def page_body(difficulty: str) -> str:
         return head + (f"{err}<div class='rl-start'><p>The roster comes from your raid's last log: your last raid "
                        f"(read when the app starts), else your guild's latest log (Settings).</p>"
                        f"<form method='post' action='/raidlead/read'><input type='hidden' name='difficulty' "
-                       f"value='{e(difficulty)}'><button class='btn'>Read my raid's roster</button></form></div>")
+                       f"value='{e(difficulty)}'><button class='btn'>Read my raid's roster</button></form></div>"
+                       + _tools())
     bench = set(state.get("bench") or [])
     chips = "".join(
         f"<form method='post' action='/raidlead/bench' class='rl-p{' off' if n in bench else ''}'>"
@@ -320,7 +328,7 @@ def page_body(difficulty: str) -> str:
               if everything else "")
     miss = (f"<p class='small muted'>Not prepared yet, so no sheet: {e(', '.join(missing))}. "
             f"<a href='/raid/prepare?difficulty={e(difficulty)}'>Prepare the whole raid</a> first.</p>" if missing else "")
-    return head + roster + f"<h2>Boss by boss {allbtn}</h2>{miss}<div class='rl-grid'>{cards}</div>{COPY_JS}"
+    return head + roster + f"<h2>Boss by boss {allbtn}</h2>{miss}<div class='rl-grid'>{cards}</div>{_tools()}{COPY_JS}"
 
 
 COPY_JS = """<script>document.addEventListener('click',function(ev){var b=ev.target.closest('.copy');if(!b)return;

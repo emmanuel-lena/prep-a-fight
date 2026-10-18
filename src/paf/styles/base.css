@@ -123,6 +123,9 @@ body.has-side{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:
 .side-links{display:flex;flex-direction:column;gap:2px} .side-links a{font-size:13.5px;padding:7px 10px}
 .side-links a.on{color:var(--fg);background:var(--surface-2)}
 .side-foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-top:12px}
+.side-fb{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;color:var(--muted);font-size:13.5px;
+  font-weight:600;text-decoration:none} .side-fb svg{width:18px;height:18px}
+.side-fb:hover{background:var(--surface-2);color:var(--fg);text-decoration:none}
 .side .who{margin:0} .side .who>summary{color:var(--fg);border-color:var(--line);background:var(--surface-2);border-radius:12px;
   padding:6px 10px 6px 6px} .side .who>summary:hover{background:var(--surface)}
 .side .who-menu{top:auto;bottom:calc(100% + 6px);left:0}
@@ -131,12 +134,12 @@ body.has-side>main{max-width:1400px;width:100%;margin:0 auto}
 body.has-side>.side{grid-column:1;grid-row:1} body.has-side>main,body.has-side>iframe{grid-column:2;grid-row:1;min-width:0}
 @media (max-width:640px){body.has-side>main,body.has-side>iframe{grid-column:1}}
 @media (max-width:1100px){body.has-side{grid-template-columns:68px minmax(0,1fr)} .side{padding:12px 8px;align-items:center}
-  .side .brand,.side-nav a span,.side-extra .side-lab,.side .who summary span,.side .who-caret,.side .lang{display:none}
+  .side .brand,.side-nav a span,.side-fb span,.side-extra .side-lab,.side .who summary span,.side .who-caret,.side .lang{display:none}
   .side-top{padding:0 0 8px;justify-content:center} .side-nav a{justify-content:center;padding:10px}
   .side-extra{width:100%} .side-extra select,.side-links{display:none} .side .who>summary{padding:4px}}
 @media (max-width:640px){body.has-side{grid-template-columns:minmax(0,1fr);padding-bottom:64px}
   .side{position:fixed;top:auto;bottom:0;left:0;right:0;height:auto;flex-direction:row;align-items:center;padding:6px 8px;
     padding-bottom:calc(6px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid var(--line);overflow:visible}
-  .side-top,.side-extra{display:none} .side-nav{flex-direction:row;flex:1;justify-content:space-around}
+  .side-top,.side-extra,.side-fb{display:none} .side-nav{flex-direction:row;flex:1;justify-content:space-around}
   .side-nav a{min-width:44px;min-height:44px} .side-foot{margin:0;padding:0;flex-direction:row}
   .side .who-menu{right:0;left:auto}}

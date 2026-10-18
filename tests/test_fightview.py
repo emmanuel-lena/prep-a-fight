@@ -32,10 +32,11 @@ def test_moments_put_the_boss_and_you_together(monkeypatch):
     assert first.t < 0 and first.title == "Before the pull" and first.you[0].kind == "pot"  # a pre-pot
     adds = next(m for m in ms if m.t == 50.0)
     assert adds.title == "4 × Amani" and adds.anchor.kind == "adds"
-    assert [y.text for y in adds.you] == ["Kill Amani", "Shadow Blades"]  # 52 s shares the adds' moment
+    assert [y.text for y in adds.you] == ["Shadow Blades", "Kill Amani"]  # 52 s shares the adds' row, burst first
     assert next(y for y in adds.you if y.text == "Shadow Blades").dur == 16.0  # its aura, from the game data
     two = next(m for m in ms if m.t == 150.0)
-    assert two.title == "Stage Two"  # a phase always opens its own moment
+    assert two.title == "Stage Two begins"  # a phase always opens its own row
+    assert ms[-1].title == "The kill, around 5:00"
 
 
 def test_the_page_carries_its_data_and_one_script(monkeypatch):
@@ -46,9 +47,25 @@ def test_the_page_carries_its_data_and_one_script(monkeypatch):
     assert any(s["k"] == "cd" and s["d"] == 16.0 for s in data["strips"])
     assert page.count("id='c-sync'") == 1 and "aria-keyshortcuts='Control+Shift+Space'" in page
     assert "Your job on this boss" in page and "<b>Kill the Amani</b>" in page
-    assert "<b>Shadow Blades</b> at 0:52, 3:20." in page and "<b>Potion</b> before the pull." in page
-    assert "role='dialog'" in page and "Dig deeper" in page
+    assert ("<b>Shadow Blades</b> at 0:52, 3:20: keep for the next add wave if it comes within 45 s, otherwise use "
+            "it." in page) and "<b>Potion</b> before the pull." in page
+    blades = [a for a in data["acts"] if a["n"] == "Shadow Blades"]
+    assert blades[0]["t"] == 52 and blades[0]["c"] == "on the 4 × Amani"  # called at its own time, not the row's
+    assert [a["k"] for a in data["anchors"]] == ["cast", "adds", "phase", "cast"]  # what a press can confirm
+    assert "<dialog class='ss' id='ss'" in page and "Dig deeper" in page
     assert fightview.JS.strip().startswith("/*") and "</script" not in fightview.JS
+
+
+def test_movement_is_a_bar_not_an_event(monkeypatch):
+    from paf.movement import Movement, Window
+
+    d = sheet(monkeypatch)
+    d.movement = Movement(windows=[Window(100.0, 30.0, [("Shadowstep", 0.8)])])
+    ms = fightview.moments(d)
+    row = next(m for m in ms if m.t == 100.0)
+    assert row.anchor is None and [y.text for y in row.you] == ["Shadowstep to keep up while the raid moves"]
+    data = json.loads(re.search(r"var FV=(\{.*?\});</script>", fightview.html(d)).group(1))
+    assert not any(a["k"] == "move" for a in data["anchors"]) and any(s["k"] == "move" for s in data["strips"])
 
 
 def test_no_fight_no_view():

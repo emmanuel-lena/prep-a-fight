@@ -251,4 +251,7 @@ autocomplete="off">
 <tr><td>Caches (sims, logs)</td><td class="small">{size(cache_root()) / 1e6:,.0f} MB
 (cap {settings.get('cache_max_mb')} MB)</td></tr>
 <tr><td>Data folder</td><td class="small">{e(str(data_dir()))}</td></tr>
-<tr><td>Checked</td><td class="small">{time.strftime('%d %b %H:%M')}</td></tr></table></div></div></div>"""
+<tr><td>Checked</td><td class="small">{time.strftime('%d %b %H:%M')}</td></tr></table></div>
+<h2>Every tool</h2><div class="card"><p class="small">The prep of a boss runs them all; each one is also on its own
+page, to dig further: <a href="/tools">see every tool</a>. <a href="/feedback">Send us a feedback</a>.</p></div>
+</div></div>"""

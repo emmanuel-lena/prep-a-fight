@@ -1,108 +1,139 @@
-/* The fight view (paf.fightview): plays the fight on the plan's clock, says what to press next, and follows a raid
-   ahead of or behind the plan from one press on a boss moment. FV comes from the page. */
+/* The fight view (paf.fightview): plays the fight on the plan's clock, says what to press next at its own time, and
+   follows a raid ahead of or behind the plan from one press on a boss event (a phase start first). FV comes from
+   the page: acts (what you press), anchors (boss events a press can confirm), boss (what the boss line shows). */
 (function () {
   'use strict';
   var root = document.querySelector('.fv');
   if (!root || typeof FV === 'undefined') return;
-  var M = FV.moments, $ = function (id) { return document.getElementById(id); };
-  var LEAD = 5, NOW_FOR = 3, WIN = 12, LATE = 25;
+  var A = FV.acts, N = FV.anchors, B = FV.boss, $ = function (id) { return document.getElementById(id); };
+  var LEAD = 5, NOW_FOR = 3, SAME = 1, BOUNCE = 3, QUIET = 1.5, LAST_PUSH = 30;
+  var WIN = { phase: [-30, 40], immune: [-30, 40], adds: [-10, 12], cast: [-10, 12] };
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var st = { cur: 0, playing: false, speed: 1, sound: false, conf: [], said: {}, key: '', curRow: -1, ended: false,
-             userScroll: 0, last: null, ssFrom: null };
+  var st = { cur: 0, playing: false, speed: 1, sound: false, conf: [], key: '', curRow: -1, target: -1, lastPress: -1e9,
+             quietUntil: 0, userScroll: 0, last: null, ssFrom: null, sq: [], sqAt: 0, said: {} };
 
   function mmss(t) { var s = Math.max(0, Math.round(t)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  function clock(t) { return t < 0 ? '−' + mmss(-t) : mmss(t); }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function secs(n) { n = Math.max(1, Math.ceil(n - 0.05)); return n + ' s'; }
+  function secs(n) { return Math.max(1, Math.ceil(n - 0.05)) + ' s'; }
+  function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+  function visible() { var p = root.closest('.panel'); return !p || !p.hidden; }
 
-  /* the clock: a confirmed boss moment moves every later moment by the boss's delay */
-  function shift(i) {
-    var s = 0, best = -1;
-    st.conf.forEach(function (c) { if (M[c.i].t <= M[i].t && M[c.i].t >= best) { best = M[c.i].t; s = c.at - M[c.i].t; } });
+  /* the clock: a confirmed boss event moves every later event by the boss's delay */
+  function shift(pt) {
+    var s = 0, best = -1e9;
+    st.conf.forEach(function (c) { if (c.pt <= pt + 0.01 && c.pt > best) { best = c.pt; s = c.at - c.pt; } });
     return s;
   }
-  function eff(i) { return M[i].t + shift(i); }
+  function eff(pt) { return pt + shift(pt); }
   function confirmed(i) { return st.conf.some(function (c) { return c.i === i; }); }
+
+  /* what you press: the next group (presses within a second of each other) still to come or just due */
+  function group(t, after) {
+    for (var i = 0; i < A.length; i++) {
+      var e = eff(A[i].t);
+      if (e >= t - NOW_FOR && (after == null || e > after + 0.5)) {
+        var g = [A[i]];
+        for (var j = i + 1; j < A.length && eff(A[j].t) - e <= SAME; j++) g.push(A[j]);
+        return { at: e, acts: g };
+      }
+    }
+    return null;
+  }
+  function names(g, sep) { return g.acts.map(function (a) { return a.n; }).join(sep || ' + '); }
+  function icon(ic) {
+    return ic ? '<i class="ic" aria-hidden="true" style="background-image:url(\'https://wow.zamimg.com/images/wow/icons/medium/' + esc(ic) + '.jpg\')"></i>'
+      : '<i class="ic none" aria-hidden="true"></i>';
+  }
+
+  function call(t) {
+    var g = group(t);
+    if (!g) {
+      if (t >= FV.end - LAST_PUSH) {
+        return { key: 'end', cls: 'call fv-soon fv-end', state: 'end', say: '', html: '<span class="lab">Last push <span class="cd">' +
+          (t < FV.end ? 'kill around ' + mmss(FV.end) : 'any moment') + '</span></span><p class="pend">Everything on the boss until it drops.</p>' };
+      }
+      return { key: 'none', cls: 'call fv-soon', state: 'none', say: '', html: '<span class="lab">Your rotation</span><p class="pend">Nothing to press before the kill.</p>' };
+    }
+    var dt = g.at - t, c = g.acts[0].c;
+    var state = dt <= 0.5 ? 'go' : dt <= LEAD ? 'ready' : 'soon';
+    var kick = state === 'go' ? (cap(c) || 'Press') : (state === 'ready' ? 'Get ready' : 'Next') + (c ? ', ' + c : '');
+    var lab = state === 'go' ? 'Now' : state === 'ready' ? secs(dt) : 'in ' + secs(dt);
+    var win = state === 'soon' ? '' : '<span class="win"><i style="transform:scaleX(' + (state === 'go' ? 1 : Math.max(0, 1 - dt / LEAD)).toFixed(3) + ')"></i></span>';
+    var rows = g.acts.map(function (a) {
+      return '<div class="a">' + icon(a.ic) + '<div><b>' + esc(a.n) + '</b>' + (a.d && a.k !== 'move' ? '<small>lasts ' + Math.round(a.d) + ' s</small>' : '') + '</div></div>';
+    }).join('');
+    return { key: g.at.toFixed(1) + ':' + state, g: g, state: state, cls: 'call fv-' + state,
+             say: state === 'go' ? names(g, ', then ') + ', now' : state === 'ready' ? 'Get ready: ' + names(g, ', then ') + (c ? ', ' + c : '') : '',
+             html: '<span class="lab">' + esc(kick) + ' <span class="cd">' + esc(lab) + '</span></span><div class="acts">' + rows + '</div>' + win };
+  }
+  function then(t, cc) {
+    if (!cc.g) return '';
+    var n = group(t, cc.g.at);
+    if (!n) return '';
+    var c = n.acts[0].c, said = names(n);
+    return 'Then ' + said + ' at ' + mmss(n.at) + (c && said.indexOf(c.replace(/^on (the )?/, '')) < 0 ? ' · ' + c : '');
+  }
+
+  /* the boss line: what is running now (adds alive, the boss immune, Bloodlust) or was just cast */
+  function bossNow(t) {
+    var on = B.filter(function (b) { var e = eff(b.t); return b.k !== 'move' && e <= t && t < e + Math.max(b.d, 6); });
+    return on.length ? on.map(function (b) { return b.n; }).join('; ') : '—';
+  }
+  function title(t, cc) {
+    if (t < 0) return 'Before the pull';
+    if (cc.state === 'end') return 'Last push';
+    var cur = 'The pull';
+    N.forEach(function (a) { if (eff(a.t) <= t) cur = a.n; });
+    return cur;
+  }
   function phaseAt(t) {
-    var p = FV.phases[0];
+    var p = FV.phases[0][0];
     FV.phases.forEach(function (x, k) {
-      var i = M.findIndex(function (m) { return Math.abs(m.t - x[1]) < 0.6; });
-      var start = k === 0 ? 0 : (i >= 0 ? eff(i) : x[1]);
-      if (t >= start - 0.01) p = x;
+      if (!k) return;
+      var a = N.findIndex(function (n) { return n.k === 'phase' && Math.abs(n.t - x[1]) < 0.6; });
+      if (t >= (a >= 0 ? eff(N[a].t) : x[1])) p = x[0];
     });
-    return p ? p[0] : '';
+    return p;
   }
-  function currentRow(t) { var c = -1; for (var i = 0; i < M.length; i++) if (eff(i) <= t + 0.01) c = i; return c; }
-  function nextYou(t, after) {
-    for (var i = 0; i < M.length; i++) {
-      if (!M[i].you.length) continue;
-      var e = eff(i);
-      if (e >= t - NOW_FOR && (after == null || e > after + 0.5)) return i;
-    }
-    return -1;
-  }
-  function nextAnchor(t) {
-    for (var i = 0; i < M.length; i++) if (M[i].anchor && eff(i) > t) return i;
-    return -1;
-  }
-  /* the boss moment a press now would confirm: the closest one in its window, not already confirmed */
+  function nextAnchor(t) { for (var i = 0; i < N.length; i++) if (eff(N[i].t) > t) return i; return -1; }
+
+  /* the boss event a press now confirms: a phase start first (they move with the boss's health), else the closest */
   function syncTarget(t) {
-    var best = -1, bd = 1e9;
-    for (var i = 0; i < M.length; i++) {
-      if (!M[i].anchor || confirmed(i) || M[i].t < 1) continue;
-      var d = t - eff(i);
-      if (d < -WIN || d > LATE) continue;
+    var best = -1, bd = 1e9, phase = false;
+    N.forEach(function (a, i) {
+      if (confirmed(i)) return;
+      var w = WIN[a.k] || WIN.cast, d = t - eff(a.t), big = a.k === 'phase' || a.k === 'immune';
+      if (d < w[0] || d > w[1]) return;
+      if (big && !phase) { phase = true; bd = 1e9; }
+      if (phase && !big) return;
       if (Math.abs(d) < bd) { bd = Math.abs(d); best = i; }
-    }
+    });
     return best;
   }
 
-  /* one line of what to press, its context */
-  function ctx(i) { var a = M[i].anchor; return a ? 'on ' + a : (M[i].t < 0 ? 'before the pull' : ''); }
-  function acts(i, big) {
-    return M[i].you.map(function (y) {
-      var ic = y.ic ? '<i class="ic" aria-hidden="true" style="background-image:url(\'https://wow.zamimg.com/images/wow/icons/medium/' + esc(y.ic) + '.jpg\')"></i>' : '<i class="ic none" aria-hidden="true"></i>';
-      return '<div class="a">' + ic + '<div><b>' + esc(y.n) + '</b>' + (big && y.d ? '<small>lasts ' + Math.round(y.d) + ' s</small>' : '') + '</div></div>';
-    }).join('');
-  }
-  function names(i) { return M[i].you.map(function (y) { return y.n; }).join(', then '); }
-
-  function call(t) {
-    var i = nextYou(t);
-    if (i < 0) {
-      if (t >= FV.end) return { key: 'end', cls: 'call soon', html: '<span class="lab">The kill <span class="cd">Keep going</span></span><p class="pend">Everything on the boss until it drops.</p>', say: '' };
-      return { key: 'none', cls: 'call soon', html: '<span class="lab">Your rotation</span>', say: '' };
-    }
-    var dt = eff(i) - t, c = ctx(i);
-    var state = dt <= 0.5 ? 'go' : dt <= LEAD ? 'ready' : 'soon';
-    var lab = state === 'go' ? 'Now' : state === 'ready' ? secs(dt) : 'in ' + secs(dt);
-    var kick = state === 'go' ? (c ? c.charAt(0).toUpperCase() + c.slice(1) : 'Press') : state === 'ready' ? 'Get ready' + (c ? ', ' + c : '') : 'Next' + (c ? ', ' + c : '');
-    var win = state === 'soon' ? '' : '<span class="win"><i style="transform:scaleX(' + (state === 'go' ? 1 : Math.max(0, 1 - dt / LEAD)).toFixed(3) + ')"></i></span>';
-    var say = state === 'go' ? names(i) + ' now' : state === 'ready' ? 'Get ready: ' + names(i) + (c ? ', ' + c : '') : '';
-    return { key: i + ':' + state, i: i, state: state, cls: 'call ' + state, say: say,
-             html: '<span class="lab">' + esc(kick) + ' <span class="cd">' + esc(lab) + '</span></span><div class="acts">' + acts(i, true) + '</div>' + win };
-  }
-
-  function then(t, cc) {
-    if (cc.i == null) return '';
-    var j = nextYou(t, eff(cc.i));
-    return j < 0 ? '' : 'Then ' + names(j) + ' at ' + mmss(eff(j)) + (ctx(j) ? ' · ' + ctx(j) : '');
-  }
-
-  /* the screen reader hears what the voice says; one line at a time, never twice */
-  function say(s, voiceToo) {
+  /* the screen reader hears what the voice says: one write every 1.5 s at most, never the same line twice in 4 s */
+  function say(s, voice) {
     if (!s) return;
-    var sr = $('sr'), k = s.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').trim();
-    if (st.said[k] && performance.now() - st.said[k] < 4000) return;
-    st.said[k] = performance.now();
-    sr.textContent = s;
-    if (voiceToo && st.sound && window.speechSynthesis) {
+    var k = s.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').trim(), now = performance.now();
+    if (st.said[k] && now - st.said[k] < 4000) return;
+    st.said[k] = now;
+    if (voice && st.sound && window.speechSynthesis) {
       try { speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(s); u.rate = 1.1; speechSynthesis.speak(u); } catch (e) { /* no voice */ }
     }
+    st.sq.push(s); flush();
+  }
+  function flush() {
+    if (!st.sq.length) return;
+    var wait = st.sqAt + 1500 - performance.now();
+    if (wait > 0) { clearTimeout(st.sqT); st.sqT = setTimeout(flush, wait); return; }
+    $('sr').textContent = st.sq.splice(0).join('. ');
+    st.sqAt = performance.now();
   }
   function beep() {
     if (!st.sound) return;
     try {
-      var A = window.AudioContext || window.webkitAudioContext; st.ac = st.ac || new A();
+      var C = window.AudioContext || window.webkitAudioContext; st.ac = st.ac || new C();
       var o = st.ac.createOscillator(), g = st.ac.createGain(); o.frequency.value = 880; g.gain.value = 0.08;
       o.connect(g); g.connect(st.ac.destination); o.start(); o.stop(st.ac.currentTime + 0.12);
     } catch (e) { /* no sound */ }
@@ -112,63 +143,80 @@
   function txt(el, s) { if (el && el.textContent !== s) el.textContent = s; }
 
   function render() {
-    var t = st.cur, r = currentRow(t), cc = call(t);
-    txt($('c-time'), t < 0 ? '−' + mmss(-t) : mmss(t));
-    txt($('ss-clock'), $('c-time').textContent);
-    var ph = phaseAt(t); txt($('c-phase'), ph); txt($('ss-phase'), ph);
-    var m = r >= 0 ? M[r] : null;
-    txt($('c-title'), t < 0 ? 'Before the pull' : m ? m.title : 'The pull');
-    txt($('c-boss'), m && m.boss.length ? m.boss.join('; ') : 'Nothing for you to watch');
-    txt($('c-you'), m && m.you.length && t - eff(r) < 8 ? m.you.map(function (y) { return y.n; }).join('; ') : 'Your rotation');
-    ['c-call', 'ss-call'].forEach(function (id) { var el = $(id); if (!el) return; set(el, cc.html); el.className = cc.cls; });
+    var t = st.cur, cc = call(t), sh = shift(1e9);
+    txt($('c-time'), clock(t)); txt($('ss-clock'), clock(t));
+    var ph = phaseAt(t) + (st.conf.length && Math.abs(Math.round(sh)) >= 2 ? ' · boss ' + Math.abs(Math.round(sh)) + ' s ' + (sh > 0 ? 'behind' : 'ahead') : '');
+    txt($('c-phase'), ph); txt($('ss-phase'), ph);
+    txt($('c-title'), title(t, cc));
+    txt($('c-boss'), bossNow(t));
+    txt($('c-you'), cc.state === 'go' ? names(cc.g) : 'Your rotation');
+    ['c-call', 'ss-call'].forEach(function (id) { var el = $(id); set(el, cc.html); el.className = cc.cls; });
     var th = then(t, cc); txt($('c-then'), th); txt($('ss-then'), th);
     var n = nextAnchor(t);
     if (n >= 0) {
-      txt($('c-next'), M[n].anchor + ' '); txt($('c-in'), 'in ' + secs(eff(n) - t));
-      var prev = 0; for (var k = n - 1; k >= 0; k--) if (M[k].anchor) { prev = eff(k); break; }
-      $('c-meter').style.transform = 'scaleX(' + Math.min(1, Math.max(0, (t - prev) / Math.max(1, eff(n) - prev))).toFixed(3) + ')';
+      txt($('c-next'), N[n].n + ' '); txt($('c-in'), 'in ' + secs(eff(N[n].t) - t));
+      var prev = n > 0 ? eff(N[n - 1].t) : 0;
+      $('c-meter').style.transform = 'scaleX(' + Math.min(1, Math.max(0, (t - prev) / Math.max(1, eff(N[n].t) - prev))).toFixed(3) + ')';
     } else { txt($('c-next'), ''); txt($('c-in'), ''); $('c-meter').style.transform = 'scaleX(0)'; }
-    var s = st.playing ? syncTarget(t) : -1;
+    st.target = st.playing ? syncTarget(t) : -1;
     ['c-sync', 'ss-sync'].forEach(function (id) {
-      var b = $(id); if (!b) return; b.hidden = s < 0;
-      if (s >= 0) txt(b.firstChild, M[s].anchor + ' started? Press');
+      var b = $(id), hide = st.target < 0;
+      if (hide && !b.hidden && document.activeElement === b) $(id === 'c-sync' ? 'play' : 'ss-play').focus();
+      b.hidden = hide;
+      if (!hide) {
+        txt(b.firstChild, N[st.target].n + ' started? Press');
+        b.setAttribute('aria-label', 'Confirm ' + N[st.target].n + ' started now (Control Shift Space)');
+      }
     });
-    if (cc.key !== st.key) {
+    if (cc.key !== st.key && performance.now() >= st.quietUntil) {
       if (st.playing && cc.say) { say(cc.say, true); if (cc.state === 'go') beep(); }
       st.key = cc.key;
     }
-    if (r !== st.curRow) {
-      document.querySelectorAll('.fv .fm.on').forEach(function (x) { x.classList.remove('on'); });
-      var row = r >= 0 ? document.querySelector('.fv .fm[data-i="' + r + '"]') : null;
-      if (row) {
-        row.classList.add('on');
-        if (st.playing && performance.now() - st.userScroll > 4000) row.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
-      }
-      st.curRow = r;
-    }
+    row(t);
     bars(t);
     playBtn();
   }
 
-  /* second screen: what comes in the next minute, as bars that empty */
-  function bars(t) {
-    var box = $('ss-bars'); if (!box || $('ss').hidden) return;
-    var out = [];
-    for (var i = 0; i < M.length && out.length < 5; i++) {
-      var e = eff(i); if (e < t - 0.5 || e > t + 60) continue;
-      if (!M[i].you.length && !M[i].anchor) continue;
-      var mine = M[i].you.length > 0, label = mine ? names(i) : M[i].anchor;
-      out.push('<div class="fbar' + (mine ? ' mine' : '') + '" role="listitem"><i class="fill" style="transform:scaleX(' + Math.max(0, Math.min(1, (e - t) / 60)).toFixed(3) + ')"></i><b>' + esc(label) + '</b><span>' + (e - t <= 0.5 ? 'now' : secs(e - t)) + '</span></div>');
+  /* the current row: lit, aria-current on its time, that time the only one in the Tab order */
+  function row(t) {
+    var r = -1;
+    FV.rows.forEach(function (rt, i) { if (eff(rt) <= t + 0.01) r = i; });
+    if (r === st.curRow) return;
+    var old = root.querySelector('.fm.on');
+    if (old) { old.classList.remove('on'); old.querySelector('.t').setAttribute('aria-current', 'false'); }
+    var el = r >= 0 ? root.querySelector('.fm[data-i="' + r + '"]') : null;
+    if (el) {
+      el.classList.add('on'); el.querySelector('.t').setAttribute('aria-current', 'true');
+      roving(el.querySelector('.t'));
+      if (st.playing && performance.now() - st.userScroll > 4000) el.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
     }
-    set(box, out.join('') || '<p class="pend">Nothing in the next minute: your rotation.</p>');
+    st.curRow = r;
+  }
+  function roving(cur) { root.querySelectorAll('.fm .t').forEach(function (b) { b.tabIndex = b === cur ? 0 : -1; }); }
+
+  /* second screen: what comes in the next minute, yours and the boss's, as bars that empty */
+  function bar(e, t, cls, ic, who, n) {
+    return [e, '<div class="fbar ' + cls + '" role="listitem"><i class="fill" style="transform:scaleX(' + Math.max(0, Math.min(1, (e - t) / 60)).toFixed(3) + ')"></i>' + icon(ic) + '<b><span class="vh">' + who + ': </span>' + esc(n) + '</b><span>' + (e - t <= 0.5 ? 'now' : secs(e - t)) + '</span></div>'];
+  }
+  function bars(t) {
+    if (!$('ss').open) return;
+    var out = [], seen = {};
+    A.forEach(function (a) {
+      var e = eff(a.t), k = e.toFixed(0) + a.n;
+      if (e < t - 0.5 || e > t + 60 || seen[k]) return;
+      seen[k] = 1; out.push(bar(e, t, 'mine', a.ic, 'You', a.n));
+    });
+    N.forEach(function (a) { var e = eff(a.t); if (e >= t - 0.5 && e <= t + 60) out.push(bar(e, t, 'boss', a.ic, 'Boss', a.n)); });
+    out.sort(function (a, b) { return a[0] - b[0]; });
+    set($('ss-bars'), out.slice(0, 7).map(function (x) { return x[1]; }).join('') || '<p class="pend">Nothing in the next minute: your rotation.</p>');
   }
 
   function playBtn() {
     ['play', 'ss-play'].forEach(function (id) {
-      var b = $(id); if (!b) return; var l = st.playing ? 'Pause' : (st.cur > 0 ? 'Resume' : 'Play');
-      var s = b.querySelector('span'); txt(s || b, l);
+      var b = $(id), s = b.querySelector('span'); txt(s || b, st.playing ? 'Pause' : (st.cur !== 0 ? 'Resume' : 'Play'));
     });
     document.body.classList.toggle('playing', st.playing);
+    document.body.classList.toggle('paused', !st.playing && st.cur !== 0);
     document.body.classList.toggle('live', st.playing || st.cur !== 0);
   }
 
@@ -176,47 +224,66 @@
     if (!st.playing) return;
     if (st.last != null) st.cur += (now - st.last) / 1000 * st.speed;
     st.last = now;
-    if (st.cur > FV.end + 30) { setPlay(false); say('Playback over. Play to start again.'); st.cur = 0; st.conf = []; render(); return; }
+    if (st.cur > FV.end + 30) { setPlay(false, true); st.cur = 0; st.conf = []; st.key = ''; say('Playback over. Play to start again.'); render(); return; }
     render();
     requestAnimationFrame(tick);
   }
-  function setPlay(on) {
+  function setPlay(on, quiet) {
     st.playing = on; st.last = null;
     if (on) requestAnimationFrame(tick);
+    if (!quiet) say(on ? 'Playing from ' + clock(st.cur) : 'Paused at ' + clock(st.cur));
     render();
   }
-  function pullTimer() { st.cur = -10; st.conf = []; st.key = ''; setPlay(true); say('Pull in 10 seconds.'); }
-  function wipe() { setPlay(false); st.cur = 0; st.conf = []; st.key = ''; render(); say('Back to the pull.'); }
+  function pullTimer() {
+    if (st.playing) { say('The fight is running: pause or wipe first.'); return; }
+    st.cur = -10; st.conf = []; st.key = ''; setPlay(true, true); say('Pull in 10 seconds.');
+  }
+  function wipe() { setPlay(false, true); st.cur = 0; st.conf = []; st.key = ''; render(); say('Wipe: back to the pull.'); }
 
-  /* "it starts now": the boss moment closest to now, within its window */
+  /* "it starts now": exactly the boss event the button names */
   function sync() {
-    if (!st.playing) return;
-    var i = syncTarget(st.cur);
+    if (!st.playing) { say('Press Play first.'); return; }
+    var now = performance.now();
+    if (now - st.lastPress < BOUNCE * 1000) { say('Already confirmed.'); return; }
+    var i = st.target;
     if (i < 0) { say('Nothing to confirm right now.', true); return; }
-    var d = Math.round(st.cur - M[i].t);
-    st.conf.push({ i: i, at: st.cur });
-    st.key = '';
-    var how = Math.abs(d) <= 2 ? 'on time' : 'boss ' + Math.abs(d) + ' s ' + (d > 0 ? 'behind' : 'ahead of') + ' the plan';
-    say(M[i].anchor + ' confirmed, ' + how + '.', true);
+    var a = N[i], late = Math.round(st.cur - a.t);
+    st.conf = st.conf.filter(function (c) { return c.pt < a.t; });  // what came after it is timed from it now
+    st.conf.push({ i: i, pt: a.t, at: st.cur });
+    st.lastPress = now; st.quietUntil = now + QUIET * 1000; st.key = '';
+    var how = Math.abs(late) <= 2 ? 'on time' : 'boss ' + Math.abs(late) + ' s ' + (late > 0 ? 'behind' : 'ahead of') + ' the plan';
+    say(a.n + ' confirmed, ' + how + '.', true);
     render();
   }
 
-  function openSS() { st.ssFrom = document.activeElement; $('ss').hidden = false; document.body.classList.add('ss-on'); $('ss').focus(); render(); }
-  function closeSS() { $('ss').hidden = true; document.body.classList.remove('ss-on'); (st.ssFrom || $('ss-open')).focus(); }
+  function openSS() {
+    st.ssFrom = document.activeElement;
+    var dlg = $('ss');
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+    dlg.classList.add('open'); document.body.classList.add('ss-on'); dlg.focus(); render();
+  }
+  function closeSS() {
+    var dlg = $('ss');
+    if (dlg.close && dlg.open) dlg.close(); else dlg.removeAttribute('open');
+    dlg.classList.remove('open'); document.body.classList.remove('ss-on'); (st.ssFrom || $('ss-open')).focus();
+  }
 
-  /* strips: each duration drawn along the clock, from the rows' positions */
-  function layout() {
-    var tl = $('tl'); if (!tl) return;
-    tl.querySelectorAll('.strip').forEach(function (x) { x.remove(); });
-    var rows = [].slice.call(tl.querySelectorAll('.fm')), base = tl.getBoundingClientRect().top;
-    var pts = rows.map(function (r) { return [+r.dataset.t, r.getBoundingClientRect().top - base + 14]; }).sort(function (a, b) { return a[0] - b[0]; });
-    if (pts.length < 2) return;
-    function yAt(t) {
+  /* bars along the clock and the "now" marker, from the rows' positions */
+  function yAtFn() {
+    var tl = $('tl'), base = tl.getBoundingClientRect().top;
+    var pts = [].slice.call(tl.querySelectorAll('.fm')).map(function (r) { return [+r.dataset.t, r.getBoundingClientRect().top - base + 14]; })
+      .sort(function (a, b) { return a[0] - b[0]; });
+    return function (t) {
+      if (!pts.length) return 0;
       if (t <= pts[0][0]) return pts[0][1];
       for (var k = 1; k < pts.length; k++) if (t <= pts[k][0]) { var a = pts[k - 1], b = pts[k]; return a[1] + (b[1] - a[1]) * (t - a[0]) / Math.max(0.1, b[0] - a[0]); }
       var l = pts[pts.length - 1]; return l[1] + (t - l[0]) * 2;
-    }
-    var spine = tl.querySelector('.fm .spine'); if (!spine) return;
+    };
+  }
+  function layout() {
+    var tl = $('tl'); if (!tl || !tl.offsetParent) return;
+    tl.querySelectorAll('.strip').forEach(function (x) { x.remove(); });
+    var yAt = yAtFn(), spine = tl.querySelector('.fm .spine'); if (!spine) return;
     var sb = spine.getBoundingClientRect(), tlb = tl.getBoundingClientRect(), lanes = { boss: 0, you: 0 };
     FV.strips.forEach(function (s) {
       var y0 = yAt(s.t), y1 = yAt(s.t + s.d), el = document.createElement('div');
@@ -237,35 +304,54 @@
   $('ss-sync').addEventListener('click', sync);
   $('ss-open').addEventListener('click', openSS);
   $('ss-close').addEventListener('click', closeSS);
+  $('ss').addEventListener('cancel', function (ev) { ev.preventDefault(); closeSS(); });
   $('ss-wipe').addEventListener('click', wipe);
-  $('ss-sound').addEventListener('click', function () { st.sound = !st.sound; this.setAttribute('aria-pressed', st.sound); if (st.sound) say('Voice on.', true); });
+  $('ss-sound').addEventListener('click', function () {
+    st.sound = !st.sound; this.setAttribute('aria-pressed', st.sound); say(st.sound ? 'Voice and beeps on.' : 'Voice and beeps off.', true);
+  });
   root.querySelectorAll('.seg [data-s]').forEach(function (b) {
     b.addEventListener('click', function () {
       st.speed = +b.dataset.s; root.querySelectorAll('.seg [data-s]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
     });
   });
-  root.querySelectorAll('.fm .t').forEach(function (b) {
-    b.addEventListener('click', function () { var i = +b.closest('.fm').dataset.i; st.cur = eff(i); st.key = ''; render(); });
+  var pills = [].slice.call(root.querySelectorAll('.fm .t'));
+  pills.forEach(function (b, k) {
+    b.tabIndex = k ? -1 : 0;
+    b.addEventListener('click', function () {
+      var r = b.closest('.fm'), t = eff(+r.dataset.t); st.cur = t; st.key = ''; render();
+      say('At ' + clock(t) + ', ' + (r.dataset.title || b.textContent));
+    });
+    b.addEventListener('keydown', function (ev) {
+      var n = { ArrowDown: 1, ArrowUp: -1 }[ev.key]; if (!n) return;
+      ev.preventDefault(); var to = pills[Math.max(0, Math.min(pills.length - 1, k + n))]; roving(to); to.focus();
+    });
   });
   var mrtB = $('mrt');
   if (mrtB) mrtB.addEventListener('click', function () {
-    var box = $('mrt-text'), done = function () { txt(mrtB, 'Copied'); setTimeout(function () { txt(mrtB, 'Copy as MRT note'); }, 1500); };
-    var fallback = function () { box.hidden = false; box.select(); try { document.execCommand('copy'); done(); } catch (e) { /* the box stays open */ } };
+    var box = $('mrt-text'), lab = mrtB.querySelector('span');
+    var done = function () { txt(lab, 'Copied'); say('MRT note copied.'); setTimeout(function () { txt(lab, 'Copy as MRT note'); }, 1500); };
+    var fallback = function () {
+      box.hidden = false; box.select(); var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      if (ok) done(); else { txt(lab, 'Select and copy'); say('Select the note and copy it.'); }
+    };
     if (navigator.clipboard) navigator.clipboard.writeText(box.value).then(done, fallback); else fallback();
   });
   document.addEventListener('keydown', function (ev) {
+    if (!visible()) return;
     var tag = (ev.target.tagName || '').toLowerCase();
-    if (ev.key === 'Escape' && !$('ss').hidden) { ev.preventDefault(); closeSS(); return; }
     if (ev.ctrlKey && ev.shiftKey && (ev.code === 'Space' || ev.key === ' ')) { ev.preventDefault(); sync(); return; }
     if (ev.altKey && (ev.key === 'p' || ev.key === 'P')) { ev.preventDefault(); pullTimer(); return; }
-    if ((ev.code === 'Space' || ev.key === ' ') && !ev.ctrlKey && !ev.altKey && !/^(input|textarea|select|button|a)$/.test(tag)) {
-      if (!root.closest('.panel') || !root.closest('.panel').hidden) { ev.preventDefault(); setPlay(!st.playing); }
+    if ((ev.code === 'Space' || ev.key === ' ') && !ev.ctrlKey && !ev.altKey && !ev.metaKey
+        && !/^(input|textarea|select|button|a|summary)$/.test(tag) && (root.contains(ev.target) || ev.target === document.body)) {
+      ev.preventDefault(); setPlay(!st.playing);
     }
   });
   window.addEventListener('wheel', function () { st.userScroll = performance.now(); }, { passive: true });
   window.addEventListener('keydown', function (ev) { if (/^(PageUp|PageDown|ArrowUp|ArrowDown|Home|End)$/.test(ev.key)) st.userScroll = performance.now(); });
   var lt; window.addEventListener('resize', function () { clearTimeout(lt); lt = setTimeout(layout, 150); });
+  if (window.ResizeObserver) new ResizeObserver(function () { clearTimeout(lt); lt = setTimeout(layout, 100); }).observe($('tl'));
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
-  window.__fv = { st: st, render: render, layout: layout, sync: sync };
+  window.__fv = { st: st, render: render, layout: layout, sync: sync, eff: eff };
   layout(); render();
 })();

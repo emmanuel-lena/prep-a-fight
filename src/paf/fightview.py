@@ -13,27 +13,35 @@ come by the boss's delay, so the card follows a raid that is ahead or behind the
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from html import escape as e
 from importlib.resources import files
 
 from paf import icons, simple, theme
 
-ROW_GAP = 6.0  # seconds: events this close share one moment
-PRE = -2.0  # where the "before the pull" moment sits
-ANCHORS = ("phase", "adds", "cast", "move")  # boss moments a press can confirm, in title order
+ROW_GAP = 6.0  # seconds: events this close share one row of the timeline
+PRE = -2.0  # where "before the pull" sits
+ANCHORS = ("phase", "immune", "adds", "cast")  # boss events a press can confirm, and that name a row, in this order
+YOU_ORDER = ("pot", "cd", "def", "do", "move")  # your items in a row: the burst first, the movement cue last
 LUST_SECONDS = 40.0
 POTION_SECONDS = 30.0
+DEF_SUPPORT = 0.4  # a defensive is shown when at least this share of the top players press one there
+DEF_SNAP = 10.0  # a defensive this close before its boss ability is moved to just before it
+MOVE_CUE = 10.0  # a movement window this long gets a "keep up" cue (with the spell the top players use)
+MOVE_ICON = "inv_misc_map_01"  # a neutral picture: no spell of yours
+IMMUNE_ICON = "spell_holy_divineshield"
 
 
 @dataclass
 class Item:
     side: str  # "boss" or "you"
-    kind: str  # boss: phase, adds, cast, move, lust; you: cd, pot, def, do
+    kind: str  # boss: phase, immune, adds, cast, move, lust; you: pot, cd, def, do, move
     name: str  # game name (icon, tooltip)
     text: str  # what the lane says
     icon: str = ""
     dur: float = 0.0  # seconds it lasts (a bar along the clock), 0 = none
+    t: float = 0.0  # its own time (a row groups items a few seconds apart)
 
 
 @dataclass
@@ -47,11 +55,11 @@ class Moment:
 
     @property
     def you(self) -> list[Item]:
-        return [i for i in self.items if i.side == "you"]
+        return sorted((i for i in self.items if i.side == "you"), key=lambda i: (YOU_ORDER.index(i.kind), i.t))
 
     @property
     def anchor(self) -> Item | None:
-        """The boss event that marks this moment in the game (what a press confirms), if any."""
+        """The boss event that names this row, if any (movement and Bloodlust never do)."""
         for kind in ANCHORS:
             for i in self.boss:
                 if i.kind == kind:
@@ -67,7 +75,7 @@ class Moment:
         a = self.anchor
         if a is not None:
             return a.text
-        return self.you[0].text if self.you else ""
+        return self.you[0].text if self.you else (self.boss[0].text if self.boss else "")
 
 
 def _mmss(t: float) -> str:
@@ -77,6 +85,11 @@ def _mmss(t: float) -> str:
 
 def _icon(d, name: str) -> str:
     return d.icons.get(name, "") or simple._fallback(d, name)
+
+
+def _clean(name: str) -> str:
+    """A unit's name as the game shows it: the corpus's notes in brackets go ('Echo (after Soul Transfer)')."""
+    return re.sub(r"\s*\([^)]*\)", "", name).strip() or name
 
 
 def _durations(d) -> dict[str, float]:
@@ -96,55 +109,82 @@ def _durations(d) -> dict[str, float]:
     return out
 
 
+def _defensives(d) -> list[tuple[float, str, str]]:
+    """(time, spell, boss ability) of the defensives most top players press, just before the hit they take."""
+    casts = dict(d.boss_casts)
+    out = []
+    for m in (d.defensives.moments if d.defensives else []):
+        if not m.spells or m.share < DEF_SUPPORT:
+            continue
+        t = m.time
+        hits = [c for c in casts.get(m.boss_ability, []) if t - 3 <= c <= t + DEF_SNAP] if m.boss_ability else []
+        if hits:
+            t = max(0.0, min(hits, key=lambda c: abs(c - t)) - 1)
+        out.append((t, m.spells[0][0], m.boss_ability))
+    return out
+
+
 def items(d) -> list[tuple[float, Item]]:
-    """Every event of the fight, (time, item)."""
+    """Every event of the fight, (time, item), each at its own time."""
     out: list[tuple[float, Item]] = []
+
+    def add(t: float, it: Item) -> None:
+        it.t = t
+        out.append((t, it))
+
     todo = {"kill": "Kill {}", "interrupt": "Interrupt {}", "contact": "Soak {}"}
     act = {a.name: todo[a.kind] for a in d.actions if a.kind in todo
            and not (a.kind == "interrupt" and not a.text.startswith("Interrupt"))}
+    skip = {a.name for a in d.actions if a.kind == "ignore"}
     for name, start in sorted(d.phases, key=lambda p: p[1]):
         if start >= 1:
-            out.append((start, Item("boss", "phase", name, name)))
+            add(start, Item("boss", "phase", name, f"{name} begins"))
+    starts = [s for _n, s in d.phases if s >= 1]
+    for w in (d.fight.invulnerable if d.fight is not None else []):
+        at = next((s for s in starts if abs(s - w.start) <= 3), w.start)  # an intermission: on its phase's row
+        add(at, Item("boss", "immune", "Boss immune", f"The boss is immune for {w.duration:.0f} s", IMMUNE_ICON,
+                     float(w.duration)))
     for name, times in d.boss_casts:
         for t in times:
-            out.append((t, Item("boss", "cast", name, name, _icon(d, name))))
+            add(t, Item("boss", "cast", name, name, _icon(d, name)))
             if name in act:
-                out.append((t, Item("you", "do", name, act[name].format(name), _icon(d, name))))
+                add(t, Item("you", "do", name, act[name].format(name), _icon(d, name)))
     for t, count, life, name in d.waves:
         if not count:
             continue
-        label = f"{count} × {name}" if count > 1 else name
-        out.append((t, Item("boss", "adds", name, label, _icon(d, name), float(life or 0))))
-        if name in act:
-            out.append((t, Item("you", "do", name, act[name].format(name), _icon(d, name))))
+        shown = _clean(name)
+        label = f"{count} × {shown}" if count > 1 else shown
+        stop = d.duration or (d.fight.duration if d.fight else 0) or t + life
+        add(t, Item("boss", "adds", name, label, _icon(d, name), float(min(life or 0, max(0.0, stop - t)))))
+        if name not in skip and _clean(name) not in skip:
+            add(t, Item("you", "do", name, act.get(name, "Kill {}").format(shown), _icon(d, name)))
     for f in (d.fight.focus if d.fight is not None else []):
-        out.append((f.start, Item("you", "do", f.name, f"Hit {f.name}", _icon(d, f.name))))
+        add(f.start, Item("you", "do", f.name, f"Hit {f.name}", _icon(d, f.name)))
     if d.lust is not None:
-        out.append((d.lust, Item("boss", "lust", "Bloodlust", "Bloodlust", _icon(d, "Bloodlust"), LUST_SECONDS)))
+        add(d.lust, Item("boss", "lust", "Bloodlust", "Bloodlust", _icon(d, "Bloodlust"), LUST_SECONDS))
     names, order, _ = simple._pressed(d)
     dur = _durations(d)
     for n in names:
         pot = "potion" in n.lower()
         for t in order[n]:
             at = PRE if t < 0.5 and (n in d.precast or pot) else t
-            out.append((at, Item("you", "pot" if pot else "cd", n, n, _icon(d, n),
-                                 POTION_SECONDS if pot else dur.get(n, 0.0))))
-    for m in (d.defensives.moments if d.defensives else []):
-        if m.spells:
-            s = m.spells[0][0]
-            why = f" for {m.boss_ability}" if m.boss_ability else ""
-            out.append((m.time, Item("you", "def", s, f"{s}{why}", _icon(d, s))))
-    for w in (d.movement.windows if d.movement else []):
-        out.append((w.start, Item("boss", "move", "Movement", f"Everyone moves for {w.duration:.0f} s",
-                                  _icon(d, "Movement"), float(w.duration))))
-        out.append((w.start, Item("you", "do", "Movement", "Move with the raid", _icon(d, "Movement"))))
-        for s, _share in w.spells[:1]:
-            out.append((w.start, Item("you", "do", s, f"{s} to keep up", _icon(d, s))))
+            add(at, Item("you", "pot" if pot else "cd", n, n, _icon(d, n), POTION_SECONDS if pot else dur.get(n, 0.0)))
+    for t, s, why in _defensives(d):
+        add(t, Item("you", "def", s, f"{s} for {why}" if why else s, _icon(d, s), dur.get(s, 0.0)))
+    end = d.duration or (d.fight.duration if d.fight else 0)
+    if end:
+        add(end, Item("boss", "kill", "The kill", f"The kill, around {_mmss(end)}"))
+    for w in (d.movement.windows if d.movement else []):  # the strategy's movement: a bar, never an event
+        add(w.start, Item("boss", "move", "Movement", f"Everyone moves for {w.duration:.0f} s", MOVE_ICON,
+                          float(w.duration)))
+        if w.duration >= MOVE_CUE and w.spells:
+            s = w.spells[0][0]
+            add(w.start, Item("you", "move", s, f"{s} to keep up while the raid moves", _icon(d, s)))
     return sorted(out, key=lambda x: x[0])
 
 
 def moments(d) -> list[Moment]:
-    """Events close in time share a moment; a phase start always opens its own."""
+    """Events close in time share a row; a phase start always opens its own."""
     out: list[Moment] = []
     for t, it in items(d):
         if (not out or t - out[-1].t > ROW_GAP or (it.kind == "phase" and t - out[-1].t > 0.5)
@@ -169,19 +209,22 @@ def _ic(icon: str, cls: str = "ic") -> str:
 def _ev(it: Item) -> str:
     bold = it.side == "you" and it.kind in ("cd", "pot", "def")
     text = f"<b>{e(it.text)}</b>" if bold else e(it.text)
-    small = f"<small>lasts {it.dur:.0f} s</small>" if it.dur and it.kind not in ("move",) else ""
+    small = f"<small>lasts {it.dur:.0f} s</small>" if it.dur and it.kind not in ("move", "immune") else ""
     return (f"<div class='ev ek-{it.kind}'>{_ic(it.icon)}<div class='x'><span class='main'>{text}</span>{small}"
             "</div></div>")
 
 
-def _row(m: Moment, i: int) -> str:
-    boss = "".join(_ev(x) for x in m.boss if x.kind != "phase")  # the phase's band already says it
+def _row(m: Moment, i: int, gap: float = 0.0) -> str:
+    shown = [x for x in m.boss if x.kind != "phase"] or m.boss  # the phase's band says it, unless it is alone
+    boss = "".join(_ev(x) for x in shown)
     you = "".join(_ev(x) for x in m.you)
     when = "Before the pull" if m.t < 0 else ("Pull" if m.t < 1 else _mmss(m.t))
     label = f"{when}, {m.title}: show this moment"
-    quiet = not m.you and not any(x.kind in ("phase", "adds", "move", "lust") for x in m.boss)
-    cls = "fm quiet" if quiet else "fm"
-    return (f"<div class='{cls}{' has-boss' if boss else ''}' data-i='{i}' data-t='{m.t:g}'>"
+    quiet = not m.you and not any(x.kind in ("phase", "immune", "adds", "move", "lust", "kill") for x in m.boss)
+    cls = "fm quiet" if quiet else ("fm kill" if any(x.kind == "kill" for x in m.boss) else "fm")
+    room = f" style='min-height:{min(110, max(0, (gap - ROW_GAP) * 2.2)) + 34:.0f}px'" if gap > ROW_GAP else ""
+    return (f"<div class='{cls}{' has-boss' if boss else ''}' data-i='{i}' data-t='{m.t:g}' data-title='{e(m.title)}'"
+            f"{room}>"
             f"<div class='boss'>{'<span class=vh>Boss: </span>' + boss if boss else ''}</div>"
             f"<div class='spine'><button type='button' class='t' aria-label='{e(label)}'>{e(when)}</button></div>"
             f"<div class='you'>{'<span class=vh>You: </span>' + you if you else ''}</div></div>")
@@ -189,8 +232,23 @@ def _row(m: Moment, i: int) -> str:
 
 def job_html(d) -> str:
     """Your job on this boss, in six lines at most: what kills a raid first, then your cooldowns and when."""
-    rows = [(ic, f"<b>{e(say)}</b>") for ic, say in simple._watch(d)[:3]]
-    names, order, held = simple._pressed(d)
+    from paf.prep_report import rule_phrase
+
+    rows = [(a.name, f"<b>{e(a.text.split(':')[0].split(' (')[0])}</b>") for a in d.actions
+            if a.kind in ("kill", "contact") or (a.kind == "interrupt" and a.text.startswith("Interrupt"))][:2]
+    for w in (d.fight.invulnerable if d.fight is not None else [])[:1]:
+        adds = [_clean(x[3]) for x in d.waves if w.start - 2 <= x[0] <= w.start + w.duration and x[1]]
+        what = f": kill the {e(adds[0])} to bring it back" if adds else ""
+        rows.append(("", f"<b>The boss is immune at {_mmss(w.start)}</b> for {w.duration:.0f} s{what}."))
+    defs = _defensives(d)
+    if defs:
+        s, why = defs[0][1], defs[0][2]
+        rows.append((s, f"<b>{e(s)}</b>{' for ' + e(why) if why else ''}, the top players' defensive."))
+    names, order, _held = simple._pressed(d)
+    plan = simple._plan(d)
+    rules = {d.cd_names.get(k, k): r.name for k, r in (plan.choice.items() if plan else []) if r.name != "default"}
+    if d.lust is not None and d.lust < 5 and names:
+        rows.append(("Bloodlust", "<b>Bloodlust at the pull</b>: your opener goes inside it."))
     for n in names:
         pre = [t for t in order[n] if t < 0.5 and (n in d.precast or "potion" in n.lower())]
         rest = [_mmss(t) for t in order[n] if t not in pre]
@@ -199,27 +257,52 @@ def job_html(d) -> str:
             when = "before the pull" + (f", then {when}" if rest else "")
         elif rest:
             when = f"at {when}"
-        rows.append((n, f"<b>{e(n)}</b> {e(when)}."))
+        why = f": {rule_phrase(d, rules[n])}" if n in rules else ""
+        rows.append((n, f"<b>{e(n)}</b> {e(when)}{e(why)}."))
     if not rows:
         return ""
-    lis = "".join(f"<li>{_ic(_icon(d, ic))}<span>{txt}</span></li>" for ic, txt in rows[:6])
-    how = "Hold your cooldowns for these times." if held else "Press your cooldowns as soon as they are ready."
-    return (f"<section class='fbox job'><h2>Your job on this boss</h2><ul class='keys'>{lis}</ul>"
-            f"<p class='how'>{how}</p></section>")
+    lis = "".join(f"<li>{_ic(_icon(d, ic) if ic else '')}<span>{txt}</span></li>" for ic, txt in rows[:7])
+    return f"<section class='fbox job'><h2>Your job on this boss</h2><ul class='keys'>{lis}</ul></section>"
+
+
+def _ctx(t: float, its: list[tuple[float, Item]]) -> str:
+    """What a press is for, in a few words: on the pull, on the boss event it answers, inside Bloodlust."""
+    if t < 1:
+        return "on the pull"
+    near = [x for at, x in its if x.side == "boss" and x.kind in ANCHORS and t - 8 <= at <= t + 1]
+    if near:
+        order = ("adds", "cast", "immune", "phase")  # what you press it for, the most concrete first
+        x = min(near, key=lambda x: (order.index(x.kind), abs(x.t - t)))
+        return "on the " + x.text if x.kind == "adds" else ("when it starts" if x.kind == "phase" else "on " + x.text)
+    return ""
 
 
 def data(d, ms: list[Moment], dur: float) -> dict:
-    """What the page's script needs: the moments and what to press, on the plan's clock."""
+    """What the page's script needs, each event at its own time on the plan's clock."""
+    its = items(d)
+    phases = _phases(d, dur)
+
+    def ph(t: float) -> int:
+        return max((i for i, p in enumerate(phases) if t >= p[1] - 0.5), default=0)
+
+    row = {id(x): i for i, m in enumerate(ms) for x in m.items}
+    phase_starts = [s for _n, s, _e in phases[1:]]
+    acts = [{"t": round(t, 1), "n": x.text, "k": x.kind, "ic": x.icon, "d": round(x.dur, 1),
+             "c": "" if x.kind == "move" else _ctx(t, its),
+             "r": row.get(id(x), 0)} for t, x in its if x.side == "you"]
+    acts.sort(key=lambda a: (a["t"], YOU_ORDER.index(a["k"])))
     return {
         "end": round(dur, 1),
-        "phases": [[n, round(s, 1), round(t, 1)] for n, s, t in _phases(d, dur)],
-        "moments": [{"t": round(m.t, 1), "title": m.title,
-                     "anchor": (m.anchor.text if m.anchor is not None else ""),
-                     "boss": [x.text for x in m.boss],
-                     "you": [{"n": x.text, "k": x.kind, "ic": x.icon, "d": round(x.dur, 1)} for x in m.you]}
-                    for m in ms],
+        "phases": [[n, round(s, 1), round(t, 1)] for n, s, t in phases],
+        "rows": [round(m.t, 1) for m in ms],
+        "acts": acts,
+        "anchors": [{"t": round(t, 1), "n": x.name if x.kind in ("phase", "immune") else x.text, "k": x.kind,
+                     "p": ph(t), "ic": x.icon} for t, x in its if x.side == "boss" and x.kind in ANCHORS and t >= 1
+                    and not (x.kind == "immune" and any(abs(t - s) < 0.01 for s in phase_starts))],
+        "boss": [{"t": round(t, 1), "d": round(x.dur, 1), "n": x.text, "k": x.kind} for t, x in its
+                 if x.side == "boss" and x.kind not in ("phase",)],
         "strips": [{"t": round(t, 1), "d": round(x.dur, 1), "k": x.kind, "side": x.side, "n": x.name}
-                   for t, x in items(d) if x.dur and x.kind in ("cd", "pot", "lust", "adds", "move")],
+                   for t, x in its if x.dur and x.kind in ("cd", "pot", "def", "lust", "adds", "move", "immune")],
     }
 
 
@@ -246,7 +329,8 @@ def _phase_html(name: str, start: float, end: float, pi: int, rows: str) -> str:
 
 
 LEGEND = ("<div class='fv-legend' aria-hidden='true'><span><i class='s-cd'></i>your cooldown</span>"
-          "<span><i class='s-pot'></i>your potion</span><span><i class='s-lust'></i>Bloodlust</span>"
+          "<span><i class='s-pot'></i>your potion</span><span><i class='s-def'></i>your defensive</span>"
+          "<span><i class='s-lust'></i>Bloodlust</span>"
           "<span><i class='s-adds'></i>adds alive</span><span><i class='s-move'></i>everyone moves</span>"
           "<span>each bar lasts as long as it does in the fight</span></div>")
 
@@ -274,7 +358,7 @@ def _side(d) -> str:
 
 
 def _second_screen(d) -> str:
-    return ("<div class='ss' id='ss' role='dialog' aria-modal='true' aria-labelledby='ss-h' hidden tabindex='-1'>"
+    return (f"<dialog class='ss' id='ss' aria-label='{e(d.boss)}, second screen' tabindex='-1'>"
             f"<div class='ss-top'><h2><span id='ss-h'>{e(d.boss)}</span> {theme.diff_pill(d.difficulty)}</h2>"
             "<span class='ss-clock' id='ss-clock'>0:00</span><span class='ss-phase' id='ss-phase'></span>"
             f"{_btn('ss-close', 'Back to the plan', 'Escape')}</div>"
@@ -284,7 +368,7 @@ def _second_screen(d) -> str:
             f"{_btn('ss-pull', 'Start at 10 on the pull timer', 'Alt+P')}"
             f"{_btn('ss-sync', '', 'Control+Shift+Space', hidden=True)}</div>"
             f"<div class='grp'>{_btn('ss-sound', 'Voice and beeps', cls='btn ghost', more=' aria-pressed=false')}"
-            f"{_btn('ss-wipe', 'Wipe, back to the pull', cls='btn ghost')}</div></div></div>")
+            f"{_btn('ss-wipe', 'Wipe, back to the pull', cls='btn ghost')}</div></div></dialog>")
 
 
 def html(d) -> str:
@@ -293,9 +377,11 @@ def html(d) -> str:
     ms = moments(d)
     if not dur or not ms:
         return ""
-    sections = []
-    for pi, (name, start, end) in enumerate(_phases(d, dur)):
-        rows = "".join(_row(m, i) for i, m in enumerate(ms) if (m.t >= start - 0.5 or pi == 0) and m.t < end - 0.5)
+    sections, phases = [], _phases(d, dur)
+    for pi, (name, start, end) in enumerate(phases):
+        last = pi == len(phases) - 1
+        rows = "".join(_row(m, i, (ms[i + 1].t if i + 1 < len(ms) else dur) - m.t) for i, m in enumerate(ms)
+                       if (m.t >= start - 0.5 or pi == 0) and (m.t < end - 0.5 or (last and m.t <= end)))
         if rows:
             sections.append(_phase_html(name, start, end, pi, rows))
     payload = json.dumps(data(d, ms, dur)).replace("</", "<\\/")

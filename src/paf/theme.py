@@ -60,15 +60,15 @@ def _svg(path: str) -> str:
 # the app's places, each with a drawn icon (one stroke, one weight)
 PLACES = (
     ("/", "Home", "M3 11.5 12 4l9 7.5M6 10v9.5h4.5V15h3v4.5H18V10"),
-    ("/tools", "Tools", "M14.5 6.5a4 4 0 0 0-5.3 5.3L4 17l3 3 5.2-5.2a4 4 0 0 0 5.3-5.3l-2.6 2.6-2.4-.6-.6-2.4z"),
+    ("/reclear", "Reclear", "M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"),
     ("/raidlead", "Raid lead", "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.5 20a5.5 5.5 0 0 1 11 0M16 11a3 3 0 1 0 0-6"
                                "M18 20a5.5 5.5 0 0 0-3-4.9"),
     ("/characters", "Characters", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20.5a7.5 7.5 0 0 1 15 0"),
     ("/settings", "Settings", "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7 7 0 0 1-2 1.2L14.8"
                               " 21h-4l-.3-2a7 7 0 0 1-2-1.2l-1.9.7-2-3.4 1.6-1.2a7 7 0 0 1 0-2.4L4.6 9.3l2-3.4 1.9.7a7 7"
                               " 0 0 1 2-1.2L10.8 3h4l.3 2a7 7 0 0 1 2 1.2l1.9-.7 2 3.4-1.6 1.2a7 7 0 0 1 0 2.4z"),
-    ("/feedback", "Feedback", "M4 5h16v11H9l-5 4z"),
 )
+FEEDBACK = ("<a class='side-fb' href='/feedback' title='Feedback'>" + _svg("M4 5h16v11H9l-5 4z") + "<span>Feedback</span></a>")
 BACK_ICON = ("<button type='button' class='side-back' hidden aria-label='Go back' title='Go back' "
              "onclick='history.back()'>" + _svg("M15 5l-7 7 7 7") + "<span>Back</span></button>"
              "<script>(function(){var b=document.currentScript.previousElementSibling;"
@@ -76,7 +76,7 @@ BACK_ICON = ("<button type='button' class='side-back' hidden aria-label='Go back
 # the place the page belongs to, lit in the side bar
 SIDE_JS = ("<script>(function(){var p=location.pathname,best=null;document.querySelectorAll('.side-nav a').forEach("
            "function(a){var h=a.getAttribute('href');if(p===h||(h!=='/'&&p.indexOf(h)===0)){best=a}});"
-           "if(!best&&(p.indexOf('/view/')===0||p.indexOf('/boss')===0||p.indexOf('/job/')===0))"
+           "if(!best&&(p.indexOf('/view/')===0||p.indexOf('/boss')===0||p.indexOf('/job/')===0||p.indexOf('/raid/')===0))"
            "best=document.querySelector(\".side-nav a[href='/']\");if(best){best.classList.add('on');"
            "best.setAttribute('aria-current','page')}})();</script>")
 
@@ -89,7 +89,7 @@ def sidebar(extra: str = "", who: str = "", foot: str = "") -> str:
     return (f"<aside class='side'><div class='side-top'><a class='brand' href='/'>prep-a-<b>fight</b></a>"
             f"{BACK_ICON}</div><nav class='side-nav' aria-label='The app'>{links}</nav>"
             + (f"<div class='side-extra'>{extra}</div>" if extra else "")
-            + f"<div class='side-foot'>{foot}{who}</div></aside>{SIDE_JS}")
+            + f"<div class='side-foot'>{FEEDBACK}{foot}{who}</div></aside>{SIDE_JS}")
 
 
 # the game's class colors: the app takes the active character's (accent, its soft background, the header's stripe)

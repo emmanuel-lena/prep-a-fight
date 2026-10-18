@@ -107,15 +107,20 @@ def _character() -> str:
             f"<small>{e(c.spec.title())} {e(c.class_name.title())}</small></span></a>")
 
 
+def cards(cmds: tuple[str, ...] | list[str], target: str = "") -> str:
+    """The tools' cards, each a link to its page; `target` for a page shown in a frame (the sheet)."""
+    tgt = f" target='{target}'" if target else ""
+    return "<div class='ws-cards'>" + "".join(
+        f"<a class='ws-card' href='/tool/{t.cmd}'{tgt}>{_icon(t.icon, 'ws-ic')}<span class='ws-txt'><b>{e(t.title)}</b>"
+        f"<span class='ws-q'>{e(t.question)}</span><span class='ws-meta'><span class='pill'>~{e(t.minutes)} min</span>"
+        + ("<span class='pill gold'>after a prep</span>" if t.needs_prep else "") + "</span></span></a>"
+        for c in cmds if (t := BY_CMD.get(c))) + "</div>"
+
+
 def index() -> str:
     groups = ""
     for gid, title in GROUPS:
-        cards = "".join(
-            f"<a class='ws-card' href='/tool/{t.cmd}'>{_icon(t.icon, 'ws-ic')}<span class='ws-txt'><b>{e(t.title)}</b>"
-            f"<span class='ws-q'>{e(t.question)}</span><span class='ws-meta'><span class='pill'>~{e(t.minutes)} min</span>"
-            + ("<span class='pill gold'>after a prep</span>" if t.needs_prep else "") + "</span></span></a>"
-            for t in TOOLS if t.group == gid)
-        groups += f"<h2>{e(title)}</h2><div class='ws-cards'>{cards}</div>"
+        groups += f"<h2>{e(title)}</h2>{cards([t.cmd for t in TOOLS if t.group == gid])}"
     from paf.webtools import raw_index
 
     return (f"<div class='ws'><header class='ws-head'><div><h1>Tools</h1><p class='lead'>Each tool answers one "

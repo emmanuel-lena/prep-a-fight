@@ -899,6 +899,27 @@ if(n.dataset.ready!==s.dataset.ready||!n.classList.contains('on')){location.relo
 s.replaceWith(n);s=n}).catch(function(){})},8000)})();</script>"""
 
 
+def reclear_page() -> str:
+    """After a raid night (issue #24): the character's last log read against the top players of the spec, boss by
+    boss (paf.lastraid), then the tools that dig into one log."""
+    from paf import characters, lastraid, workshop
+
+    slug = characters.current_slug()
+    card = lastraid.card(slug) if slug else ""
+    if card:
+        last = card + lastraid.CARD_JS
+    else:
+        last = ("<section class='rc-empty'><h2>No raid read yet</h2><p>Each time it starts, the app reads your "
+                "character's latest log of the current raid and shows here what cost you the most on each boss. "
+                "Raid with your character logged on Warcraft Logs, then come back.</p>"
+                "<form method='post' action='/lastraid/again'><button class='btn'>Look for my last raid now</button>"
+                "</form></section>")
+    return (f"<div class='rc'><header class='rc-head'><h1>Reclear</h1><p class='lead'>Your last raid, read against "
+            f"the top players of your spec: what cost you the most, boss by boss, and where to look in the log.</p>"
+            f"</header>{last}<h2>Dig deeper into a log</h2>"
+            f"{workshop.cards(('rotation', 'diff', 'wipe', 'night', 'review', 'comp'))}</div>{workshop.CSS}")
+
+
 def raid_prepare_page(difficulty: str) -> bytes:
     """Before the whole raid is queued: the bosses to prepare, those already prepared this week, how long until
     every boss has its sheet (the quota shared), and the button."""
@@ -1632,6 +1653,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(queue_strip(settings.get("difficulty")).encode(), ctype="text/html; charset=utf-8")
             elif url.path == "/boss":
                 self._send(boss_page(q.get("boss", ""), q.get("difficulty", settings.get("difficulty"))))
+            elif url.path == "/reclear":
+                self._send(page("Reclear", reclear_page()))
             elif url.path == "/tools":
                 from paf import workshop
 
@@ -1876,7 +1899,7 @@ class Handler(BaseHTTPRequestHandler):
                 from paf import characters, lastraid
 
                 lastraid.again(characters.current_slug())
-                self._redirect("/#lastraid")
+                self._redirect("/reclear")
             elif self.path == "/character/autologs":
                 from paf import lastraid
 
