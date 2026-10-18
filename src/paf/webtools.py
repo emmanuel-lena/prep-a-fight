@@ -252,7 +252,8 @@ autocomplete="off">
 <h2>Status</h2><div class="card"><table class="status">
 <tr><td>SimulationCraft</td><td class="small"><div class="val"><span>{simc}</span>
 <form method="post" action="/tool/setup">
-<button class="btn ghost" title="Downloads the latest SimulationCraft nightly into the app; a build of your own stays where it is">Get nightly</button></form></div></td></tr>
+<button class="btn ghost" title="Downloads the latest SimulationCraft nightly into the app; a build of your own
+stays where it is">Get nightly</button></form></div></td></tr>
 <tr><td>prep-a-fight</td><td class="small"><div class="val"><span>version {e(__version__)}</span>
 <form method="post" action="/update/check"><button class="btn ghost">Check for updates</button></form></div></td></tr>
 <tr><td>Warcraft Logs</td><td class="small">{quota}</td></tr>
