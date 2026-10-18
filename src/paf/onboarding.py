@@ -109,7 +109,7 @@ def page_body() -> str:
     keep_char_wcl = ("<button class='btn ghost save-alt' hidden>Find this one instead</button>"
                      + keep.format("Keep this character"))
     keep_guild = "<button class='btn ghost save-alt' hidden>Save changes</button>" + keep.format("Keep it")
-    summary = "; ".join(x for x in (
+    summary = "</li><li>".join(esc(x) for x in (
         ("Warcraft Logs through your account" if wcllogin.logged_in() else "Warcraft Logs through your own API key")
         if key_done else "",
         f"character {char.name}" if char else "",
@@ -135,7 +135,7 @@ def page_body() -> str:
 <ol class="ob-dots" aria-hidden="true">{''.join('<li></li>' for _ in STEPS[1:-1])}</ol>
 
 <section class="ob-step" data-step="welcome">
-<h1>Your boss, prepared in a few minutes</h1>
+<h1>Your boss, prepared on your computer</h1>
 <ul class="ob-points"><li><b>What the best players do</b> on this boss, read from their logs.</li>
 <li><b>Your character simmed on the real fight</b>, rebuilt from those logs: talents, gear, cooldowns.</li>
 <li><b>One sheet</b>: what to change, when to press what, what to watch out for.</li></ul>
@@ -176,7 +176,7 @@ def page_body() -> str:
 
 <section class="ob-step" data-step="done">
 <h1>Ready</h1>
-{f"<p>Already set: <b>{esc(summary)}</b>.</p>" if summary else ""}
+{f"<p>Already set:</p><ul class='ob-set'><li>{summary}</li></ul>" if summary else ""}
 <p class="ob-summary muted" data-title="Guild saved" data-text="{'Everything can be changed later in Settings.' if summary else 'You can set the rest later in Settings.'}"></p>
 <div class="ob-actions"><a class="btn go finish" href="/onboard/finish">Prepare a boss &rarr;</a></div></section>
 </div>"""

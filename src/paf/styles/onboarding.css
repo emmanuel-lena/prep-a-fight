@@ -36,3 +36,5 @@ body:has(.ob:not(.story))>main{grid-column:1;display:grid;align-content:start;pa
 .ob .btn[hidden]{display:none}
 .ob-labelled label:first-child{flex:2}
 .ob-labelled label input,.ob-labelled label select{font-weight:400}
+.ob-set{margin:4px 0 12px;padding-left:20px} .ob-set li{margin:2px 0}
+.ob textarea{font-size:15px} .ob select[name=region]{min-width:120px}
