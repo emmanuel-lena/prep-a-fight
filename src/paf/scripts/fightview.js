@@ -7,7 +7,7 @@
   if (!root || typeof FV === 'undefined') return;
   var A = FV.acts, N = FV.anchors, B = FV.boss, $ = function (id) { return document.getElementById(id); };
   var LEAD = 5, NOW_FOR = 3, SAME = 1, BOUNCE = 3, QUIET = 1.5, LAST_PUSH = 30;
-  var WIN = { pull: [-5, 10], phase: [-30, 40], immune: [-30, 40], adds: [-10, 12], cast: [-10, 12] }, FIRST = [-10, 40], FAR = 30;
+  var WIN = { pull: [-5, 10], phase: [-30, 40], immune: [-30, 40], adds: [-10, 12], cast: [-10, 12] }, FIRST = 10, NEAR = 4, CARRY = 10, FAR = 30, THEN = 60;
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   var st = { cur: 0, playing: false, speed: 1, sound: false, conf: [], key: '', curRow: -1, target: -1, lastPress: -1e9,
              quietUntil: 0, userScroll: 0, last: null, ssFrom: null, sq: [], sqAt: 0, said: {} };
@@ -22,7 +22,11 @@
   /* the clock: a confirmed boss event moves every later event by the boss's delay */
   function shift(pt) {
     var s = 0, best = -1e9;
-    st.conf.forEach(function (c) { if (c.pt <= pt + 0.01 && c.pt > best) { best = c.pt; s = c.at - c.pt; } });
+    st.conf.forEach(function (c) {
+      // a confirmed phase also carries what comes just before it (a defensive for its opening hit)
+      var mine = c.pt <= pt + 0.01 || (c.big && c.pt > pt && c.pt - pt <= CARRY);
+      if (mine && c.pt > best) { best = c.pt; s = c.at - c.pt; }
+    });
     return s;
   }
   function eff(pt) { return pt + shift(pt); }
@@ -88,15 +92,19 @@
     if (!cc.g) return '';
     if (cc.state === 'far') return '';
     var n = group(t, cc.g.last);
-    if (!n) return '';
+    if (!n || n.at - t > THEN) return '';
     var c = n.acts[0].c, said = names(n);
     return 'Then ' + said + ' at ' + mmss(n.at) + (c && said.indexOf(c.replace(/^on (the )?/, '')) < 0 ? ' · ' + c : '');
   }
 
   /* the boss line: what is running now (adds alive, the boss immune, Bloodlust) or was just cast */
   function bossNow(t) {
-    var on = B.filter(function (b) { var e = eff(b.t); return b.k !== 'move' && !gone(b.t) && e <= t && t < until(b); });
-    return on.length ? on.map(function (b) { return b.n; }).join('; ') : '—';
+    var on = B.filter(function (b) { var e = eff(b.t); return !gone(b.t) && e <= t && t < until(b); });
+    return on.length ? on.map(function (b) {
+      if (b.k === 'move') return 'Moving until ' + mmss(until(b));
+      if (b.k === 'immune') return 'Boss immune, back in ' + secs(until(b) - t);
+      return b.n;
+    }).join('; ') : '—';
   }
   function title(t, cc) {
     if (t < 0) return 'Before the pull';
@@ -120,17 +128,24 @@
   function nextAnchor(t) { for (var i = 0; i < N.length; i++) if (N[i].k !== 'pull' && !gone(N[i].t) && eff(N[i].t) > t) return i; return -1; }
 
   /* the boss event a press now confirms: a phase start first (they move with the boss's health), else the closest */
+  /* the boss event a press now confirms: the pull while nothing is confirmed yet; a phase start when it is close and
+     no other boss event is within a few seconds (phases follow the boss's health); otherwise the closest event */
   function syncTarget(t) {
-    var best = -1, bd = 1e9, phase = false, past = lastPt();
+    var past = lastPt(), c = [];
     N.forEach(function (a, i) {
       if (confirmed(i) || a.t < past || gone(a.t)) return;
-      var w = WIN[a.k] || WIN.cast, d = t - eff(a.t), big = (a.k === 'phase' || a.k === 'immune') && d >= FIRST[0] && d <= FIRST[1];
-      if (d < w[0] || d > w[1]) return;
-      if (big && !phase) { phase = true; bd = 1e9; }
-      if (phase && !big) return;
-      if (Math.abs(d) < bd) { bd = Math.abs(d); best = i; }
+      var w = WIN[a.k] || WIN.cast, d = t - eff(a.t);
+      if (d >= w[0] && d <= w[1]) c.push({ i: i, d: d, k: a.k });
     });
-    return best;
+    if (!c.length) return -1;
+    var pull = c.filter(function (x) { return x.k === 'pull'; })[0];
+    if (pull && !st.conf.length && t < 10) return pull.i;
+    var big = function (x) { return x.k === 'phase' || x.k === 'immune'; };
+    var near = c.some(function (x) { return !big(x) && x.k !== 'pull' && Math.abs(x.d) <= NEAR; });
+    var ph = c.filter(function (x) { return big(x) && Math.abs(x.d) <= FIRST; }).sort(function (a, b) { return Math.abs(a.d) - Math.abs(b.d); })[0];
+    if (ph && !near) return ph.i;
+    c.sort(function (a, b) { return Math.abs(a.d) - Math.abs(b.d); });
+    return c[0].i;
   }
 
   /* the screen reader hears what the voice says: one write every 1.5 s at most, never the same line twice in 4 s */
@@ -148,7 +163,7 @@
     if (!st.sq.length) return;
     var wait = st.sqAt + 1500 - performance.now();
     if (wait > 0) { clearTimeout(st.sqT); st.sqT = setTimeout(flush, wait); return; }
-    $('sr').textContent = st.sq.splice(0).join('. ');
+    $('sr').textContent = st.sq.splice(0).map(function (s) { return s.replace(/[.\s]+$/, ''); }).join('. ') + '.';
     st.sqAt = performance.now();
   }
   function beep() {
@@ -186,11 +201,10 @@
       b.hidden = hide;
       if (!hide) {
         txt(b.firstChild, N[st.target].n + ' started? Press');
-        b.setAttribute('aria-label', 'Confirm ' + N[st.target].n + ' started now (Control Shift Space)');
+        b.setAttribute('aria-label', N[st.target].n + ' started? Press Control Shift Space');
       }
     });
-    if (st.target >= 0 && st.target !== st.saidTarget && st.playing) say('Control Shift Space confirms ' + N[st.target].n + '.');
-    st.saidTarget = st.target;
+    if (st.target >= 0 && !st.saidKeys && st.playing) { say('Control Shift Space confirms a boss event when it starts.'); st.saidKeys = true; }
     if (cc.key !== st.key && performance.now() >= st.quietUntil) {
       if (st.playing && cc.say) { say(cc.say, true); if (cc.state === 'go') beep(); }
       st.key = cc.key;
@@ -265,9 +279,9 @@
   }
   function pullTimer() {
     if (st.playing) { say('The fight is running: pause or wipe first.'); return; }
-    st.cur = -10; st.conf = []; st.key = ''; setPlay(true, true); say('Pull in 10 seconds.');
+    st.cur = -10; st.conf = []; st.key = ''; st.saidKeys = false; setPlay(true, true); say('Pull in 10 seconds.');
   }
-  function wipe() { setPlay(false, true); st.cur = 0; st.conf = []; st.key = ''; render(); say('Wipe: back to the pull.'); }
+  function wipe() { setPlay(false, true); st.cur = 0; st.conf = []; st.key = ''; st.saidKeys = false; render(); say('Wipe: back to the pull.'); }
 
   /* "it starts now": exactly the boss event the button names */
   function sync() {
@@ -278,7 +292,9 @@
     if (i < 0) { say('Nothing to confirm right now.', true); return; }
     var a = N[i], late = Math.round(st.cur - a.t);
     st.conf = st.conf.filter(function (c) { return c.pt < a.t; });  // what came after it is timed from it now
-    st.conf.push({ i: i, pt: a.t, at: st.cur, big: a.k === 'phase' || a.k === 'immune' });
+    N.forEach(function (b, j) {  // the boss events at the same time are confirmed with it
+      if (Math.abs(b.t - a.t) <= 1) st.conf.push({ i: j, pt: b.t, at: st.cur + (b.t - a.t), big: b.k === 'phase' || b.k === 'immune' });
+    });
     st.lastPress = now; st.quietUntil = now + QUIET * 1000; st.key = '';
     var how = Math.abs(late) <= 2 ? 'on time' : 'boss ' + Math.abs(late) + ' s ' + (late > 0 ? 'behind' : 'ahead of') + ' the plan';
     say(a.n + ' confirmed, ' + how + '.', true);
