@@ -288,13 +288,31 @@ def aim_html(d) -> str:
         tiles.append(("On a training dummy", _k(d.patchwerk_dps),
                       f"DPS: this fight costs you {1 - d.sim_dps / d.patchwerk_dps:.0%}" if d.sim_dps < d.patchwerk_dps
                       else "DPS: this fight gives you more than a dummy"))
-    p = getattr(d, "your_profile", None)
+    p = _profile(d)
     if p is not None and getattr(p, "boss_dps", None):
         tiles.append((f"The best {e(d.spec)}", _k(p.boss_dps), f"boss DPS, {_k(p.dps)} in all (median of the top "
                                                               f"100, their own gear)"))
     cells = "".join(f"<div class='kpi'><div class='l'>{lab}</div><div class='v'>{val}</div><div class='s'>{sub}</div>"
                     "</div>" for lab, val, sub in tiles)
-    return f"<div class='aim rv'>{cells}</div>"
+    note = ""
+    if overshoot(d):  # the sim's total above what the best really do: said beside the figure, with your own log
+        best = ((getattr(d, "specs", None) or {}).get("kills") or {}).get("best")
+        note = (f"<p class='aim-note small'>SimC's area damage hits every add in range: its total runs above real logs "
+                f"(the top 100 do {_k(p.dps)} in all). Trust the boss figure and the gaps between plans more than this "
+                f"total.{f' Your best kill here: {_k(best)} in all.' if best else ''}</p>")
+    return f"<div class='aim rv'>{cells}</div>{note}"
+
+
+def _profile(d):
+    """Your spec's total vs boss DPS rankings on this boss (read with your raid's log)."""
+    raid = getattr(d, "raid", None)
+    return getattr(d, "your_profile", None) or (getattr(raid, "your_profile", None) if raid else None)
+
+
+def overshoot(d) -> bool:
+    """The sim's total DPS on this fight above the top players' real median: the adds count more in SimC."""
+    p = _profile(d)
+    return bool(p is not None and getattr(p, "dps", None) and d.sim_dps and d.sim_dps > 1.05 * p.dps)
 
 
 def spec_role(s: dict) -> str:
@@ -357,7 +375,8 @@ def confidence_pill(d) -> str:
     med = d.validation[1]
     gap = abs(med - 1)
     level = "high" if gap <= 0.05 else "medium" if gap <= 0.12 else "low"
-    say = {"high": "the sim matches the damage the best players really did: trust the numbers.",
+    say = {"high": "the sim matches the damage the best players really did: trust the numbers"
+                   + (", the boss ones first (see the total above)." if overshoot(d) else "."),
            "medium": f"the sim does {med:.0%} of the damage the best players really did: trust which option wins "
                      f"more than the exact %.",
            "low": f"the sim does {med:.0%} of the damage the best players really did: read the numbers as hints."}[level]

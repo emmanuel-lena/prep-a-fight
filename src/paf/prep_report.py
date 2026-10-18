@@ -108,7 +108,7 @@ class PrepData:
     export: dict[str, str] = field(default_factory=dict)  # plan label ('' = fight only) -> simc lines (Raidbots)
 
 
-PALETTE = ["#c89933", "#8e6a9b", "#4f8a8b", "#d0705a", "#b8ad3c", "#b0577f", "#3f6fa0", "#6c9a5b", "#74526c"]
+PALETTE = ["#c89933", "#8e6a9b", "#4f8a8b", "#5b8fb0", "#b8ad3c", "#b0577f", "#3f6fa0", "#6c9a5b", "#74526c"]
 
 
 def _key(label: str) -> str:
@@ -163,7 +163,7 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
         fight_row.append(f'<rect x="{x(w.start)}" y="{y}" width="{w.duration * px:.1f}" height="16" fill="#868e96" '
                          f'opacity="0.4"><title>boss away</title></rect>')
     if fight.lust_time is not None:
-        fight_row.append(f'<rect x="{x(fight.lust_time)}" y="{y - 2}" width="{40 * px:.1f}" height="3" fill="#b0577f">'
+        fight_row.append(f'<rect x="{x(fight.lust_time)}" y="{y - 2}" width="{40 * px:.1f}" height="3" fill="#c2410c">'
                          f'<title>Bloodlust {_mmss(fight.lust_time)}</title></rect>')
     rows.append("".join(fight_row))
     y += 26
@@ -204,7 +204,7 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
             + (" Green: add waves." if fight.add_waves else "")
             + (" Gold: boss vulnerability windows (x = damage taken)." if fight.vulnerable else "")
             + (" Grey: boss away." if fight.invulnerable else "")
-            + (" Pink line: Bloodlust." if fight.lust_time is not None else "")
+            + (" Orange line: Bloodlust." if fight.lust_time is not None else "")
             + (" Dashed lines: stage changes." if phases and len(phases) > 1 else "")
             + (" A press before the pull is drawn at 0:00." if any(t < 0.5 for t, _l in plan.timeline) else "") + "</p>")
 
@@ -234,12 +234,14 @@ def rule_phrase(d: PrepData, rule: str) -> str:
     import re
 
     vuln, units = burst_names(d)
+    waves = ", ".join(dict.fromkeys(re.sub(r"\s*\([^)]*\)", "", w.name).strip() or "adds"
+                                    for w in (d.fight.add_waves if d.fight is not None else [])))
     m = re.fullmatch(r"hold_(adds|vulnerable)_(\d+)", rule)
     if m:
         what = "the next add wave" if m.group(1) == "adds" else (vuln or "the damage amp")
         return f"keep for {what} if it comes within {m.group(2)} s, otherwise use it"
     return {"default": "as SimC's default priority list", "on_cooldown": "the moment it is ready (the default list can wait some seconds)",
-            "add_waves": "only on add waves", "secondary_targets": f"only on {units or 'the secondary targets'}",
+            "add_waves": f"only on add waves{f' ({waves})' if waves else ''}", "secondary_targets": f"only on {units or 'the secondary targets'}",
             "vulnerable_windows": f"only during {vuln or 'the damage amp'}", "lust_pi": "with Bloodlust",
             "not_before_move": "not in the 4 s before moving"}.get(rule, rule.replace("_", " "))
 
@@ -730,7 +732,7 @@ def defensives_html(d: PrepData) -> str:
         f"<tr><td class='n'>{_mmss(m.time)}</td><td>{m.share:.0%}</td><td>"
         + ", ".join(f"{icons.img(d.icons.get(n, ''), 'small')}{link(n, f'spell={sid}')} "
                     f"<span class='muted small'>{s:.0%}</span>" for n, sid, s in m.spells)
-        + f"</td><td>{link(m.boss_ability, f'spell={m.boss_spell_id}') + cast_note(m) if m.boss_ability else '<span class=muted>-</span>'}"
+        + f"</td><td>{link(m.boss_ability, f'spell={m.boss_spell_id}') + cast_note(m) if m.boss_ability else '<span class=muted>no boss cast close by</span>'}"
         + "</td></tr>" for m in df.moments)
     table = (f"<div class='scroll'><table><tr><th>When</th><th>Top players</th><th>Defensive</th><th>The boss "
              f"ability it answers</th></tr>{rows}</table></div>") if df.moments else (
@@ -1139,7 +1141,7 @@ and the gear for that.</p></div>""")
             cells = ""
             for f in tc.fights:
                 tot, boss = r.per_fight.get(f, (None, None))
-                cells += f"<td class='n'>{_pct(tot, err=tc.error)}{'<br><span class=small>boss ' + _pct(boss, 1, err=2 * tc.error) + '</span>' if boss is not None else ''}</td>"
+                cells += f"<td class='n'>{_pct(tot, err=tc.error)}{'<br><span class=small>on the boss ' + _pct(boss, 1, err=2 * tc.error) + '</span>' if boss is not None else ''}</td>"
             both = set(r.add) & set(r.drop)
             add = [t for t in dict.fromkeys(r.add) if t not in both]
             drop = [t for t in dict.fromkeys(r.drop) if t not in both]

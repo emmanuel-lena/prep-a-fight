@@ -373,9 +373,10 @@
       if (N.some(function (a) { return a.n === b.n && Math.abs(a.t - b.t) <= 1; })) return;
       out.push(bar(e, t, 'boss', b.ic || '', 'Boss', b.n));
     });
+    if (FV.end - t > 0.5 && FV.end - t <= 60) out.push(bar(FV.end, t, 'boss', '', 'Boss', 'The kill, around ' + mmss(FV.end)));
     out.sort(function (a, b) { return a[0] - b[0]; });
     var shown = out.slice(0, 5);  // what fits above the controls; a stage change or an immunity always among them
-    var key = out.slice(5).filter(function (x) { return /Stage|Intermission|immune|Phase/i.test(x[1]); })[0];
+    var key = out.slice(5).filter(function (x) { return /Stage|Intermission|immune|Phase|The kill/i.test(x[1]); })[0];
     if (key) shown[shown.length - 1] = key;
     set($('ss-bars'), shown.map(function (x) { return x[1]; }).join('') || '<p class="pend">Nothing in the next minute: your rotation.</p>');
   }
