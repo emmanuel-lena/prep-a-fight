@@ -114,8 +114,9 @@ def moves_html(d) -> str:
                                               if (more or button) else "")
         items.append(f"<li class='rv'><span class='n'>{i}</span><div class='mv'>{body}</div>{tag}</li>")
     top = moves[0][0]
-    note = ("" if top >= 1 else "<p class='aside rv'>Your setup is already right here: the changes "
-                                "below are small.</p>")
+    note = ("" if top >= 1 else
+            "<p class='aside rv'>Your setup is already right here: the changes below are small.</p>" if top > 0 else
+            "<p class='aside rv'>Your setup is already right here: nothing below changes it.</p>")
     return f"<h2 class='rv'>What matters for you</h2>{note}<ol class='moves'>{''.join(items)}</ol>"
 
 

@@ -159,13 +159,17 @@ def nsrt_lines(d: Defensives, encounter_id: int, phases: list[tuple[str, float]]
     """The defensive moments as NSRT reminders (the most used defensive of each moment)."""
     from paf.optimize import NSRT_UNSURE_AFTER, nsrt_phase
 
-    out = []
+    out, dropped = [], []
     for m in d.moments:
         if not m.spells:
             continue
         ph, since = nsrt_phase(encounter_id, phases, m.time)
         limit = NSRT_UNSURE_AFTER.get((encounter_id, ph))
         if ph == 0 or (limit is not None and since > limit):
+            dropped.append(f"{m.spells[0][0]} {int(m.time // 60)}:{int(m.time % 60):02d}")
             continue
         out.append(f"time:{since:.1f};ph:{ph:g};tag:{player};spellid:{m.spells[0][1]};dur:5")
+    if dropped:  # said, as for the cooldowns: never dropped in silence
+        out.append("-- prep-a-fight: defensives not placed (NSRT changes phase at a moment the logs do not give; "
+                   "see the MRT note): " + ", ".join(dropped))
     return out

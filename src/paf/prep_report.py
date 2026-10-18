@@ -439,6 +439,12 @@ def copy_button(text: str, label: str) -> str:
     return f'<button type="button" class="btn ghost copy" data-copy="{e(text)}">{e(label)}</button>'
 
 
+def simple_plan(d):
+    from paf import simple
+
+    return simple._plan(d)
+
+
 def _stall(d, p) -> str:
     """A plan that holds a cooldown and loses far more boss damage than any cooldown is worth: SimC's default rotation
     ties other spells to that cooldown, so they stop while it is held (Subtlety: Shadow Dance waits on Shadow Blades)."""
@@ -542,7 +548,10 @@ def suggestions(d: PrepData) -> list[Suggestion]:
             tag = " <span class='pill'>pick one: see Your raid</span>"
         elif costly(p):
             tag = " <span class='pill'>only if your raid needs it dead fast</span>"
-        out.append(Suggestion("info" if costly(p) else _severity(p.gain), f"Cooldown plan <b>{e(goal)}</b>{tag}", lines, p.gain,
+        played = want is not None and p.objective == want
+        sev = "info" if costly(p) else "alt" if (want is not None and not played and p.objective in ("boss", "total")) \
+            else _severity(p.gain)  # a plan the sheet does not play is an alternative, whatever its size
+        out.append(Suggestion(sev, f"Cooldown plan <b>{e(goal)}</b>{tag}", lines, p.gain,
                               d.icons.get(first, ""), {"boss": "boss damage", "total": "total damage",
                                                        "secondary": "burst damage"}.get(p.objective, "")))
     if d.gear:
@@ -561,8 +570,12 @@ def suggestions(d: PrepData) -> list[Suggestion]:
             and a.in_units - a.units_cover > 0.1]
     if held:
         vuln, units = burst_names(d)
+        played = simple_plan(d)
+        rules = {cd_name(d, k): rule_phrase(d, r.name) for k, r in (played.choice.items() if played else [])}
+        said = [f"Your plan: {a.ability} {rules[a.ability]} (SimC finds it worth more that way for your character)."
+                for a in held if a.ability in rules and "only on" not in rules[a.ability].replace("only on add", "")]
         out.append(Suggestion("info", "The top players keep " + ", ".join(lk(a.ability) for a in held) + " for "
-                              + e(" / ".join(x for x in (vuln, units) if x) or "the burst windows"), [],
+                              + e(" / ".join(x for x in (vuln, units) if x) or "the burst windows"), [e(s) for s in said],
                               None, ic(held[0].ability)))
     order = {"info": 0}
     # your raid's verdict first, then the gains, biggest first, the situational ones last
@@ -683,7 +696,8 @@ def nsrt_block(note: str) -> str:
 def suggestions_html(d: PrepData) -> str:
     rows = []
     for s in suggestions(d):
-        label = {"major": "Major", "moderate": "Moderate", "minor": "Minor", "info": "Info"}[s.severity]
+        label = {"major": "Major", "moderate": "Moderate", "minor": "Minor", "info": "Info",
+                 "alt": "Alternative"}[s.severity]
         if s.severity == "info" and s.gain is not None:  # a gain only for some raids (a burst they may not need)
             label = "Situational"
         unit = f"<small>{e(s.metric)}</small>" if s.metric else ""
@@ -1008,8 +1022,9 @@ for reference: a build can be worse there and much better on this fight. Error a
             if p.flags:
                 checks += "<ul class='small'>" + "".join(f"<li class='warn'>&#9888; {e(re.sub(r'[-+]0[.]0%', 'about 0%', f))}</li>"
                                                          for f in p.flags) + "</ul>"
-            blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, err=1e9 if p.objective == "secondary" or _stall(d, p) else 0.0)}{" <span class='pill gold'>the sheet plays this plan</span>" if p.objective == first else ""}
-<span class="small muted">vs the default priority list{'; ' + others if others else ''}</span></h3>
+            blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, err=1e9 if p.objective == "secondary" or _stall(d, p) else 0.0)}
+<span class="small muted">vs the default priority list{'; ' + others if others else ''}</span>{" <span class='pill gold'>the sheet plays this plan</span>" if p.objective == first else ""}</h3>
+{("<p class='small'>Played because " + ("your raid pads the adds" if p.objective == "total" else "your raid stays on the boss" if p.objective == "boss" else "it is your choice") + " (see Your raid, in this section).</p>") if p.objective == first and p.objective in ("boss", "total") else ""}
 {"<p class='small muted'>Burst damage counts only the damage on " + e(burst_names(d)[1] or "the burst targets") + ": worth it only if your raid needs them dead fast" + ("." if _stall(d, p) else ", at the cost of the boss and total damage above.") + "</p>" if p.objective == "secondary" else ""}
 {checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases)}
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
