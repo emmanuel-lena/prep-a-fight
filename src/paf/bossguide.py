@@ -49,6 +49,7 @@ def modernize(html: str) -> str:
                r'<section class="card stage"><h3>\1</h3>\2</section>', h, flags=re.S)
     h = re.sub(r"(<div class=\"unit\" style=\"[^\"]*\">)([^<]*) <span class='muted small clamp'>(.*?)</span></div>",
                r"\1\2</div><p class='small muted unit-d'>\3</p>", h, flags=re.S)
+    h = re.sub(r'class="pill gold">(deadly|interrupt)', r'class="pill warn">\1', h)
     h = re.sub(r"<h3>What you do \(([^)]*)\)</h3>", r"<h3>What the journal tells \1</h3>", h)
     return readable(h)
 

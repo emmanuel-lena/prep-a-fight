@@ -222,3 +222,6 @@ textarea[name=plan],textarea[name=notes]{font-family:var(--font-data);font-size:
 /* the journal flows ability by ability across two columns (a stage's card continues in the next column) */
 @media (min-width:1300px){.boss-journal .stage{break-inside:auto;-webkit-box-decoration-break:clone;box-decoration-break:clone}
   .boss-journal .ab,.boss-journal .unit,.boss-journal .unit-d{break-inside:avoid} .boss-journal .stage>h3{break-after:avoid}}
+.boss-journal .stages{display:grid!important;grid-template-columns:minmax(0,1fr)!important;column-count:auto!important;gap:16px}
+@media (min-width:1100px){.boss-journal .stage{column-count:2;column-gap:32px}
+  .boss-journal .stage>h3{column-span:all} .boss-journal .unit{break-after:avoid} .boss-journal .ab,.boss-journal .unit,.boss-journal .unit-d{break-inside:avoid}}

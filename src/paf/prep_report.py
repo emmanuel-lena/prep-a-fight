@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -363,9 +364,8 @@ def raid_section(r: RaidInfo) -> str:
     rows = "".join(
         f"<tr><td>{e(v.add.name)}</td><td class='n'>{v.without_you:.0%}</td><td class='n'>{v.with_you:.0%}</td>"
         f"<td class='n'>{v.low:.0%}</td><td><b>{'boss' if v.verdict == 'boss' else 'pad'}</b>: "
-        f"{e(raidneed.readable(v.reason))}</td></tr>" for v in r.verdicts)
-    import re
-
+        f"{e(re.sub(r'^(pad them|stay on the boss)[:,] *', '', raidneed.readable(v.reason)))}</td></tr>"
+        for v in r.verdicts)
     groups = "".join(f"<li><b>{e(k)}</b> ({len(ps)}): {e(re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', ', '.join(ps)))}</li>"
                      for k, ps in r.archetypes.items() if ps)
     verdict = ("Stay on the boss: the cooldown plan and the gear below are the ones for boss damage." if r.objective
@@ -900,7 +900,7 @@ for reference: a build can be worse there and much better on this fight. Error a
             rules = "".join(f"<tr><td>{icons.img(d.icons.get(k, ''), 'small')} {link(cd_name(d, k), d.links.get(k))}</td>"
                             f"<td>{e(rule_phrase(d, r.name))}</td></tr>"
                             for k, r in changed.items()) or "<tr><td colspan=2>the default priority list</td></tr>"
-            others = ", ".join(f"{o} {_pct(v, 1)}" for o, v in p.totals.items() if o != p.objective)
+            others = ", ".join(f"{_goal(o)} {_pct(v, 1)}" for o, v in p.totals.items() if o != p.objective)
             steps = ""
             if p.timeline and d.fight is not None:
                 from paf.optimize import fight_context
@@ -916,7 +916,7 @@ for reference: a build can be worse there and much better on this fight. Error a
                            + (" &rarr; <b>robust</b>" if p.robust else " &rarr; <b>not robust</b>") + "</p>")
             if p.flags:
                 checks += "<ul class='small'>" + "".join(f"<li class='warn'>&#9888; {e(f)}</li>" for f in p.flags) + "</ul>"
-            blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain)}
+            blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, err=1e9 if p.objective == "secondary" else 0.0)}
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span></h3>
 {checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names)}
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
