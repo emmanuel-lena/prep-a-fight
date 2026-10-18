@@ -119,11 +119,29 @@ def index() -> str:
             f"</header>{groups}</div>{CSS}")
 
 
+def _prepared_ids(encounters: list) -> set:
+    """The bosses with a prep sheet of your spec at your difficulty (the data a tool reads)."""
+    try:
+        from paf import settings
+        from paf.corpus.template import _slug
+        from paf.web import prepared
+
+        mine = f"{settings.get('spec')}-{settings.get('class')}".lower().replace(" ", "-")
+        keys = {x["key"] for x in prepared() if "prep" in x["files"]}
+        diff = settings.get("difficulty")
+        return {x.id for x in encounters if f"{_slug(x.name)}-{diff}-{mine}" in keys}
+    except Exception:  # noqa: BLE001 - no data: no marks
+        return set()
+
+
 def _boss_select(encounters: list, optional: str = "", last: bool = False) -> str:
     """The raid's bosses; `optional` an empty choice, first (every boss) or `last` (the training dummy: the real fight
     comes first, it is the point of the app)."""
     extra = f"<option value=''>{e(optional)}</option>" if optional else ""
-    opts = "".join(f"<option value='{x.id}'>{e(x.name)}</option>" for x in encounters)
+    ready = _prepared_ids(encounters)  # the bosses with a sheet: said, and the first of them picked
+    first = next((x.id for x in encounters if x.id in ready), None) if not optional else None
+    opts = "".join(f"<option value='{x.id}'{' selected' if x.id == first else ''}>{e(x.name)}"
+                   f"{' · prepared' if x.id in ready else ''}</option>" for x in encounters)
     body = opts + extra if last else extra + opts
     return f"<label class='ws-f'><span>Boss</span><select name='boss' class='big'>{body}</select></label>"
 

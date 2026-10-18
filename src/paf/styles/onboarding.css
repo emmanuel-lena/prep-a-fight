@@ -29,3 +29,5 @@ body.has-side:has(.ob:not(.story)){grid-template-columns:minmax(0,1fr)} body:has
 body:has(.ob:not(.story))>main{grid-column:1;display:grid;align-content:center;min-height:100vh}
 .ob .btn:focus:not(:focus-visible){outline:none} .ob-actions .btn{min-height:46px}
 .ob-brand{font:600 18px var(--font-display);margin:0 0 18px;color:var(--fg)} .ob-brand b{color:var(--accent)}
+.ob-note{margin-top:14px} .ob-actions .btn{box-sizing:border-box;height:46px} /* notes off the controls; buttons one height */
+.what-sim{border:1px solid var(--line);border-radius:10px;padding:8px 14px 10px;margin:12px 0 0} .what-sim legend{font-weight:600;padding:0 6px}

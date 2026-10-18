@@ -253,7 +253,7 @@ def text(sh: dict, difficulty: str, mrt: bool = False) -> str:
 def _tools() -> str:
     from paf import workshop
 
-    return (f"<h2>Dig deeper</h2>{workshop.cards(('review', 'comp', 'raid', 'night', 'assigns', 'mechanics'))}"
+    return (f"<h2>Dig deeper into a log</h2>{workshop.cards(('review', 'comp', 'raid', 'night', 'assigns', 'mechanics'))}"
             f"{workshop.CSS}")
 
 

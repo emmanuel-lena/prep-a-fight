@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import html
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -529,7 +530,8 @@ def boss_cards(items: list[dict], limit: int = 6) -> str:
         ic = icons.img(icons.CLASS_ICON.format(cls=cls), "medium", "bc-ic") if cls else ""
         return (f'<a class="bcard" href="/view/{e(x["key"])}">{ic}<span class="bc-txt"><b>{e(x["name"])}</b>'
                 f'<span class="bc-meta">{diff_pill(x["difficulty"])}'
-                f' {e(x["spec"] or "")}</span></span><span class="bc-when">{ago(x["mtime"])}</span></a>')
+                f' {e(x["spec"] or "")}{"" if "prep" in x["files"] else " · top players&#39; timelines only"}</span></span>'
+                f'<span class="bc-when">{ago(x["mtime"])}</span></a>')
     head = "".join(card(x) for x in items[:limit])
     rest = items[limit:]
     more = (f'<details class="bc-more" open><summary>{len(rest)} more</summary><div class="bcards">'
@@ -553,9 +555,14 @@ def view_page(key: str, tab: str) -> bytes:
         for k, label in TABS if k in item["files"])
     def spec_of(x: dict) -> str:  # "subtlety-rogue" in the key: two sheets of a boss told apart
         return x["key"].partition(f'-{x["difficulty"]}-')[2].replace("-", " ").title()
-    others = "".join(f'<option value="/view/{e(x["key"])}"{" selected" if x["key"] == key else ""}>'
-                     f'{e(x["name"])} · {e(x["difficulty"][:1].upper())} · {e(spec_of(x))}</option>'
-                     for x in sorted(prepared(), key=lambda x: (x["name"], x["difficulty"], x["key"])))
+    groups: dict[str, list[dict]] = {}  # one group per spec, yours first: the spec is what tells sheets apart
+    for x in sorted(prepared(), key=lambda x: (x["name"], x["difficulty"])):
+        groups.setdefault(spec_of(x), []).append(x)
+    others = "".join(
+        f'<optgroup label="{e(g)}">' + "".join(
+            f'<option value="/view/{e(x["key"])}"{" selected" if x["key"] == key else ""}>'
+            f'{e(x["name"])} · {e(x["difficulty"][:1].upper())}</option>' for x in xs) + "</optgroup>"
+        for g, xs in sorted(groups.items(), key=lambda kv: (kv[0] != spec_of(item), kv[0])))
     src = f'/report/{e(item["files"][tab])}'
     boss_link = _boss_link(item)
     nav = (f'<label class="side-lab">Your sheets</label><select onchange="location=this.value" aria-label="Your sheets">'
@@ -943,12 +950,18 @@ def raid_prepare_page(difficulty: str) -> bytes:
                                               "one.</p>")
     cls, spec = settings.get("class"), settings.get("spec")
     ready = fresh_bosses(encs, difficulty, cls, spec)
+    from paf.corpus.template import _slug
+
+    sheets = {x["key"] for x in prepared() if "prep" in x["files"]}  # an older sheet: "to redo", as on Home
+    mine_key = f"{spec}-{cls}".lower().replace(" ", "-")
+    old = {x.id for x in encs if f"{_slug(x.name)}-{difficulty}-{mine_key}" in sheets}
     todo = [x for x in encs if x.id not in ready]
     diffs = "".join(f'<label class="seg"><input type="radio" name="difficulty" value="{d}"{" checked" if d == difficulty else ""} '
                     f'onchange="this.form.submit()"><span>{e(DIFF_LABELS.get(d, d))}</span></label>'
                     for d in settings.DIFFICULTIES if d != "lfr")
     rows = "".join(f"<li class='{'ok' if x.id in ready else 'todo'}'><b>{e(x.name)}</b>"
-                   f"<span>{'prepared this week' if x.id in ready else 'to prepare'}</span></li>" for x in encs)
+                   f"<span>{'prepared this week' if x.id in ready else 'to redo' if x.id in old else 'to prepare'}"
+                   "</span></li>" for x in encs)
     if not todo:
         plan = "<p class='lead'>Every boss is prepared for this week at this difficulty.</p><p><a class='btn' href='/'>Back home</a></p>"
     else:
@@ -1170,7 +1183,8 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
     except Exception:  # noqa: BLE001 - an estimate never breaks the page
         est = None
     est_html = (f"<p class='est-line'><b>{'Ready fast' if est.source != 'collect' else 'First prep'}:</b> "
-                f"{e(est.sentence)}</p>") if est else ""
+                + re.sub(r"(About [^.]*\.)$", r"<span class='nw'>\1</span>", e(est.sentence))  # never "min." alone
+                + "</p>") if est else ""
     raid_now = current_raid(enc, difficulty)
     g = settings.get("guild")
     raid_said = f"the latest public log of {g}" if g else ""
@@ -1191,7 +1205,7 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
 <small>The prep reads your raid's log: if the others already cover the adds, you stay on the boss.</small></span></label>
 </div><div class="ob-actions">{nxt}</div></section>
 <section class="ob-step" data-step="assigns"><h2>Are you assigned to something?</h2>{assigns}
-<p class="small muted">Each assignment is simulated: its moves and its downtime change your cooldown plan and your gear.</p>
+<p class="small muted ob-note">Each assignment is simulated: its moves and its downtime change your cooldown plan and your gear.</p>
 <div class="ob-actions">{back}{nxt}</div></section>
 <section class="ob-step" data-step="raid"><h2>Your raid</h2>
 <input name="raid" style="width:100%" value="{e(raid_now)}"
@@ -1207,13 +1221,12 @@ placeholder="Link to one of your raid's logs: https://www.warcraftlogs.com/repor
 <li data-if="raid">Your raid: <b class="recap-raid"></b></li>
 <li data-if="no-raid">Your raid: <b>{e(raid_said) if raid_said else "none (the prep shows both plans)"}</b></li>
 </ul>
-<details class="what-sim"><summary>What to sim</summary>
+<fieldset class="what-sim"><legend>What to sim</legend>
 <label><input type="checkbox" name="gear" checked> Best gear from your bags, and what this boss drops for you</label>
 <label><input type="checkbox" name="optimize" checked> Ideal cooldown plan per objective
-<span class="muted small">(the slowest part: 20 to 40 min)</span></label></details>
-<p class="est-again">{e(est.sentence) if est else ""}</p>
+<span class="muted small">(the slowest part: 20 to 40 min)</span></label></fieldset>
 <div class="ob-actions">{back}<button class="btn go">Prepare this fight &rarr;</button></div>
-<p class="small muted">Runs on your computer; you can follow it live.</p></section>
+<p class="small muted ob-note">Runs on your computer; you can follow it live.</p></section>
 </form></div>
 {(f"<aside class='boss-guide'>{guide}</aside>") if guide else ""}</div>{journal}
 {_story_css()}{STORY_JS}
@@ -1407,13 +1420,13 @@ def feedback_page(jid: str = "", note: str = "") -> str:
     return f'''<h1>Send feedback</h1>{note}<p class="lead">A bug, a wrong number, an idea: it is {dest}.</p>
 <form method="post" action="/feedback" class="card"><input type="hidden" name="job" value="{e(jid)}">
 <label>Your message <textarea name="message" required placeholder="What you did, what you expected, what you got.
-Your spec and the boss help."></textarea></label>
+Your spec and the boss help us."></textarea></label>
 {f"""<label class="check-row"><input type="checkbox" name="log" checked><span> Attach the {"log of this prep" if jid else "app's log"}
 (below; your Warcraft Logs key, user folder and email addresses are removed)</span></label>""" if log.strip() else ""}
 <label class="check-row"><input type="checkbox" name="perf" checked><span> Attach performance measures: your computer's CPU,
 cores and memory, and how long each step took (nothing personal: no name, no log, no folder). They help make the app
 faster on every computer.</span></label>
-<div class="cta"><button class="btn go">Send</button></div></form>
+<div class="cta"><button class="btn go">{"Send" if feedback.endpoint() else "Open it on GitHub"}</button></div></form>
 <details class="card" open><summary>Exactly what is sent</summary><pre class="log">{e(preview[-20000:])}</pre></details>'''
 
 
