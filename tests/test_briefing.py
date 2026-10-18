@@ -41,7 +41,7 @@ def test_what_to_aim_for_comes_first_in_the_overview():
     html = briefing.aim_html(d)
     assert "You can aim for" in html and "180k" in html and "250k in all" in html
     assert "On a training dummy" in html and "this fight costs you 17%" in html
-    assert "The best Subtlety" in html and "231k" in html
+    assert "The best Subtlety" in html and "290k" in html  # the total: WCL's boss metric counts other units
     assert briefing.aim_html(SimpleNamespace(sim_dps=None)) == ""
     alone = briefing.aim_html(SimpleNamespace(sim_dps=200000.0, sim_boss_dps=None, patchwerk_dps=None, spec="Arms",
                                               your_profile=None))

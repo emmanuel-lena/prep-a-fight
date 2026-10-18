@@ -290,8 +290,8 @@ def aim_html(d) -> str:
                       else "DPS: this fight gives you more than a dummy"))
     p = _profile(d)
     if p is not None and getattr(p, "boss_dps", None):
-        tiles.append((f"The best {e(d.spec)}", _k(p.boss_dps), f"boss DPS, {_k(p.dps)} in all (median of the top "
-                                                              f"100, their own gear)"))
+        tiles.append((f"The best {e(d.spec)}", _k(p.dps), "DPS in all (median of the top 100, their own gear, as "
+                                                          "Warcraft Logs ranks them)"))  # its 'boss' counts other units
     cells = "".join(f"<div class='kpi'><div class='l'>{lab}</div><div class='v'>{val}</div><div class='s'>{sub}</div>"
                     "</div>" for lab, val, sub in tiles)
     note = ""
@@ -375,8 +375,8 @@ def confidence_pill(d) -> str:
     med = d.validation[1]
     gap = abs(med - 1)
     level = "high" if gap <= 0.05 else "medium" if gap <= 0.12 else "low"
-    say = {"high": "the sim matches the damage the best players really did: trust the numbers"
-                   + (", the boss ones first (see the total above)." if overshoot(d) else "."),
+    say = {"high": "the top players' own characters, simmed on this fight, do "
+                   f"{med:.0%} of their real damage: trust the numbers.",
            "medium": f"the sim does {med:.0%} of the damage the best players really did: trust which option wins "
                      f"more than the exact %.",
            "low": f"the sim does {med:.0%} of the damage the best players really did: read the numbers as hints."}[level]
@@ -386,6 +386,9 @@ def confidence_pill(d) -> str:
         low = int(share[1]) < int(share[2])
         say += (f" The split leans {'to the adds' if low else 'to the boss'}: SimC's default list in the top players' "
                 f"gear puts {share[1]}% of its damage on the boss, they put {share[2]}%.")
+    if overshoot(d):  # your character's total above what the best really do: the adds weigh more in SimC
+        say += (" Here SimC's area damage makes the total run high: trust the boss figures and which option wins "
+                "more than the exact total.")
     return f"<p class='trust {level} rv'><span>How much to trust this:</span> {e(say)}</p>"
 
 

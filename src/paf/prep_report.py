@@ -172,7 +172,7 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
     for _, label in plan.timeline:
         if label not in labels:
             labels.append(label)
-    for label in labels:
+    for label in sorted(labels, key=_key):  # one order for every plan's chart: compared row by row
         color = PALETTE[sum(map(ord, _key(label))) % len(PALETTE)]  # one color per cooldown, the same in every chart
         by_link = {_key(n): n for n in (links or {})}  # the game's own name of a racial or a trinket
         small = {"of", "the", "and", "a", "in", "on", "to"}  # a name's small words stay small, as the game writes them
@@ -417,7 +417,7 @@ def raid_section(r: RaidInfo, gear: bool = True) -> str:
     build = ""
     if p is not None:
         build = (f"<p class='small'>Your spec's top 100 on this boss: {p.dps / 1000:,.0f}k total DPS vs "
-                 f"{p.boss_dps / 1000:,.0f}k for the top 100 by boss DPS ({p.boss_share:.0%}); {p.same_players} players "
+                 f"{p.boss_dps / 1000:,.0f}k for the top 100 by boss DPS ({p.boss_share:.0%}, Warcraft Logs counting every boss unit as the boss); {p.same_players} players "
                  f"are in both. ")
         build += (f"The pad build takes {e(', '.join(p.pad_talents) or '-')}; the boss build takes "
                   f"{e(', '.join(p.boss_talents) or '-')}.</p>" if p.pad_talents or p.boss_talents else
@@ -728,11 +728,15 @@ def defensives_html(d: PrepData) -> str:
         near = [c for c in casts.get(m.boss_ability, []) if m.time - 8 <= c <= m.time + 12]  # its hit, around
         before = [c for c in casts.get(m.boss_ability, []) if c < m.time]
         return "" if near or not before else f" <span class='muted small'>(its damage; cast at {_mmss(max(before))})</span>"
+    def untied(m) -> str:  # no ability tied in the logs: the boss's cast just before, said as a lead, not a fact
+        lead = max(((c, n) for n, ts in d.boss_casts for c in ts if m.time - 10 <= c <= m.time), default=None)
+        return (f"<span class='muted small'>none tied in the logs ({e(lead[1])} starts at {_mmss(lead[0])})</span>"
+                if lead else "<span class='muted small'>none tied in the logs</span>")
     rows = "".join(
         f"<tr><td class='n'>{_mmss(m.time)}</td><td>{m.share:.0%}</td><td>"
         + ", ".join(f"{icons.img(d.icons.get(n, ''), 'small')}{link(n, f'spell={sid}')} "
                     f"<span class='muted small'>{s:.0%}</span>" for n, sid, s in m.spells)
-        + f"</td><td>{link(m.boss_ability, f'spell={m.boss_spell_id}') + cast_note(m) if m.boss_ability else '<span class=muted>no boss cast close by</span>'}"
+        + f"</td><td>{link(m.boss_ability, f'spell={m.boss_spell_id}') + cast_note(m) if m.boss_ability else untied(m)}"
         + "</td></tr>" for m in df.moments)
     table = (f"<div class='scroll'><table><tr><th>When</th><th>Top players</th><th>Defensive</th><th>The boss "
              f"ability it answers</th></tr>{rows}</table></div>") if df.moments else (
@@ -1141,7 +1145,7 @@ and the gear for that.</p></div>""")
             cells = ""
             for f in tc.fights:
                 tot, boss = r.per_fight.get(f, (None, None))
-                cells += f"<td class='n'>{_pct(tot, err=tc.error)}{'<br><span class=small>on the boss ' + _pct(boss, 1, err=2 * tc.error) + '</span>' if boss is not None else ''}</td>"
+                cells += f"<td class='n'>{_pct(tot, 1, err=tc.error)}{'<br><span class=small>on the boss ' + _pct(boss, 1, err=2 * tc.error) + '</span>' if boss is not None else ''}</td>"
             both = set(r.add) & set(r.drop)
             add = [t for t in dict.fromkeys(r.add) if t not in both]
             drop = [t for t in dict.fromkeys(r.drop) if t not in both]
