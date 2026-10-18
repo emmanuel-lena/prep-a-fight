@@ -185,6 +185,11 @@ def items(d) -> list[tuple[float, Item]]:
         at = next((s for s in starts if abs(s - w.start) <= 3), w.start)  # an intermission: on its phase's row
         add(at, Item("boss", "immune", "Boss immune", f"The boss is immune for {w.duration:.0f} s", IMMUNE_ICON,
                      float(w.duration)))
+    cast_names = {n for n, _ts in d.boss_casts}
+    for a in d.actions:  # a mechanic that can be you, at the times the logs give, when no boss cast already says it
+        if a.kind == "mechanic" and a.name not in cast_names:
+            for t in (getattr(d, "mech_times", None) or {}).get(a.name, []):
+                add(t, Item("boss", "mech", a.name, f"{a.name} (it can be you)", _icon(d, a.name)))
     roles = getattr(d, "ability_roles", None) or {}
     hits_you = {why.removesuffix("'s damage") for _t, _s, why in _defensives(d)}
     hits_you |= {m.boss_ability for m in (d.defensives.moments if d.defensives else []) if m.boss_ability}  # any
@@ -301,7 +306,7 @@ def _row(m: Moment, i: int, gap: float = 0.0) -> str:
     you = "".join(_ev(x, m.t) for x in m.you)
     when = "Before the pull" if m.t < 0 else ("Pull" if m.t < 1 else _mmss(m.t))
     label = f"{when}, {m.title}: show this moment"
-    quiet = not m.you and not any(x.kind in ("phase", "immune", "adds", "move", "lust", "kill") for x in m.boss)
+    quiet = not m.you and not any(x.kind in ("phase", "immune", "adds", "move", "lust", "kill", "mech") for x in m.boss)
     quiet = quiet or (not m.you and all(x.kind == "tank" for x in m.boss))
     cls = "fm quiet" if quiet else ("fm kill" if any(x.kind == "kill" for x in m.boss) else "fm")
     room = f" style='min-height:{min(110, max(0, (gap - ROW_GAP) * 2.2)) + 34:.0f}px'" if gap > ROW_GAP else ""

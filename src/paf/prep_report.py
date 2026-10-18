@@ -105,6 +105,7 @@ class PrepData:
     role_bullets: list[str] = field(default_factory=list)  # what the journal tells your role to do
     actions: list = field(default_factory=list)  # paf.actions.Action: what the top players do, from their logs
     ability_roles: dict[str, list[str]] = field(default_factory=dict)  # boss ability -> roles the journal flags
+    mech_times: dict[str, list[float]] = field(default_factory=dict)  # mechanic -> typical times (paf.assigns)
     export: dict[str, str] = field(default_factory=dict)  # plan label ('' = fight only) -> simc lines (Raidbots)
 
 
@@ -235,7 +236,8 @@ def rule_phrase(d: PrepData, rule: str) -> str:
 
     vuln, units = burst_names(d)
     waves = ", ".join(dict.fromkeys(re.sub(r"\s*\([^)]*\)", "", w.name).strip() or "adds"
-                                    for w in (d.fight.add_waves if d.fight is not None else [])))
+                                    for w in (d.fight.add_waves if d.fight is not None else []) if w.scalable))
+    # the add waves a rule is about; a boss unit played as a wave (an Echo) has its own burst plan
     m = re.fullmatch(r"hold_(adds|vulnerable)_(\d+)", rule)
     if m:
         what = "the next add wave" if m.group(1) == "adds" else (vuln or "the damage amp")
@@ -837,6 +839,18 @@ def _tools_html() -> str:
                               "mechanics"), target="_top"))
 
 
+def mech_around(html: str, d: PrepData) -> str:
+    """The journal card of a mechanic that hits players (not a boss cast) gets its times from the logs too."""
+    casts = {n for n, _ts in d.boss_casts}
+    for name, ts in (getattr(d, "mech_times", None) or {}).items():
+        if name in casts or not ts:
+            continue
+        times = ", ".join(_mmss(t) for t in ts)
+        html = re.sub(rf"(<b>{re.escape(e(name))}</b>[^<]*(?:<span[^>]*>[^<]*</span>[^<]*)*</div>)(?!<div class='small muted'>around)",
+                      lambda m, times=times: m.group(1) + f"<div class='small muted'>around {times}</div>", html, count=1)
+    return html
+
+
 def stage_times(html: str, phases: list[tuple[str, float]], duration: float) -> str:
     """The journal's 'around m:ss' timings, each stage keeping only the casts that fall in it."""
     ph = sorted(phases, key=lambda p: p[1])
@@ -1041,7 +1055,7 @@ def render(d: PrepData) -> str:
         tabs["boss"].append(defensives_html(d))
         tabs["boss"].append("<h2>Every ability, from the Encounter Journal</h2><p class='small muted'>From the in-game "
                             "Encounter Journal; timings and how many players are hit come from the ranked kills.</p>"
-                            + f"<div class='stages'>{stage_times(bossguide.modernize(d.guide_abilities, d.difficulty), d.phases, d.duration)}"
+                            + f"<div class='stages'>{stage_times(mech_around(bossguide.modernize(d.guide_abilities, d.difficulty), d), d.phases, d.duration)}"
                             "</div>")
     else:
         tabs["boss"].append(defensives_html(d))

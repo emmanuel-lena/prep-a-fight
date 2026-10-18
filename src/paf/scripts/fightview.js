@@ -112,7 +112,7 @@
     var h = holding();
     if (h && !g.owed && afterHold(g.acts[0].t) && g.acts[0].c !== 'default list timing') {
       return { key: 'wait' + h.a.t, g: g, cls: 'call fv-next', state: 'far', say: '',
-               html: '<span class="lab">' + esc(youNow(t, { state: 'far' })) + '</span><p class="pend">Next press, once ' +
+               html: '<span class="lab">' + esc(youNow(t, { state: 'far' })) + '</span><p class="pend">Next, once ' +
                  esc(h.a.n) + ' starts: ' + esc(names(g)) + '</p>' };
     }
     var dt = g.owed ? 0 : g.at - t, c = g.owed ? 'late: the boss came early' : g.acts[0].c;
@@ -120,7 +120,7 @@
     if (dt > FAR) {
       var head = youNow(t, { state: 'far' });
       return { key: 'far' + g.at.toFixed(0), g: g, cls: 'call fv-next', state: 'far', say: '',
-               html: '<span class="lab">' + esc(head) + '</span><p class="pend">Next press: ' + esc(names(g)) + ' at ' + mmss(g.at) + (c ? ', ' + esc(c) : '') + '</p>' };
+               html: '<span class="lab">' + esc(head) + '</span><p class="pend">Next: ' + esc(names(g)) + ' at ' + mmss(g.at) + (c ? ', ' + esc(c) : '') + '</p>' };
     }
     var state = dt <= 0.5 ? 'go' : dt <= LEAD ? 'ready' : 'soon';
     var kick = state === 'go' ? (cap(c) || 'Press') : (state === 'ready' ? 'Get ready' : 'Next') + (c ? ', ' + c : '');
@@ -369,7 +369,7 @@
     });
     B.forEach(function (b) {  // a boss cast that is no sync point (Dig In on its stage's start): still announced
       var e = eff(b.t);
-      if (b.k !== 'cast' || gone(b.t) || e < t - 0.5 || e > t + 60) return;
+      if ((b.k !== 'cast' && b.k !== 'mech') || gone(b.t) || e < t - 0.5 || e > t + 60) return;
       if (N.some(function (a) { return a.n === b.n && Math.abs(a.t - b.t) <= 1; })) return;
       out.push(bar(e, t, 'boss', b.ic || '', 'Boss', b.n));
     });

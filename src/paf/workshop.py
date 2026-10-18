@@ -85,7 +85,7 @@ TOOLS: tuple[Tool, ...] = (
          "The boss's abilities by role, and who handles what in the top kills.", needs_prep=False),
     Tool("assigns", "Assignments you can take", "Which mechanics can a player be assigned to, when do they come, and "
          "what do they cost?", "ability_warrior_rallyingcry", "boss", "1", ("boss", "difficulty"),
-         "Each assignable mechanic with its timings and the damage it costs you."),
+         "Each assignable mechanic with its timings and the damage it costs.", needs_prep=False),  # reads the kills
 )
 BY_CMD = {t.cmd: t for t in TOOLS}
 CURATED_FIELDS = {"boss", "difficulty", "objective", "raid", "fight"}  # set by the curated form, not under "options"

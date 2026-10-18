@@ -1218,6 +1218,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
             d.links[f"use_item:{slot}"] = d.links[it.name]
     d.alignment = tops_alignment_safe(tl_all, fight)
     mechs = _boss_guide(d, con, enc, diff, diff_name, spec, tl_all, fight, pk)
+    d.mech_times = {m.name: [round(t, 1) for t in m.times] for m in mechs or [] if m.times}  # when each one lands
     from paf import defensives
 
     d.defensives = pk.defensives if pk is not None else defensives.analyze(con, enc.id, diff, spec)
