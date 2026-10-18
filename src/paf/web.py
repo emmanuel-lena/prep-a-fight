@@ -822,7 +822,8 @@ def characters_page() -> str:
         play = ('<span class="pill on">active</span>' if c.current else
                 f'<form method="post" action="/character/select"><input type="hidden" name="slug" value="{e(c.slug)}">'
                 f'<button class="btn ghost">Play this character</button></form>')
-        cards += (f'<div class="ccard{" on" if c.current else ""}">{ic}<div class="cc-txt"><b>{e(c.name)}</b>'
+        cards += (f'<div class="ccard{" on" if c.current else ""}">{ic}<div class="cc-txt"><b>{e(c.name)}'
+                  f'{(" <small class=muted>" + e(c.realm) + "</small>") if c.realm else ""}</b>'
                   f'<span class="cc-spec">{e(c.spec.title())} {e(c.class_name.title())}</span><span>{badge} '
                   f'<span class="muted small">updated <span>{ago(c.mtime)}</span></span></span></div><div class="cc-act">{play}'
                   f'<a class="btn ghost" href="#add">Update</a>'
@@ -1226,7 +1227,7 @@ placeholder="Link to one of your raid's logs: https://www.warcraftlogs.com/repor
 <fieldset class="what-sim"><legend>What to sim</legend>
 <label><input type="checkbox" name="gear" checked> Best gear from your bags, and what this boss drops for you</label>
 <label><input type="checkbox" name="optimize" checked> Ideal cooldown plan per objective
-<span class="muted small">(the slowest part; counted in the estimate above, measured on this computer)</span></label></fieldset>
+<span class="muted small">(the slowest part: 20 to 40 min the first time; the estimate above comes from this computer's last preps, faster when their sims are reused)</span></label></fieldset>
 <div class="ob-actions">{back}<button class="btn go">Prepare this fight &rarr;</button></div>
 <p class="small muted ob-note">Runs on your computer; you can follow it live.</p></section>
 </form></div>

@@ -27,6 +27,7 @@ class Character:
     imported: bool  # read from a log, not a /simc export
     mtime: float
     current: bool
+    realm: str = ""  # "EU/Ysondre", from the export's first line: two characters of one name told apart
 
 
 def _dir() -> Path:
@@ -75,8 +76,9 @@ def all_characters() -> list[Character]:
         prof = _read(p)
         if not prof.class_name:
             continue
+        realm = re.search(r"^#[^\n]* - ([A-Z]{2}/[^\n]+?)\s*$", text.split("\n", 1)[0])
         out.append(Character(p.stem, prof.name, prof.class_name, prof.spec, len(prof.candidates),
-                             IMPORTED in text, p.stat().st_mtime, p.stem == now))
+                             IMPORTED in text, p.stat().st_mtime, p.stem == now, realm[1] if realm else ""))
     return sorted(out, key=lambda c: (not c.current, -c.mtime))
 
 

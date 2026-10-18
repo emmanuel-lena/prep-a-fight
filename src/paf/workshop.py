@@ -83,8 +83,8 @@ TOOLS: tuple[Tool, ...] = (
     Tool("mechanics", "The boss's mechanics", "Every ability from the Encounter Journal, by role: what concerns you?",
          "inv_misc_book_09", "boss", "1", ("boss", "difficulty"),
          "The boss's abilities by role, and who handles what in the top kills.", needs_prep=False),
-    Tool("assigns", "Assignments you can take", "Which mechanics can you be assigned to, when do they come, and "
-         "what do they cost you?", "ability_warrior_rallyingcry", "boss", "1", ("boss", "difficulty"),
+    Tool("assigns", "Assignments you can take", "Which mechanics can a player be assigned to, when do they come, and "
+         "what do they cost?", "ability_warrior_rallyingcry", "boss", "1", ("boss", "difficulty"),
          "Each assignable mechanic with its timings and the damage it costs you."),
 )
 BY_CMD = {t.cmd: t for t in TOOLS}
@@ -135,11 +135,11 @@ def _prepared_ids(encounters: list, diff: str | None = None) -> set:
         return set()
 
 
-# the "· prepared" marks follow the difficulty picked in the same form
+# the "· has a sheet" marks follow the difficulty picked in the same form
 READY_JS = ("<script>(function(s){var f=s&&s.form;if(!f)return;function up(){var c=f.querySelector("
             "'[name=difficulty]:checked')||f.querySelector('select[name=difficulty]');if(!c)return;"
             "[].forEach.call(s.options,function(o){if(o.dataset.n==null)return;o.textContent=o.dataset.n+((' '+"
-            "o.dataset.r+' ').indexOf(' '+c.value+' ')>=0?' · prepared':'')})}f.addEventListener('change',"
+            "o.dataset.r+' ').indexOf(' '+c.value+' ')>=0?' · has a sheet':'')})}f.addEventListener('change',"
             "function(ev){if(ev.target.name==='difficulty')up()});up()})(document.currentScript.previousElementSibling"
             ".querySelector('select'))</script>")
 
@@ -152,7 +152,7 @@ def _boss_select(encounters: list, optional: str = "", last: bool = False) -> st
     first = next((x.id for x in encounters if x.id in ready), None) if not optional else None
     by_diff = {d: _prepared_ids(encounters, d) for d in ("normal", "heroic", "mythic")}
     opts = "".join(f"<option value='{x.id}' data-n='{e(x.name)}' data-r='{' '.join(d for d, s in by_diff.items() if x.id in s)}'"
-                   f"{' selected' if x.id == first else ''}>{e(x.name)}{' · prepared' if x.id in ready else ''}</option>"
+                   f"{' selected' if x.id == first else ''}>{e(x.name)}{' · has a sheet' if x.id in ready else ''}</option>"
                    for x in encounters)
     body = opts + extra if last else extra + opts
     return f"<label class='ws-f'><span>Boss</span><select name='boss' class='big'>{body}</select></label>{READY_JS}"
