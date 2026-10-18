@@ -14,3 +14,4 @@
 .ab-d{max-width:80ch;margin-top:2px}
 .guide .other-role{font-size:14px;color:var(--muted);margin:14px 0 4px}
 .ics{vertical-align:-4px;margin-right:6px}
+.stage>.abg:first-child>.ab:first-child{border-top:0;padding-top:0}

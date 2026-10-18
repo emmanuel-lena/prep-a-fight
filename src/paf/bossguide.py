@@ -104,7 +104,7 @@ def modernize(html: str, difficulty: str = "heroic") -> str:
     if "class='abg'" not in h:
         h = grouped(h)
     # an ability card titled by the ability it opens with: the title once (the ability row carries it)
-    h = re.sub(r'<section class="card stage"><h3>([^<]+)(?:<span[^>]*>[^<]*</span>)*</h3>'
+    h = re.sub(r'<section class="card stage"><h3>([^<]+?)\s*(?:<span[^>]*>[^<]*</span>\s*)*</h3>'
                r'(\s*<div class=\'abg\'><div class="ab" style="margin-left:0px"><div>'
                r'(?:<img[^>]*>|<span class="ics[^"]*"></span>)?<b>\1</b>)',
                r'<section class="card stage">\2', h)

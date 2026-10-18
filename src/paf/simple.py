@@ -18,6 +18,10 @@ POTION_ICON = "inv_potion_54"
 ADDS_ICON = "inv_misc_groupneedmore"
 LUST_ICON = "spell_nature_bloodlust"
 MOVE_ICON = "ability_rogue_sprint"
+RACIAL_ICONS = {"Ancestral Call": "ability_racial_ancestralcall", "Blood Fury": "racial_orc_berserkerstrength",
+                "Berserking": "racial_troll_berserk", "Fireblood": "ability_racial_fireblood",
+                "Light's Judgment": "ability_racial_orbitalstrike", "Arcane Torrent": "spell_shadow_teleport",
+                "Bag of Tricks": "ability_racial_bagoftricks"}  # racials a plan presses, when the prep has no icon
 
 
 def _mmss(t: float) -> str:
@@ -32,6 +36,8 @@ def _fallback(d, name: str) -> str:
         return LUST_ICON
     if name == "Movement":
         return MOVE_ICON
+    if name in RACIAL_ICONS:
+        return RACIAL_ICONS[name]
     adds = {w[3] for w in d.waves if w[1]} | {a.name for a in d.actions if a.kind in ("kill", "ignore")}
     return ADDS_ICON if name in adds else ""
 

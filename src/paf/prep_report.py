@@ -125,7 +125,8 @@ def alive(fight, t: float, life: float) -> float:
 
 
 def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: int, px: float = 1.4,
-                      names: dict[str, str] | None = None, phases: list | None = None) -> str:
+                      names: dict[str, str] | None = None, phases: list | None = None,
+                      links: dict[str, str] | None = None) -> str:
     """Lorrgs-like strip for a plan: the fight (phases, add waves, vulnerability windows, lust) then one row per
     cooldown with the plan's casts (dots) over the top players' casts of the same cooldown (bars)."""
     if fight is None or not plan.timeline:
@@ -173,7 +174,11 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
             labels.append(label)
     for label in labels:
         color = PALETTE[sum(map(ord, _key(label))) % len(PALETTE)]  # one color per cooldown, the same in every chart
-        shown = (names or {}).get(_key(label)) or label[:1].upper() + label[1:]
+        by_link = {_key(n): n for n in (links or {})}  # the game's own name of a racial or a trinket
+        small = {"of", "the", "and", "a", "in", "on", "to"}  # a name's small words stay small, as the game writes them
+        words = label.replace("_", " ").split()
+        titled = " ".join(w if i and w.lower() in small else w[:1].upper() + w[1:] for i, w in enumerate(words))
+        shown = (names or {}).get(_key(label)) or by_link.get(_key(label)) or titled
         shown = shown if len(shown) <= 24 else shown[:23] + "…"
         row = [f'<text x="4" y="{y + 12}" font-size="11" fill="var(--fg)">{e(shown)}</text>']
         tt = tops.get(_key(label)) or []
@@ -884,7 +889,7 @@ def render(d: PrepData) -> str:
     if d.pi:
         extra.append("Power Infusion at " + ", ".join(_mmss(t) for t in d.pi))
     extra.append(f"top {e(d.spec)} players move {d.moving_share:.0%} of the fight")
-    if d.add_share_spec is not None:
+    if d.add_share_spec:
         extra.append(f"and do {d.add_share_spec:.0%} of their damage to adds")
     focus = ""
     if d.fight is not None and d.fight.focus:
@@ -1003,7 +1008,7 @@ for reference: a build can be worse there and much better on this fight. Error a
             "<h2>Ideal cooldown play-by-play</h2><div class='card'><p><b>The default priority list is already right "
             "on this fight:</b> play it as it is. No other plan beats it for boss, total "
             f"or burst damage (all within the noise, ±{max(p.error, 0.01):.2f}%).</p>"
-            f"{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases)}"
+            f"{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases, links=d.links)}"
             + (f"<h4>MRT note {copy_button(note, 'Copy the MRT note')}</h4><pre class='small note-pre'>{e(note)}</pre>"
                if note else "") + "</div>")
     if d.optimized and not flat:
@@ -1041,7 +1046,7 @@ for reference: a build can be worse there and much better on this fight. Error a
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span>{" <span class='pill gold'>the sheet plays this plan</span>" if p.objective == first else ""}</h3>
 {("<p class='small'>Played because " + ("your raid pads the adds" if p.objective == "total" else "your raid stays on the boss" if p.objective == "boss" else "it is your choice") + " (see Your raid, in this section)." + (" The fight tab calls a burst pressed while the boss is immune on the adds that follow." if d.fight is not None and d.fight.invulnerable else "") + "</p>") if p.objective == first and p.objective in ("boss", "total") else ""}
 {"<p class='small muted'>Burst damage counts only the damage on " + e(burst_names(d)[1] or "the burst targets") + ": worth it only if your raid needs them dead fast" + ("." if _stall(d, p) else ", at the cost of the boss and total damage above.") + "</p>" if p.objective == "secondary" else ""}
-{checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases)}
+{checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases, links=d.links)}
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
 <div class="pp-grid"><div><h4>Play-by-play of one simulated pull</h4><div class="scroll pp"><table>
 <tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></div>
@@ -1140,12 +1145,13 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
     # the four sections: the fight to play, what to change, the boss, and everything else for who digs
     from paf import fightview
 
-    card = simple.change_card(d)
+    card, sugg = simple.change_card(d), suggestions_html(d)
     sections: dict[str, list[str]] = {
         "fight": notices + [fightview.html(d)],
         "change": [f"<div class='simple change-top'><div class='cards'>{card}</div></div>",
-                   briefing.spec_html(d), ("<h2>Worth knowing</h2>" if "Nothing to change" in card else
-                                           "<h2>Everything worth changing</h2>") + suggestions_html(d)]
+                   briefing.spec_html(d), "" if "Nothing to change" in card and "Nothing to change" in sugg else
+                   ("<h2>Worth knowing</h2>" if "Nothing to change" in card else "<h2>Everything worth changing</h2>")
+                   + sugg]
         + tabs["gear"],
         "boss": tabs["boss"],
         "deeper": tabs["overview"] + [f"<div class='simple'>{simple.review_card(d)}</div>"] + tabs["cooldowns"] + tabs["raid"] + tabs["fight"]
