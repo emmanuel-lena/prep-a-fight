@@ -56,3 +56,4 @@
   .ws-cards.c4{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .ws-form label[hidden],.ws-form .seg[hidden]{display:none}
 .ws-go .btn:disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.6)} /* off, and looks it */
+.ws-note a{color:var(--link);text-decoration:underline;font-weight:600}

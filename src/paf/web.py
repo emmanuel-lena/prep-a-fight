@@ -1273,6 +1273,7 @@ function recap(){
   var picked = [].slice.call(f.querySelectorAll('input[name=assign]:checked')).map(function(i){
     var t = i.parentNode.cloneNode(true); var m = t.querySelector('.meta'); if (m) m.remove(); return t.textContent.trim(); });
   var raid = (f.querySelector('input[name=raid]') || {}).value || '';
+  if (raid && raid.indexOf('warcraftlogs.com/reports/') < 0) raid += ' (not a Warcraft Logs report link: fix it or leave it empty)';
   f.querySelector('.recap-assigns').textContent = picked.join(', ');
   f.querySelector('.recap-raid').textContent = raid;
   f.querySelectorAll('.recap [data-if]').forEach(function(li){
@@ -1289,7 +1290,8 @@ function show(i, back){
 f.querySelectorAll('.next').forEach(function(b){ b.addEventListener('click', function(){ show(at + 1); }); });
 f.querySelectorAll('.prev').forEach(function(b){ b.addEventListener('click', function(){ show(at - 1, true); }); });
 f.querySelectorAll('input[name=goal]').forEach(function(r){ r.addEventListener('change', function(){
-  try { localStorage.setItem(key, r.value); } catch (e) {} setTimeout(function(){ show(at + 1); }, 200); }); });
+  try { localStorage.setItem(key, r.value); } catch (e) {}  // on to the step after the goal, once, however fast the clicks
+  var from = at; setTimeout(function(){ if (at === from) show(from + 1); }, 200); }); });
 f.addEventListener('submit', function(){ var r = f.querySelector('input[name=goal]:checked');
   try { if (r) localStorage.setItem(key, r.value); } catch (e) {} });
 show(0);
