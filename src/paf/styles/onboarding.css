@@ -39,3 +39,4 @@ body:has(.ob:not(.story))>main{grid-column:1;display:grid;align-content:start;pa
 .ob-set{margin:4px 0 12px;padding-left:20px} .ob-set li{margin:2px 0}
 .ob textarea{font-size:15px} .ob select[name=region]{min-width:120px}
 .ob-field{display:grid;gap:6px;font-weight:600;font-size:14px}
+.ob-field input{font-weight:400} .ob-field input::placeholder{color:var(--muted);font-weight:400}

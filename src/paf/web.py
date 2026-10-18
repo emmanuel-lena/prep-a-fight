@@ -1241,7 +1241,7 @@ placeholder="https://www.warcraftlogs.com/reports/..."></label>
 </ul>
 <fieldset class="what-sim"><legend>What to sim</legend>
 <label><input type="checkbox" name="gear" checked> Best gear from your bags, and what this boss drops for you</label>
-<label><input type="checkbox" name="optimize" checked> Ideal cooldown plan{" for boss damage" if no_adds else " per objective"}
+<label><input type="checkbox" name="optimize" checked> Ideal cooldown plan{" for boss damage" if no_adds else " for your goal"}
 <span class="muted small">(the slowest part: 20 to 40 min the first time; the estimate above comes from this computer's last preps, faster when their sims are reused)</span></label></fieldset>
 <div class="ob-actions">{back}<button class="btn go">Prepare this fight &rarr;</button></div>
 <p class="small muted ob-note">Runs on your computer; you can follow it live.</p></section>
@@ -1329,11 +1329,11 @@ def raid_hint(no_adds: bool = False) -> str:
     if no_adds:  # nothing to pad: the log says how your last pull compares
         return (f"Empty: the latest public log of {g} is used" if g else "Optional") + (
             ": it shows how your last pull compares with the top players'.")
+    what = ("it shows who plays what in your raid and how your last pull compares with the top players'; with "
+            "\"Let my raid decide\", it also decides between padding the adds and the boss.")
     if g:
-        return (f"Empty: the latest public log of {g} is used. Your raid's composition and DPS decide whether you pad "
-                f"the adds or stay on the boss.")
-    return ("Optional. Your raid's composition and DPS decide whether you pad the adds or stay on the boss. "
-            "Or set your guild once on the home page.")
+        return f"Empty: the latest public log of {g} is used: {what}"
+    return f"Optional: {what} Or set your guild once on the home page."
 
 
 def write_raid(boss_id: int, difficulty: str, url: str) -> None:

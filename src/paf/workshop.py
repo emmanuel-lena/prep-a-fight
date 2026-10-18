@@ -150,7 +150,8 @@ function update(init){
     if(r.value==='total'||r.value==='all'){l.hidden=na;if(na&&r.checked){var b=f.querySelector('[name=objective][value=boss]');if(b)b.checked=true}}});
   var why=f.dataset.addsOnly&&na?'noadds':(f.dataset.needsPrep&&!sheet(o,d)?'noprep':'');
   f.querySelectorAll('.ws-noadds,.ws-noprep').forEach(function(n){n.hidden=n.className.indexOf('ws-'+why)<0||!why});
-  var g=f.querySelector('.ws-go .btn');if(g)g.disabled=!!why}
+  var g=f.querySelector('.ws-go .btn');if(g)g.disabled=!!why;
+  var a=f.querySelector('.ws-prep');if(a&&o.value)a.href='/boss?boss='+o.value+'&difficulty='+(d||'')}
 f.addEventListener('change',function(){update()});document.addEventListener('DOMContentLoaded',function(){update(1)});update(1)
 })(document.currentScript.previousElementSibling.querySelector('select'))</script>"""
 
@@ -174,7 +175,8 @@ def _no_adds(encounters: list) -> set:
 def _boss_select(encounters: list, optional: str = "", last: bool = False) -> str:
     """The raid's bosses; `optional` an empty choice, first (every boss) or `last` (the training dummy: the real fight
     comes first, it is the point of the app)."""
-    extra = f"<option value=''>{e(optional)}</option>" if optional else ""
+    extra = (f"<option value=''{' data-na=1' if last else ''}>{e(optional)}</option>"  # a training dummy has no adds
+             if optional else "")
     ready = _prepared_ids(encounters)  # the bosses with a sheet: said, and the first of them picked
     first = next((x.id for x in encounters if x.id in ready), None) if not optional else None
     by_diff = {d: _prepared_ids(encounters, d) for d in ("normal", "heroic", "mythic")}
@@ -206,8 +208,8 @@ def _field(kind: str, encounters: list) -> str:
         return _segs("objective", "Your goal", [("boss", "Boss damage", "progress: everyone on the boss"),
                                                 ("total", "Pad the adds", "total damage: the adds count too")], "boss")
     if kind == "goal3":
-        return _segs("objective", "Your goal", [("all", "Both", "a plan for each"),  # the wizard's words
-                                                ("boss", "Boss damage", ""), ("total", "Pad the adds", "")], "all")
+        return _segs("objective", "Your goal", [("boss", "Boss damage", ""), ("total", "Pad the adds", ""),
+                                                ("all", "Both, a plan for each", "")], "all")  # the wizard's words
     if kind == "raid":
         g = settings.get("guild")
         hint = f"Empty: the latest public log of {g}." if g else "Or set your guild in Settings."
@@ -233,8 +235,8 @@ def tool_page(cmd: str, encounters: list) -> str | None:
             f"<input type='hidden' name='_curated' value='1'>"
             f"{fields}<p class='ws-gives'><b>You get:</b> {e(t.gives)}</p>{note}"
             "<p class='ws-note ws-noadds' hidden>No adds on this boss: nothing for this tool to read. Pick a boss with "
-            "adds.</p><p class='ws-note ws-noprep' hidden>No sheet for this boss at this difficulty yet: prepare it from "
-            "<a href='/'>Home</a> first, then run this tool.</p>"
+            "adds.</p><p class='ws-note ws-noprep' hidden>No sheet for this boss at this difficulty yet: <a href='/' "
+            "class='ws-prep'>prepare it</a> first, then run this tool.</p>"
             f"<div class='ws-go'><button class='btn go'>Run it &rarr;</button><span class='muted small'>About "
             f"{e(t.minutes)} min, on your computer. You can leave the page: it keeps running.</span></div></form></div>{CSS}")
 
