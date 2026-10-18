@@ -26,3 +26,4 @@
 @media (prefers-reduced-motion:reduce){.ob-step.on{animation:none}}
 /* the first run is its own moment: no side bar yet */
 body.has-side:has(.ob){grid-template-columns:minmax(0,1fr)} body:has(.ob)>.side{display:none}
+body:has(.ob)>main{grid-column:1;display:grid;align-content:center;min-height:100vh}
