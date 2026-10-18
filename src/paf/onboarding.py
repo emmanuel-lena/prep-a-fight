@@ -132,7 +132,7 @@ def page_body() -> str:
                  "<div class='ob-actions'><button type='button' class='btn go next'>Next &rarr;</button></div>")
     return f"""<div class="ob" data-key="{'1' if key_done else ''}">
 <p class="ob-brand">prep-a-<b>fight</b></p>
-<ol class="ob-dots" aria-hidden="true">{''.join('<li></li>' for _ in STEPS[1:])}</ol>
+<ol class="ob-dots" aria-hidden="true">{''.join('<li></li>' for _ in STEPS[1:-1])}</ol>
 
 <section class="ob-step" data-step="welcome">
 <h1>Your boss, prepared in a few minutes</h1>
@@ -176,8 +176,8 @@ def page_body() -> str:
 
 <section class="ob-step" data-step="done">
 <h1>Ready</h1>
-<p class="ob-summary" data-title="your raid is saved" data-text="{'Everything can be changed later in Settings.' if summary else 'You can set the rest later in Settings.'}"></p>
-{f"<p class='muted'>Already set: {esc(summary)}.</p>" if summary else ""}
+{f"<p>Already set: <b>{esc(summary)}</b>.</p>" if summary else ""}
+<p class="ob-summary muted" data-title="Guild saved" data-text="{'Everything can be changed later in Settings.' if summary else 'You can set the rest later in Settings.'}"></p>
 <div class="ob-actions"><a class="btn go finish" href="/onboard/finish">Prepare a boss &rarr;</a></div></section>
 </div>"""
 
@@ -189,7 +189,11 @@ JS = """<script>
 var root = document.querySelector('.ob'); if (!root) return;
 var steps = [].slice.call(root.querySelectorAll('.ob-step')), dots = [].slice.call(root.querySelectorAll('.ob-dots li'));
 var names = steps.map(function(s){ return s.dataset.step; }), at = 0, done = {};
+var typed = false;  // something typed and not saved: leaving or reloading asks first
+window.addEventListener('beforeunload', function(ev){ if (typed) { ev.preventDefault(); ev.returnValue = ''; } });
+root.querySelectorAll('form').forEach(function(f){ f.addEventListener('submit', function(){ typed = false; }); });
 root.querySelectorAll('form').forEach(function(f){ f.addEventListener('input', function(){  // an edit: save it first
+  typed = true;
   var k = f.querySelector('.keep'), s = f.querySelector('.save-alt'); if (!k || !s) return;
   s.hidden = false; s.classList.remove('ghost'); s.classList.add('go');
   k.classList.remove('go'); k.classList.add('ghost'); k.innerHTML = 'Keep the saved one &rarr;';
@@ -201,7 +205,8 @@ function show(i, back){
   at = Math.max(0, Math.min(steps.length - 1, i));
   steps.forEach(function(s, j){ s.classList.toggle('on', j === at); s.classList.toggle('back', !!back); });
   dots.forEach(function(d, j){ d.classList.toggle('on', j < at); });  // the welcome is not a step
-  store(at); var f = steps[at].querySelector('input,textarea,button'); if (f) f.focus({preventScroll: true});
+  store(at); var f = steps[at].querySelector('input:not([type=hidden]),textarea');  // a field, never a tab or a button
+  if (f) f.focus({preventScroll: true});
   if (names[at] === 'done') summary();
 }
 function next(){ show(at + 1); }

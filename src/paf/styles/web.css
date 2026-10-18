@@ -239,3 +239,7 @@ textarea[name=plan],textarea[name=notes]{font-family:var(--font-data);font-size:
 .settings.dirty .cta{background:var(--surface);border-top:2px solid var(--accent)} /* one accent line, in both themes */
 .card-h{margin:0 0 8px;font:600 13px var(--font-display);text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 .set-cols .card+.card{margin-top:14px}
+/* one heading style on the Settings page: the form's groups and the cards' titles as the page's h2 */
+.settings .set-group>legend,.settings .set-group>summary,.set-group>legend,.set-group>summary,.card-h{font:600 17px var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+/* the Save bar sticks only once there is something to save: at rest it ends the form and covers nothing */
+.settings .cta{position:static;box-shadow:none} .settings.dirty .cta{position:sticky;box-shadow:0 -10px 14px -10px rgba(0,0,0,.18)}

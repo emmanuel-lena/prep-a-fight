@@ -235,9 +235,7 @@ def settings_page(message: str = "") -> str:
 </p>{msg}<div class="set-cols"><div>
 <form method="post" action="/settings" class="card settings">{settings_form()}
 <div class="cta"><button class="btn go">Save</button><span class="dirty-note">Unsaved changes</span></div></form>
-<script>(function(f){{var d=false;f.addEventListener('input',function(){{d=true;f.classList.add('dirty')}});
-f.addEventListener('submit',function(){{d=false}});window.addEventListener('beforeunload',function(ev){{if(d){{ev.preventDefault();
-ev.returnValue=''}}}})}})(document.currentScript.previousElementSibling)</script></div><div>
+</div><div>
 {account if account else "<h2>Warcraft Logs</h2>"}<div class="card"><h3 class="card-h">Your API key</h3>
 <p class="small measure">{current} To use another one (a new
 client, or a regenerated secret): create or open it on <a href="https://www.warcraftlogs.com/api/clients"
@@ -262,4 +260,9 @@ stays where it is">Get nightly</button></form></div></td></tr>
 <tr><td>Data folder</td><td class="small">{e(str(data_dir()))}</td></tr></table></div>
 <h2>Every tool</h2><div class="card"><p class="small">The prep of a boss runs them all; each one is also on its own
 page, to dig further.</p><p><a class="btn ghost" href="/tools">See every tool &rarr;</a></p></div>
-</div></div>"""
+</div></div>
+<script>(function(){{var d=new Set();
+document.querySelectorAll('.set-cols form').forEach(function(f){{
+f.addEventListener('input',function(){{d.add(f);f.classList.add('dirty')}});
+f.addEventListener('submit',function(){{d.clear()}})}});window.addEventListener('beforeunload',function(ev){{
+if(d.size){{ev.preventDefault();ev.returnValue=''}}}})}})()</script>"""
