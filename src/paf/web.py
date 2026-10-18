@@ -1308,7 +1308,7 @@ if (rl) ['change', 'input'].forEach(function(ev){ rl.addEventListener(ev, functi
   var bad = rl.value.trim() && !/warcraftlogs[.]com[/]reports[/][A-Za-z0-9]{16}/.test(rl.value);
   rl.classList.toggle('bad', !!bad); rl.setAttribute('aria-invalid', bad ? 'true' : 'false'); if (go) go.disabled = !!bad;
   var h = document.getElementById('raid-help'); if (h) h.classList.toggle('err', !!bad); if (h) { if (h.dataset.t == null) h.dataset.t = h.textContent;
-    h.textContent = bad ? 'Not a Warcraft Logs report link: paste one like https://www.warcraftlogs.com/reports/..., or leave it empty.' : (rl.value.trim() ? 'This log is read for your raid.' : h.dataset.t); } }); });
+    h.textContent = bad ? 'Not a Warcraft Logs report link: paste one like https://www.warcraftlogs.com/reports/..., or leave it empty.' : h.dataset.t; } }); });  // a good link keeps the help as it is: the buttons below do not move under the click
 f.querySelectorAll('.prev').forEach(function(b){ b.addEventListener('click', function(){ show(at - 1, true); }); });
 f.querySelectorAll('input[name=goal]').forEach(function(r){ r.addEventListener('change', function(){
   try { localStorage.setItem(key, r.value); } catch (e) {} }); });  // a goal is picked; Next moves on (keyboard-safe)

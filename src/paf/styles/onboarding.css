@@ -45,3 +45,4 @@ body:has(.ob:not(.story))>main{grid-column:1;display:grid;align-content:start;pa
 .ob-field input{width:100%} .raid-help{margin-top:6px;font-size:13.5px} .raid-help.err{color:var(--neg)}
 .ob .btn:disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.5)} .go-why{color:var(--neg);font-size:14px}
 .recap li.bad::before{content:"\2717";color:var(--neg)} /* an error is never ticked green */
+.raid-help{min-height:4.2em}
