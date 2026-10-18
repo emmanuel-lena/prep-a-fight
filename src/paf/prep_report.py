@@ -1074,8 +1074,8 @@ def render(d: PrepData) -> str:
             tabs["boss"].insert(0, "<h2>What the top players do, from their logs</h2><div class='card guide'>"
                                 f"{blocks}</div>")
         tabs["boss"].append(defensives_html(d))
-        tabs["boss"].append("<h2>Every ability, from the Encounter Journal</h2><p class='small muted'>From the in-game "
-                            "Encounter Journal; timings and how many players are hit come from the ranked kills.</p>"
+        tabs["boss"].append("<h2>Every ability, from the Encounter Journal</h2><p class='small muted'>Timings and how "
+                            "many players are hit come from the ranked kills.</p>"
                             + f"<div class='stages'>{stage_times(mech_around(bossguide.modernize(d.guide_abilities, d.difficulty), d), d.phases, d.duration)}"
                             "</div>")
     else:

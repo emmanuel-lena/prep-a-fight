@@ -1177,8 +1177,8 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
     if sections:
         gicons = icons_for(bossguide.spell_refs(sections))
         guide = f"<h2>The boss in 60 seconds</h2>{bossguide.summary_html(sections, 'damage')}"
-        journal = (f"<section class='boss-journal'><h2>Every ability, from the Encounter Journal</h2><p class='small muted'>From "
-                   f"the in-game Encounter Journal.</p><div class='stages'>"
+        journal = (f"<section class='boss-journal'><h2>Every ability, from the Encounter Journal</h2><p class='small muted'>Timings "
+                   f"and how many players are hit come from the ranked kills.</p><div class='stages'>"
                    f"{bossguide.abilities_html(sections, mechanics=mechs, icon_map=gicons)}</div></section>")
     try:  # where the data will come from, and how long: from what will really happen (paf.estimate)
         from paf import estimate
@@ -1242,7 +1242,7 @@ placeholder="https://www.warcraftlogs.com/reports/..."></label>
 <fieldset class="what-sim"><legend>What to sim</legend>
 <label><input type="checkbox" name="gear" checked> Best gear from your bags, and what this boss drops for you</label>
 <label><input type="checkbox" name="optimize" checked> Ideal cooldown plan{" for boss damage" if no_adds else " for your goal"}
-<span class="muted small">(the slowest part: 20 to 40 min the first time; the estimate above comes from this computer's last preps, faster when their sims are reused)</span></label></fieldset>
+<span class="muted small">(the slowest part: 20 to 40 min the first time; the estimate above comes from this computer's last preps, faster when their sims are reused)</span></label><p class="small muted sim-none" hidden>Both off: the prep still gives the fight view, the boss journal and your talents, without a gear or cooldown plan.</p></fieldset>
 <div class="ob-actions">{back}<button class="btn go">Prepare this fight &rarr;</button><span class="go-why" hidden>Fix
 the raid log link (step 3) or leave it empty first.</span></div>
 <p class="small muted ob-note">Runs on your computer; you can follow it live.</p></section>
@@ -1250,10 +1250,10 @@ the raid log link (step 3) or leave it empty first.</span></div>
 {(f"<aside class='boss-guide'>{guide}</aside>") if guide else ""}</div>{journal}
 {_story_css()}{STORY_JS}
 <h2>Advanced</h2>
-<details class="card" open><summary>Your fight plan: your own movements, Bloodlust, Power Infusion</summary>
-{plan_block(enc, difficulty)}</details>
-<details class="card" open><summary>What you know about this boss: damage amps, targets to ignore</summary>
-{notes_block(enc, difficulty)}</details>"""
+<section class="card adv"><h3>Your fight plan: your own movements, Bloodlust, Power Infusion</h3>
+{plan_block(enc, difficulty)}</section>
+<section class="card adv"><h3>What you know about this boss: damage amps, targets to ignore</h3>
+{notes_block(enc, difficulty)}</section>"""
     return page(enc.name, body)
 
 
@@ -1298,12 +1298,15 @@ f.querySelectorAll('.next').forEach(function(b){ b.addEventListener('click', fun
 f.addEventListener('keydown', function(ev){  // Enter in a field moves on a step; only the last step's button prepares
   if (ev.key === 'Enter' && ev.target.tagName === 'INPUT' && steps[at].dataset.step !== 'go') { ev.preventDefault(); show(at + 1); } });
 var rl = f.querySelector('input[name=raid]'), go = f.querySelector('.ob-step[data-step=go] .btn.go');
-if (rl) rl.addEventListener('input', function(){  // a link that is not a report: said at once, and no prep from it
+f.querySelectorAll('input[name=gear],input[name=optimize]').forEach(function(c){ c.addEventListener('change', function(){
+  var none = !f.querySelector('input[name=gear]:checked') && !f.querySelector('input[name=optimize]:checked');
+  var n = f.querySelector('.sim-none'); if (n) n.hidden = !none; }); });  // both off: what the prep still gives
+if (rl) ['change', 'input'].forEach(function(ev){ rl.addEventListener(ev, function(e){  // checked when the field is left
+  if (e.type === 'input' && !rl.classList.contains('bad')) return;  // while typing, only an error already shown clears
   var bad = rl.value.trim() && !/warcraftlogs[.]com[/]reports[/][A-Za-z0-9]{16}/.test(rl.value);
   rl.classList.toggle('bad', !!bad); rl.setAttribute('aria-invalid', bad ? 'true' : 'false'); if (go) go.disabled = !!bad;
-  var why = f.querySelector('.go-why'); if (why) why.hidden = !bad;
   var h = document.getElementById('raid-help'); if (h) h.classList.toggle('err', !!bad); if (h) { if (h.dataset.t == null) h.dataset.t = h.textContent;
-    h.textContent = bad ? 'Not a Warcraft Logs report link: paste one like https://www.warcraftlogs.com/reports/..., or leave it empty.' : (rl.value.trim() ? 'This log is read for your raid.' : h.dataset.t); } });
+    h.textContent = bad ? 'Not a Warcraft Logs report link: paste one like https://www.warcraftlogs.com/reports/..., or leave it empty.' : (rl.value.trim() ? 'This log is read for your raid.' : h.dataset.t); } }); });
 f.querySelectorAll('.prev').forEach(function(b){ b.addEventListener('click', function(){ show(at - 1, true); }); });
 f.querySelectorAll('input[name=goal]').forEach(function(r){ r.addEventListener('change', function(){
   try { localStorage.setItem(key, r.value); } catch (e) {} }); });  // a goal is picked; Next moves on (keyboard-safe)
