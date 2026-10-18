@@ -25,13 +25,15 @@ def test_to_simc():
 
 def test_adds_alive_when_the_boss_comes_back_are_split():
     f = Fight("B", 400, add_waves=[AddWave(148, 1, 114, "Echo", scalable=False), AddWave(10, 3, 20, "Amani"),
-                                   AddWave(250, 2, 30, "Late")],
+                                   AddWave(140, 2, 140, "Before"), AddWave(250, 2, 30, "During")],
               invulnerable=[Window(158.7, 103)])
     events = [e for e in f.raid_event_lines() if "adds" in e]
     assert "first=10,duration=20" in events[0]  # untouched
-    assert "first=148,duration=112.7" in events[1]  # dies 1 s before the boss comes back at 261.7; 0.3 s left: gone
-    assert "first=250,duration=10.7" in events[2] and "first=262.2,duration=17.8" in events[3]  # split
-    assert len(events) == 4
+    # spawned before the immunity and outliving it: dies 1 s before the boss comes back at 261.7, back right after
+    assert "first=140,duration=120.7" in events[1] and "first=262.2,duration=17.8" in events[2]
+    assert "first=148,duration=112.7" in events[3]  # dies 1 s before the boss comes back; 0.3 s left: gone
+    assert "first=250,duration=10.7" in events[4]  # an intermission's add dies with the intermission: no respawn
+    assert len(events) == 5
 
 
 def test_no_lust():
@@ -61,3 +63,13 @@ def test_unique_units_are_not_scaled():
     f = Fight("B", 100, add_waves=[AddWave(10, 4, 20), AddWave(50, 1, 20, "Heart", scalable=False)], add_scale=2.0)
     events = [e for e in f.to_simc() if "adds" in e]
     assert "count=8" in events[0] and "count=1" in events[1]
+
+
+def test_an_intermission_add_dies_with_the_intermission():
+    from paf.fight import AddWave, Fight, Window
+
+    f = Fight("B", 240, add_waves=[AddWave(102.6, 1, 89.9, "Echo", scalable=False), AddWave(52.7, 6, 16.7, "Amani")],
+              invulnerable=[Window(97.3, 54.8)])
+    echo, amani = f.add_waves
+    assert echo.lifetime == 49.5 and amani.lifetime == 16.7  # cut at the immunity's end; the earlier wave untouched
+    assert not any(a > 152.1 for a, _d, w in f._spawns() if w.name == "Echo")  # no respawn in Stage Two

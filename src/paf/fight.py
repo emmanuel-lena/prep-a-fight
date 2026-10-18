@@ -10,7 +10,7 @@ Facts verified on simc 1210-01 (docs/research/simc-experiments.md):
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
 from paf.simc import fmt
@@ -86,6 +86,17 @@ class Fight:
     candidate_vulnerable: list[Vulnerable] = field(default_factory=list)
     focus: list[Focus] = field(default_factory=list)  # a council: who the top players hit, when
     targets: int = 1  # bosses hit at once the whole fight (a council's stacked members): desired_targets
+
+    def __post_init__(self) -> None:
+        """An add that appears during an immunity (an intermission's add) dies with it at the latest: the corpus can
+        merge an intermission's successive adds into one window running past it (Nek'zali heroic: one Echo of Jawae
+        'alive' 90 s for a 55 s intermission, 40 s of a phantom add in Stage Two). Adds that appear before an immunity
+        keep their lifetime (see _spawns)."""
+        for i, w in enumerate(self.add_waves):
+            for inv in self.invulnerable:
+                end = inv.start + inv.duration
+                if inv.start - 3 <= w.time <= end and w.time + w.lifetime > end:
+                    self.add_waves[i] = replace(w, lifetime=round(max(1.0, end - w.time), 1))
 
     def _spawns(self) -> list[tuple[float, float, AddWave]]:
         """(spawn, lifetime, wave) as simulated. SimC never goes back to the boss if an add is still alive when
