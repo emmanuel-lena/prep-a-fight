@@ -321,7 +321,10 @@ def job_html(d) -> str:
     """Your job on this boss, in six lines at most: what kills a raid first, then your cooldowns and when."""
     from paf.prep_report import rule_phrase
 
-    rows = [(a.name, f"<b>{e(a.text.split(':')[0].split(' (')[0])}</b>") for a in d.actions
+    def at(name: str) -> str:  # the waves of that unit, as the fight tab places them
+        ts = [t for t, c, _l, n in d.waves if c and _clean(n) == name]
+        return f" at {', '.join(_mmss(t) for t in ts)}" if ts else ""
+    rows = [(a.name, f"<b>{e(a.text.split(':')[0].split(' (')[0])}</b>{at(a.name)}") for a in d.actions
             if a.kind in ("kill", "contact") or (a.kind == "interrupt" and a.text.startswith("Interrupt"))][:2]
     for w in (d.fight.invulnerable if d.fight is not None else [])[:1]:
         adds = [_clean(x[3]) for x in d.waves if w.start - 2 <= x[0] <= w.start + w.duration and x[1]]

@@ -232,8 +232,8 @@ def verdicts(types: list[AddType], comp: list[tuple[str, float]], you: tuple[str
             v, why = "pad", (f"pad them, you make the difference: your raid does {others:.0%} of the top raids' damage "
                              f"on them without you, {with_you:.0%} with you (the weakest top raids do {low:.0%})")
         else:
-            v, why = "pad", (f"pad them: your raid does {with_you:.0%} of the top raids' damage on them, even counting "
-                             f"you (the weakest top raids do {low:.0%}); it lacks cleave")
+            v, why = "pad", (f"pad them: with you, your raid does {with_you:.0%} of the top raids' damage on them (the "
+                             f"weakest top raids do {low:.0%}); it lacks cleave")
         out.append(AddVerdict(t, others, with_you, low, v, why))
     return out
 
@@ -242,11 +242,14 @@ def readable(reason: str) -> str:
     """A verdict saved by an older prep, in the current words (the sheet is rendered again from the prep's data)."""
     import re
 
+    reason = re.sub(r"^pad them: your raid does (\d+%) of the top raids' damage on them, even counting you \(",
+                    r"pad them: with you, your raid does \1 of the top raids' damage on them (", reason)
+
     m = re.fullmatch(r"even with you, your raid puts (\d+%) of the top raids' damage on them \(their weakest quarter: "
                      r"(\d+%)\): pad them, your raid lacks cleave", reason)
     if m:
-        return (f"pad them: your raid does {m[1]} of the top raids' damage on them, even counting you (the weakest "
-                f"top raids do {m[2]}); it lacks cleave")
+        return (f"pad them: with you, your raid does {m[1]} of the top raids' damage on them (the weakest top raids "
+                f"do {m[2]}); it lacks cleave")
     m = re.fullmatch(r"without you, your raid already puts (\d+%) of the top raids' damage on them \(their weakest "
                      r"quarter: (\d+%)\): the others cover them, stay on the boss", reason)
     if m:

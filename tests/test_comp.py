@@ -61,7 +61,7 @@ def test_a_whole_raid_add_lists_who_missed_it_and_the_ranked_player_is_left_out(
 
 def test_the_page():
     page = workshop_views.render({"kind": "comp", **comp.to_dict("Boss", "this boss, kill of 1:40", rows())})
-    assert "The specs that hit each target hardest" in page and "Put them on it" in page and "Hardly hit it" in page
+    assert "the most damage on" in page and "Put them on it" in page and "Hardly hit it" in page
 
 
 def test_the_spec_damage_of_the_tops_never_turns_into_a_spec_change():
@@ -96,7 +96,7 @@ def test_the_night_tracker():
     d = tracker.to_dict("x", [row], {"Moon": "Druid-Balance"})
     assert d["summary"]["Moon"]["bare"] == 1 and d["summary"]["Dk"]["pulls_damage_potion"] == 1
     page = workshop_views.render({"kind": "night", **d})
-    assert "1 pull, 1 death before the wipes" in page and "Pull by pull" in page
+    assert "1 pull, 1 death before the wipes" in page and "Pull by pull" not in page  # one pull: the table says it
 
 
 def test_the_raid_tab_of_the_sheet_shows_the_raid_tools():

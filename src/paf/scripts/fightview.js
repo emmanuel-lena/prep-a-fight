@@ -375,9 +375,12 @@
     });
     if (FV.end - t > 0.5 && FV.end - t <= 60) out.push(bar(FV.end, t, 'boss', 'inv_misc_bone_humanskull_01', 'Boss', 'The kill, around ' + mmss(FV.end)));
     out.sort(function (a, b) { return a[0] - b[0]; });
-    var shown = out.slice(0, 5);  // what fits above the controls; a stage change or an immunity always among them
-    var key = out.slice(5).filter(function (x) { return /Stage|Intermission|immune|Phase|The kill/i.test(x[1]); })[0];
-    if (key) shown[shown.length - 1] = key;
+    // five rows fit above the controls: your presses first (up to three), then a stage change or the kill, then the rest
+    var yours = out.filter(function (x) { return x[1].indexOf('fbar mine') >= 0; }).slice(0, 3);
+    var key = out.filter(function (x) { return yours.indexOf(x) < 0 && /Stage|Intermission|immune|Phase|The kill/i.test(x[1]); }).slice(0, 1);
+    var shown = yours.concat(key);
+    out.forEach(function (x) { if (shown.length < 5 && shown.indexOf(x) < 0) shown.push(x); });
+    shown.sort(function (a, b) { return a[0] - b[0]; });
     set($('ss-bars'), shown.map(function (x) { return x[1]; }).join('') || '<p class="pend">Nothing in the next minute: your rotation.</p>');
   }
 

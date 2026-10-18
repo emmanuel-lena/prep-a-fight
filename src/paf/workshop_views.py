@@ -302,8 +302,8 @@ def comp(d: dict) -> str:
     if not targets:
         return _verdict("ok", "Nothing to assign on this boss", "<span>The top raids put their damage on the boss.</span>")
     if assigned:
-        head = _verdict("go", "The specs that hit each target hardest", "<span>The specs of your raid that do the most damage on "
-                        "each target, from the top kills of this boss.</span>")
+        head = ("<p class='ws-lead'>The specs of your raid that do the most damage on "
+                "each target, from the top kills of this boss.</p>")
     else:
         head = _verdict("ok", "No add assigned", "<span>No add is assigned in the top raids: the whole raid "
                         "switches.</span>")
@@ -480,8 +480,9 @@ def night(d: dict) -> str:
                       for t, n, b in dead[:12])
         detail += (f"<li><div class='j-head'><b>{e(r['boss'])}</b><small><span class='num'>{_mmss(r['duration'])}</span>"
                    f" &middot; {end}</small></div><div class='whos'>{who}</div></li>")
-    return (f"{head}<h3>Over the night</h3>{table}<details class='more' open><summary>Pull by pull ({len(pulls)})</summary>"
-            f"<ul class='pulls'>{detail}</ul></details><p class='ws-fine'>Read from the casts of the log: a damage "
+    by_pull = (f"<details class='more' open><summary>Pull by pull ({len(pulls)})</summary><ul class='pulls'>{detail}</ul>"
+               "</details>") if len(pulls) > 1 else ""  # one pull: the table above says it all
+    return (f"{head}<h3>Over the night</h3>{table}{by_pull}<p class='ws-fine'>Read from the casts of the log: a damage "
             "potion counts from 10 s before the pull (the pre-pot); the deaths of the wipe itself are left out. A red 0/1: no "
             "damage potion in that pull. A name in red died without a "
             "healthstone or a health potion first.</p>")
