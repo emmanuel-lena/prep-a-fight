@@ -136,16 +136,16 @@ def _prepared_ids(encounters: list, diff: str | None = None) -> set:
 
 
 # the "· has a sheet" marks follow the difficulty picked in the same form
-READY_JS = ("<script>(function(s){var f=s&&s.form;if(!f)return;function goal(){var na=(s.options[s.selectedIndex]"
+READY_JS = ("<script>(function(s){var f=s&&s.form;if(!f)return;function goal(init){var na=(s.options[s.selectedIndex]"
             "||{}).dataset;na=na&&na.na;f.querySelectorAll('[name=objective]').forEach(function(r){var l=r.closest('label')"
             "||r;if(r.value==='total'||r.value==='all'){l.hidden=!!na;if(na&&r.checked){var b=f.querySelector("
             "'[name=objective][value=boss]');if(b)b.checked=true}}});if(f.dataset.addsOnly){var n=f.querySelector('.ws-noadds'),"
-            "g=f.querySelector('.ws-go .btn');if(na){var o=[].filter.call(s.options,function(o){return !o.dataset.na})[0];"
+            "g=f.querySelector('.ws-go .btn');if(na&&init===1){var o=[].filter.call(s.options,function(o){return !o.dataset.na})[0];"
             "if(o){s.value=o.value;na=null}}if(n)n.hidden=!na;if(g)g.disabled=!!na}prep()}"
             "function prep(){if(!f.dataset.needsPrep)return;var c=f.querySelector('[name=difficulty]:checked');"
             "var o=s.options[s.selectedIndex],ok=!c||!o||(' '+o.dataset.r+' ').indexOf(' '+c.value+' ')>=0,"
             "p=f.querySelector('.ws-noprep'),g=f.querySelector('.ws-go .btn');if(p)p.hidden=ok;"
-            "if(g&&!f.dataset.addsOnly)g.disabled=!ok}f.addEventListener('change',prep)s.addEventListener('change',goal);document.addEventListener('DOMContentLoaded',goal);goal();function up(){var c=f.querySelector("
+            "if(g&&!f.dataset.addsOnly)g.disabled=!ok}f.addEventListener('change',prep);s.addEventListener('change',function(){goal()});document.addEventListener('DOMContentLoaded',function(){goal(1)});goal(1);function up(){var c=f.querySelector("
             "'[name=difficulty]:checked')||f.querySelector('select[name=difficulty]');if(!c)return;"
             "[].forEach.call(s.options,function(o){if(o.dataset.n==null)return;o.textContent=o.dataset.n+((' '+"
             "o.dataset.r+' ').indexOf(' '+c.value+' ')>=0?' · has a sheet':'')})}f.addEventListener('change',"
