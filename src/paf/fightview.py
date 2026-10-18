@@ -179,7 +179,7 @@ def items(d) -> list[tuple[float, Item]]:
                           float(w.duration)))
         if w.duration >= MOVE_CUE and w.spells:
             s = w.spells[0][0]
-            add(w.start, Item("you", "move", s, f"{s} to keep up while the raid moves", _icon(d, s)))
+            add(w.start, Item("you", "move", s, f"{s} for the move", _icon(d, s)))
     return sorted(out, key=lambda x: x[0])
 
 
@@ -320,12 +320,23 @@ def _btn(id_: str, label: str, keys: str = "", cls: str = "btn", hidden: bool = 
     return f"<button type='button' class='{cls}' id='{id_}'{attrs}><span>{label}</span>{kbd}</button>"
 
 
-def _phase_html(name: str, start: float, end: float, pi: int, rows: str) -> str:
+def _phase_html(name: str, start: float, end: float, pi: int, rows: str, its: list) -> str:
     lasts = f"Starts around {_mmss(start)}; " if start >= 1 else "Starts at the pull; "
     lanes = "".join(f"<span>{x}</span>" for x in ("The boss", "Pull clock", "You"))
+    mine = [(t, x) for t, x in its if start - 0.5 <= t < end - 0.5 and x.side == "boss"]
+    said = [x.text[0].lower() + x.text[1:] for _t, x in mine if x.kind == "immune"]
+    said += [f"{x.text} at {_mmss(t)}" for t, x in mine if x.kind == "adds"]
+    lust = [t for t, x in mine if x.kind == "lust"]
+    if lust:
+        said.insert(0, "Bloodlust " + ("at the pull" if lust[0] < 5 else f"at {_mmss(lust[0])}"))
+    adv = f"<p class='ph-adv'>{e(cap(', then '.join(said)))}.</p>" if said else ""
     return (f"<section class='stl' aria-labelledby='ph{pi}-h'><div class='ph-band' id='ph{pi}'><div class='ph-name'>"
-            f"<h2 id='ph{pi}-h'>{e(name)}</h2><span>{lasts}lasts about {_mmss(end - start)}.</span></div>"
+            f"<h2 id='ph{pi}-h'>{e(name)}</h2><span>{lasts}lasts about {_mmss(end - start)}.</span></div>{adv}"
             f"<div class='ph-lanes' aria-hidden='true'>{lanes}</div></div>{rows}</section>")
+
+
+def cap(s: str) -> str:
+    return s[:1].upper() + s[1:]
 
 
 LEGEND = ("<div class='fv-legend' aria-hidden='true'><span><i class='s-cd'></i>your cooldown</span>"
@@ -377,13 +388,13 @@ def html(d) -> str:
     ms = moments(d)
     if not dur or not ms:
         return ""
-    sections, phases = [], _phases(d, dur)
+    sections, phases, its = [], _phases(d, dur), items(d)
     for pi, (name, start, end) in enumerate(phases):
         last = pi == len(phases) - 1
         rows = "".join(_row(m, i, (ms[i + 1].t if i + 1 < len(ms) else dur) - m.t) for i, m in enumerate(ms)
                        if (m.t >= start - 0.5 or pi == 0) and (m.t < end - 0.5 or (last and m.t <= end)))
         if rows:
-            sections.append(_phase_html(name, start, end, pi, rows))
+            sections.append(_phase_html(name, start, end, pi, rows, its))
     payload = json.dumps(data(d, ms, dur)).replace("</", "<\\/")
     return (f"<div class='fv'><a class='skip' href='#tl'>Skip to the fight</a><div class='sheet-fv'>{_side(d)}"
             f"<section class='ftl' id='tl' tabindex='-1' aria-label='The fight'>{LEGEND}{''.join(sections)}"

@@ -631,7 +631,7 @@ def suggestions_html(d: PrepData) -> str:
     for s in suggestions(d):
         label = {"major": "Major", "moderate": "Moderate", "minor": "Minor", "info": "Info"}[s.severity]
         gain = f'<div class="gain">{s.gain:+.1f}%</div>' if s.gain is not None else '<div class="gain"></div>'
-        pic = icons.img(s.icon, "medium") or '<span class="phm"></span>'
+        pic = icons.img(s.icon or "inv_misc_groupneedmore", "medium")
         details = "".join(f"<div>{x}</div>" for x in s.details)
         rows.append(f'<div class="sugg {s.severity}">{pic}<div><div class="t"><span class="sev">{label}</span> '
                     f'{s.title}</div><div class="d">{details}</div></div>{gain}</div>')
@@ -930,7 +930,9 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
 
     sections: dict[str, list[str]] = {
         "fight": notices + [fightview.html(d)],
-        "change": [simple.change_card(d), briefing.spec_html(d), suggestions_html(d)] + tabs["gear"],
+        "change": [f"<div class='simple change-top'><div class='cards'>{simple.change_card(d)}</div></div>",
+                   briefing.spec_html(d), "<h2>Everything worth changing, by gain</h2>" + suggestions_html(d)]
+        + tabs["gear"],
         "boss": tabs["boss"],
         "deeper": tabs["overview"] + [simple.review_card(d)] + tabs["cooldowns"] + tabs["raid"] + tabs["fight"]
         + [_tools_html()],

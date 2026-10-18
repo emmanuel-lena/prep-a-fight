@@ -63,7 +63,7 @@ def test_movement_is_a_bar_not_an_event(monkeypatch):
     d.movement = Movement(windows=[Window(100.0, 30.0, [("Shadowstep", 0.8)])])
     ms = fightview.moments(d)
     row = next(m for m in ms if m.t == 100.0)
-    assert row.anchor is None and [y.text for y in row.you] == ["Shadowstep to keep up while the raid moves"]
+    assert row.anchor is None and [y.text for y in row.you] == ["Shadowstep for the move"]
     data = json.loads(re.search(r"var FV=(\{.*?\});</script>", fightview.html(d)).group(1))
     assert not any(a["k"] == "move" for a in data["anchors"]) and any(s["k"] == "move" for s in data["strips"])
 
