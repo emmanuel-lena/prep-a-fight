@@ -235,3 +235,7 @@ textarea[name=plan],textarea[name=notes]{font-family:var(--font-data);font-size:
 .set-cols .key-in{width:100%}
 .status td{height:56px;box-sizing:border-box}
 .settings .dirty-note{display:none;margin-left:12px;color:var(--accent);font-weight:600} .settings.dirty .dirty-note{display:inline} .settings.dirty .cta{background:var(--accent-soft)}
+.settings .cta{box-shadow:0 -10px 14px -10px rgba(0,0,0,.18)} /* the bar reads as a bar over the scrolling form */
+.settings.dirty .cta{background:var(--surface);border-top:2px solid var(--accent)} /* one accent line, in both themes */
+.card-h{margin:0 0 8px;font:600 13px var(--font-display);text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.set-cols .card+.card{margin-top:14px}

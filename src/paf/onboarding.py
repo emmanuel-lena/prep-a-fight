@@ -139,7 +139,7 @@ def page_body() -> str:
 <ul class="ob-points"><li><b>What the best players do</b> on this boss, read from their logs.</li>
 <li><b>Your character simmed on the real fight</b>, rebuilt from those logs: talents, gear, cooldowns.</li>
 <li><b>One sheet</b>: what to change, when to press what, what to watch out for.</li></ul>
-<p class="muted">Free, on your computer. Three short steps; skip any of them, everything is in Settings later.</p>
+<p class="muted">Free, on your computer. Three short steps, then you are ready; skip any of them, everything is in Settings later.</p>
 <div class="ob-actions"><button type="button" class="btn go next">Start &rarr;</button>
 <a class="btn ghost" href="/onboard/skip">Skip all</a></div></section>
 
@@ -192,7 +192,10 @@ var names = steps.map(function(s){ return s.dataset.step; }), at = 0, done = {};
 root.querySelectorAll('form').forEach(function(f){ f.addEventListener('input', function(){  // an edit: save it first
   var k = f.querySelector('.keep'), s = f.querySelector('.save-alt'); if (!k || !s) return;
   s.hidden = false; s.classList.remove('ghost'); s.classList.add('go');
-  k.classList.remove('go'); k.classList.add('ghost'); k.innerHTML = 'Keep the saved one &rarr;'; }); });
+  k.classList.remove('go'); k.classList.add('ghost'); k.innerHTML = 'Keep the saved one &rarr;';
+  var g = f.querySelector('input[name=guild]');  // an emptied guild saves "no guild": said so
+  if (g && s.dataset.label == null) s.dataset.label = s.textContent;
+  if (g) s.textContent = g.value.trim() ? s.dataset.label : 'Save without a guild'; }); });
 function store(i){ try { localStorage.setItem('paf-onboard', names[i]); } catch (e) {} }
 function show(i, back){
   at = Math.max(0, Math.min(steps.length - 1, i));

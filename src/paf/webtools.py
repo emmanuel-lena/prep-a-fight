@@ -127,7 +127,8 @@ def new_reports(since: float) -> list[str]:
 SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
     ("Your raid", False, [
         ("difficulty", "Difficulty", "The difficulty a new prep starts on."),
-        ("guild", "Guild", "Its latest log gives your raid's composition (who hits the adds, pad or not)."),
+        ("guild", "Guild", "Its latest public log tells the prep who plays what in your raid: whether the others cover "
+                           "the adds or you should pad them."),
         ("guild_server", "Guild's server", "For example Kazzak."),
         ("guild_region", "Guild's region", "Where your guild's logs are read from."),
     ]),
@@ -237,7 +238,8 @@ def settings_page(message: str = "") -> str:
 <script>(function(f){{var d=false;f.addEventListener('input',function(){{d=true;f.classList.add('dirty')}});
 f.addEventListener('submit',function(){{d=false}});window.addEventListener('beforeunload',function(ev){{if(d){{ev.preventDefault();
 ev.returnValue=''}}}})}})(document.currentScript.previousElementSibling)</script></div><div>
-{account}<h2>Warcraft Logs key</h2><div class="card"><p class="small measure">{current} To use another one (a new
+{account if account else "<h2>Warcraft Logs</h2>"}<div class="card"><h3 class="card-h">Your API key</h3>
+<p class="small measure">{current} To use another one (a new
 client, or a regenerated secret): create or open it on <a href="https://www.warcraftlogs.com/api/clients"
 target="_blank" rel="noopener">warcraftlogs.com/api/clients</a>, then paste both values.
 It is tested before it replaces the old one.</p>
@@ -250,7 +252,7 @@ autocomplete="off">
 <h2>Status</h2><div class="card"><table class="status">
 <tr><td>SimulationCraft</td><td class="small"><div class="val"><span>{simc}</span>
 <form method="post" action="/tool/setup">
-<button class="btn ghost">Update</button></form></div></td></tr>
+<button class="btn ghost" title="Downloads the latest SimulationCraft nightly into the app; a build of your own stays where it is">Get nightly</button></form></div></td></tr>
 <tr><td>prep-a-fight</td><td class="small"><div class="val"><span>version {e(__version__)}</span>
 <form method="post" action="/update/check"><button class="btn ghost">Check for updates</button></form></div></td></tr>
 <tr><td>Warcraft Logs</td><td class="small">{quota}</td></tr>
