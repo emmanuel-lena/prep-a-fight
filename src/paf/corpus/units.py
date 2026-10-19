@@ -7,7 +7,7 @@ import sqlite3
 import statistics as st
 from collections.abc import Callable
 
-from paf.corpus.analyze import kills_filter
+from paf.corpus.analyze import KILLABLE_DEATH_RATE, kills_filter
 from paf.wcl import WCLClient, WCLError
 
 FIGHT_QUERY = """query($code:String!,$f:[Int]!){ reportData { report(code:$code) {
@@ -15,6 +15,7 @@ FIGHT_QUERY = """query($code:String!,$f:[Int]!){ reportData { report(code:$code)
 GRAPH_QUERY = """query($code:String!,$f:[Int]!,$s:Float,$e:Float){ reportData { report(code:$code) {
   graph(fightIDs:$f, startTime:$s, endTime:$e, dataType:DamageTaken, hostilityType:Enemies) } } }"""
 MIN_SHARE = 0.05  # a boss-type unit must take this share of the enemies' damage to count (else: a mechanic)
+NPC_MIN_SHARE = 0.02  # another enemy must take this share to count (Nymrissa mythic's Bubblefin Frostscale: 4%)
 
 
 UP_SHARE = 0.2  # a unit is attackable where it takes at least this share of its usual damage rate
@@ -60,15 +61,33 @@ def analyze_graph(series: list[dict], boss_name: str, duration: float) -> list[t
     return out
 
 
+def npc_graph_windows(series: list[dict], duration: float) -> list[tuple[str, float, float]]:
+    """(name, start, duration) of the windows when a non-boss enemy takes damage, for the enemies taking at least
+    NPC_MIN_SHARE of the enemies' damage. The raid's damage, not one spec's: Nymrissa's Bubblefin Shorerunners take
+    60% of the top Elementals' damage and 8% of the top Subtlety Rogues', and never die (they flee into a bubble)."""
+    by = {s.get("name"): (s.get("type"), s.get("data") or []) for s in series}
+    total = sum(sum(v for v in d if isinstance(v, (int, float))) for t, d in by.values() if t in ("Boss", "NPC"))
+    out = []
+    for name, (kind, data) in by.items():
+        if kind != "NPC" or not data or sum(data) / (total or 1) < NPC_MIN_SHARE:
+            continue
+        step = duration / len(data)
+        floor = UP_SHARE * st.median([v for v in data if v > 0] or [0])
+        out += [(name, round(s, 1), round(d, 1)) for s, d in windows_from_series(data, step, floor) if d >= 2 * step]
+    return out
+
+
 def fetch_unit_windows(client: WCLClient, con: sqlite3.Connection, encounter_id: int, difficulty: int,
                        boss_name: str, kills: int = 12,
                        log: Callable[[str], None] = lambda s: print(s, flush=True)) -> int:
     where, params = kills_filter(encounter_id, difficulty)
-    have = con.execute(f"SELECT COUNT(*) FROM unit_status u JOIN fight f USING(report, fight_id) WHERE {where}",
-                       params).fetchone()[0]
-    todo = con.execute(
-        f"SELECT f.report, f.fight_id, f.duration_s FROM fight f LEFT JOIN unit_status u USING(report, fight_id) "
-        f"WHERE {where} AND u.report IS NULL ORDER BY f.report LIMIT ?", (*params, max(0, kills - have))).fetchall()
+    have = con.execute(f"SELECT COUNT(*) FROM unit_status u JOIN npc_status n USING(report, fight_id) "
+                       f"JOIN fight f USING(report, fight_id) WHERE {where}", params).fetchone()[0]
+    todo = con.execute(  # the kills missing either table (npc_window came in 0.8.11: older corpora fill it now)
+        f"SELECT f.report, f.fight_id, f.duration_s, u.report IS NOT NULL FROM fight f "
+        f"LEFT JOIN unit_status u USING(report, fight_id) LEFT JOIN npc_status n USING(report, fight_id) "
+        f"WHERE {where} AND (u.report IS NULL OR n.report IS NULL) "
+        f"ORDER BY u.report IS NULL, f.report LIMIT ?", (*params, max(0, kills - have))).fetchall()
     for r in todo:
         try:
             fr = client.query(FIGHT_QUERY, {"code": r[0], "f": [r[1]]},
@@ -79,9 +98,15 @@ def fetch_unit_windows(client: WCLClient, con: sqlite3.Connection, encounter_id:
             log(f"  graph skipped: {str(e)[:100]}")
             continue
         g = g.get("data", g) if isinstance(g, dict) else {}
-        rows = analyze_graph(g.get("series") or [], boss_name, (fr["endTime"] - fr["startTime"]) / 1000)
-        con.executemany("INSERT INTO unit_window VALUES(?,?,?,?,?,?)", [(r[0], r[1], *x) for x in rows])
-        con.execute("INSERT OR REPLACE INTO unit_status VALUES(?,?)", (r[0], r[1]))
+        series, length = g.get("series") or [], (fr["endTime"] - fr["startTime"]) / 1000
+        if not r[3]:
+            rows = analyze_graph(series, boss_name, length)
+            con.executemany("INSERT INTO unit_window VALUES(?,?,?,?,?,?)", [(r[0], r[1], *x) for x in rows])
+            con.execute("INSERT OR REPLACE INTO unit_status VALUES(?,?)", (r[0], r[1]))
+        con.execute("DELETE FROM npc_window WHERE report=? AND fight_id=?", (r[0], r[1]))
+        con.executemany("INSERT INTO npc_window VALUES(?,?,?,?,?)",
+                        [(r[0], r[1], *x) for x in npc_graph_windows(series, length)])
+        con.execute("INSERT OR REPLACE INTO npc_status VALUES(?,?)", (r[0], r[1]))
         con.commit()
     return len(todo)
 
@@ -333,3 +358,43 @@ def unit_windows(con: sqlite3.Connection, encounter_id: int, difficulty: int, mi
         per_kill.setdefault((r[0], r[1]), []).append((r[3], r[4], r[2]))
         ratios.setdefault(r[2], []).append(r[5])
     return per_kill, {name: st.median(v) for name, v in ratios.items()}
+
+
+def undying_waves(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> list[tuple[float, int, float, str]]:
+    """Waves of enemies that take real damage but never die, (start, count, lifetime, name): their windows come from
+    the damage-taken graph (npc_window), their count from the instances spawned in each window. Deaths miss them:
+    Nymrissa's Bubblefin Shorerunners flee into her bubble, 15 at a time, every 45 to 65 s."""
+    from paf.corpus.analyze import canonical_waves
+
+    where, params = kills_filter(encounter_id, difficulty)
+    kills = [tuple(r) for r in con.execute(
+        f"SELECT n.report, n.fight_id FROM npc_status n JOIN fight f USING(report, fight_id) WHERE {where} "
+        f"ORDER BY n.report, n.fight_id", params)]
+    if not kills:
+        return []
+    totals = dict(con.execute(
+        f"SELECT d.target, SUM(d.amount) FROM damage_by_target d JOIN fight f USING(report, fight_id) "
+        f"WHERE {where} GROUP BY d.target", params).fetchall())
+    raid = sum(v or 0 for v in totals.values()) or 1
+    died: dict[str, list[int]] = {}
+    spawns: dict[tuple[str, str, int], list[float]] = {}
+    for name, rep, fid, t, d in con.execute(
+            f"SELECT n.name, a.report, a.fight_id, a.t_spawn, a.died FROM add_instance a JOIN npc n USING(game_id) "
+            f"JOIN fight f USING(report, fight_id) WHERE {where} AND NOT n.is_boss", params):
+        died.setdefault(name, []).append(d)
+        if t is not None:
+            spawns.setdefault((name, rep, fid), []).append(t)
+    windows: dict[str, dict[tuple[str, int], list]] = {}
+    for rep, fid, name, start, length in con.execute(
+            f"SELECT w.report, w.fight_id, w.name, w.t_start, w.duration FROM npc_window w "
+            f"JOIN fight f USING(report, fight_id) WHERE {where}", params):
+        if name in died and sum(died[name]) / len(died[name]) < KILLABLE_DEATH_RATE \
+                and (totals.get(name) or 0) / raid >= NPC_MIN_SHARE:  # over the corpus, not one kill's graph
+            windows.setdefault(name, {}).setdefault((rep, fid), []).append((start, 1, length, [name]))
+    out = []
+    for name, per_kill in windows.items():
+        for w in canonical_waves([per_kill.get(k, []) for k in kills]):
+            counts = [sum(w.t - 5 <= t <= w.t + w.lifetime for t in spawns.get((name, *k), [])) for k in kills]
+            counts = [c for c in counts if c]
+            out.append((w.t, max(1, round(st.median(counts))) if counts else 1, w.lifetime, name))
+    return sorted(out)

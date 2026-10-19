@@ -16,3 +16,16 @@ def test_damage_taken_amp_prefers_the_difficulty_row(monkeypatch):
 def test_damage_taken_amp_none_without_the_aura(monkeypatch):
     monkeypatch.setattr(gamedata, "_filtered_rows", lambda table, col, value: [])
     assert gamedata.damage_taken_amp(1, "heroic") is None
+
+
+def test_known_not_amp_follows_the_triggered_spells(monkeypatch):
+    from paf import gamedata
+
+    effects = {1: [{"EffectAura": "226", "EffectTriggerSpell": "0"}],  # a periodic dummy: known, no amp
+               2: [{"EffectAura": "23", "EffectTriggerSpell": "3"}],  # triggers spell 3, which is an amp
+               3: [{"EffectAura": "87", "EffectTriggerSpell": "0", "EffectBasePointsF": "30"}]}
+    monkeypatch.setattr(gamedata, "_filtered_rows", lambda table, col, sid, locale="": effects.get(sid, []))
+    assert gamedata.known_not_amp(1)
+    assert not gamedata.known_not_amp(2)
+    assert not gamedata.known_not_amp(3)
+    assert not gamedata.known_not_amp(9)  # unknown to the game data: the logs may still be right

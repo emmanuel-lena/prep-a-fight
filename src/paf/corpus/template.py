@@ -205,17 +205,28 @@ def game_amp(encounter_id: int, unit_name: str, difficulty: str) -> tuple[float 
     return None, ""
 
 
-def aura_amps(found: list[tuple[str, float, list[tuple[float, float]], int, int]],
-              amp_of) -> tuple[list[Vulnerable], list[Vulnerable]]:
-    """Recurring boss auras (paf.corpus.units.amp_candidates) as (game-data amps, unconfirmed candidates). The game
-    data decides first; the measured ratio only gates the unconfirmed ones (Sszorak's Dig In, +30% in the game data,
-    measures x1.32 in the Subtlety logs but x1.2 in the Elemental ones: a floor on it lost the amp for some specs)."""
+IMMUNE_MULTIPLIER = 0.1  # a boss aura cutting damage taken to this or less makes the boss immune (-90% or more)
+
+
+def aura_amps(found: list[tuple[str, float, list[tuple[float, float]], int, int]], amp_of,
+              not_amp=lambda aid: False) -> tuple[list[Vulnerable], list[Vulnerable], list[Window]]:
+    """Recurring boss auras (paf.corpus.units.amp_candidates) as (game-data amps, unconfirmed candidates, immune
+    windows). The game data decides first; the measured ratio only gates the unconfirmed ones (Sszorak's Dig In, +30%
+    in the game data, measures x1.32 in the Subtlety logs but x1.2 in the Elemental ones: a floor on it lost the amp
+    for some specs). An aura the game data knows without any damage-taken effect (`not_amp`) is no candidate either.
+    `amp_of` gives the game data's damage-taken multiplier, reductions included: -99% (the Sentinels' Vitriolic
+    Stasis, every 100 s while the phases only keep its first start) is an immune window."""
     from paf.corpus.units import AMP_MIN_RATIO
 
-    vulnerable, candidates = [], []
+    vulnerable, candidates, immune = [], [], []
     for name, ratio, wins, _k, aid in found:
         amp = amp_of(aid)
-        if not amp and ratio < AMP_MIN_RATIO:
+        if amp is not None and amp <= IMMUNE_MULTIPLIER:
+            immune += [Window(round(t, 1), round(d, 1)) for t, d in wins]
+            continue
+        if amp is not None and amp <= 1:
+            amp = None
+        if not amp and (ratio < AMP_MIN_RATIO or not_amp(aid)):
             continue
         for t, d in wins:
             if amp:  # the game data confirms it: a real amp on the boss
@@ -224,7 +235,7 @@ def aura_amps(found: list[tuple[str, float, list[tuple[float, float]], int, int]
             else:
                 candidates.append(Vulnerable(round(t, 1), round(d, 1), ratio, f"{name} (boss aura)",
                                              "measured in the logs, not confirmed"))
-    return vulnerable, candidates
+    return vulnerable, candidates, immune
 
 
 def ability_names_all(con: sqlite3.Connection) -> dict[int, str]:
@@ -284,6 +295,9 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
     for kind in sorted({s[2] for spawns in adds.values() for s in spawns}):
         per_kill = [fight_waves([s for s in adds.get(k, []) if s[2] == kind]) for k in keys]
         add_waves += [AddWave(w.t, max(1, round(w.count)), w.lifetime, kind) for w in canonical_waves(per_kill)]
+    from paf.corpus.units import undying_waves
+
+    add_waves += [AddWave(t, n, life, name) for t, n, life, name in undying_waves(con, encounter_id, difficulty)]
     add_waves.sort(key=lambda w: w.time)
     # a council (several bosses with their own health): the simulated bosses are the members the player hits at once
     # (Fight.targets), so the members are neither adds nor vulnerability windows; their order is information
@@ -385,16 +399,29 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
         vulnerable = [Vulnerable(round(w.time, 1), round(w.lifetime, 1), mult, w.name) for w in boss_waves]
 
     from paf.corpus.units import amp_candidates
-    from paf.gamedata import damage_taken_amp
+    from paf.gamedata import damage_taken_multiplier, known_not_amp
 
     def amp_of(aid: int) -> float | None:
         try:
-            return damage_taken_amp(aid, diff_name or "heroic")
+            return damage_taken_multiplier(aid, diff_name or "heroic")
         except OSError:
             return None
+    def not_amp(aid: int) -> bool:
+        try:
+            return known_not_amp(aid)
+        except OSError:
+            return False
     found = amp_candidates(con, encounter_id, difficulty, ability_names_all(con), 0.0)
-    confirmed, candidates = aura_amps(found, amp_of)
+    confirmed, candidates, immune = aura_amps(found, amp_of, not_amp)
     vulnerable += confirmed
+    for w in immune:  # an immunity the phases miss (a phase that comes back is only kept at its first start)
+        if not any(min(w.start + w.duration, i.start + i.duration) - max(w.start, i.start) >= w.duration / 2
+                   for i in invulnerable):
+            invulnerable.append(w)
+    invulnerable.sort(key=lambda w: w.start)
+    # a candidate inside a known amp is that amp seen again (Ula'tek's rage exposes the heart: x1.32 on the boss)
+    candidates = [c for c in candidates if not any(
+        min(c.start + c.duration, v.start + v.duration) - max(c.start, v.start) >= c.duration / 2 for v in vulnerable)]
 
     fight = Fight(
         name=f"{title or boss_name} {diff_name}".strip(),

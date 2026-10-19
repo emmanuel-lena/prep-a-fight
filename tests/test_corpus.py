@@ -116,10 +116,55 @@ def test_a_boss_unit_is_up_from_the_ranked_players_first_hit():
 
 def test_aura_amps_trust_the_game_data_over_the_measured_ratio():
     from paf.corpus.template import aura_amps
+    from paf.fight import Window
 
     found = [("Dig In", 1.2, [(111.1, 25.0), (249.2, 25.0)], 12, 1286033),  # +30% in the game data, x1.2 measured
              ("Frenzy", 1.5, [(60.0, 10.0)], 12, 2),  # not in the game data: a candidate for the boss notes
              ("Shell", 0.9, [(30.0, 4.0)], 12, 3)]
-    vulnerable, candidates = aura_amps(found, {1286033: 1.3}.get)
+    vulnerable, candidates, _ = aura_amps(found, {1286033: 1.3}.get)
     assert [(v.start, v.multiplier) for v in vulnerable] == [(111.1, 1.3), (249.2, 1.3)]
     assert [(v.name, v.multiplier) for v in candidates] == [("Frenzy (boss aura)", 1.5)]
+    # the game data knows Uncoiled Wrath (damage done, not taken): not a candidate
+    found.append(("Uncoiled Wrath", 1.34, [(393.4, 8.2)], 12, 1308583))
+    _, candidates, _ = aura_amps(found, {1286033: 1.3}.get, lambda aid: aid == 1308583)
+    # the Sentinels' Vitriolic Stasis: -99% in the game data, every 100 s -> immune windows, not an amp
+    stasis = [("Vitriolic Stasis", 0.27, [(46.0, 10.0), (148.0, 12.0), (250.0, 8.0)], 12, 1284606)]
+    assert aura_amps(stasis, {1284606: 0.01}.get) == ([], [], [Window(46.0, 10.0), Window(148.0, 12.0),
+                                                                Window(250.0, 8.0)])
+    assert [v.name for v in candidates] == ["Frenzy (boss aura)"]
+
+
+def test_adds_that_never_die_come_from_the_damage_graph():
+    """Nymrissa's Bubblefin Shorerunners flee into her bubble: no deaths, yet 60% of the top Elementals' damage."""
+    import sqlite3
+
+    from paf.corpus.db import SCHEMA
+    from paf.corpus.units import npc_graph_windows, undying_waves
+
+    series = [{"name": "Nymrissa Wavecaller", "type": "Boss", "data": [100.0] * 100},
+              {"name": "Bubblefin Shorerunner", "type": "NPC",
+               "data": [0.0] * 10 + [80.0] * 15 + [0.0] * 30 + [70.0] * 15 + [0.0] * 30},
+              {"name": "Totem", "type": "NPC", "data": [1.0] * 100}]  # 1% of the damage: a mechanic
+    assert npc_graph_windows(series, 200.0) == [("Bubblefin Shorerunner", 20.0, 30.0),
+                                                 ("Bubblefin Shorerunner", 110.0, 30.0)]
+
+    con = sqlite3.connect(":memory:")
+    con.executescript(SCHEMA)
+    con.executemany("INSERT INTO npc VALUES (?,?,?)", [(1, "Bubblefin Shorerunner", 0), (2, "Imp", 0), (3, "Egg", 0)])
+    for k in range(5):
+        rep = f"r{k}"
+        con.execute("INSERT INTO fight(report, fight_id, encounter_id, difficulty, status) VALUES (?,1,3379,4,'done')",
+                    (rep,))
+        con.execute("INSERT INTO npc_status VALUES (?, 1)", (rep,))
+        for start in (20 + k, 110 + k):
+            con.execute("INSERT INTO npc_window VALUES (?, 1, 'Bubblefin Shorerunner', ?, 30)", (rep, start))
+            con.executemany("INSERT INTO add_instance VALUES (?, 1, ?, 1, 1, ?, 300, 0)",
+                            [(rep, 1000 + start * 20 + i, start + i) for i in range(15)])
+        con.execute("INSERT INTO add_instance VALUES (?, 1, 99, 1, 2, 50, 60, 1)", (rep,))  # an add that dies
+        con.execute("INSERT INTO add_instance VALUES (?, 1, 98, 1, 3, 70, 300, 0)", (rep,))
+        con.execute("INSERT INTO npc_window VALUES (?, 1, 'Imp', 50, 10)", (rep,))  # tracked by its deaths instead
+        con.executemany("INSERT INTO damage_by_target VALUES (?, 1, 5, ?, ?)",
+                        [(rep, "Nymrissa Wavecaller", 78), (rep, "Bubblefin Shorerunner", 21), (rep, "Egg", 1)])
+        con.execute("INSERT INTO npc_window VALUES (?, 1, 'Egg', 70, 20)", (rep,))  # 1% over the corpus: a mechanic
+    assert undying_waves(con, 3379, 4) == [(22, 15, 30, "Bubblefin Shorerunner"),
+                                           (112, 15, 30, "Bubblefin Shorerunner")]

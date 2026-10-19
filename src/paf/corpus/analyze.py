@@ -166,6 +166,10 @@ def analyze(con: sqlite3.Connection, encounter_id: int, difficulty: int, boss_na
         if r["name"] in killable and r["t_spawn"] is not None:
             spawns[(r["report"], r["fight_id"])].append((r["t_spawn"], r["t_death"] - r["t_spawn"], r["name"]))
     waves = canonical_waves([fight_waves(spawns.get(k, [])) for k in sorted(keys)])
+    from paf.corpus.units import undying_waves
+
+    waves = sorted(waves + [Wave(t, t, t, n, life, 1.0, [name])  # adds that never die: from the damage graph
+                            for t, n, life, name in undying_waves(con, encounter_id, difficulty)], key=lambda w: w.t)
 
     dmg = con.execute(
         f"SELECT d.report, d.fight_id, d.actor_id, d.target, d.amount FROM damage_by_target d "
@@ -244,8 +248,10 @@ def format_report(r: Report, spec: str, top_talents: int = 12) -> str:
                  f"   {w.support:5.0%}   {', '.join(w.types)}")
     L.append("")
     L.append("Adds by type          per kill  lifetime  killed")
+    undying = {t for w in r.waves for t in w.types if w.t == w.t_p25 == w.t_p75}
     for nm, per, life, rate in r.adds:
-        tag = "" if rate >= KILLABLE_DEATH_RATE else "   (mechanic, not killed)"
+        tag = "" if rate >= KILLABLE_DEATH_RATE else "   (never killed: waves from the damage graph)" \
+            if nm in undying else "   (mechanic, not killed)"
         L.append(f"  {nm:<22} {per:6.1f}  {life:6.0f}s  {rate:6.0%}{tag}")
     L.append("")
     L.append("Damage done, by target (whole raid)")

@@ -147,8 +147,11 @@ def build_timeline(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
     for r in rows:
         if r["name"] in killable and not r["is_boss"] and r["t_spawn"] is not None:
             spawns[(r["report"], r["fight_id"])].append((r["t_spawn"], r["t_death"] - r["t_spawn"], r["name"]))
-    waves = [(w.t, w.count, w.lifetime, ", ".join(w.types))
-             for w in canonical_waves([fight_waves(spawns.get(k, [])) for k in keys])]
+    from paf.corpus.units import undying_waves
+
+    waves = sorted([(w.t, w.count, w.lifetime, ", ".join(w.types))
+                    for w in canonical_waves([fight_waves(spawns.get(k, [])) for k in keys])]
+                   + undying_waves(con, encounter_id, difficulty))  # adds that never die (the damage graph)
 
     # main boss abilities: enemy casts from units that are not tracked as adds (a boss unit that comes and goes,
     # like Nek'zali's Echo of Jawae, is tracked too but its casts are the boss's: two of the three Soul Transfers)

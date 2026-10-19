@@ -138,6 +138,12 @@ def _filtered_rows(table: str, column: str, value: int, locale: str = "") -> lis
 def damage_taken_amp(spell_id: int, difficulty: str = "heroic") -> float | None:
     """Multiplier of damage taken applied by a spell (aura 'mod damage % taken'), from the game data:
     e.g. Venomous Heart +100% -> 2.0. Difficulty-specific effects win over the default ones."""
+    mult = damage_taken_multiplier(spell_id, difficulty)
+    return mult if mult is not None and mult > 1 else None
+
+
+def damage_taken_multiplier(spell_id: int, difficulty: str = "heroic") -> float | None:
+    """Like damage_taken_amp, reductions included: the Sentinels' Vitriolic Stasis -99% -> 0.01."""
     rows = [r for r in _filtered_rows("SpellEffect", "SpellID", spell_id)
             if r.get("EffectAura") == str(AURA_MOD_DAMAGE_PERCENT_TAKEN)]
     if not rows:
@@ -151,7 +157,22 @@ def damage_taken_amp(spell_id: int, difficulty: str = "heroic") -> float | None:
         pct = float(row.get("EffectBasePointsF") or row.get("EffectBasePoints") or 0)
     except ValueError:
         return None
-    return round(1 + pct / 100, 2) if pct > 0 else None
+    return round(1 + pct / 100, 2) if pct else None
+
+
+def known_not_amp(spell_id: int, depth: int = 2) -> bool:
+    """True when the game data has the spell and neither it nor the spells it triggers changes damage taken:
+    a boss aura measured in the logs is then not an amp (Vexhul's Uncoiled Wrath raises the survivor's damage done)."""
+    rows = _filtered_rows("SpellEffect", "SpellID", spell_id)
+    if not rows:
+        return False
+    for r in rows:
+        if r.get("EffectAura") == str(AURA_MOD_DAMAGE_PERCENT_TAKEN):
+            return False
+        trig = int(r.get("EffectTriggerSpell") or 0)
+        if trig and depth and not known_not_amp(trig, depth - 1) and _filtered_rows("SpellEffect", "SpellID", trig):
+            return False
+    return True
 
 
 def spell_description(spell_id: int, locale: str = "") -> str:
