@@ -45,6 +45,7 @@ class Item:
     dur: float = 0.0  # seconds it lasts (a bar along the clock), 0 = none
     t: float = 0.0  # its own time (a row groups items a few seconds apart)
     why: str = ""  # a press no boss event explains: the plan's rule or its cooldown, and what the top players do
+    hint: str = ""  # a boss event: the Encounter Journal's line for damage dealers that names it
 
 
 @dataclass
@@ -166,6 +167,18 @@ def defensive_moments(d) -> list:
     return out
 
 
+def journal_hints(d, names) -> dict[str, str]:
+    """Event name -> the Encounter Journal's line for damage dealers that names it ("Dig In increases Sszorak's
+    damage taken during Howling Maelstrom."): the one-line 'do' of a boss row, for every boss (#28)."""
+    out: dict[str, str] = {}
+    for b in getattr(d, "role_bullets", None) or []:
+        line = re.sub(r"[\[\]]", "", b).strip()
+        for n in names:
+            if n and n not in out and re.search(rf"(?<!\w){re.escape(n)}(?!\w)", line, re.I):
+                out[n] = line
+    return out
+
+
 def items(d) -> list[tuple[float, Item]]:
     """Every event of the fight, (time, item), each at its own time."""
     out: list[tuple[float, Item]] = []
@@ -257,6 +270,10 @@ def items(d) -> list[tuple[float, Item]]:
     for t, it in out:
         if it.kind in ("cd", "pot") and t >= 5 and not _ctx(t, out):
             it.why = _why(d, it.name, t, order.get(it.name, []))
+    hints = journal_hints(d, {_clean(it.name) for _t, it in out if it.side == "boss"})
+    for _t, it in out:
+        if it.side == "boss" and it.kind in ("cast", "mech", "adds", "phase"):
+            it.hint = hints.get(_clean(it.name), "")
     starts = sorted(s for _n, s in d.phases if s >= 1)
     for k, (t, it) in enumerate(out):  # a boss event logged just before a phase starts belongs to that phase
         s = next((s for s in starts if s - 1.0 <= t < s), None)
@@ -328,6 +345,8 @@ def _ev(it: Item, row_t: float | None = None) -> str:
     if it.why:
         notes.append(it.why)
     small = f"<small>{', '.join(notes)}</small>" if notes else ""
+    if it.hint:
+        small += f"<small class='hint'>{e(it.hint)}</small>"
     return (f"<div class='ev ek-{it.kind}'>{_ic(it.icon)}<div class='x'><span class='main'>{text}</span>{small}"
             "</div></div>")
 
@@ -361,6 +380,13 @@ def job_html(d) -> str:
         adds = [_clean(x[3]) for x in d.waves if w.start - 2 <= x[0] <= w.start + w.duration and x[1]]
         what = f": kill the {e(adds[0])} to bring it back" if adds else ""
         rows.append((IMMUNE_ICON, f"<b>The boss is immune at {_mmss(w.start)}</b> for {w.duration:.0f} s{what}."))
+    if len(rows) < 2:  # the journal's lines for damage dealers about this fight's events (Sszorak: Dig In)
+        said = {r[0] for r in rows}
+        seen: set[str] = set()
+        for t, it in items(d):
+            if it.hint and it.hint not in seen and it.name not in said and len(rows) < 3:
+                seen.add(it.hint)
+                rows.append((it.name, f"{e(it.hint)} <span class='muted'>({_mmss(max(0.0, t))}, the journal)</span>"))
     defs = _defensives(d)
     if defs:
         s, why = defs[0][1], defs[0][2]

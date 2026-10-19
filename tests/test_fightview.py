@@ -107,3 +107,20 @@ def test_a_press_no_boss_event_explains_says_why(monkeypatch):
     assert why[182] == "as soon as it is ready again, like 75% of the top players"
     acts = fightview.data(d, fightview.moments(d), 300)["acts"]
     assert next(a for a in acts if a["t"] == 92)["w"] == why[92]
+
+
+def test_a_boss_row_says_what_the_journal_tells_damage_dealers(monkeypatch):
+    """#28: Sszorak's Dig In row had no instruction; the journal's line for damage dealers names it."""
+    d = sheet(monkeypatch)
+    d.actions = []
+    d.waves = []
+    d.boss_casts = [("Dig In", [111.0, 249.0]), ("Ravage", [30.0])]
+    d.role_bullets = ["[Dig In] increases Sszorak's damage taken during Howling Maelstrom.",
+                      "Venomous Surge inflicts raid-wide damage."]
+    dig = [it for _t, it in fightview.items(d) if it.name == "Dig In"]
+    assert len(dig) == 2 and all(it.hint == "Dig In increases Sszorak's damage taken during Howling Maelstrom."
+                                 for it in dig)
+    assert not next(it for _t, it in fightview.items(d) if it.name == "Ravage").hint  # not a damage dealer's line
+    page = fightview.html(d)
+    assert "<small class='hint'>Dig In increases Sszorak&#x27;s damage taken" in page
+    assert "the journal)" in fightview.job_html(d)  # Your job says it too, with when

@@ -476,3 +476,4 @@ dialog.ss::backdrop{background:var(--bg)}
 .fv .ss .ss-you{margin:0 auto;text-align:center}
 .fv .call .ic.none{visibility:hidden}
 .fv .fbar>span{background:var(--surface-2);border-radius:4px;padding:1px 6px} /* the countdown on its own ground, whatever the fill under it */
+.fv .ev small.hint{color:var(--fg);opacity:.8}
