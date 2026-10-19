@@ -112,3 +112,14 @@ def test_a_boss_unit_is_up_from_the_ranked_players_first_hit():
     where, params = kills_filter(3470, 4)
     assert first_hit(con, where, params, "Subtlety", "Echo") == 92
     assert first_hit(con, where, params, "Subtlety", "Nobody") is None
+
+
+def test_aura_amps_trust_the_game_data_over_the_measured_ratio():
+    from paf.corpus.template import aura_amps
+
+    found = [("Dig In", 1.2, [(111.1, 25.0), (249.2, 25.0)], 12, 1286033),  # +30% in the game data, x1.2 measured
+             ("Frenzy", 1.5, [(60.0, 10.0)], 12, 2),  # not in the game data: a candidate for the boss notes
+             ("Shell", 0.9, [(30.0, 4.0)], 12, 3)]
+    vulnerable, candidates = aura_amps(found, {1286033: 1.3}.get)
+    assert [(v.start, v.multiplier) for v in vulnerable] == [(111.1, 1.3), (249.2, 1.3)]
+    assert [(v.name, v.multiplier) for v in candidates] == [("Frenzy (boss aura)", 1.5)]

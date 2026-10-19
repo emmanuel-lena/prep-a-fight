@@ -205,6 +205,28 @@ def game_amp(encounter_id: int, unit_name: str, difficulty: str) -> tuple[float 
     return None, ""
 
 
+def aura_amps(found: list[tuple[str, float, list[tuple[float, float]], int, int]],
+              amp_of) -> tuple[list[Vulnerable], list[Vulnerable]]:
+    """Recurring boss auras (paf.corpus.units.amp_candidates) as (game-data amps, unconfirmed candidates). The game
+    data decides first; the measured ratio only gates the unconfirmed ones (Sszorak's Dig In, +30% in the game data,
+    measures x1.32 in the Subtlety logs but x1.2 in the Elemental ones: a floor on it lost the amp for some specs)."""
+    from paf.corpus.units import AMP_MIN_RATIO
+
+    vulnerable, candidates = [], []
+    for name, ratio, wins, _k, aid in found:
+        amp = amp_of(aid)
+        if not amp and ratio < AMP_MIN_RATIO:
+            continue
+        for t, d in wins:
+            if amp:  # the game data confirms it: a real amp on the boss
+                vulnerable.append(Vulnerable(round(t, 1), round(d, 1), amp, f"{name} (boss aura)",
+                                             f"game data (spell {aid}: damage taken +{round((amp - 1) * 100)}%)"))
+            else:
+                candidates.append(Vulnerable(round(t, 1), round(d, 1), ratio, f"{name} (boss aura)",
+                                             "measured in the logs, not confirmed"))
+    return vulnerable, candidates
+
+
 def ability_names_all(con: sqlite3.Connection) -> dict[int, str]:
     from paf.gamedata import spell_names
 
@@ -365,19 +387,14 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
     from paf.corpus.units import amp_candidates
     from paf.gamedata import damage_taken_amp
 
-    candidates = []
-    for name, ratio, wins, _k, aid in amp_candidates(con, encounter_id, difficulty, ability_names_all(con)):
+    def amp_of(aid: int) -> float | None:
         try:
-            amp = damage_taken_amp(aid, diff_name or "heroic")
+            return damage_taken_amp(aid, diff_name or "heroic")
         except OSError:
-            amp = None
-        for t, d in wins:
-            if amp:  # the game data confirms it: a real amp on the boss
-                vulnerable.append(Vulnerable(round(t, 1), round(d, 1), amp, f"{name} (boss aura)",
-                                             f"game data (spell {aid}: damage taken +{round((amp - 1) * 100)}%)"))
-            else:
-                candidates.append(Vulnerable(round(t, 1), round(d, 1), ratio, f"{name} (boss aura)",
-                                             "measured in the logs, not confirmed"))
+            return None
+    found = amp_candidates(con, encounter_id, difficulty, ability_names_all(con), 0.0)
+    confirmed, candidates = aura_amps(found, amp_of)
+    vulnerable += confirmed
 
     fight = Fight(
         name=f"{title or boss_name} {diff_name}".strip(),
