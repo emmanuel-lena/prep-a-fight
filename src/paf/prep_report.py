@@ -491,16 +491,24 @@ def off_tops(d, p) -> list[str]:
         ts, n = d.tops_casts.get(key), d.tops_players
         if not ts or not n or t <= 5 or label in short or seen.get(key, 0) >= 2:
             continue
-        if sum(abs(x - t) <= 4 for x in ts) / n >= 0.25:  # a fair share of them press it then too
+        here, there = tops_moment(ts, n, t)
+        if here >= 0.25 or there is None:  # a fair share of them press it then too, or no other moment
             continue
-        peak = max(((sum(abs(x - c) <= 4 for x in ts), c) for c in ts if 6 <= abs(c - t) <= 30), default=None)
-        if peak is None or peak[0] / n < 0.5:
-            continue
-        around = sorted(x for x in ts if abs(x - peak[1]) <= 4)
         seen[key] = seen.get(key, 0) + 1
-        out.append(f"{cd_name(d, key)}: the plan presses it at {_mmss(t)}, {min(1, peak[0] / n):.0%} of the top "
-                   f"players at about {_mmss(around[len(around) // 2])}.")
+        out.append(f"{cd_name(d, key)}: the plan presses it at {_mmss(t)}, {there[0]:.0%} of the top "
+                   f"players at about {_mmss(there[1])}.")
     return out
+
+
+def tops_moment(ts: list[float], players: int, t: float) -> tuple[float, tuple[float, float] | None]:
+    """The top players around a press at t: the share of them pressing it within 4 s, and the moment 6 to 30 s away
+    where most of them (half at least) press it instead: (share, typical time), or None."""
+    here = min(1.0, sum(abs(x - t) <= 4 for x in ts) / players)
+    peak = max(((sum(abs(x - c) <= 4 for x in ts), c) for c in ts if 6 <= abs(c - t) <= 30), default=None)
+    if peak is None or peak[0] / players < 0.5:
+        return here, None
+    around = sorted(x for x in ts if abs(x - peak[1]) <= 4)
+    return here, (min(1.0, peak[0] / players), around[len(around) // 2])
 
 
 def _stall(d, p) -> str:

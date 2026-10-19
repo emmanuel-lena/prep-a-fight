@@ -115,30 +115,32 @@
                html: '<span class="lab">' + esc(youNow(t, { state: 'far' })) + '</span><p class="pend">Next, once ' +
                  esc(h.a.n) + ' starts: ' + esc(names(g)) + '</p>' };
     }
-    var dt = g.owed ? 0 : g.at - t, c = g.owed ? 'late: the boss came early' : g.acts[0].c;
-    if (c === 'default list timing') c = '';  // said by the time itself
+    var dt = g.owed ? 0 : g.at - t, c = g.owed ? 'late: the boss came early' : g.acts[0].c, w = '';
+    if (c === 'default list timing') { c = ''; w = g.acts[0].w || ''; }  // no boss event: why it is there (#25)
     if (dt > FAR) {
       var head = youNow(t, { state: 'far' });
       return { key: 'far' + g.at.toFixed(0), g: g, cls: 'call fv-next', state: 'far', say: '',
-               html: '<span class="lab">' + esc(head) + '</span><p class="pend">Next: ' + esc(names(g)) + ' at ' + mmss(g.at) + (c ? ', ' + esc(c) : '') + '</p>' };
+               html: '<span class="lab">' + esc(head) + '</span><p class="pend">Next: ' + esc(names(g)) + ' at ' + mmss(g.at) + (c ? ', ' + esc(c) : w ? ': ' + esc(w) : '') + '</p>' };
     }
     var state = dt <= 0.5 ? 'go' : dt <= LEAD ? 'ready' : 'soon';
     var kick = state === 'go' ? (cap(c) || 'Press') : (state === 'ready' ? 'Get ready' : 'Next') + (c ? ', ' + c : '');
     var lab = state === 'go' ? 'Now' : state === 'ready' ? secs(dt) : 'in ' + secs(dt);
     var win = state === 'soon' ? '' : '<span class="win"><i style="transform:scaleX(' + (state === 'go' ? 1 : Math.max(0, 1 - dt / LEAD)).toFixed(3) + ')"></i></span>';
     var rows = g.acts.map(function (a) {
-      return '<div class="a">' + icon(a.ic) + '<div><b>' + esc(a.n) + '</b>' + (a.d && a.k !== 'move' ? '<small>lasts ' + Math.round(a.d) + ' s</small>' : '') + '</div></div>';
+      var sm = [a.d && a.k !== 'move' ? 'lasts ' + Math.round(a.d) + ' s' : '', a.c === 'default list timing' ? a.w || '' : ''].filter(Boolean);
+      return '<div class="a">' + icon(a.ic) + '<div><b>' + esc(a.n) + '</b>' + (sm.length ? '<small>' + esc(sm.join(' · ')) + '</small>' : '') + '</div></div>';
     }).join('');
     return { key: g.at.toFixed(1) + ':' + state, g: g, state: state, cls: 'call ' + { go: 'fv-go', ready: 'fv-soon', soon: 'fv-next' }[state],
              say: state === 'go' ? names(g, ', then ') + ', now' : state === 'ready' ? 'Get ready: ' + names(g, ', then ') + (c ? ', ' + c : '') : '',
-             html: '<span class="lab">' + esc(kick) + ' <span class="cd">' + esc(lab) + '</span></span><div class="acts">' + rows + '</div>' + win };
+             html: '<span class="lab">' + esc(kick) + ' <span class="cd">' + esc(lab) + '</span></span><div class="acts">' + rows + '</div>' +
+               win };
   }
   function then(t, cc) {
     if (!cc.g) return '';
     if (cc.state === 'far') return '';
     var n = group(t, cc.g.last);
     if (!n || n.at - t > THEN) return '';
-    var c = n.acts[0].c === 'default list timing' ? '' : n.acts[0].c, said = names(n);
+    var c = n.acts[0].c === 'default list timing' ? (n.acts[0].w || '').split(';')[0] : n.acts[0].c, said = names(n);
     return 'Then ' + said + ' at ' + mmss(n.at) + (c && said.indexOf(c.replace(/^on (the )?/, '').replace(/^\d+ × /, '')) < 0 ? ' · ' + c : '');
   }
 

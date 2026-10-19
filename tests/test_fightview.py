@@ -91,3 +91,19 @@ def test_the_desktop_holds_the_sync_key_only_while_a_fight_plays():
     api.sync_key(False)
     assert not api.want.is_set()
     assert "__fv" in desktop.SYNC_JS and "sync()" in desktop.SYNC_JS
+
+
+def test_a_press_no_boss_event_explains_says_why(monkeypatch):
+    """Issue #25: the plan's rule, else its cooldown coming back, and what the top players do then."""
+    d = sheet(monkeypatch)
+    presses = [(0.2, ["Potion"]), (2, ["Shadow Blades"]), (92, ["Shadow Blades"]), (182, ["Shadow Blades"])]
+    monkeypatch.setattr("paf.optimize.plan_moments", lambda plan, fight, names: presses)
+    d.optimized = [Plan("boss", {"shadow_blades": Rule("default", "", None)}, 0.0, 0.2)]
+    d.tops_players = 20
+    d.tops_casts = {"shadow_blades": [2.0] * 20 + [98.0] * 16 + [182.0] * 15}
+    why = {t: it.why for t, it in fightview.items(d) if it.name == "Shadow Blades"}
+    assert why[2] == ""  # the pull says it
+    assert why[92] == "as soon as it is ready again; 80% of the top players wait until 1:38"
+    assert why[182] == "as soon as it is ready again, like 75% of the top players"
+    acts = fightview.data(d, fightview.moments(d), 300)["acts"]
+    assert next(a for a in acts if a["t"] == 92)["w"] == why[92]

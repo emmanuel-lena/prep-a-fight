@@ -44,6 +44,7 @@ class Item:
     icon: str = ""
     dur: float = 0.0  # seconds it lasts (a bar along the clock), 0 = none
     t: float = 0.0  # its own time (a row groups items a few seconds apart)
+    why: str = ""  # a press no boss event explains: the plan's rule or its cooldown, and what the top players do
 
 
 @dataclass
@@ -253,6 +254,9 @@ def items(d) -> list[tuple[float, Item]]:
             if s is not None:
                 it.t = s
                 out[k] = (s, it)
+    for t, it in out:
+        if it.kind in ("cd", "pot") and t >= 5 and not _ctx(t, out):
+            it.why = _why(d, it.name, t, order.get(it.name, []))
     starts = sorted(s for _n, s in d.phases if s >= 1)
     for k, (t, it) in enumerate(out):  # a boss event logged just before a phase starts belongs to that phase
         s = next((s for s in starts if s - 1.0 <= t < s), None)
@@ -260,6 +264,32 @@ def items(d) -> list[tuple[float, Item]]:
             it.t = s
             out[k] = (s, it)
     return sorted(out, key=lambda x: (x[0], x[1].kind != "phase"))
+
+
+def _why(d, name: str, t: float, presses: list[float]) -> str:
+    """Why a press no boss event explains is there (issue #25): the plan's rule for it, or its cooldown coming back,
+    then whether the top players press it then too or wait for another moment. Any spec, any boss."""
+    from paf.prep_report import _key, rule_phrase, tops_moment
+
+    plan = simple._plan(d)
+    keys = {v: k for k, v in d.cd_names.items()}
+    rule = plan.choice.get(keys.get(name, _key(name))) if plan is not None else None
+    if rule is not None and rule.name not in ("default", "on_cooldown"):
+        why = rule_phrase(d, rule.name)
+    else:
+        before = [x for x in presses if x < t - 1]
+        gaps = [b - a for a, b in zip(presses, presses[1:], strict=False)]
+        why = "as soon as it is ready again" if before and gaps and t - before[-1] <= min(gaps) + 3 else \
+            "when your rotation calls it"
+    ts, n = d.tops_casts.get(_key(name)), d.tops_players
+    if ts and n:
+        here, there = tops_moment(ts, n, t)
+        if there is not None and here < 0.25:
+            when = "wait until" if there[1] > t else "press it at"
+            why += f"; {there[0]:.0%} of the top players {when} {_mmss(there[1])}"
+        elif here >= 0.5:
+            why += f", like {here:.0%} of the top players"
+    return why
 
 
 def moments(d) -> list[Moment]:
@@ -295,6 +325,8 @@ def _ev(it: Item, row_t: float | None = None) -> str:
                                       and f"from {_mmss(it.t)}" not in it.text) else []
     if it.dur and it.kind not in ("move", "immune"):
         notes.append(f"lasts {it.dur:.0f} s")
+    if it.why:
+        notes.append(it.why)
     small = f"<small>{', '.join(notes)}</small>" if notes else ""
     return (f"<div class='ev ek-{it.kind}'>{_ic(it.icon)}<div class='x'><span class='main'>{text}</span>{small}"
             "</div></div>")
@@ -407,7 +439,8 @@ def data(d, ms: list[Moment], dur: float) -> dict:
 
     phase_starts = [s for _n, s, _e in phases[1:]]
     acts = [{"t": _t1(t), "n": x.text, "k": x.kind, "ic": x.icon, "d": round(x.dur, 1),
-             "c": "" if x.kind == "move" else (_ctx(t, its) or ("default list timing" if x.kind == "cd" else ""))}
+             "c": "" if x.kind == "move" else (_ctx(t, its) or ("default list timing" if x.kind == "cd" else "")),
+             "w": x.why}
             for t, x in its if x.side == "you"]
     acts.sort(key=lambda a: (a["t"], YOU_ORDER.index(a["k"])))
     return {
