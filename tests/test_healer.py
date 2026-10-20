@@ -114,4 +114,4 @@ def test_a_held_press_is_not_on_cooldown():
     tl = SimpleNamespace(abilities=[ab], duration=400.0, players=players)
     cd = healer.cooldowns(tl, [], {7: (90.0, 1)})[0]
     gaps = [y - x for x, y in zip(cd.times, cd.times[1:], strict=False)]
-    assert cd.every == 0.0 or all(abs(g - cd.every) <= 0.25 * cd.every for g in gaps)
+    assert cd.every == 0.0 or all(abs(g - cd.every) <= 0.15 * cd.every for g in gaps)

@@ -363,7 +363,7 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         sid = max(abs_, key=lambda a: a.users).id
         times, alt = press_moments(per_player, max(1, round(per_kill)), tl.duration)
         every = on_cadence(per_player, per_kill, tl.duration)
-        if every and any(abs((y - x) - every) > 0.25 * every for x, y in pairwise(times)):
+        if every and any(abs((y - x) - every) > 0.15 * every for x, y in pairwise(times)):
             every = 0.0  # its moments are not a cooldown apart: the top players hold it (the Vessel at 0:03, 2:02)
         tied = not (every or per_kill >= 4 or _external(sid) or _moving(sid))  # on cooldown, a 1-minute button, a
         near = []  # buff on one player, a cast-while-moving: near a hit by chance, not kept for it
