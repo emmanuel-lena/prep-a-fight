@@ -41,3 +41,27 @@ def test_bench(tmp_path, monkeypatch):
     assert raidlead.load()["bench"] == ["Nolow"]
     raidlead.toggle_bench("Nolow")
     assert raidlead.load()["bench"] == []
+
+
+def test_the_page_opens_on_the_answer(tmp_path, monkeypatch):
+    """Nek'zali heroic, a real roster (2026-10-20): three players named on the Restless Amani (an add the whole raid
+    may also hit) and two talent changes; the answer counts the three, never "everyone stays on the boss"."""
+    from types import SimpleNamespace
+
+    from paf import web
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    more = [["Ssamii", "Balance Druid", 1], ["Tristy", "Beast Mastery Hunter", 1]]
+    raidlead.save({"players": STATE["players"] + more, "report": "abcd", "roster_from": "another boss, pull of 3:10"})
+    monkeypatch.setattr(web, "_encounters", lambda: [SimpleNamespace(id=3470, name="Nek'zali the Soulcoiler")])
+    monkeypatch.setattr(web, "journal_order", lambda encs: encs)
+    sh = {"boss": "Nek'zali", "targets": [
+        {"name": "Restless Amani", "whole_raid": True, "second_boss": False, "players": ["Frosty", "Ssamii", "Tristy"],
+         "best": ["Frost Mage"]},
+        {"name": "Echo of Jawae", "whole_raid": True, "second_boss": False, "players": [], "best": []}],
+        "builds": [{"name": "Ssamii", "spec": "Balance Druid", "side": "pad", "take": ["A"], "drop": []},
+                   {"name": "Nolow", "spec": "Affliction Warlock", "side": "boss", "take": ["B"], "drop": []}]}
+    monkeypatch.setattr(raidlead, "sheet", lambda state, x, diff: sh)
+    monkeypatch.setattr(raidlead, "lust_block", lambda sh, difficulty: "")
+    page = raidlead.page_body("heroic")
+    assert "4 players in your raid. On the prepared boss: 3 players hit the adds, 2 talent changes." in page

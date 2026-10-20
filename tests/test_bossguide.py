@@ -20,7 +20,8 @@ def test_summary_and_abilities():
         sec(5, "Venomous Heart", "ability", "The heart is exposed.", ["damage"], 1299526),
         sec(6, "Malice", "ability", "A bolt.", ["interruptible", "deadly"], 1290779)])
     s = summary_html([over, stage], "damage")
-    assert "She splashes venom." in s and "<li>Burst the Heart.</li>" in s and "other-role'>Tank</h3>" in s
+    assert "She splashes venom." in s and "<li>Burst the Heart.</li>" in s
+    assert "<b>Tank:</b> Taunt on Mother&#x27;s Wrath." in s
 
     class Mech:
         name, kind, players_per_kill, cost = "Malice", "interrupt", 0, 1.0
@@ -50,3 +51,34 @@ def test_a_stage_names_what_it_repeats():
     assert "Also, as in Stage One: Soulcoil Well, Soulcoil Rite, Uncoiled Rage." in second
     assert "A well of necrotic energy." not in second and "She calls the cultists." in second
     assert "A corpse lingers." in second  # deadly now: told again
+
+
+def test_another_roles_abilities_are_named_not_told():
+    """A damage dealer's journal: Nek'zali's tank abilities (Possession Barrage, and what sits under it) are named at
+    the stage's end; the abilities of no role or of the damage dealers stay in full."""
+    stage = sec(4, "Stage One", "stage", children=[
+        sec(5, "Essence Rend", "ability", "Pulls several players in.", ["damage"]),
+        sec(6, "Possession Barrage", "ability", "Echoes burst on impact.", ["tank"], children=[
+            sec(7, "Spectral Echo", "ability", "An echo of her soul.")]),
+        sec(8, "Soulcoil Ignition", "ability", "Raid damage.", ["healer"]),
+        sec(9, "Soulcoil Well", "ability", "A well of necrotic energy.")])
+    a = abilities_html([stage], role="damage")
+    assert "Pulls several players in." in a and "A well of necrotic energy." in a
+    assert "Echoes burst on impact." not in a and "An echo of her soul." not in a
+    assert "For the tanks: Possession Barrage." in a and "For the healers: Soulcoil Ignition." in a
+    assert "Echoes burst on impact." in abilities_html([stage])  # no role (the sheet's boss tab): everything
+
+
+def test_a_unit_told_before_shows_only_what_changes():
+    """Nek'zali's intermission repeats the Restless Amani of Stage One, with Vessel of Awakening now deadly: the unit
+    is named with "As in Stage One", the changed ability told, the others named."""
+    def amani(base, deadly):
+        return sec(base, "Restless Amani", "creature", "Ancient spirits return to their corpses.", children=[
+            sec(base + 1, "Vessel of Awakening", "ability", "A corpse lingers.", ["deadly"] if deadly else []),
+            sec(base + 2, "Corpse Blight", "ability", "Plague damage to all players.")])
+    one = sec(1, "Stage One", "stage", children=[amani(2, False)])
+    two = sec(10, "Intermission", "stage", children=[amani(11, True)])
+    a = abilities_html([one, two])
+    inter = a[a.index("Intermission"):]
+    assert "As in Stage One; what changes:" in inter and "Ancient spirits" not in inter
+    assert "A corpse lingers." in inter and "Also, as in Stage One: Corpse Blight." in inter

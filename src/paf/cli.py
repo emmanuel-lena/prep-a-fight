@@ -939,9 +939,12 @@ def cmd_prep(args: argparse.Namespace) -> int:
 
     profile_text, origin = _load_profile(args.profile)
     profile = parse_simc_export(profile_text)
+    from pathlib import Path
+
     from paf.profile import role, use_profile_spec
 
-    use_profile_spec(profile)  # the corpus, timelines and talents are the loaded character's spec's
+    playing = Path(origin).resolve() == (data_dir() / "profiles" / "current.simc").resolve()
+    use_profile_spec(profile, persist=playing)  # the corpus, timelines and talents are the loaded character's spec's
     if role(profile) == "healer":  # no SimulationCraft for healing: a prep from the logs only (issue #16)
         return _prep_healer(args, profile)
     if role(profile) == "tank":  # from the logs of the top tanks too (issue #15)

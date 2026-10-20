@@ -57,3 +57,23 @@ def test_add_types_from_a_tiny_corpus():
     t = types[0]
     assert round(t.focus["Balance Druid"], 2) == 0.5 and round(t.focus["Arms Warrior"], 2) == 0.1
     assert round(t.lifetime) == 20 and round(t.tops_rate) == 600  # 1000 DPS x 0.5 + 1000 x 0.1
+
+
+def test_raid_pull_before_a_key_run_of_the_same_log():
+    """A real log (2026-10-20): 35 mythic pulls of a raid boss and a 26-minute Mythic+ key: the roster comes from a
+    raid pull (18 players), never from the key (5)."""
+    from paf.raidneed import FIGHTS_QUERY, raid_from_report
+
+    fights = [{"id": 1, "encounterID": 3420, "difficulty": 5, "kill": False, "startTime": 0, "endTime": 190_000},
+              {"id": 2, "encounterID": 112521, "difficulty": 10, "kill": True, "startTime": 0, "endTime": 1_566_000}]
+
+    class Client:
+        def query(self, q, v, cache_ttl=0):
+            if q == FIGHTS_QUERY:
+                return {"reportData": {"report": {"fights": fights}}}
+            assert v["f"] == [1]
+            return {"reportData": {"report": {"table": {"data": {"entries": [
+                {"name": "A", "icon": "Mage-Arcane", "total": 1000}]}}}}}
+
+    rc = raid_from_report(Client(), "https://www.warcraftlogs.com/reports/abcdEFGH12345678", 3470, 4)
+    assert rc.fight == "another boss, pull of 3:10" and rc.players[0][1] == "Arcane Mage"

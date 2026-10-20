@@ -147,7 +147,6 @@ SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
          "uses the whole quota."),
         ("region", "Rankings from one region only", "All regions unless you pick one."),
         ("cache_max_mb", "Disk cache cap (MB)", "Sim results and Warcraft Logs answers; the oldest go first."),
-        ("onboarded", "First-run steps done", "Off: the welcome steps show again."),
     ]),
 ]
 
@@ -183,20 +182,19 @@ def settings_form() -> str:
     # set elsewhere, never typed: the class and spec follow the active character, the last raids read are ticked
     # per character in Characters
     listed = {k for _g, _f, rows in SETTINGS_FORM for k, _l, _h in rows}
-    listed |= {"class", "spec", "auto_logs", "language"}  # set elsewhere; the language: English only before 1.0
+    listed |= {"class", "spec", "auto_logs", "language", "onboarded"}  # set elsewhere; onboarded: a link
     groups = [(g, folded, [r for r in rows if r[0] in settings.SETTINGS]) for g, folded, rows in SETTINGS_FORM]
     groups[-1][2].extend((k, k.replace("_", " ").capitalize(), s.help) for k, s in settings.SETTINGS.items()
                          if k not in listed)
     out = ""
-    for group, folded, rows in groups:
+    for group, _folded, rows in groups:
         def row(k: str, label: str, help_: str) -> str:
             check = settings.SETTINGS[k].choices == ("on", "off")  # a checkbox goes before its label
             lab, ctl = f"<label for='s-{e(k)}'>{e(label)}</label>", _setting_control(k)
             return (f"<div class='set-row{' set-check' if check else ''}'>" + (ctl + lab if check else lab + ctl)
                     + (f"<p class='set-help'>{e(help_)}</p>" if help_ else "") + "</div>")
         fields = "".join(row(k, label, help_) for k, label, help_ in rows)
-        out += (f"<details class='set-group' open><summary>{e(group)}</summary>{fields}</details>" if folded else
-                f"<fieldset class='set-group'><legend>{e(group)}</legend>{fields}</fieldset>")
+        out += f"<fieldset class='set-group'><legend>{e(group)}</legend>{fields}</fieldset>"  # nothing folded
     return out
 
 
@@ -226,23 +224,27 @@ def settings_page(message: str = "") -> str:
     if wcllogin.logged_in():
         account = ("<p class='small'>Connected with your Warcraft Logs account.</p><form method='post' "
                    "action='/wcl/logout'><button class='btn ghost'>Disconnect</button></form>")
-    elif cid:  # the key works already: connecting is an option, not the page's action
-        account = ("<p class='small'>The app reads the logs with your own API key (below). You can connect with "
-                   "your Warcraft Logs account instead: one login in your browser, no key to keep.</p>"
-                   + connect_block(lead=False, ghost=True))
+    elif cid:  # the key works already: connecting is an option under it, not the page's action
+        account = ""
     else:
         account = connect_block(lead=False)
-    account = (f"<h2>Warcraft Logs</h2><div class='card'>{account}<hr class='set-hr'>" if wcllogin.available() else "")
+    alt = ("<hr class='set-hr'><p class='small'>Or connect with your Warcraft Logs account instead: one login in your "
+           "browser, no key to keep.</p>" + connect_block(lead=False, ghost=True)) if cid and not wcllogin.logged_in() \
+        and wcllogin.available() else ""
+    account = (f"<h2>Warcraft Logs</h2><div class='card'>{account}<hr class='set-hr'>" if account else "")
     said = ["SimulationCraft installed" if exe else "SimulationCraft <b>not installed</b> (Get nightly, below)"]
     said.append("Warcraft Logs connected with your account" if wcllogin.logged_in() else
                 "Warcraft Logs read with your own key" if cid else "Warcraft Logs <b>not connected</b> (below)")
     ok = exe and (wcllogin.logged_in() or cid)
     return f"""<h1>Settings</h1><p class="lead">{"All set" if ok else "Not ready yet"}: {", ".join(said)}.</p>
-{msg}<div class="set-cols"><div><h2>Your raid and the app</h2>
-<form method="post" action="/settings" class="card settings">{settings_form()}
+{msg}<div class="set-cols"><div>
+<form method="post" action="/settings" class="settings">{settings_form()}
 <div class="cta"><button class="btn go">Save</button><span class="dirty-note">Unsaved changes</span></div></form>
+<p class="muted"><a href="/welcome">Show the welcome steps again</a>: your key, your character and your guild, step
+by step.</p>
 </div><div>
-{account if account else "<h2>Warcraft Logs</h2><div class='card'>"}<h3 class="card-h">Your API key</h3>
+{account if account else "<h2>Warcraft Logs</h2><div class='card'>"}\
+{'<h3 class="key-h">Your own API key</h3>' if account else ''}
 <p class="small measure">{current} To use another one (a new
 client, or a regenerated secret): create or open it on <a href="https://www.warcraftlogs.com/api/clients"
 target="_blank" rel="noopener">warcraftlogs.com/api/clients</a>, then paste both values.
@@ -252,7 +254,7 @@ It is tested before it replaces the old one.</p>
 <label class="key-l">Client Secret<input name="secret" class="key-in" type="password" required
 autocomplete="off"></label>
 <button class="btn ghost">Save and test</button></form>
-<p class="tiny muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p></div>
+<p class="tiny muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p>{alt}</div>
 <h2>Status</h2><div class="set-status"><table class="status">
 <tr><td>SimulationCraft</td><td class="small"><div class="val"><span class="path">{simc}</span>
 <form method="post" action="/tool/setup">
@@ -263,8 +265,8 @@ stays where it is">Get nightly</button></form></div></td></tr>
 <tr><td>Warcraft Logs</td><td class="small">{quota}</td></tr>
 <tr><td>Caches (sims, logs)</td><td class="small">{size(cache_root()) / 1e6:,.0f} MB
 (cap {settings.get('cache_max_mb')} MB)</td></tr>
-<tr><td>Tools</td><td class="small"><a href="/tools">Every tool, each on its own page</a></td></tr>
 <tr><td>Data folder</td><td class="small"><span class="path">{e(str(data_dir()))}</span></td></tr></table></div>
+<p class="muted small">Every tool the prep runs also has <a href="/tools">its own page</a>.</p>
 </div></div>
 <script>(function(){{var d=new Set();
 document.querySelectorAll('.set-cols form').forEach(function(f){{

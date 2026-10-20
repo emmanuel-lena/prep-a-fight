@@ -155,7 +155,11 @@ def report_code(url: str) -> str:
     return m.group(1)
 
 
-def raid_from_report(client, url: str, encounter_id: int, difficulty: int) -> RaidComp:
+RAID_DIFFICULTIES = (3, 4, 5)  # Warcraft Logs: 10 is a Mythic+ key, 1 LFR, 8 a Mythic dungeon
+
+
+def raid_from_report(client, url: str, encounter_id: int, difficulty: int,
+                     names: dict[int, str] | None = None) -> RaidComp:
     """Composition and DPS of your raid from one of its logs: this boss at this difficulty if the log has it
     (a kill first, else the longest pull), else this boss at another difficulty, else the longest boss pull."""
     code = report_code(url)
@@ -164,9 +168,9 @@ def raid_from_report(client, url: str, encounter_id: int, difficulty: int) -> Ra
     if not fights:
         raise ValueError("this log has no boss pull")
 
-    def key(f):
-        return (f["encounterID"] == encounter_id, f["difficulty"] == difficulty, bool(f["kill"]),
-                f["endTime"] - f["startTime"])
+    def key(f):  # a raid fight (normal, heroic, mythic) before a dungeon's: a log can hold a key run too
+        return (f["encounterID"] == encounter_id, f.get("difficulty") in RAID_DIFFICULTIES,
+                f["difficulty"] == difficulty, bool(f["kill"]), f["endTime"] - f["startTime"])
 
     f = max(fights, key=key)
     dur = (f["endTime"] - f["startTime"]) / 1000
@@ -183,7 +187,7 @@ def raid_from_report(client, url: str, encounter_id: int, difficulty: int) -> Ra
         targets[e.get("name", "?")] = {tg.get("name", "?"): float(tg.get("total") or 0)
                                          for tg in e.get("targets") or []}
     same = f["encounterID"] == encounter_id
-    what = "this boss" if same else "another boss"
+    what = (names or {}).get(f["encounterID"]) or ("this boss" if same else "another boss")  # names: the raid's
     return RaidComp(code, f"{what}, {'kill' if f['kill'] else 'pull'} of {int(dur // 60)}:{int(dur % 60):02d}",
                     players, targets, dur, same)
 

@@ -160,12 +160,16 @@ def role(p: Profile) -> str:
     return "tank" if s in TANK_SPECS else "damage"
 
 
-def use_profile_spec(p: Profile) -> tuple[str, str] | None:
-    """Analyze the loaded character's own spec: the settings follow the profile (each spec has its corpus)."""
+def use_profile_spec(p: Profile, persist: bool = True) -> tuple[str, str] | None:
+    """Analyze the loaded character's own spec: the settings follow the profile (each spec has its corpus).
+    persist=False for a character the app is not playing (a prep of another export): this process only, else the
+    app's own pages would take that character's spec (a tank's role on a rogue's boss page, 2026-10-20)."""
     from paf import settings
 
     names = wcl_class_spec(p)
-    if names and (settings.get("class"), settings.get("spec")) != names:
+    if names and not persist:
+        settings.LOCAL.update({"class": names[0], "spec": names[1]})
+    elif names and (settings.get("class"), settings.get("spec")) != names:
         settings.set_value("class", names[0])
         settings.set_value("spec", names[1])
     return names

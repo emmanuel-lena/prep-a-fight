@@ -78,3 +78,21 @@ def test_candidates_by_source():
 def test_looks_like_export():
     assert looks_like_export(EXPORT)
     assert not looks_like_export("hello world")
+
+
+def test_another_characters_prep_keeps_the_apps_spec(tmp_path, monkeypatch):
+    """A prep of a Protection Warrior export while the app plays a Subtlety Rogue (2026-10-20): the prep's process
+    reads the warrior's corpus, the app's settings stay the rogue's."""
+    from paf import settings
+    from paf.profile import parse_simc_export, use_profile_spec
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    monkeypatch.setattr(settings, "LOCAL", {})
+    settings.set_value("class", "Rogue")
+    settings.set_value("spec", "Subtlety")
+    use_profile_spec(parse_simc_export('warrior="Tank"\nspec=protection\nhead=,id=1\n'), persist=False)
+    assert (settings.get("class"), settings.get("spec")) == ("Warrior", "Protection")  # this process
+    import json
+
+    saved = json.loads((tmp_path / "settings.json").read_text(encoding="utf-8"))
+    assert (saved["class"], saved["spec"]) == ("Rogue", "Subtlety")  # the app's

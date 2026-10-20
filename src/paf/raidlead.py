@@ -104,7 +104,7 @@ def run(log=print) -> int:
     """The reader: the roster of the log, its talents, and the talent rankings of its specs on every prepared boss."""
     from paf import settings
     from paf.corpus import db
-    from paf.raidneed import raid_from_report
+    from paf.raidneed import RAID_DIFFICULTIES, raid_from_report
     from paf.wcl import WCLClient
     from paf.web import _encounters, journal_order
     from paf.wipe import DETAILS, talent_split
@@ -119,15 +119,17 @@ def run(log=print) -> int:
         diff = settings.DIFFICULTIES.get(state.get("difficulty") or "heroic", 4)
         encs = journal_order(_encounters())
         url = f"https://www.warcraftlogs.com/reports/{state['report']}"
-        rc = raid_from_report(client, url, encs[0].id if encs else 0, diff)
+        rc = raid_from_report(client, url, encs[0].id if encs else 0, diff, {x.id: x.name for x in encs})
         state["players"] = [[n, s, d] for n, s, d in rc.players]
         state["roster_from"] = rc.fight
         # the players' talents, from a pull of the log
-        rep = client.query("""query($c:String!){ reportData { report(code:$c) {
-          fights(killType: Encounters) { id endTime startTime } } } }""", {"c": state["report"]},
+        rep = client.query("""query($c:String!){ reportData { report(code:$c) { startTime
+          fights(killType: Encounters) { id endTime startTime difficulty } } } }""", {"c": state["report"]},
                            cache_ttl=3600)["reportData"]["report"]
-        fights = sorted(rep.get("fights") or [], key=lambda f: f["startTime"] - f["endTime"])
-        fight = fights[0]["id"] if fights else None  # the longest pull
+        state["report_day"] = rep.get("startTime")  # how fresh the roster is, said on the page
+        fights = sorted(rep.get("fights") or [], key=lambda f: (f.get("difficulty") not in RAID_DIFFICULTIES,
+                                                               f["startTime"] - f["endTime"]))
+        fight = fights[0]["id"] if fights else None  # the longest raid pull (a key run of the same log: not it)
         talents: dict[str, list[int]] = {}
         if fight:
             data = client.query(DETAILS, {"c": state["report"], "f": [fight]}, cache_ttl=86400)
@@ -301,10 +303,19 @@ def page_body(difficulty: str) -> str:
     diffs = "".join(f'<label class="seg"><input type="radio" name="difficulty" value="{d}"{" checked" if d == difficulty else ""} '
                     f'onchange="this.form.submit()"><span>{e(DIFF_LABELS.get(d, d))}</span></label>'
                     for d in settings.DIFFICULTIES if d != "lfr")
-    head = (f"<h1>Raid lead</h1><p class='lead'>Your raid's roles on every boss, from your roster and the top raids: "
-            f"who hits which add, who changes talents, which spec change is worth it. The strategy stays yours."
-            f"</p><form method='get' action='/raidlead' class='segs' role='radiogroup' aria-label='Difficulty'>{diffs}"
-            f"</form>")
+    lead = ("<p class='lead'>Your raid's roles on every boss, from your roster and the top raids: who hits which "
+            "add, who changes talents, which spec change is worth it. The strategy stays yours.</p>")
+    head = (f"<h1>Raid lead</h1>{lead}<form method='get' action='/raidlead' class='segs' role='radiogroup' "
+            f"aria-label='Difficulty'>{diffs}</form>")
+    try:
+        code = None if state.get("players") or state.get("error") else source_log()
+    except Exception:  # noqa: BLE001 - offline: the button stays
+        code = None
+    if code and state.get("auto") != code and not runner_alive(state):  # the page opens on the answer: the roster
+        state["auto"] = code                                               # is read once by itself, per log
+        save(state)
+        start(difficulty, code)
+        state = load()
     reading = runner_alive(state)
     if reading:
         return head + ("<div class='rl-wait' id='rlwait'><span class='pl-spin'></span> Reading your roster and the "
@@ -327,7 +338,9 @@ def page_body(difficulty: str) -> str:
         f"<input type='hidden' name='name' value='{e(n)}'><button type='submit' title='"
         f"{'Back in the raid' if n in bench else 'Bench'}'><b>{e(n)}</b><small>{e(pretty(s))}</small></button></form>"
         for n, s, _d in sorted(state["players"], key=lambda p: p[1]))
-    roster = (f"<section class='rl-roster'><h2>Your roster</h2><p class='small muted'>From {e(state.get('roster_from', ''))} "
+    day = state.get("report_day")
+    when = time.strftime(" (%a %d %b)", time.localtime(day / 1000)) if day else ""
+    roster = (f"<section class='rl-roster'><h2>Your roster</h2><p class='small muted'>From {e(state.get('roster_from', ''))}{when} "
               f"of <a href='https://www.warcraftlogs.com/reports/{e(state['report'])}' target='_blank' rel='noopener'>"
               f"this log</a>. Click a player to bench them.</p><div class='rl-chips'>{chips}</div>"
               f"<form method='post' action='/raidlead/read'><input type='hidden' name='difficulty' value='{e(difficulty)}'>"
@@ -348,11 +361,11 @@ def page_body(difficulty: str) -> str:
             f"<li><b>{e(t['name'])}</b>: " + (
                 "everyone" if t["whole_raid"] and not t["players"] else
                 (e(", ".join(t["players"])) if t["players"] else "<span class='muted'>nobody fits</span>"))
-            + (f" <small>({'second boss' if t['second_boss'] else 'best: ' + e(', '.join(pretty(b) for b in t['best']))})</small>")
+            + (f" <small>({'a second boss: everyone hits it' if t['second_boss'] else 'best: ' + e(', '.join(pretty(b) for b in t['best']))})</small>")
             + "</li>" for t in sh["targets"])
         bd = "".join(
             f"<li><b>{e(b['name'])}</b> <small>{e(pretty(b['spec']))}, "
-            f"{'on an add: padding talents' if b['side'] == 'pad' else 'on the boss: boss talents'}</small>"
+            f"{'on an add: padding talents' if b['side'] == 'pad' else 'boss talents'}</small>"
             + (f"<br>take {e(', '.join(b['take']))}" if b["take"] else "")
             + (f"<br>drop {e(', '.join(b['drop']))}" if b["drop"] else "") + "</li>" for b in sh["builds"])
         cards += (f"<article class='rl-boss' id='boss-{x.id}'><header><h3>{e(x.name)}</h3>"
@@ -360,13 +373,25 @@ def page_body(difficulty: str) -> str:
                   f"{copy_button(text(sh, difficulty, mrt=True), 'Copy MRT note')}</header>"
                   f"<h4>Who hits what</h4><ul>{tg or '<li>Everyone on the boss: no add to assign.</li>'}</ul>"
                   + (f"<h4>Talents to change</h4><ul>{bd}</ul>" if bd else
-                     "<h4>Talents</h4><p class='small muted'>Nobody needs to change, from what the log shows.</p>")
+                     "<h4>Talents to change</h4><p class='small muted'>Nobody, from what the log shows.</p>")
                   + lust_block(sh, difficulty) + "</article>")
     allbtn = (copy_button("\n\n".join(text(sh, difficulty) for sh in everything), "Copy every boss for Discord")
               if everything else "")
     miss = (f"<p class='small muted'>Not prepared yet, so no sheet: {e(', '.join(missing))}. "
             f"<a href='/raid/prepare?difficulty={e(difficulty)}'>Prepare the whole raid</a> first.</p>" if missing else "")
-    return head + roster + f"<h2>Boss by boss {allbtn}</h2>{miss}<div class='rl-grid'>{cards}</div>{_tools()}{COPY_JS}"
+    adds = {p for sh in everything for t in sh["targets"] for p in t["players"]}  # named on an add
+    changes = sum(len(sh["builds"]) for sh in everything)
+    n = len(everything)
+    answer = (f"<p class='lead rl-answer'>{len(state['players']) - len(bench)} players in your raid. On "
+              f"{'the prepared boss' if n == 1 else f'the {n} prepared bosses'}: "
+              + (f"{len(adds)} {'player hits' if len(adds) == 1 else 'players hit'} the adds" if adds else
+                 "everyone stays on the boss")
+              + (f", {changes} talent {'change' if changes == 1 else 'changes'}." if changes else
+                 ", nobody changes talents.") + "</p>") if n else ""
+    if answer:  # the answer is the page's lead; what the page does goes
+        head = head.replace(lead, answer)
+    return (head + roster + f"<h2>Boss by boss</h2><div class='rl-all'>{allbtn}</div>{miss}<div class='rl-grid'>{cards}</div>"
+            f"{_tools()}{COPY_JS}")
 
 
 def lust_block(sh: dict, difficulty: str) -> str:

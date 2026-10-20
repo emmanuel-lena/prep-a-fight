@@ -47,6 +47,9 @@ def _path():
     return data_dir() / "settings.json"
 
 
+LOCAL: dict[str, Any] = {}  # this process only (a prep of a character the app is not playing), never saved
+
+
 def load() -> dict[str, Any]:
     values = {k: s.default for k, s in SETTINGS.items()}
     p = _path()
@@ -56,6 +59,7 @@ def load() -> dict[str, Any]:
         except ValueError:
             saved = {}
         values.update({k: v for k, v in saved.items() if k in SETTINGS})
+    values.update(LOCAL)
     return values
 
 

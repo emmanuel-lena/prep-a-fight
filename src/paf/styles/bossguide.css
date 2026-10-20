@@ -28,3 +28,8 @@
 .abg:has(>.unit){border-left:1px solid var(--line);padding-left:10px;margin-left:2px}
 .abg>.unit{margin-bottom:2px}
 .stage>.abg{border-bottom:0;margin-bottom:16px} /* groups apart by space: no rule left hanging at a column's foot */
+.guide .over p{margin:0 0 6px}
+.guide .others{font-size:14px;color:var(--fg);margin:10px 0 0} .guide .others b{color:var(--fg)}
+.abg:has(>.unit){border-left:0;padding-left:0;margin-left:0}
+.unit{font:600 15px/1.3 var(--font-reading);text-transform:none;letter-spacing:0;color:var(--fg);padding:12px 0 2px}
+.ab>.small.muted{font-size:13px;font-variant-numeric:tabular-nums}

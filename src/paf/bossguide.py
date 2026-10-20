@@ -161,13 +161,14 @@ def summary_html(sections: list[Section], role: str = "damage", full_link: str =
         return ""
     mine = next((c for c in over.children if _same_role(c.title, role)), None)
     others = [c for c in over.children if c is not mine and c.text]
-    out = [f"<p>{e(readable(over.text))}</p>" if over.text else ""]
+    sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z])", readable(over.text)) if over.text else []
+    out = ["<div class='over'>" + "".join(f"<p>{e(x)}</p>" for x in sentences) + "</div>" if sentences else ""]
     if mine and mine.text:
         out.append(f"<h3>For you, as {ROLE_AS.get(role, 'a player')}</h3><ul>"
                    + "".join(f"<li>{e(readable(b))}</li>" for b in bullets(mine.text)) + "</ul>")
-    for c in others:  # the other roles: shown, smaller (what the raid around you does)
-        out.append(f"<h3 class='other-role'>{e(c.title)}</h3><ul class='small muted'>"
-                   + "".join(f"<li>{e(readable(b))}</li>" for b in bullets(c.text)) + "</ul>")
+    for c in others:  # the other roles: one short paragraph each (what the raid around you does)
+        out.append(f"<p class='others'><b>{e(c.title)}:</b> "
+                   + " ".join(e(readable(b)) for b in bullets(c.text)) + "</p>")
     if full_link:
         out.append(f'<p class="small"><a href="{e(full_link)}">Every ability, phase by phase &rarr;</a></p>')
     return f'<div class="guide">{"".join(out)}</div>'
@@ -204,13 +205,16 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
     body = f"<div class='small ab-d'>{e(text)}</div>" if text else ""
     pic = icons.img(ctx["icons"].get(s.title, ""), "small")
     fact = f"<div class='small muted'>{' &middot; '.join(facts)}</div>" if facts else ""
-    return (f'<div class="ab" style="margin-left:{min(depth, 3) * 14}px"><div>{pic}<b>{e(s.title)}</b> {tags}</div>'
+    return (f'<div class="ab" style="margin-left:{min(depth, 1) * 14}px"><div>{pic}<b>{e(s.title)}</b> {tags}</div>'
             f"{fact}{body}</div>")
+
+
+ROLE_OTHERS = {"tank": "the tanks", "healer": "the healers", "damage": "the damage dealers"}
 
 
 def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] | None = None,
                    mechanics: list | None = None, burst: dict[str, float] | None = None,
-                   icon_map: dict[str, str] | None = None) -> str:
+                   icon_map: dict[str, str] | None = None, role: str | None = None) -> str:
     """Every stage and unit of the journal with its abilities; facts from the logs when known."""
     ctx = {"timings": {k.lower(): v for k, v in (timings or {}).items()},
            "mechanics": {m.name.lower(): m for m in (mechanics or [])},
@@ -227,8 +231,16 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
     for top in sections:
         if top.kind == "overview":
             continue
-        rows, repeated = [], {}
+        rows, repeated, others, skip = [], {}, {}, None
         for depth, s in walk(top.children):
+            if skip is not None and depth > skip:  # under an ability of another role: named with it
+                continue
+            skip = None
+            mine = [f for f in s.flags if f in ROLE_OTHERS]
+            if role and s.kind == "ability" and mine and role not in mine:  # another role's job: named, not told
+                others.setdefault(mine[0], []).append(s.title)
+                skip = depth
+                continue
             if s.kind in ("ability", "creature") and again(s):
                 if s.kind == "ability":
                     repeated.setdefault(seen[key(s)], []).append(s.title)
@@ -237,18 +249,24 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
                 seen.setdefault(key(s), top.title)
             if s.kind == "ability":
                 rows.append(_ability(s, depth, ctx))
-            elif s.kind == "creature":
-                rows.append(f'<div class="unit" style="margin-left:{min(depth, 3) * 14}px">{e(s.title)}</div>'
-                            + (f"<p class='small muted unit-d' style='margin-left:{min(depth, 3) * 14}px'>"
-                               f"{e(readable(s.text))}</p>" if s.text else ""))
+            elif s.kind == "creature":  # a unit told before: its name, then only what changed under it
+                told = seen.get(key(s), top.title) != top.title
+                rows.append(f'<div class="unit" style="margin-left:{min(depth, 1) * 14}px">{e(s.title)}</div>'
+                            + (f"<p class='small muted unit-d' style='margin-left:{min(depth, 1) * 14}px'>"
+                               + (f"As in {e(seen[key(s)])}; what changes:" if told else e(readable(s.text)))
+                               + "</p>" if s.text else ""))
         head = e(top.title) + "".join(f' <span class="pill">{SHOWN_FLAGS[f]}</span>'
                                        for f in top.flags if f in SHOWN_FLAGS)
         intro = f"<p class='small muted'>{e(readable(top.text)[:300])}</p>" if top.text and top.kind != "stage" else ""
         if top.kind == "ability":
             rows.insert(0, _ability(top, 0, ctx))
         title = "" if top.kind == "ability" else f"<h3>{head}</h3>"  # an ability's card: its row names it
-        also = "".join(f"<p class='small muted also'>Also, as in {e(where)}: {e(', '.join(dict.fromkeys(names)))}.</p>"
-                       for where, names in repeated.items())
+        also = "".join("<p class='small muted also'>" + (
+            f"Also, as in {e(where)}: {e(', '.join(dict.fromkeys(names)))}." if len(set(names)) <= 4 else
+            f"{len(set(names))} abilities of {e(where)} stay as they were.") + "</p>"
+            for where, names in repeated.items())
+        also += "".join(f"<p class='small muted also'>For {ROLE_OTHERS[r]}: {e(', '.join(dict.fromkeys(names)))}.</p>"
+                        for r, names in others.items())
         cards.append(f'<section class="stage">{title}{intro}{grouped("".join(rows))}{also}</section>')
     return "".join(cards)
 

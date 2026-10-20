@@ -850,11 +850,12 @@ def characters_page() -> str:
                f"<input type='hidden' name='server' value='{e(sv)}'><input type='hidden' name='region' value='{e(rg)}'>"
                f"<button class='btn ghost'>Add {e(n)} <small>{e(sv)}-{e(rg.upper())}</small></button></form>"
                for n, sv, rg in mine) + "</div><p class='add-help'>Or, with your bags:</p>") if mine else (
-        "" if wcllogin.logged_in() or not wcllogin.available() else
-        "<p class='add-help'>Or <a href='/settings'>connect Warcraft Logs</a> to add your account's characters in one "
-        "click.</p>")
+        "")
+    after = ("<p class='add-help'>Faster, without bags: <a href='/settings'>connect Warcraft Logs</a> and add your "
+             "account's characters in one click.</p>") if not mine and wcllogin.available() and not wcllogin.logged_in() \
+        else ""
     return (f"<h1>Your characters</h1><p class='lead'>{lead}</p><div class='ccards'>{cards}</div>{empty}"
-            f"<h2 id='add'>Add a character</h2>{acc}{ADD_FORM}")
+            f"<h2 id='add'>Add a character</h2>{acc}{ADD_FORM}{after}")
 
 
 DIFF_SHAPES = (("normal", "tri"), ("heroic", "sq"), ("mythic", "penta"))  # WoW's green, blue, purple
@@ -945,7 +946,8 @@ def reclear_page() -> str:
                 "</form></section>")
     return (f"<div class='rc'><header class='rc-head'><h1>Reclear</h1><p class='lead'>Your last raid, read against "
             f"the top players of your spec: what cost you the most, boss by boss, and where to look in the log.</p>"
-            f"</header>{last}<h2>Dig deeper into your own log</h2>"
+            f"</header>{last}<h2>Dig deeper into your own log</h2><p class='muted'>Each one reads a log you give it: "
+            f"yours, or any raid's.</p>"
             f"{workshop.cards(('rotation', 'diff', 'wipe'))}<p class='muted'>The raid's pulls, player by player, and "
             f"your raid night are on <a href='/raidlead'>Raid lead</a>.</p></div>{workshop.CSS}")
 
@@ -1078,9 +1080,8 @@ def raid_board(encs, class_name: str, spec: str) -> str:
             else:
                 href, state, word = f"/boss?boss={x.id}&amp;difficulty={diff}", "no", "prepare"
             if diff == settings.get("difficulty"):  # said under the portrait, without pointing at it
-                here = (f"<small class='rb-st {state}'>"
-                        f"{'not prepared' if state == 'no' else 'ready ' + word if state == 'ok' else 'redo after reset' if state == 'old' else word}"
-                        "</small>")
+                said = {"no": "not prepared", "ok": f"ready {word}", "old": "last week&#39;s"}.get(state, word)
+                here = f"<small class='rb-st {state}'>{said}</small>"
             states += (f"<a class='rb-d {state}' href='{href}'><span class='rb-frame {shape}'><span class='rb-in'>"
                        f"{portrait(x)}</span></span><b>{e(DIFF_LABELS.get(diff, diff))}</b><small>{word}</small></a>")
         items += (f"<div class='rb-boss{'' if ready else ' grey'}' tabindex='0'><span class='rb-face'>{portrait(x)}"
@@ -1089,8 +1090,8 @@ def raid_board(encs, class_name: str, spec: str) -> str:
                   f"<div class='rb-ds'>{states}</div></div></div>")
     return (f"<h2 class='h-mine'>Your raid, boss by boss</h2>"
             f"<p class='rb-legend'>Under each boss, where it stands in {e(DIFF_LABELS.get(settings.get('difficulty'), ''))} "
-            "this week; point at it for the other difficulties, click one to open its sheet or start its prep.</p>"
-            f"<div class='rb-row'>{items}</div>{queue_strip(settings.get('difficulty'))}{QUEUE_JS}{RB_JS}")
+            "this week. Click a boss for its three difficulties, then open a sheet or start a prep.</p>"
+            f"<div class='rb-row'>{items}</div>{QUEUE_JS}{RB_JS}")  # the queue strip: in the hero, this week
 
 
 def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
@@ -1107,13 +1108,14 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
     options = "".join(f'<option value="{x.id}"{" selected" if nxt and x.id == nxt.id else ""}>{e(x.name)}</option>'
                       for x in encs)
     where = e(DIFF_LABELS.get(diff, diff))
-    if not encs or not ready:
-        week = ""
-    elif nxt is None:
-        week = f'<p class="start-say">Every boss is ready this week in {where}.</p>'
+    if nxt is not None:  # the next boss to prepare: no list to scroll, the board below picks another one
+        pick = (f'<input type="hidden" name="boss" value="{nxt.id}"><p class="start-next">Next to prepare: '
+                f'<b>{e(nxt.name)}</b>.</p><p class="start-say">For another boss, click it in your raid below.</p>')
     else:
-        week = (f'<p class="start-say">{len(ready)} of {len(encs)} bosses ready this week in {where}. '
-                f'Next: <b>{e(nxt.name)}</b>.</p>')
+        pick = ((f'<p class="start-say">Every boss is ready this week in {where}: pick one to prepare again.</p>'
+                 if encs else "") + f'<select name="boss" aria-label="Boss" class="big">{options}</select>')
+    week = (f'<aside class="hero-week"><h2>This week in {where}</h2><p class="hw-n"><b>{len(ready)}</b> of '
+            f'{len(encs)} bosses ready</p>{queue_strip(diff)}</aside>') if encs else ""
     diffs = "".join(f'<label class="seg"><input type="radio" name="difficulty" value="{d}"{" checked" if d == diff else ""}>'
                     f'<span>{e(DIFF_LABELS.get(d, d))}</span></label>' for d in settings.DIFFICULTIES if d != "lfr")
     ic = icons.img(icons.CLASS_ICON.format(cls=loaded.class_name.lower()), "large", "me-ic")
@@ -1136,11 +1138,10 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
     g = settings.get("guild")
     return f"""<section class="home-hero"><form method="get" action="/boss" class="start"><h1>Prepare a boss</h1>
 <p class="me">{ic}<span>for <b>{e(loaded.name)}</b>, {e(loaded.spec.title())} {e(loaded.class_name.title())}\
-{(" &middot; " + e(g)) if g else ""}</span></p>{week}
-<select name="boss" aria-label="Boss" class="big">{options}</select>
+{(" &middot; " + e(g)) if g else ""}</span></p>{pick}
 <div class="segs" role="radiogroup" aria-label="Difficulty">{diffs}</div>
 <button class="btn go">Prepare <span class="go-boss">{e(nxt.name if nxt else (encs[0].name if encs else "this boss"))}</span>
-&rarr;</button></form></section>
+&rarr;</button></form>{week}</section>
 <script>(function(){{var s=document.querySelector('.start select'),b=document.querySelector('.go-boss');
 if(s&&b)s.addEventListener('change',function(){{b.textContent=s.options[s.selectedIndex].text}})}})()</script>
 {board}{last}{mine}"""
@@ -1208,10 +1209,14 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
             pass
     if sections:
         gicons = icons_for(bossguide.spell_refs(sections))
-        guide = f"<h2>The boss in 60 seconds</h2>{bossguide.summary_html(sections, 'damage')}"
+        from paf.profile import HEALER_SPECS, TANK_SPECS
+
+        sp = (settings.get("spec") or "").lower()
+        mine = "healer" if sp in HEALER_SPECS else "tank" if sp in TANK_SPECS else "damage"
+        guide = f"<h2>The boss in 60 seconds</h2>{bossguide.summary_html(sections, mine)}"
         journal = (f"<section class='boss-journal'><h2>Every ability, from the Encounter Journal</h2><p class='adv-lede'>Timings "
                    f"and how many players are hit come from the ranked kills.</p><div class='stages'>"
-                   f"{bossguide.abilities_html(sections, mechanics=mechs, icon_map=gicons)}</div></section>")
+                   f"{bossguide.abilities_html(sections, mechanics=mechs, icon_map=gicons, role=mine)}</div></section>")
     try:  # where the data will come from, and how long: from what will really happen (paf.estimate)
         from paf import estimate
 

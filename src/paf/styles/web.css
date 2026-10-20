@@ -26,7 +26,7 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .chars .ch-ic{width:26px;height:26px;border-radius:50%;margin:0}
 .ch-new{display:inline-flex;align-items:center;padding:6px 14px;border-radius:999px;border:1.5px dashed var(--accent);
   color:var(--accent);font-weight:600;text-decoration:none} .ch-new:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
-.ccards{display:grid;gap:0;margin-bottom:24px;max-width:1000px}
+.ccards{display:grid;gap:0;margin-bottom:24px}
 .ccard{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:16px 0;border-top:1px solid var(--line)}
 .ccard:last-child{border-bottom:1px solid var(--line)}
 .ccard .cc-ic{width:48px;height:48px;border-radius:10px;margin:0}
@@ -90,7 +90,7 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .btn.danger{color:var(--neg)} .btn.danger:not(.ghost){background:var(--neg);color:var(--bg);border-color:var(--neg)}
 .add-form textarea{width:100%;min-height:160px;box-sizing:border-box}
 /* every prep sheet: a ruled list, one group per boss */
-.sheets{column-width:420px;column-gap:40px;max-width:1000px} .bgroup{break-inside:avoid;padding-top:1px}
+.sheets{column-width:420px;column-gap:40px} .bgroup{break-inside:avoid;padding-top:1px}
 .bgroup h3{font:600 18px/1.3 var(--font-reading);margin:18px 0 4px}
 .bcards{display:block}
 .bcard{display:grid;grid-template-columns:28px 1fr auto;gap:12px;align-items:center;padding:8px 0;
@@ -283,3 +283,36 @@ h1 .pill{font-size:13px;vertical-align:middle;position:relative;top:-3px}
 .last-sheet{margin:-8px 0 16px}
 .adv .muted.small,.adv p.small{font-size:14px;max-width:80ch}
 .rl-start p,.rc-empty p{color:var(--muted)}
+/* settings: the form on the page, its groups titled like the app's other sections */
+form.settings .set-group{border:0;padding:0;margin:0 0 22px}
+form.settings .set-group>legend{font:600 19px/1.3 var(--font-reading);letter-spacing:0;text-transform:none;color:var(--fg);padding:0;margin:0 0 6px}
+/* home: prepare the next boss | this week (DESIGN.md: two blocks from 1100px) */
+@media (min-width:1100px){.home-hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px 48px;align-items:start}}
+.hero-week{padding-top:8px} .hero-week h2{margin:0 0 6px}
+.hw-n{font:400 19px/1.4 var(--font-reading);color:var(--muted);margin:0 0 6px} .hw-n b{color:var(--fg);font-weight:600}
+.hero-week .rq{margin:10px 0 0;flex-direction:column;align-items:flex-start;gap:10px}
+.rl-answer{font:400 22px/1.45 var(--font-reading);color:var(--fg);max-width:68ch;margin:18px 0 0}
+.rl-boss header h3{font:600 19px/1.3 var(--font-reading)}
+/* round 4 */
+.start-next{font:400 22px/1.4 var(--font-reading);margin:0} .start-next b{font-weight:600}
+.start-say{margin:-6px 0 0}
+.rb-st.old{color:var(--warn)}
+.settings .cta,.settings.dirty .cta{background:var(--bg)}
+.key-h{font:600 19px/1.3 var(--font-reading);margin:0 0 6px}
+.rl-boss{background:none;border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none;padding:14px 0}
+.rl-grid{column-gap:40px;align-items:start}
+.rl-boss h4{font:600 16px/1.3 var(--font-reading);text-transform:none;letter-spacing:0;color:var(--fg);margin:12px 0 4px}
+.rl-boss li small{font-size:13px} .rl-roster>p.small{font-size:14px}
+.rl-all{margin:-4px 0 12px} .rl-answer{margin:0 0 18px}
+@media (min-width:1200px){.ws-cards.c3{grid-template-columns:repeat(3,minmax(0,1fr))}}
+form.settings>.set-group:first-of-type>legend{margin-top:10px}
+/* round 5 */
+form.settings .set-group>legend{font-size:22px} form.settings>.set-group:first-of-type>legend{margin-top:10px}
+.hero-week{padding-top:0;margin-top:2px} .hero-week h2{font-size:30px;line-height:1.15;margin:0 0 6px}
+.sheets{margin-bottom:0} .sheets .bgroup:last-child{margin-bottom:0}
+.rl-grid{display:block;columns:2 420px;column-gap:40px} .rl-boss{break-inside:avoid}
+.rl-all .btn{font-size:15px;padding:9px 16px}
+/* round 6: the hero's two columns and Settings' two columns start on one line */
+body.has-side>main .hero-week h2{font-size:30px;line-height:1.15;margin:4px 0 6px}
+body.has-side>main .sheets+h2{margin-top:24px}
+form.settings .set-group>legend{line-height:1.25} form.settings{padding-top:10px}
