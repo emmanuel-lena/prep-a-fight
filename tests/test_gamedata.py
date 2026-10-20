@@ -46,3 +46,16 @@ def test_a_charge_longer_than_the_spells_own_cooldown_wins(monkeypatch):
     assert cds[871] == (180.0, 1) and cds[12975] == (180.0, 1)
     if hasattr(gamedata.spell_cooldowns, "cache_clear"):
         gamedata.spell_cooldowns.cache_clear()
+
+
+def test_a_filtered_table_keeps_its_own_rows_only(tmp_path, monkeypatch):
+    """wago.tools' filter matches a prefix: SpellEffect of SpellID 100 (Charge) came with 100002, 10001... and the
+    tank sheet listed Charge among the short defensives."""
+    from paf import gamedata
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    f = tmp_path / "gamedata" / "filtered" / "SpellEffect-SpellID-100.csv"
+    f.parent.mkdir(parents=True)
+    f.write_text("ID,SpellID,EffectAura,ImplicitTarget_0\n1,100,0,6\n2,10001,87,1\n3,100002,79,18\n", encoding="utf-8")
+    assert [r["ID"] for r in gamedata._filtered_rows("SpellEffect", "SpellID", 100)] == ["1"]
+    assert not gamedata.is_mitigation(100) and not gamedata.weakens_enemy(100)

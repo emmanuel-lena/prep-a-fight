@@ -147,7 +147,9 @@ def _filtered_rows(table: str, column: str, value: int, locale: str = "") -> lis
     text = p.read_text(encoding="utf-8-sig", errors="replace")
     if text.lstrip().startswith("{"):  # {"errors": ...}
         return []
-    return list(csv.DictReader(io.StringIO(text)))
+    # wago.tools' filter matches a prefix: SpellID 100 (Charge) also brings 100002, 10001... (2,710 rows, and Charge
+    # read as a defensive); only the rows of this value
+    return [r for r in csv.DictReader(io.StringIO(text)) if r.get(column) == str(value)]
 
 
 def damage_taken_amp(spell_id: int, difficulty: str = "heroic") -> float | None:
