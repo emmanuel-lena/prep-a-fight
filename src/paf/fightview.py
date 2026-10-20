@@ -83,6 +83,12 @@ class Moment:
         return self.you[0].text if self.you else (self.boss[0].text if self.boss else "")
 
 
+def _span(v: float) -> str:
+    """A duration, never mistaken for a clock time: "12 s", "1 min 43 s"."""
+    v = round(v)
+    return f"{v} s" if v < 60 else f"{v // 60} min" + (f" {v % 60} s" if v % 60 else "")
+
+
 def _mmss(t: float) -> str:
     s = int(max(0.0, t))  # whole seconds, as the MRT note and Dig deeper write them
     return f"{s // 60}:{s % 60:02d}"
@@ -174,7 +180,7 @@ def journal_hints(d, names) -> dict[str, str]:
     for b in getattr(d, "role_bullets", None) or []:
         line = re.sub(r"[\[\]]", "", b).strip()
         for n in names:
-            if n and n not in out and re.search(rf"(?<!\w){re.escape(n)}(?!\w)", line, re.I):
+            if n and n not in out and re.search(rf"(?<!\w){re.escape(n)}(?:e?s)?(?!\w)", line, re.I):  # "Shorerunners"
                 out[n] = line
     return out
 
@@ -271,9 +277,13 @@ def items(d) -> list[tuple[float, Item]]:
         if it.kind in ("cd", "pot") and t >= 5 and not _ctx(t, out):
             it.why = _why(d, it.name, t, order.get(it.name, []))
     hints = journal_hints(d, {_clean(it.name) for _t, it in out if it.side == "boss"})
-    for _t, it in out:
-        if it.side == "boss" and it.kind in ("cast", "mech", "adds", "phase"):
-            it.hint = hints.get(_clean(it.name), "")
+    told: set[str] = set()
+    for _t, it in sorted(out, key=lambda x: x[0]):  # said once, on the first event it names (the cause first)
+        named = it.side == "boss" and it.kind in ("cast", "mech", "adds", "phase")
+        hint = hints.get(_clean(it.name), "") if named else ""
+        if hint and hint not in told:
+            it.hint = hint
+            told.add(hint)
     starts = sorted(s for _n, s in d.phases if s >= 1)
     for k, (t, it) in enumerate(out):  # a boss event logged just before a phase starts belongs to that phase
         s = next((s for s in starts if s - 1.0 <= t < s), None)
@@ -324,7 +334,14 @@ def _phases(d, dur: float) -> list[tuple[str, float, float]]:
     ph = sorted(d.phases, key=lambda p: p[1]) or [("The fight", 0.0)]
     if ph[0][0].strip().lower() in ("", d.boss.lower()):  # a first phase named after the boss: say what it is
         ph[0] = ("Stage One" if len(ph) > 1 else "The fight", ph[0][1])
-    return [(n, 0.0 if i == 0 else s, ph[i + 1][1] if i + 1 < len(ph) else dur) for i, (n, s) in enumerate(ph)]
+    total = {n: sum(1 for m, _ in ph if m == n) for n, _ in ph}
+    seen: dict[str, int] = {}
+    named = []
+    for n, s in ph:  # a stage that comes back says so (the Sentinels' Stage One, between each Stasis)
+        seen[n] = seen.get(n, 0) + 1
+        named.append((n if total[n] == 1 else f"{n} ({seen[n]} of {total[n]})", s))
+    return [(n, 0.0 if i == 0 else s, named[i + 1][1] if i + 1 < len(named) else dur) for i, (n, s) in enumerate(named)]
+
 
 
 def _ic(icon: str, cls: str = "ic") -> str:
@@ -346,7 +363,7 @@ def _ev(it: Item, row_t: float | None = None) -> str:
         notes.append(it.why)
     small = f"<small>{', '.join(notes)}</small>" if notes else ""
     if it.hint:
-        small += f"<small class='hint'>{e(it.hint)}</small>"
+        small += f"<small class='hint' title='{e(it.hint)}'>Journal: {e(it.hint)}</small>"
     return (f"<div class='ev ek-{it.kind}'>{_ic(it.icon)}<div class='x'><span class='main'>{text}</span>{small}"
             "</div></div>")
 
@@ -376,17 +393,37 @@ def job_html(d) -> str:
         return f" at {', '.join(_mmss(t) for t in ts)}" if ts else ""
     rows = [(a.name, f"<b>{e(a.text.split(':')[0].split(' (')[0])}</b>{at(a.name)}") for a in d.actions
             if a.kind in ("kill", "contact") or (a.kind == "interrupt" and a.text.startswith("Interrupt"))][:2]
-    for w in (d.fight.invulnerable if d.fight is not None else [])[:1]:
+    hints = {it.name: it.hint for _t, it in items(d) if it.hint}
+    said = {_clean(a.name) for a in d.actions}
+    skip = {a.name for a in d.actions if a.kind == "ignore"}
+    for _t, c, _l, n in d.waves:  # adds the fight has but no action names (Nymrissa's murlocs): kill them
+        name = _clean(n)
+        if len(rows) < 2 and c and name not in said and name not in skip and n not in skip:
+            said.add(name)
+            why = next((h for k, h in hints.items() if name.lower() in h.lower()), "")
+            many = any(c2 > 1 for _t2, c2, _l2, n2 in d.waves if _clean(n2) == name) and not name.endswith("s")
+            rows.append((n, f"<b>Kill the {e(name)}{'s' if many else ''}</b>{at(name)}."))  # the why: on the rows
+            hints = {k: h for k, h in hints.items() if h != why}
+    imm = d.fight.invulnerable if d.fight is not None else []
+    for w in imm[:1]:
         adds = [_clean(x[3]) for x in d.waves if w.start - 2 <= x[0] <= w.start + w.duration and x[1]]
-        what = f": kill the {e(adds[0])} to bring it back" if adds else ""
-        rows.append((IMMUNE_ICON, f"<b>The boss is immune at {_mmss(w.start)}</b> for {w.duration:.0f} s{what}."))
+        what = f": your damage goes on the {e(adds[0])}" if adds else ""
+        lo, hi = min(round(x.duration) for x in imm), max(round(x.duration) for x in imm)
+
+        long = _span(lo) if lo == hi else f"{_span(lo)} to {_span(hi)} each"  # every time (the Sentinels: three)
+        if len(imm) == 1:
+            when = f"from {_mmss(w.start)} to {_mmss(w.start + w.duration)}"
+        else:
+            when = f"at {', '.join(_mmss(x.start) for x in imm)}"
+        rows.append((IMMUNE_ICON, f"<b>Boss immune</b> {when} ({long}){what}."))
     if len(rows) < 2:  # the journal's lines for damage dealers about this fight's events (Sszorak: Dig In)
-        said = {r[0] for r in rows}
-        seen: set[str] = set()
-        for t, it in items(d):
-            if it.hint and it.hint not in seen and it.name not in said and len(rows) < 3:
-                seen.add(it.hint)
-                rows.append((it.name, f"{e(it.hint)} <span class='muted'>({_mmss(max(0.0, t))}, the journal)</span>"))
+        done = {r[0] for r in rows}
+        for _t, it in items(d):
+            if it.hint and it.hint in hints.values() and it.name not in done and len(rows) < 3:
+                done.add(it.name)
+                times = [_mmss(max(0.0, x)) for x, y in items(d) if y.side == "boss" and y.name == it.name]
+                rows.append((it.name, f"<b>{e(_clean(it.name))}</b> at {', '.join(times[:5])}: {e(it.hint)} "
+                                      "<span class='src'>(Journal)</span>"))
     defs = _defensives(d)
     if defs:
         s, why = defs[0][1], defs[0][2]
@@ -539,10 +576,14 @@ def _phase_html(name: str, start: float, end: float, pi: int, rows: str, its: li
     lust = [t for t, x in mine if x.kind == "lust"]
     if lust:
         said.insert(0, "Bloodlust " + ("at the pull" if lust[0] < 5 else f"at {_mmss(lust[0])}"))
-    adv = f"<p class='ph-adv'>{e(cap('; '.join(said)))}.</p>" if said else ""  # in time order; they can overlap
-    return (f"<section class='stl' aria-labelledby='ph{pi}-h'><div class='ph-band' id='ph{pi}'><div class='ph-name'>"
-            f"<h2 id='ph{pi}-h'>{e(name)}</h2><span>{lasts}lasts about {_mmss(round(end - start))}.</span></div>{adv}"
-            f"<div class='ph-lanes' aria-hidden='true'>{lanes}</div></div>{rows}</section>")
+    short = bool(mine) and all(x.kind in ("immune", "phase") for _t, x in mine)  # an immunity alone: its row says it
+    adv = f"<p class='ph-adv'>{e(cap('; '.join(said)))}.</p>" if said and not short else ""  # in time order
+    span = _span(end - start)
+    m = re.fullmatch(r"(.*) \((\d+ of \d+)\)", name)
+    title = f"{e(m[1])} <span class='rep'>({m[2]})</span>" if m else e(name)
+    return (f"<section class='stl{' short' if short else ''}' aria-labelledby='ph{pi}-h'><div class='ph-band' "
+            f"id='ph{pi}'><div class='ph-name'><h2 id='ph{pi}-h'>{title}</h2><span>{lasts}lasts about {span}.</span>"
+            f"</div>{adv}<div class='ph-lanes' aria-hidden='true'>{lanes}</div></div>{rows}</section>")
 
 
 def cap(s: str) -> str:
@@ -599,6 +640,21 @@ def _second_screen(d) -> str:
             f"{_btn('ss-wipe', 'Wipe, back to the pull', cls='btn ghost')}</div></div></dialog>")
 
 
+def kill_switch(d) -> str:
+    """The kill times this boss is planned for (issue #26), one sheet each: the fight, the plan's presses and the
+    notes are those of that kill time."""
+    kt = getattr(d, "kill_times", None) or []
+    if len(kt) < 2:
+        return ""
+    now = getattr(d, "kill_now", 0)
+    links = "".join(
+        f"<a href='{e(f)}#fight' class='ks{' on' if i == now else ''}'{' aria-current=page' if i == now else ''}>"
+        f"<b>{_mmss(t)}</b><small>{e(who)}</small></a>" for i, (who, t, f) in enumerate(kt))
+    return (f"<nav class='kill-switch' aria-label='Plan for a kill of'><span class='ks-lab'>Plan for a kill of</span>"
+            f"{links}<span class='ks-hint'>Pick the closest to your raid's kill; slower than {_mmss(kt[-1][1])}, "
+            f"take {_mmss(kt[-1][1])} (its later timings are then approximate).</span></nav>")
+
+
 def html(d) -> str:
     """The fight view, or '' when the prep has no fight to show."""
     dur = d.duration or (d.fight.duration if d.fight else 0)
@@ -613,7 +669,8 @@ def html(d) -> str:
         if rows:
             sections.append(_phase_html(name, start, end, pi, rows, its))
     payload = json.dumps(data(d, ms, dur)).replace("</", "<\\/")
-    return (f"<div class='fv'><a class='skip' href='#tl'>Skip to the fight</a><div class='sheet-fv'>{_side(d)}"
+    return (f"<div class='fv'><a class='skip' href='#tl'>Skip to the fight</a>{kill_switch(d)}"
+            f"<div class='sheet-fv'>{_side(d)}"
             f"<section class='ftl' id='tl' tabindex='-1' aria-label='The fight'>{legend(its)}{''.join(sections)}"
             f"<div class='tl-end'></div></section></div>{_second_screen(d)}"
             "<p class='vh' id='sr' aria-live='polite' aria-atomic='false'></p>"

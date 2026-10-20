@@ -57,6 +57,15 @@ class PrepData:
     game_phases: list[tuple[str, float]] = field(default_factory=list)  # Warcraft Logs' own, for NSRT's counter
     waves: list[tuple[float, int, float, str]] = field(default_factory=list)
     lust: float | None = None
+    # the top raids' Bloodlust spots (paf.corpus.lust.Spot) with what each one gives you in the sim:
+    # [(spot, total damage %, boss damage %)] against the lust the fight uses; lust_pick: the raid lead's
+    lust_spots: list = field(default_factory=list)
+    lust_pick: str = ""
+    lust_noise: float = 0.0  # +- % of a spot's gain (the sims' noise)
+    # the kill times this boss is planned for (issue #26): [(who kills that long, seconds, sheet file)]; kill_now:
+    # this sheet's one. The fight tab switches between them.
+    kill_times: list = field(default_factory=list)
+    kill_now: int = 0
     pi: list[float] = field(default_factory=list)
     moving_share: float = 0.0
     add_share_spec: float | None = None  # median share of the spec's damage on adds (logs)
@@ -720,7 +729,9 @@ def checklist_items(d: PrepData) -> list[tuple[str, str]]:
     elif any(p.objective == want for p in d.optimized):
         item(f"Cooldowns ({_goal(want)} damage): use them as soon as they are ready; holding them for a moment of "
              f"the fight gains nothing measurable here")
-    if d.lust is not None:
+    if getattr(d, "lust_spots", None):
+        item(f"{icons.img(d.icons.get('Bloodlust', '') or _sfallback(d, 'Bloodlust'), 'small')}{lust_line(d)}")
+    elif d.lust is not None:
         item("Bloodlust goes out at the pull" if d.lust < 15 else f"Bloodlust usually comes around {_mmss(d.lust)}")
     mine = [a for a in d.actions if a.kind in ("kill", "contact", "interrupt", "mechanic")
             and not (a.kind == "interrupt" and not a.text.startswith("Interrupt"))]
@@ -944,6 +955,40 @@ def in_time_order(note: str) -> str:
     head = [x for x in lines if when(x) is None]
     timed = sorted((x for x in lines if when(x) is not None), key=when)
     return "\n".join(head + timed) + ("\n" if note.endswith("\n") else "")
+
+
+def lust_line(d: PrepData) -> str:
+    """Where the fight puts Bloodlust (the raid lead's pick, else the top raids' most used spot) and what the top
+    raids' other spots would give you in the sim."""
+    spots = d.lust_spots
+    used = next((x for x in spots if x[0].label == d.lust_pick), None) or next(
+        (x for x in spots if x[0].t == d.lust), spots[0])
+    sp = used[0]
+    if sp.t is None:
+        head = "<b>No Bloodlust</b>"
+    elif sp.kind == "pull":
+        head = "<b>Bloodlust on pull</b>"
+    elif sp.kind == "phase":
+        head = f"<b>Bloodlust at {_mmss(sp.t)}</b>, {e(sp.phrase.removeprefix('at '))}"
+    else:
+        head = f"<b>Bloodlust at {_mmss(sp.t)}</b>" + (f", {e(sp.label[0].lower() + sp.label[1:])}"
+                                                      if sp.kind == "last_minute" else "")
+    why = "your raid lead's pick" if d.lust_pick else f"{sp.share:.0%} of the top raids lust there"
+    boss = (wanted(d) or "boss") == "boss"
+    noise = getattr(d, "lust_noise", 0.0) or 0.0
+    gains = [(x, b if boss and b is not None else tot) for x, tot, b in spots  # going without: the raid lead's call
+             if x is not sp and tot is not None and x.t is not None]
+    what = "boss damage" if boss else "damage"
+    better = [(x, g) for x, g in gains if g > max(noise, 0.05)]
+    tail = ""
+    if better:
+        x, g = max(better, key=lambda xg: xg[1])
+        tail = (f" Lust {e(x.phrase)} ({x.share:.0%} of them) would give you <b class='pos'>{g:+.1f}% {what}</b>"
+                + (f" (&plusmn;{noise:.1f}%)" if noise else "")
+                + (": tell your raid lead." if not d.lust_pick else "."))
+    elif gains:
+        tail = " The top raids' other spots give you no more."
+    return f"{head} ({why}).{tail}"
 
 
 def unsimmed_amps(d: PrepData) -> list[str]:

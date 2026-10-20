@@ -387,3 +387,27 @@ abilities used by at least {MIN_USERS:.0%} of players and cast at most {MAX_CAST
 
 def lifetimes_quantiles(values: list[float]) -> tuple[float, float, float]:
     return _q(values, .25), _q(values, .5), _q(values, .75)
+
+
+def immune_phases(phases: list[tuple[str, float]], immune: list[tuple[float, float]]) -> list[tuple[str, float]]:
+    """A phase that opens on the boss's first immunity and runs over the next ones is that immunity coming back:
+    Warcraft Logs keeps an intermission's first start only (the Sentinels' Vitriolic Stasis at 0:46, 2:28 and 4:08,
+    shown as one intermission lasting 4:41). It becomes a window per immunity, the stage before it coming back after
+    each. immune: (start, duration) of the fight's immune windows."""
+    ph = sorted(phases, key=lambda p: p[1])
+    wins = sorted(immune)
+    for i, (name, s) in enumerate(ph[1:], 1):
+        nxt = ph[i + 1][1] if i + 1 < len(ph) else float("inf")
+        if not wins or abs(wins[0][0] - s) > 3:
+            continue
+        inside = [w for w in wins[1:] if w[0] < nxt]
+        if not inside:
+            return ph
+        before = ph[i - 1][0]
+        out = ph[:i]
+        for a, d in [wins[0], *inside]:
+            out += [(name, round(a, 1))]
+            if a + d < nxt - 5:
+                out += [(before, round(a + d, 1))]
+        return out + ph[i + 1:]
+    return ph

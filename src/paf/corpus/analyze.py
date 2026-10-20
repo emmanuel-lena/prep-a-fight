@@ -6,6 +6,9 @@ import json
 import sqlite3
 import statistics as st
 from collections import Counter, defaultdict
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 
 KILLABLE_DEATH_RATE = 0.5  # add types that die at least this often are "real" adds, the rest are mechanics
@@ -83,11 +86,27 @@ def council(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> list
 FOCUS = "focus"  # cohort of the kills fetched only to measure rare specs (paf.raidneed): not the analyzed spec's
 
 
+_SLOWER: ContextVar[float | None] = ContextVar("slower_kills", default=None)
+
+
+@contextmanager
+def slower_kills(min_duration: float) -> Iterator[None]:
+    """Every corpus query in the block reads the kills lasting at least `min_duration` s only (issue #26: the fight
+    of a raid that kills slower, with its own timeline, not the top raids' one stretched)."""
+    token = _SLOWER.set(min_duration)
+    try:
+        yield
+    finally:
+        _SLOWER.reset(token)
+
+
 def kills_filter(encounter_id: int, difficulty: int, include_focus: bool = False) -> tuple[str, tuple]:
-    if include_focus:
-        return ("f.encounter_id=? AND f.difficulty=? AND f.status='done'", (encounter_id, difficulty))
-    return ("f.encounter_id=? AND f.difficulty=? AND f.status='done' AND COALESCE(f.cohort, '') != 'focus'",
-            (encounter_id, difficulty))
+    where, params = "f.encounter_id=? AND f.difficulty=? AND f.status='done'", (encounter_id, difficulty)
+    if not include_focus:
+        where += " AND COALESCE(f.cohort, '') != 'focus'"
+    if (slow := _SLOWER.get()) is not None:
+        where, params = where + " AND f.duration_s >= ?", (*params, slow)
+    return where, params
 
 
 def fight_waves(spawns: list[tuple[float, float, str]]) -> list[tuple[float, int, float, list[str]]]:

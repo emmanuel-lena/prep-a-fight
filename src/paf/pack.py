@@ -19,6 +19,7 @@ from pathlib import Path
 from paf.actions import Action
 from paf.assigns import Mechanic
 from paf.config import data_dir
+from paf.corpus.lust import Spot
 from paf.corpus.timeline import Ability, Timeline
 from paf.defensives import DefensiveMoment, Defensives
 from paf.fight import Fight
@@ -26,7 +27,7 @@ from paf.raidneed import AddType
 from paf.talent_sim import Build
 
 VERSION = 4  # 2: boss units up from the first hit, recurring boss casts (0.8.7); 3: game-data boss amps (0.8.10);
-# 4: adds that never die, immunities from boss auras (0.8.11)
+# 4: adds that never die, immunities from boss auras, the raid's Bloodlust spots (0.8.11)
 MIN_KILLS = 100  # fewer: the add waves may split (measured at 84 kills); a pack under it is neither shared nor used
 GROWN = 50  # the local corpus has this many more kills than the pack: the pack is made again from it
 # weekly reset per region, in UTC (weekday: Monday = 0). To check against Blizzard's announcements: EU Wednesday
@@ -60,6 +61,7 @@ class PackData:
     activity: tuple | None = None
     version: int = VERSION
     boss_share_waves: bool = False  # boss_share counts the boss units played as add waves as adds (packs since 0.7.5)
+    lust_spots: list[Spot] = field(default_factory=list)  # the top raids' Bloodlust spots (paf.corpus.lust)
 
 
 def now_utc() -> str:
@@ -158,6 +160,7 @@ def from_json(text: str) -> PackData:
     if d.get("activity"):
         a = d["activity"]
         d["activity"] = (a[0], a[1], [tuple(x) for x in a[2]])
+    d["lust_spots"] = [Spot(**x) for x in d.get("lust_spots", [])]
     return PackData(**d)
 
 

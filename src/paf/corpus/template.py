@@ -423,6 +423,13 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
     candidates = [c for c in candidates if not any(
         min(c.start + c.duration, v.start + v.duration) - max(c.start, v.start) >= c.duration / 2 for v in vulnerable)]
 
+    # Bloodlust: the top raids' most used spot, read on the whole raid (paf.corpus.lust); the ranked player's own
+    # buffs (above) only show the lusts they cast themselves, and none cast before the pull
+    from paf.corpus.lust import default_lust, lust_spots
+
+    spots = lust_spots(con, encounter_id, difficulty, [(name, start) for _, start, _i, name in ordered], duration)
+    lust = default_lust(spots) if spots else (round(st.median(lust_times), 1) if lust_times else 0.0)
+
     fight = Fight(
         name=f"{title or boss_name} {diff_name}".strip(),
         duration=round(duration, 1),
@@ -431,7 +438,7 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
         candidate_vulnerable=candidates,
         invulnerable=invulnerable,
         movement=moves,
-        lust_time=round(st.median(lust_times), 1) if lust_times else 0.0,
+        lust_time=lust,
         power_infusion=[round(t, 1) for t in pi_times],
         source=f"median of {len(keys)} ranked kills (paf corpus)",
         focus=council_focus(con, where, params, spec, sorted(members), duration) if members else [],

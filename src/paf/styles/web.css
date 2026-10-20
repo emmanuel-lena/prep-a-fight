@@ -245,3 +245,19 @@ textarea[name=plan],textarea[name=notes]{font-family:var(--font-data);font-size:
 .settings .cta{position:static;box-shadow:none} .settings.dirty .cta{position:sticky;box-shadow:0 -10px 14px -10px rgba(0,0,0,.18)}
 .adv h3{margin:0 0 8px;font:600 15px var(--font-body);color:var(--fg)}
 .adv code{white-space:nowrap}
+.rl-lusts{display:grid;gap:6px}
+.rl-lust{display:flex;align-items:center;gap:10px;margin:0;padding:8px 12px;border:1px solid var(--line);border-radius:var(--radius);
+  cursor:pointer}
+.rl-lust:hover{border-color:var(--fg)}
+.rl-lust:has(input:checked){border-color:var(--fg);background:var(--surface-2)}
+.rl-what{display:grid;flex:1;min-width:0} .rl-what small{color:var(--muted)}
+.rl-gain{margin-left:auto;text-align:right;white-space:nowrap;font:600 13px var(--font-data);font-variant-numeric:tabular-nums;
+  color:var(--muted)}
+.rl-gain small{font:400 12px var(--font-data);color:var(--muted);margin-left:4px} .rl-gain.pos{color:var(--pos)} .rl-gain.neg{color:var(--neg)}
+.rl-gain.ref{font:600 11px var(--font-display);text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;
+  border:1px solid var(--line);border-radius:999px;background:var(--surface-2)}
+.rl-note{font-size:13px;color:var(--muted);max-width:68ch;margin:10px 0 0}
+.rl-intro{font-size:14px;color:var(--fg);max-width:68ch;margin:0 0 8px}
+.rl-lead{font-size:15px;font-weight:600;color:var(--fg);max-width:68ch;margin:0 0 6px}
+.rl-lust input{accent-color:var(--fg)} .rl-what .t{font-family:var(--font-data);font-variant-numeric:tabular-nums}
+.rl-grid{grid-template-columns:repeat(auto-fill,minmax(400px,1fr))}

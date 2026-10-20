@@ -219,10 +219,40 @@ def sheet(state: dict, enc, diff: int) -> dict | None:
         names = talent_entry_names()
     except Exception:  # noqa: BLE001
         names = {}
+    from paf.corpus.lust import lust_spots
+
+    spots = lust_spots(con, enc.id, diff)
+    pick = lust_pick(enc.id, diff)
     return {"boss": enc.name, "targets": [{"name": a.target, "whole_raid": a.whole_raid, "second_boss": a.second_boss,
                                            "players": [n for n, _s in a.proposed],
                                            "best": [s for s, _d, _n in a.ranking[:3]]} for a in rows],
-            "builds": builds(state, enc.id, diff, roles, names)}
+            "builds": builds(state, enc.id, diff, roles, names),
+            "enc": enc.id, "diff": diff, "lust": spots, "lust_pick": pick if any(x.label == pick for x in spots) else "",
+            "lust_kills": con.execute("SELECT COUNT(*) FROM raid_lust l JOIN fight f USING(report, fight_id) "
+                                      "WHERE f.encounter_id=? AND f.difficulty=? AND f.status='done'",
+                                      (enc.id, diff)).fetchone()[0],
+            "lust_gains": lust_gains(enc.name, diff)}
+
+
+def lust_gains(boss: str, diff: int) -> tuple[str, dict[str, list], float, float] | None:
+    """What each Bloodlust spot gives in the newest prep of this boss on this machine: (spec, {spot: [total %,
+    boss %]}, noise %, the prep's kill time), from the sheet's summary (paf.cli prep)."""
+    from paf import settings
+    from paf.corpus.template import _slug
+    from paf.web import prepared
+
+    name = next((n for n, v in settings.DIFFICULTIES.items() if v == diff), "")
+    for item in prepared():  # newest first
+        lust = (item.get("headline") or {}).get("lust")
+        if lust and item["key"].startswith(f"{_slug(boss)}-{name}-"):
+            return lust.get("spec", ""), lust.get("spots", {}), lust.get("noise", 0.0), lust.get("kill", 0.0)
+    return None
+
+
+def lust_spot(sh: dict):
+    """The spot the raid plays: the raid lead's pick, else the top raids' most used one."""
+    return next((x for x in sh.get("lust") or [] if x.label == sh.get("lust_pick")), None) or \
+        next(iter(sh.get("lust") or []), None)
 
 
 def pretty(spec: str) -> str:
@@ -235,6 +265,8 @@ def pretty(spec: str) -> str:
 def text(sh: dict, difficulty: str, mrt: bool = False) -> str:
     """The sheet as text: for Discord (bold boss line) or an MRT note (plain)."""
     lines = [f"{sh['boss']} ({difficulty})" if mrt else f"**{sh['boss']} ({difficulty})**"]
+    if (spot := lust_spot(sh)) is not None:
+        lines.append(f"Bloodlust: {spot.label.lower() if spot.kind != 'none' else 'none'}")
     for t in sh["targets"]:
         if t["whole_raid"] and not t["players"]:
             lines.append(f"{t['name']}: everyone")
@@ -245,7 +277,7 @@ def text(sh: dict, difficulty: str, mrt: bool = False) -> str:
         change = (f"take {', '.join(b['take'])}" if b["take"] else "") + (
             (" / " if b["take"] and b["drop"] else "") + f"drop {', '.join(b['drop'])}" if b["drop"] else "")
         lines.append(f"{b['name']} ({what}): {change}")
-    if len(lines) == 1:
+    if len(lines) == 1 + (lust_spot(sh) is not None):
         lines.append("Everyone on the boss, no change.")
     return "\n".join(lines)
 
@@ -317,18 +349,76 @@ def page_body(difficulty: str) -> str:
             f"{'on an add: padding talents' if b['side'] == 'pad' else 'on the boss: boss talents'}</small>"
             + (f"<br>take {e(', '.join(b['take']))}" if b["take"] else "")
             + (f"<br>drop {e(', '.join(b['drop']))}" if b["drop"] else "") + "</li>" for b in sh["builds"])
-        cards += (f"<article class='rl-boss'><header><h3>{e(x.name)}</h3>"
+        cards += (f"<article class='rl-boss' id='boss-{x.id}'><header><h3>{e(x.name)}</h3>"
                   f"{copy_button(text(sh, difficulty), 'Copy for Discord')}"
                   f"{copy_button(text(sh, difficulty, mrt=True), 'Copy MRT note')}</header>"
                   f"<h4>Who hits what</h4><ul>{tg or '<li>Everyone on the boss: no add to assign.</li>'}</ul>"
                   + (f"<h4>Talents to change</h4><ul>{bd}</ul>" if bd else
                      "<h4>Talents</h4><p class='small muted'>Nobody needs to change, from what the log shows.</p>")
-                  + "</article>")
+                  + lust_block(sh, difficulty) + "</article>")
     allbtn = (copy_button("\n\n".join(text(sh, difficulty) for sh in everything), "Copy every boss for Discord")
               if everything else "")
     miss = (f"<p class='small muted'>Not prepared yet, so no sheet: {e(', '.join(missing))}. "
             f"<a href='/raid/prepare?difficulty={e(difficulty)}'>Prepare the whole raid</a> first.</p>" if missing else "")
     return head + roster + f"<h2>Boss by boss {allbtn}</h2>{miss}<div class='rl-grid'>{cards}</div>{_tools()}{COPY_JS}"
+
+
+def lust_block(sh: dict, difficulty: str) -> str:
+    """The top raids' Bloodlust spots on a boss, how often each is used, what it gives in the newest prep here, and
+    the raid lead's pick (used by the preps of this app, and written in the Discord text)."""
+    spots = sh.get("lust") or []
+    if not spots:
+        return ""
+    current = lust_spot(sh)
+    spec, gains, noise, kill = sh.get("lust_gains") or ("", {}, 0.0, 0.0)
+    rows = ""
+    for x in spots:
+        g = gains.get(x.label)
+        if not g or g[0] is None:
+            gain = ""
+        elif g[0] == 0:
+            gain = "<span class='rl-gain ref'>baseline</span>"
+        else:
+            gain = (f"<span class='rl-gain {'pos' if g[0] > 0 else 'neg'}'>{_signed(g[0])}%"
+                    + (f"<small>&plusmn;{noise:.1f}%</small>" if noise else "") + "</span>")
+        when = (f", <span class='t'>{_mmss(x.t)}</span>" if x.t is not None and x.kind not in ("pull", "none")
+                else "")
+        where = f" · in {e(x.phase)}" if x.phase and x.kind in ("time", "last_minute") else ""
+        rows += (f"<label class='rl-lust'><input type='radio' name='spot' value='{e(x.label)}'"
+                 f"{' checked' if x is current else ''} onchange='this.form.submit()'>"
+                 f"<span class='rl-what'><b>{e(x.label)}{when}</b><small>{x.share:.0%} of the top raids{where}</small>"
+                 f"</span>{gain}</label>")
+    best = max(((x, gains[x.label][0]) for x in spots if x.t is not None and gains.get(x.label)
+                and gains[x.label][0] is not None), key=lambda xg: xg[1], default=None)
+    lead = ""
+    if best is not None and best[1] > max(noise, 0.1):
+        base = next((x for x in spots if (gains.get(x.label) or [None])[0] == 0), None)
+        x = best[0]
+        lead = (f"<p class='rl-lead'>Lust {e(x.phrase)}: {_signed(best[1])}% damage for the {e(spec)} prep"
+                + (f" over lust {e(base.phrase)}" if base else "") + ".</p>"
+                "<p class='rl-intro'>The top raids are split: "
+                + ", ".join(f"{y.share:.0%} {e(y.phrase)}" for y in spots if y.t is not None) + ".</p>")
+    who = ("Your pick goes into your preps here and into the Discord text." if sh.get("lust_pick") else
+           "Checked by default: the top raids' most used spot, since lust timing is a raid-wide call and one spec's "
+           "gain is only a hint. Your pick goes into your preps here and into the Discord text.")
+    rest = 1 - sum(x.share for x in spots)
+    notes = [f"{rest:.0%} of the top raids lust elsewhere, each spot under 5%."] if rest >= 0.03 else []
+    notes.append(f"Simmed on the newest {e(spec)} prep here{f' ({_mmss(kill)} kill)' if kill else ''}, with "
+                 f"Bloodlust at each spot against the spot it played (baseline). Other specs may gain differently."
+                 if gains else "Prepare this boss to see what each spot gives.")
+    return (f"<h4>Bloodlust</h4>{lead}<p class='rl-intro'>{sh.get('lust_kills', 0)} top kills read. {who}</p>"
+            f"<form method='post' action='/raidlead/lust' class='rl-lusts' role='radiogroup' aria-label='Bloodlust'>"
+            f"<input type='hidden' name='enc' value='{sh['enc']}'><input type='hidden' name='diff' value='{sh['diff']}'>"
+            f"<input type='hidden' name='difficulty' value='{e(difficulty)}'>{rows}</form>"
+            f"<p class='rl-note'>{' '.join(notes)}</p>")
+
+
+def _mmss(t: float) -> str:
+    return f"{int(t // 60)}:{int(t % 60):02d}"
+
+
+def _signed(v: float) -> str:
+    return f"+{v:.1f}" if v > 0 else f"\u2212{abs(v):.1f}"  # a true minus sign
 
 
 COPY_JS = """<script>document.addEventListener('click',function(ev){var b=ev.target.closest('.copy');if(!b)return;
@@ -343,4 +433,19 @@ def toggle_bench(name: str) -> None:
     bench = set(state.get("bench") or [])
     bench ^= {name}
     state["bench"] = sorted(bench)
+    save(state)
+
+
+def lust_pick(enc_id: int, diff: int) -> str:
+    """The Bloodlust spot the raid lead picked for a boss (a paf.corpus.lust.Spot label), "" for none."""
+    return (load().get("lust") or {}).get(f"{enc_id}-{diff}", "")
+
+
+def set_lust(enc_id: int, diff: int, label: str) -> None:
+    state = load()
+    picks = state.setdefault("lust", {})
+    if label:
+        picks[f"{enc_id}-{diff}"] = label
+    else:
+        picks.pop(f"{enc_id}-{diff}", None)
     save(state)

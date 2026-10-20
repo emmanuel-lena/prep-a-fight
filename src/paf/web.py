@@ -467,7 +467,7 @@ def prepared() -> list[dict]:
     out: dict[str, dict] = {}
     for f in reports.glob("*.html") if reports.is_dir() else []:
         kind, _, key = f.stem.partition("-")
-        if kind not in ("prep", "timeline") or not key:
+        if kind not in ("prep", "timeline") or not key or key.endswith("-slow"):  # a raid like yours: its sheet's
             continue
         item = out.setdefault(key, {"key": key, "files": {}, "mtime": 0.0, "name": "", "difficulty": ""})
         item["files"][kind] = f.name
@@ -1991,6 +1991,18 @@ class Handler(BaseHTTPRequestHandler):
 
                 raidlead.toggle_bench((form.get("name") or [""])[0])
                 self._redirect("/raidlead")
+            elif self.path == "/raidlead/lust":
+                from paf import raidlead
+
+                try:
+                    enc_id, diff = int((form.get("enc") or ["0"])[0]), int((form.get("diff") or ["0"])[0])
+                except ValueError:
+                    enc_id = diff = 0
+                if enc_id and diff:
+                    raidlead.set_lust(enc_id, diff, (form.get("spot") or [""])[0])
+                level = (form.get("difficulty") or [""])[0]
+                self._redirect(f"/raidlead?difficulty={level if level in settings.DIFFICULTIES else 'heroic'}"
+                               f"#boss-{enc_id}")
             elif self.path == "/lastraid/again":
                 from paf import characters, lastraid
 

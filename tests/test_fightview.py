@@ -118,9 +118,14 @@ def test_a_boss_row_says_what_the_journal_tells_damage_dealers(monkeypatch):
     d.role_bullets = ["[Dig In] increases Sszorak's damage taken during Howling Maelstrom.",
                       "Venomous Surge inflicts raid-wide damage."]
     dig = [it for _t, it in fightview.items(d) if it.name == "Dig In"]
-    assert len(dig) == 2 and all(it.hint == "Dig In increases Sszorak's damage taken during Howling Maelstrom."
-                                 for it in dig)
+    assert [it.hint for it in dig] == ["Dig In increases Sszorak's damage taken during Howling Maelstrom.", ""]
     assert not next(it for _t, it in fightview.items(d) if it.name == "Ravage").hint  # not a damage dealer's line
     page = fightview.html(d)
-    assert "<small class='hint'>Dig In increases Sszorak&#x27;s damage taken" in page
-    assert "the journal)" in fightview.job_html(d)  # Your job says it too, with when
+    assert ("class='hint' title='Dig In increases Sszorak&#x27;s damage taken during Howling Maelstrom.'>"
+            "Journal: Dig In") in page
+    assert "<b>Dig In</b> at 1:51, 4:09: Dig In increases" in fightview.job_html(d)  # Your job says it, with when
+    d.waves = [(24.0, 5, 30.0, "Bubblefin Shorerunner")]
+    d.role_bullets = ["[Alluring Bubble] attracts a large group of Bubblefin Shorerunners to rush toward the bubble."]
+    assert next(it for _t, it in fightview.items(d) if it.kind == "adds").hint.startswith("Alluring Bubble attracts")
+    job = fightview.job_html(d)  # no action names the murlocs: Your job says to kill them, with the journal's why
+    assert "<b>Kill the Bubblefin Shorerunners</b> at 0:24.</span>" in job  # the why stays on the fight rows

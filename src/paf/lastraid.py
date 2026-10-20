@@ -27,7 +27,7 @@ from pathlib import Path
 from paf.config import data_dir
 
 FIGHTS = """query($c:String!){ reportData { report(code:$c) { startTime
-  fights(killType: Encounters) { id encounterID difficulty kill bossPercentage } } } }"""
+  fights(killType: Encounters) { id encounterID difficulty kill bossPercentage startTime endTime } } } }"""
 URL = "https://www.warcraftlogs.com/reports/{}"
 
 
@@ -132,6 +132,8 @@ def bosses_of(fights: list[dict], encs) -> list[dict]:
             "boss": f["encounterID"], "name": next(x.name for x in encs if x.id == f["encounterID"]),
             "difficulty": names[f["difficulty"]], "pulls": 0, "kill": False, "best": 100.0, "jobs": {}})
         b["pulls"] += 1
+        if f.get("kill") and f.get("endTime") and not b["kill"]:  # how long the raid takes (issue #26)
+            b["kill_time"] = round((f["endTime"] - f.get("startTime", 0)) / 1000, 1)
         b["kill"] = b["kill"] or bool(f.get("kill"))
         b["best"] = 0.0 if b["kill"] else min(b["best"], float(f.get("bossPercentage") or 100))
     return sorted(by.values(), key=lambda b: (b["kill"], order[b["boss"]]))
@@ -349,3 +351,17 @@ CARD_JS = """<script>(function(){var s=document.getElementById('lastraid');if(!s
 setInterval(function(){fetch('/lastraid/card').then(function(r){return r.text()}).then(function(h){
 var t=document.createElement('div');t.innerHTML=h;var n=t.firstElementChild;if(!n)return;s.replaceWith(n);s=n;
 if(!n.dataset.reading)location.reload()}).catch(function(){})},10000)})();</script>"""
+
+
+def kill_time(enc_id: int, difficulty: str) -> float | None:
+    """How long your raid took to kill this boss in its last log read (the characters' newest first), or None."""
+    from paf import characters
+
+    state = load()
+    slugs = [characters.current_slug()] + [s for s in state if s != characters.current_slug()]
+    for slug in slugs:
+        cur = state.get(slug)
+        for b in (cur or {}).get("bosses", []) if isinstance(cur, dict) else []:
+            if b.get("boss") == enc_id and b.get("difficulty") == difficulty and b.get("kill_time"):
+                return float(b["kill_time"])
+    return None

@@ -168,3 +168,40 @@ def test_adds_that_never_die_come_from_the_damage_graph():
         con.execute("INSERT INTO npc_window VALUES (?, 1, 'Egg', 70, 20)", (rep,))  # 1% over the corpus: a mechanic
     assert undying_waves(con, 3379, 4) == [(22, 15, 30, "Bubblefin Shorerunner"),
                                            (112, 15, 30, "Bubblefin Shorerunner")]
+    # the top players hit 5 of them at once (each lives ~10 s of a 30 s window): the sim gets 5, not 15
+    con.executemany("INSERT INTO npc_stack VALUES (?, 1, 'Bubblefin Shorerunner', 5)", [(f"r{k}",) for k in range(4)])
+    assert [n for _t, n, _l, _nm in undying_waves(con, 3379, 4)] == [5, 5]
+
+    from paf.corpus.units import stacked_instances
+
+    hits = [{"type": "damage", "targetID": 40, "targetInstance": i, "timestamp": 1000 + 500 * j}
+            for j in range(4) for i in range(1, 6)]
+    hits.append({"type": "damage", "targetID": 41, "targetInstance": 1, "timestamp": 1000})  # another unit type
+    assert stacked_instances(hits, {40}, 0) == 5
+
+
+def test_your_raid_sees_the_adds_that_never_die():
+    """Nymrissa: 'no add type takes a real share of the damage', with 21% of it on Bubblefin Shorerunners."""
+    import sqlite3
+
+    from paf.corpus.db import SCHEMA
+    from paf.raidneed import add_types
+
+    con = sqlite3.connect(":memory:")
+    con.executescript(SCHEMA)
+    con.executemany("INSERT INTO npc VALUES (?,?,?)", [(1, "Bubblefin Shorerunner", 0), (2, "Nymrissa", 1)])
+    for k in range(12):
+        rep = f"r{k}"
+        con.execute("INSERT INTO fight(report, fight_id, encounter_id, difficulty, status, duration_s) "
+                    "VALUES (?,1,3379,4,'done',270)", (rep,))
+        con.execute("INSERT INTO npc_status VALUES (?, 1)", (rep,))
+        con.executemany("INSERT INTO npc_window VALUES (?, 1, 'Bubblefin Shorerunner', ?, 30)",
+                        [(rep, 24), (rep, 69), (rep, 134)])
+        con.executemany("INSERT INTO add_instance VALUES (?, 1, ?, 1, 1, ?, 270, 0)",
+                        [(rep, 100 + i, 24 + i) for i in range(15)])
+        for actor, spec, dmg_boss, dmg_add in ((1, "Elemental", 40, 60), (2, "Subtlety", 92, 8), (3, "Arcane", 85, 15)):
+            con.execute("INSERT INTO player VALUES (?, 1, ?, 'X', ?, 300, ?)", (rep, actor, spec, dmg_boss + dmg_add))
+            con.executemany("INSERT INTO damage_by_target VALUES (?, 1, ?, ?, ?)",
+                            [(rep, actor, "Nymrissa", dmg_boss), (rep, actor, "Bubblefin Shorerunner", dmg_add)])
+    types = add_types(con, 3379, 4)
+    assert [t.name for t in types] == ["Bubblefin Shorerunner"]

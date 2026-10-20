@@ -50,6 +50,11 @@ CREATE TABLE IF NOT EXISTS unit_status(report TEXT, fight_id INT, PRIMARY KEY(re
 CREATE TABLE IF NOT EXISTS npc_window(       -- windows when other enemies take damage (same graph): adds that never die
   report TEXT, fight_id INT, name TEXT, t_start REAL, duration REAL);
 CREATE TABLE IF NOT EXISTS npc_status(report TEXT, fight_id INT, PRIMARY KEY(report, fight_id));
+CREATE TABLE IF NOT EXISTS npc_stack(          -- adds that never die: how many of a type the ranked player hits at once
+  report TEXT, fight_id INT, name TEXT, targets REAL, PRIMARY KEY(report, fight_id, name));
+CREATE TABLE IF NOT EXISTS npc_stack_status(report TEXT, fight_id INT, PRIMARY KEY(report, fight_id));
+CREATE TABLE IF NOT EXISTS raid_lust(         -- the raid's first Bloodlust of a kill (s; NULL: none), paf.corpus.lust
+  report TEXT, fight_id INT, t REAL, PRIMARY KEY(report, fight_id));
 CREATE TABLE IF NOT EXISTS boss_aura(        -- buffs/debuffs applied to the boss by enemies (possible damage amps)
   report TEXT, fight_id INT, ability_id INT, kind TEXT, t_start REAL, duration REAL, rate_ratio REAL);
 CREATE TABLE IF NOT EXISTS aura_status(report TEXT, fight_id INT, PRIMARY KEY(report, fight_id));
@@ -102,5 +107,5 @@ def clear_fight_rows(con: sqlite3.Connection, report: str, fight_id: int) -> Non
     """Remove derived rows of a kill (before re-fetching it)."""
     for table in ("phase", "add_instance", "player", "damage_by_target", "enemy_cast",
                   "player_cast", "player_buff", "mech_event", "mech_status", "unit_window", "unit_status",
-                  "npc_window", "npc_status", "boss_aura", "aura_status"):
+                  "npc_window", "npc_status", "npc_stack", "npc_stack_status", "raid_lust", "boss_aura", "aura_status"):
         con.execute(f"DELETE FROM {table} WHERE report=? AND fight_id=?", (report, fight_id))

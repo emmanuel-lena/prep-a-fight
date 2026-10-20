@@ -313,14 +313,15 @@ def fight_variants(fight: Fight) -> dict[str, Fight]:
 
 
 def sensitivity(profile_text: str, apl: OrderedDict[str, list[str]], plans: list[Plan], fight: Fight,
-                run_dir: Path, target_error: float = 0.1) -> None:
-    """Gain of every plan on each pessimistic variant of the fight (V3: only robust plans are recommended)."""
+                run_dir: Path, target_error: float = 0.1, extra: dict[str, Fight] | None = None) -> None:
+    """Gain of every plan on each pessimistic variant of the fight (V3: only robust plans are recommended).
+    extra: other fights a plan must hold on, e.g. a slower raid's kill (paf.killtime)."""
     sets = {p.objective: apply_rules(apl, p.choice) for p in plans
             if p.objective != "secondary" and any(r.name != "default" for r in p.choice.values())}
     if not sets:
         return
     base = "\n".join([profile_text.rstrip(), *apl_lines(apl)])
-    for name, variant in fight_variants(fight).items():
+    for name, variant in {**fight_variants(fight), **(extra or {})}.items():
         res = simc.run(simc.build_input(base, variant.to_simc(), sets),
                        run_dir / f"sensitivity-{re.sub(r'[^a-z0-9]+', '-', name)}", target_error=target_error)
         by_name = {ps.name: ps for ps in res.profilesets}
@@ -623,9 +624,11 @@ def cooldown_durations(profile_text: str, run_dir: Path,
 def optimize_all(profile_text: str, fight: Fight, run_dir: Path, *, objectives: tuple[str, ...] = OBJECTIVES,
                  target_error: float = 0.2, log: Callable[[str], None] = print,
                  alignment: list | None = None,
-                 validation: float | None = None) -> tuple[list[Plan], list[Cooldown]]:
+                 validation: float | None = None,
+                 extra_variants: dict[str, Fight] | None = None) -> tuple[list[Plan], list[Cooldown]]:
     """alignment: what the top players do with their cooldowns (tops_alignment), to flag contradictions;
-    validation: simulated / real DPS of the top players on this fight."""
+    validation: simulated / real DPS of the top players on this fight; extra_variants: fights the plans must also
+    hold on (a slower raid's kill)."""
     apl = parse_apl(dump_apl(profile_text, run_dir / "apl"))
     DISCOVERED.clear()
     DISCOVERED.update(discover_cooldowns(profile_text, apl, run_dir / "discover"))
@@ -642,7 +645,7 @@ def optimize_all(profile_text: str, fight: Fight, run_dir: Path, *, objectives: 
     plans = [optimize_objective(profile_text, apl, cds, fight, obj, run_dir, target_error=target_error, log=log)
              for obj in objectives]
     confirm(profile_text, apl, plans, fight, run_dir)
-    sensitivity(profile_text, apl, plans, fight, run_dir)
+    sensitivity(profile_text, apl, plans, fight, run_dir, extra=extra_variants)
     if alignment:
         default_pull = play_by_play(profile_text, apl, Plan("default", {}, 0, 0), fight, run_dir, cds)
         alignment = adjust_alignment(alignment, default_pull, fight)

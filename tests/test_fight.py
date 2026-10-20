@@ -73,3 +73,29 @@ def test_an_intermission_add_dies_with_the_intermission():
     echo, amani = f.add_waves
     assert echo.lifetime == 49.5 and amani.lifetime == 16.7  # cut at the immunity's end; the earlier wave untouched
     assert not any(a > 152.1 for a, _d, w in f._spawns() if w.name == "Echo")  # no respawn in Stage Two
+
+
+def test_no_add_is_up_when_the_boss_comes_back():
+    """SimC never goes back to the boss when an add outlives an immunity (retarget=1). The Sentinels' Venom
+    Coagulation at 55.9 s, 0.8 s before the end of Vitriolic Stasis, kept the whole fight on the adds (0.33 of the
+    top players' DPS)."""
+    from paf.fight import AddWave, Fight, Window
+
+    f = Fight("B", 280, add_waves=[AddWave(55.9, 1, 1, "Venom Coagulation"), AddWave(0, 1, 50.9, "Blood"),
+                                   AddWave(40, 1, 30, "Blood")],
+              invulnerable=[Window(46.2, 10.5)])
+    back = 56.7
+    assert not any(a < back <= a + d for a, d, _w in f._spawns())
+    assert any(a == back + 0.5 for a, _d, w in f._spawns() if w.time == 40)  # it comes back after
+
+
+def test_a_wave_logged_at_an_immunitys_end_belongs_to_the_next_phase():
+    """The slower Nek'zali heroic kills: 18 Restless Amani logged 0.8 s before Stage Two were cut to nothing."""
+    from paf.fight import AddWave, Fight, Window
+
+    f = Fight("B", 314, add_waves=[AddWave(202.6, 18, 20.0, "Restless Amani"), AddWave(130, 1, 90, "Echo")],
+              invulnerable=[Window(126.4, 77.0)])
+    amani, echo = f.add_waves
+    assert (amani.time, amani.lifetime) == (203.9, 20.0)
+    assert echo.lifetime == 73.4  # an intermission's add still dies with it
+    assert any(w.name == "Restless Amani" and d == 20.0 for _a, d, w in f._spawns())

@@ -360,41 +360,102 @@ def unit_windows(con: sqlite3.Connection, encounter_id: int, difficulty: int, mi
     return per_kill, {name: st.median(v) for name, v in ratios.items()}
 
 
+def undying_types(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> set[str]:
+    """Non-boss enemies that take at least NPC_MIN_SHARE of the raid's damage over the corpus but rarely die."""
+    where, params = kills_filter(encounter_id, difficulty)
+    totals = dict(con.execute(
+        f"SELECT d.target, SUM(d.amount) FROM damage_by_target d JOIN fight f USING(report, fight_id) "
+        f"WHERE {where} GROUP BY d.target", params).fetchall())
+    raid = sum(v or 0 for v in totals.values()) or 1
+    died: dict[str, list[int]] = {}
+    for name, d in con.execute(
+            f"SELECT n.name, a.died FROM add_instance a JOIN npc n USING(game_id) JOIN fight f USING(report, fight_id) "
+            f"WHERE {where} AND NOT n.is_boss", params):
+        died.setdefault(name, []).append(d)
+    return {n for n, d in died.items() if sum(d) / len(d) < KILLABLE_DEATH_RATE
+            and (totals.get(n) or 0) / raid >= NPC_MIN_SHARE}
+
+
 def undying_waves(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> list[tuple[float, int, float, str]]:
     """Waves of enemies that take real damage but never die, (start, count, lifetime, name): their windows come from
-    the damage-taken graph (npc_window), their count from the instances spawned in each window. Deaths miss them:
-    Nymrissa's Bubblefin Shorerunners flee into her bubble, 15 at a time, every 45 to 65 s."""
+    the damage-taken graph (npc_window); their count is how many of them the ranked players hit at once (npc_stack),
+    else the instances spawned in the window. Deaths miss them: Nymrissa's Bubblefin Shorerunners flee into her
+    bubble, 15 every 45 to 65 s; the top Elementals hit 5 of them at once, each for about 10 s. SimC cannot kill an
+    add by damage: 15 targets for the whole window simmed the top players at 1.63 of their DPS."""
     from paf.corpus.analyze import canonical_waves
 
     where, params = kills_filter(encounter_id, difficulty)
     kills = [tuple(r) for r in con.execute(
         f"SELECT n.report, n.fight_id FROM npc_status n JOIN fight f USING(report, fight_id) WHERE {where} "
         f"ORDER BY n.report, n.fight_id", params)]
-    if not kills:
+    types = undying_types(con, encounter_id, difficulty)
+    if not kills or not types:
         return []
-    totals = dict(con.execute(
-        f"SELECT d.target, SUM(d.amount) FROM damage_by_target d JOIN fight f USING(report, fight_id) "
-        f"WHERE {where} GROUP BY d.target", params).fetchall())
-    raid = sum(v or 0 for v in totals.values()) or 1
-    died: dict[str, list[int]] = {}
     spawns: dict[tuple[str, str, int], list[float]] = {}
-    for name, rep, fid, t, d in con.execute(
-            f"SELECT n.name, a.report, a.fight_id, a.t_spawn, a.died FROM add_instance a JOIN npc n USING(game_id) "
-            f"JOIN fight f USING(report, fight_id) WHERE {where} AND NOT n.is_boss", params):
-        died.setdefault(name, []).append(d)
-        if t is not None:
-            spawns.setdefault((name, rep, fid), []).append(t)
+    for name, rep, fid, t in con.execute(
+            f"SELECT n.name, a.report, a.fight_id, a.t_spawn FROM add_instance a JOIN npc n USING(game_id) "
+            f"JOIN fight f USING(report, fight_id) WHERE {where} AND NOT n.is_boss AND a.t_spawn IS NOT NULL", params):
+        spawns.setdefault((name, rep, fid), []).append(t)
     windows: dict[str, dict[tuple[str, int], list]] = {}
     for rep, fid, name, start, length in con.execute(
             f"SELECT w.report, w.fight_id, w.name, w.t_start, w.duration FROM npc_window w "
             f"JOIN fight f USING(report, fight_id) WHERE {where}", params):
-        if name in died and sum(died[name]) / len(died[name]) < KILLABLE_DEATH_RATE \
-                and (totals.get(name) or 0) / raid >= NPC_MIN_SHARE:  # over the corpus, not one kill's graph
+        if name in types:
             windows.setdefault(name, {}).setdefault((rep, fid), []).append((start, 1, length, [name]))
+    stacked: dict[str, list[float]] = {}
+    for name, v in con.execute(f"SELECT s.name, s.targets FROM npc_stack s JOIN fight f USING(report, fight_id) "
+                               f"WHERE {where} AND s.targets > 0", params):
+        stacked.setdefault(name, []).append(v)
     out = []
     for name, per_kill in windows.items():
         for w in canonical_waves([per_kill.get(k, []) for k in kills]):
             counts = [sum(w.t - 5 <= t <= w.t + w.lifetime for t in spawns.get((name, *k), [])) for k in kills]
             counts = [c for c in counts if c]
-            out.append((w.t, max(1, round(st.median(counts))) if counts else 1, w.lifetime, name))
+            spawned = max(1, round(st.median(counts))) if counts else 1
+            at_once = round(st.median(stacked[name])) if stacked.get(name) else None
+            out.append((w.t, max(1, min(spawned, at_once)) if at_once else spawned, w.lifetime, name))
     return sorted(out)
+
+
+def stacked_instances(events: list[dict], ids: set[int], start: float) -> float | None:
+    """Median number of unit instances (ids: that type's actor ids) hit by direct damage per slice of STACK_STEP s,
+    over the slices where the player hits at least one."""
+    slices: dict[int, set[tuple]] = {}
+    for ev in events:
+        if ev.get("type") == "damage" and not ev.get("tick") and ev.get("targetID") in ids:
+            slices.setdefault(int((ev["timestamp"] - start) / 1000 // STACK_STEP), set()).add(
+                (ev["targetID"], ev.get("targetInstance")))
+    return st.median(len(v) for v in slices.values()) if slices else None
+
+
+def fetch_npc_stack(client: WCLClient, con: sqlite3.Connection, encounter_id: int, difficulty: int,
+                    kills: int = 4, log: Callable[[str], None] = lambda s: print(s, flush=True)) -> int:
+    """For the adds that never die (undying_types): how many of each the ranked players hit at once, on a few kills
+    (~1 page of the ranked player's damage events each), as fetch_council_stack does for a council."""
+    types = undying_types(con, encounter_id, difficulty)
+    if not types:
+        return 0
+    where, params = kills_filter(encounter_id, difficulty)
+    have = con.execute(f"SELECT COUNT(*) FROM npc_stack_status s JOIN fight f USING(report, fight_id) WHERE {where}",
+                       params).fetchone()[0]
+    todo = con.execute(
+        f"SELECT f.report, f.fight_id, r.actor_id FROM fight f JOIN ranked r USING(report, fight_id) "
+        f"LEFT JOIN npc_stack_status s USING(report, fight_id) WHERE {where} AND s.report IS NULL "
+        f"AND r.actor_id IS NOT NULL ORDER BY f.report LIMIT ?", (*params, max(0, kills - have))).fetchall()
+    for r in todo:
+        try:
+            fr = client.query(FIGHT_QUERY, {"code": r[0], "f": [r[1]]},
+                              cache_ttl=0)["reportData"]["report"]["fights"][0]
+            events = list(client.events(r[0], r[1], fr["startTime"], fr["endTime"], data_type="DamageDone",
+                                        source_id=r[2], cache=False))
+        except (WCLError, KeyError, TypeError, IndexError, OSError) as e:
+            log(f"  add damage skipped: {str(e)[:100]}")
+            continue
+        for name in types:
+            ids = {a for (a,) in con.execute("SELECT a.actor_id FROM npc_actor a JOIN npc n USING(game_id) "
+                                             "WHERE a.report=? AND n.name=?", (r[0], name))}
+            con.execute("INSERT OR REPLACE INTO npc_stack VALUES(?,?,?,?)",
+                        (r[0], r[1], name, stacked_instances(events, ids, fr["startTime"])))
+        con.execute("INSERT OR REPLACE INTO npc_stack_status VALUES(?,?)", (r[0], r[1]))
+        con.commit()
+    return len(todo)

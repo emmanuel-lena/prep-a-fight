@@ -68,6 +68,9 @@ def merged_movement(windows: list[Window]) -> list[Window]:
     return out + [w for w in windows if w.distance]
 
 
+BOUNDARY = 3.0  # seconds: an add wave spawned this close to an immunity's end belongs to after it
+
+
 @dataclass
 class Fight:
     name: str
@@ -95,8 +98,12 @@ class Fight:
         for i, w in enumerate(self.add_waves):
             for inv in self.invulnerable:
                 end = inv.start + inv.duration
-                if inv.start - 3 <= w.time <= end and w.time + w.lifetime > end:
-                    self.add_waves[i] = replace(w, lifetime=round(max(1.0, end - w.time), 1))
+                if end - BOUNDARY <= w.time <= end and w.time + w.lifetime > end + 1:
+                    # spawned in the immunity's last seconds: the next phase's wave, logged a little early (the
+                    # slower Nek'zali heroic kills: 18 Restless Amani 0.8 s before Stage Two, cut to nothing)
+                    self.add_waves[i] = w = replace(w, time=round(end + 0.5, 1))
+                elif inv.start - 3 <= w.time <= end and w.time + w.lifetime > end:
+                    self.add_waves[i] = w = replace(w, lifetime=round(max(1.0, end - w.time), 1))
 
     def _spawns(self) -> list[tuple[float, float, AddWave]]:
         """(spawn, lifetime, wave) as simulated. SimC never goes back to the boss if an add is still alive when
@@ -109,8 +116,8 @@ class Fight:
                 back = inv.start + inv.duration
                 nxt = []
                 for a, b in parts:
-                    if a < back - 1 and b > back - 1:
-                        nxt.append((a, back - 1))
+                    if a < back and b > back - 1:  # up when the boss comes back (one spawned in the immunity's
+                        nxt.append((a, back - 1))  # last second too: the Sentinels' fight simmed at 0.33 of the logs)
                         if b > back + 1.5:
                             nxt.append((back + 0.5, b))
                     else:

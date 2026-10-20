@@ -75,7 +75,16 @@ def add_types(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> li
         died[name].append(dead)
         if dead and t0 is not None and t1 is not None and t1 > t0:
             windows[(rep, fid, name)].append((t0, t1))
-    names = [n for n, d in died.items() if sum(d) / len(d) >= 0.8 and damage.get(n, 0) / total >= MIN_DAMAGE_SHARE]
+    from paf.corpus.units import undying_types
+
+    undying = undying_types(con, encounter_id, difficulty)  # never die (Nymrissa's murlocs): the damage graph's windows
+    for rep, fid, name, t0, length in con.execute(
+            f"SELECT w.report, w.fight_id, w.name, w.t_start, w.duration FROM npc_window w "
+            f"JOIN fight f USING(report, fight_id) WHERE {where}", params):
+        if name in undying:
+            windows[(rep, fid, name)].append((t0, t0 + length))
+    names = [n for n, d in died.items() if (sum(d) / len(d) >= 0.8 or n in undying)
+             and damage.get(n, 0) / total >= MIN_DAMAGE_SHARE]
     if not names:
         return []
     players: dict[tuple[str, int], list[tuple[int, str, float]]] = defaultdict(list)

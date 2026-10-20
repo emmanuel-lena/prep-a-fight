@@ -6,6 +6,7 @@ import argparse
 import re
 import subprocess
 import time
+from dataclasses import dataclass
 
 from paf import __version__
 from paf.config import load_dotenv
@@ -258,13 +259,17 @@ def cmd_template(args: argparse.Namespace) -> int:
     client, enc, diff_name, diff = _encounter_and_difficulty(args)
     con = db.connect()
     from paf.corpus.analyze import council
-    from paf.corpus.units import fetch_boss_auras, fetch_council_stack, fetch_unit_windows
+    from paf.corpus.units import fetch_boss_auras, fetch_council_stack, fetch_npc_stack, fetch_unit_windows
 
     boss = main_boss(con, enc.id, diff, enc.name)
     fetch_unit_windows(client, con, enc.id, diff, boss)  # secondary units' real windows (cheap, cached)
     if members := council(con, enc.id, diff):  # how many council members are stacked
         fetch_council_stack(client, con, enc.id, diff, members)
     fetch_boss_auras(client, con, enc.id, diff, boss)  # auras on the boss: possible damage amps
+    fetch_npc_stack(client, con, enc.id, diff)  # adds that never die: how many the top players hit at once
+    from paf.corpus.lust import fetch_lust
+
+    fetch_lust(client, con, enc.id, diff)  # the raid's Bloodlust in every kill (~1 point a kill, once)
     fight, info = build_template(con, enc.id, diff, boss, settings.get("spec"), diff_name, title=enc.name)
     if info.kills == 0:
         print(f"No kills in the corpus for {enc.name} {diff_name}: run `paf corpus \"{enc.name}\"` first.")
@@ -976,12 +981,20 @@ def cmd_prep(args: argparse.Namespace) -> int:
         boss = main_boss(con, enc.id, diff, enc.name)
         rep = analyze(con, enc.id, diff, boss, spec)
         from paf.corpus.analyze import council
-        from paf.corpus.units import fetch_boss_auras, fetch_council_stack, fetch_unit_windows
+        from paf.corpus.units import fetch_boss_auras, fetch_council_stack, fetch_npc_stack, fetch_unit_windows
 
         fetch_unit_windows(client, con, enc.id, diff, boss)
         if members := council(con, enc.id, diff):
             fetch_council_stack(client, con, enc.id, diff, members)
         fetch_boss_auras(client, con, enc.id, diff, boss)
+        fetch_npc_stack(client, con, enc.id, diff)
+        from paf.corpus.lust import MAX_KILLS, fetch_lust
+
+        if (n := MAX_KILLS - con.execute("SELECT COUNT(*) FROM raid_lust l JOIN fight f USING(report, fight_id) "
+                                         "WHERE f.encounter_id=? AND f.difficulty=?",
+                                         (enc.id, diff)).fetchone()[0]) > 0:
+            print(f"  reading the top raids' Bloodlust (up to {n} kills, once)...", flush=True)
+            fetch_lust(client, con, enc.id, diff)
         raw, info = build_template(con, enc.id, diff, boss, spec, diff_name, title=enc.name)
         kills, phases, moving_share = rep.kills, [(n, m) for n, _, m, _ in rep.phases], info.moving_share
         add_share = rep.ranked_add_share[1]
@@ -995,6 +1008,15 @@ def cmd_prep(args: argparse.Namespace) -> int:
 
     d.imported = is_imported(profile_text)  # found on Warcraft Logs: no bags, the sheet asks for the /simc export
     d.phases = list(phases)
+    from paf import raidlead
+    from paf.corpus.lust import lust_spots
+
+    spots = pk.lust_spots if pk is not None else lust_spots(con, enc.id, diff, list(phases), fight.duration)
+    picked = next((s for s in spots if s.label == raidlead.lust_pick(enc.id, diff)), None)
+    if picked is not None:  # the raid lead's spot (paf.raidlead), else the top raids' most used one (the fight's)
+        fight.lust_time, d.lust_pick = picked.t, picked.label
+        print(f"  Bloodlust: {picked.label.lower()}, your raid lead's pick")
+    d.lust_spots = [(sp, None, None) for sp in spots]
     d.lust, d.pi, d.moving_share = fight.lust_time, fight.power_infusion, moving_share
     d.add_share_spec = add_share
     print(f"  {kills} kills, {len(fight.add_waves)} add waves / targets, duration {_mmss(fight.duration)}")
@@ -1126,6 +1148,26 @@ def cmd_prep(args: argparse.Namespace) -> int:
             print(f"  10 s of movement without casting: -{move_cost:.2f}% DPS"
                   f" (the top players lose x{fight.movement_scale:g} of that)")
 
+    others = [sp for sp in spots if sp.t != fight.lust_time]
+    if others:  # what each of the top raids' other Bloodlust spots would give you, against the fight's
+        res = simc.run(simc.build_input(profile_text, fight.to_simc(), {
+            f"lust{i}": ["override.bloodlust=0"] if sp.t is None else [f"bloodlust_time={simc.fmt(sp.t)}",
+                                                                       "override.bloodlust=1"]
+            for i, sp in enumerate(others)}), root / "lust", target_error=args.error)
+        gains = {}
+        for i, sp in enumerate(others):
+            ps = next((x for x in res.profilesets if x.name == f"lust{i}"), None)
+            if ps is not None:
+                gains[sp.label] = (res.delta_pct(ps), res.delta_pct(ps, "prioritydps")
+                                   if "prioritydps" in ps.metrics and "prioritydps" in res.baseline else None)
+        d.lust_spots = [(sp, *gains.get(sp.label, (0.0, 0.0) if sp.t == fight.lust_time else (None, None)))
+                        for sp in spots]
+        base = res.baseline["dps"]
+        d.lust_noise = round(base.error / base.mean * 100 * 2 ** 0.5, 2) if base.mean else 0.0  # one spot vs another
+        for sp, tot, _b in d.lust_spots:
+            if tot is not None:
+                print(f"  Bloodlust {sp.label.lower()} ({sp.share:.0%} of the top raids): {tot:+.2f}% DPS")
+
     step("Cooldown timelines of the top players")
     if pk is not None:
         tl, tl_all = pk.timeline, pk.timeline_all
@@ -1213,10 +1255,12 @@ def cmd_prep(args: argparse.Namespace) -> int:
         new = pack.PackData(enc.id, diff, cls, spec, pack.now_utc(), kills, boss, pack_fight, list(phases), add_share,
                             moving_share, target, d.validation, tl, tl_all, builds,
                             raidneed.add_types(con, enc.id, diff), mechs, d.actions, d.defensives,
-                            review_mod.tops_activity(con, enc.id, diff, spec), boss_share_waves=True)
+                            review_mod.tops_activity(con, enc.id, diff, spec), boss_share_waves=True,
+                            lust_spots=spots)
         print(f"  prep pack saved: {pack.save(new)}")
         if settings.get("share_packs") == "on" and new.validation:
             print(f"  prep pack {pack.publish(new)}")
+    slow = _slow_fight(con, enc, diff, diff_name, spec, boss, fight, d, spots)
     if args.no_optimize:
         step("Cooldown plans")
         d.plans = compare_plans(profile_text, tl_all, fight, root / "cdplan", target_error=args.error / 2,
@@ -1225,8 +1269,9 @@ def cmd_prep(args: argparse.Namespace) -> int:
         from paf.optimize import mrt_note, optimize_all
 
         step("Ideal cooldown plan per objective, with sensitivity checks")
-        d.optimized, _ = optimize_all(profile_text, fight, root / "optimize", target_error=args.error,
-                                      alignment=d.alignment, validation=d.validation[1] if d.validation else None)
+        d.optimized, cds = optimize_all(profile_text, fight, root / "optimize", target_error=args.error,
+                                        alignment=d.alignment, validation=d.validation[1] if d.validation else None,
+                                        extra_variants={slow.label: slow.fight} if slow else None)
         d.mrt = {p.objective: mrt_note(enc.name, p, fight, d.cd_names) for p in d.optimized}
         if d.defensives and d.defensives.moments:  # the defensive moments go in every note
             extra = defensives.mrt_lines(d.defensives)
@@ -1338,7 +1383,16 @@ def cmd_prep(args: argparse.Namespace) -> int:
         names.build(enc.id, diff_name, d.links, i18n.wow_locale())
     d.icons["__spec__"] = CLASS_ICON.format(cls=profile.class_name.lower())
     out = reports / f"prep-{report_key(enc.name, diff_name)}.html"
+    slow_out = out.with_name(f"{out.stem}-slow.html")
+    if slow is not None and d.optimized:  # two kill times, two sheets: the fight tab switches between them
+        d.kill_times = [("the median top kill", d.duration, out.name),
+                        (slow.cut.short, slow.fight.duration, slow_out.name)]
     out.write_text(render(d), encoding="utf-8")
+    if d.kill_times:
+        step("A raid like yours")
+        _slow_sheet(d, slow, con, enc, diff, diff_name, spec, boss, profile_text, root, cds, tl_all, slow_out)
+    else:
+        slow_out.unlink(missing_ok=True)
     try:  # the sheet's data, to render it again (design work) without a new prep; local only, never shared
         (root / "prepdata.pickle").write_bytes(sheet_pickle(d))
     except Exception as exc:  # noqa: BLE001 - only a convenience
@@ -1350,6 +1404,10 @@ def cmd_prep(args: argparse.Namespace) -> int:
     top = next((s for s in suggestions(d) if s.gain is not None and s.severity != "info"), None)
     what = re.sub(r"<[^>]+>", "", re.sub(r"<span class='pill[^']*'>.*?</span>", "", top.title)) if top else ""
     summary = {"gain": round(top.gain, 1), "what": what.strip()} if top else {}
+    if any(tot is not None for _s, tot, _b in d.lust_spots):  # for the raid lead page: each spot, for this spec
+        summary["lust"] = {"spec": d.spec, "picked": d.lust_pick, "noise": d.lust_noise, "kill": d.duration, "spots": {
+            sp.label: [None if tot is None else round(tot, 2), None if b is None else round(b, 2)]
+            for sp, tot, b in d.lust_spots}}
     out.with_suffix(".json").write_text(json.dumps(summary), encoding="utf-8")  # headline for the app's home
     step("Done")
     clock.save()
@@ -1752,6 +1810,93 @@ def cmd_raid(args: argparse.Namespace) -> int:
     return 0
 
 
+@dataclass
+class _Slow:
+    """A raid like yours (paf.killtime): its fight, rebuilt from the slower kills, and what it is rebuilt from."""
+    cut: object  # paf.killtime.SlowCut
+    fight: object  # paf.fight.Fight
+    report: object  # paf.corpus.analyze.Report of those kills
+    spots: list
+
+    @property
+    def label(self) -> str:
+        return f"a slower {_mmss(self.fight.duration)} kill"
+
+
+def _slow_fight(con, enc, diff: int, diff_name: str, spec: str, boss: str, fight, d, spots) -> _Slow | None:
+    """The fight of a raid that kills slower (issue #26), with the main fight's calibration and Bloodlust spot, or
+    None when the top kills are all about as long."""
+    from paf import killtime, lastraid
+    from paf.corpus.analyze import analyze, slower_kills
+    from paf.corpus.lust import lust_spots
+    from paf.corpus.template import build_template, template_path
+    from paf.notes import with_notes
+
+    cut = killtime.slow_cut(killtime.corpus_durations(con, enc.id, diff), lastraid.kill_time(enc.id, diff_name))
+    if cut is None:
+        return None
+    with slower_kills(cut.min_duration):
+        raw, _info = build_template(con, enc.id, diff, boss, spec, diff_name, title=enc.name)
+        rep = analyze(con, enc.id, diff, boss, spec)
+        slow_spots = lust_spots(con, enc.id, diff, [(n, m) for n, _, m, _ in rep.phases], raw.duration)
+    f = with_notes(raw, template_path(enc.name, diff_name))
+    f.add_scale, f.movement_scale = fight.add_scale, fight.movement_scale
+    played = d.lust_pick or (spots[0].label if spots else "")  # the same spot as the main sheet, placed on it
+    f.lust_time = next((s.t for s in slow_spots if s.label == played), f.lust_time)
+    print(f"  a raid like yours: kills around {_mmss(f.duration)}, {cut.why} ({cut.kills} kills)")
+    return _Slow(cut, f, rep, slow_spots)
+
+
+def _slow_sheet(d, slow: _Slow, con, enc, diff: int, diff_name: str, spec: str, boss: str, profile_text: str,
+                root, cds, tl_all, out) -> None:
+    """The sheet for a raid like yours: the same plans and notes, on the fight of the slower kills (its phases,
+    waves, boss casts, Bloodlust and the plans' presses replayed on it)."""
+    import pickle
+
+    from paf import defensives, movement
+    from paf.corpus.analyze import slower_kills
+    from paf.corpus.timeline import build_timeline, immune_phases, looped_phases
+    from paf.fight import merged_movement
+    from paf.optimize import dump_apl, mrt_note, nsrt_note, parse_apl, play_by_play
+    from paf.prep_report import render, sheet_pickle
+
+    f = slow.fight
+    d2 = pickle.loads(sheet_pickle(d))
+    d2.fight, d2.duration, d2.lust, d2.kill_now = f, f.duration, f.lust_time, 1
+    d2.kills = slow.cut.kills
+    d2.phases = [(n, m) for n, _, m, _ in slow.report.phases]
+    d2.waves = [(w.time, max(1, round(w.count * f.add_scale)) if w.scalable else w.count, w.lifetime, w.name)
+                for w in f.add_waves]
+    d2.lust_spots = [(sp, None, None) for sp in slow.spots]
+    with slower_kills(slow.cut.min_duration):
+        tl = build_timeline(con, enc.id, diff, boss, diff_name, spec)
+        d2.defensives = defensives.analyze(con, enc.id, diff, spec)
+    shown = {n for n, _ts in d.boss_casts}  # the casts the main sheet shows (the journal's), on the slower kills
+    d2.boss_casts = [(n, ts) for n, ts in tl.boss_casts if n in shown]
+    d2.game_phases, d2.phases = d2.phases, looped_phases(d2.phases, tl.boss_casts, d2.duration)
+    d2.phases = immune_phases(d2.phases, [(w.start, w.duration) for w in f.invulnerable])
+    d2.mech_times = {}  # the mechanics' times come from all the kills: not placed on a slower one
+    moves = [w for w in merged_movement(f.movement) if not w.distance]
+    d2.movement = movement.Movement(movement.mobility(tl_all, moves), d.movement.cost_10s if d.movement else None,
+                                    f.movement_scale, d.moving_share)
+    apl = parse_apl(dump_apl(profile_text, root / "slow" / "apl"))
+    for p, p2 in zip(d.optimized, d2.optimized, strict=True):  # the plans' own rules, played on this fight
+        p2.timeline = play_by_play(profile_text, apl, p, f, root / "slow", cds)
+    d2.mrt = {p.objective: mrt_note(enc.name, p, f, d.cd_names) for p in d2.optimized}
+    spell_ids = {n.lower(): int(r.split("=", 1)[1]) for n, r in d.links.items()
+                 if r.startswith("spell=") and r.split("=", 1)[1].isdigit()}
+    tag = re.search(r";tag:([^;]+);", next(iter(d.nsrt.values()), "")) if d.nsrt else None
+    player = tag[1] if tag else "everyone"
+    d2.nsrt = {p.objective: nsrt_note(enc.id, p, f, d2.game_phases or d2.phases, player, spell_ids, d.cd_names)
+               for p in d2.optimized}
+    if d2.defensives and d2.defensives.moments:
+        d2.mrt = {o: n + "\n" + "\n".join(defensives.mrt_lines(d2.defensives)) for o, n in d2.mrt.items()}
+        extra = defensives.nsrt_lines(d2.defensives, enc.id, d2.game_phases or d2.phases, player)
+        d2.nsrt = {o: n + ("\n" + "\n".join(extra) if extra else "") for o, n in d2.nsrt.items()}
+    out.write_text(render(d2), encoding="utf-8")
+    print(f"  {out}")
+
+
 def _boss_guide(d, con, enc, diff: int, diff_name: str, spec: str, tl, fight, pk=None) -> list:
     """The boss in 60 seconds (Encounter Journal) with the logs' timings and assignment stats. pk: a prep pack
     (its mechanics and actions instead of the corpus). Returns the mechanics (for a new pack)."""
@@ -1772,10 +1917,12 @@ def _boss_guide(d, con, enc, diff: int, diff_name: str, spec: str, tl, fight, pk
     journal = set(bossguide.spell_refs(sections)) if sections else set()
     d.boss_casts = [(n, ts) for n, ts in (tl.boss_casts if tl is not None else [])
                     if (n in journal if journal else len(ts) <= 12)]
-    from paf.corpus.timeline import looped_phases
+    from paf.corpus.timeline import immune_phases, looped_phases
 
     if tl is not None:  # a stage that loops back is shown as windows; NSRT counts the game's own stages
         d.game_phases, d.phases = d.phases, looped_phases(d.phases, tl.boss_casts, d.duration)
+    d.game_phases = d.game_phases or list(d.phases)  # NSRT counts the game's stages, not these windows
+    d.phases = immune_phases(d.phases, [(w.start, w.duration) for w in fight.invulnerable])
     if not sections:
         return mechs
     burst = {v.name.split(" (")[0]: v.multiplier for v in fight.vulnerable}

@@ -62,3 +62,17 @@ def test_a_last_stage_that_loops_back_becomes_windows():
                                                  ("Howling Maelstrom", 249.2)]
     real = [("Stage One", 0.0), ("Intermission", 97.3), ("Stage Two", 152.1)]  # stages that do not come back
     assert looped_phases(real, [("Invoke", [170.0]), ("Ritual Burn", [3, 76, 170])], 240) == real
+
+
+def test_an_intermission_that_comes_back_with_the_immunity():
+    from paf.corpus.timeline import immune_phases
+
+    phases = [("Stage One: Entombed Sentinels", 0.0), ("Intermission: Vitriolic Stasis", 46.3)]
+    immune = [(46.2, 10.5), (147.6, 11.5), (250.3, 8.0)]
+    assert immune_phases(phases, immune) == [
+        ("Stage One: Entombed Sentinels", 0.0), ("Intermission: Vitriolic Stasis", 46.2),
+        ("Stage One: Entombed Sentinels", 56.7), ("Intermission: Vitriolic Stasis", 147.6),
+        ("Stage One: Entombed Sentinels", 159.1), ("Intermission: Vitriolic Stasis", 250.3),
+        ("Stage One: Entombed Sentinels", 258.3)]
+    nek = [("Stage One", 0.0), ("Intermission", 101.6), ("Stage Two", 160.0)]  # one immunity: unchanged
+    assert immune_phases(nek, [(101.6, 58.4)]) == nek
