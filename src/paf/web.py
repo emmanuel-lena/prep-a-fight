@@ -1242,14 +1242,7 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
     raid_said = f"the latest public log of {g}" if g else ""
     nxt = "<button type='button' class='btn go next'>Next &rarr;</button>"
     back = "<button type='button' class='btn ghost prev'>&larr; Previous step</button>"  # not the sidebar's Back
-    no_adds = False  # the prep pack knows the fight: a boss without adds has nothing to pad
-    try:
-        from paf import pack
-
-        pk = pack.load(enc.id, diff, settings.get("class"), spec)
-        no_adds = pk is not None and not pk.fight.add_waves
-    except Exception:  # noqa: BLE001 - no pack: the choice stays offered
-        pass
+    no_adds = fight_has_no_adds(enc, diff, difficulty, spec)  # a boss without adds has nothing to pad (Sszorak)
     if no_adds:
         goal_html = ('<section class="ob-step" data-step="goal"><h2><span class="vh">Step 1 of 4: </span>Your goal on this boss</h2>'
                      '<p>No adds on this boss: the prep plays for <b>boss damage</b>.</p>'
@@ -1402,6 +1395,25 @@ def prepared_link(enc, difficulty: str) -> str:
     if "prep" in item["files"]:
         return f' <a href="/view/{e(key)}">Open the last prep sheet &rarr;</a>'
     return f' <a href="/view/{e(key)}">Open the top players&#39; timelines &rarr;</a>'  # a timeline alone: said so
+
+
+def fight_has_no_adds(enc, diff: int, difficulty: str, spec: str) -> bool:
+    """The rebuilt fight has no add wave: the prep pack's fight, else the local corpus' template (Sszorak, a
+    single-target boss, offered "Pad the adds" when no pack was there). Unknown: False, the choice stays offered."""
+    from paf import pack
+    from paf.corpus.template import template_path
+    from paf.fight import Fight
+
+    try:
+        pk = pack.load(enc.id, diff, settings.get("class"), spec)
+        if pk is not None:
+            return not pk.fight.add_waves
+    except Exception:  # noqa: BLE001 - no pack: the template
+        pass
+    try:
+        return not Fight.load(template_path(enc.name, difficulty)).add_waves
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
 
 
 def boss_line(enc, difficulty: str) -> str:

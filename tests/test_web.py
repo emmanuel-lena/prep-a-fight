@@ -336,3 +336,19 @@ def test_a_long_path_keeps_its_end():
     assert short_path("C:\\Users\\Someone\\AppData\\Local\\prep-a-fight\\simc\\1210-01\\simc.exe") == (
         "…\\1210-01\\simc.exe")
     assert short_path("/home/dev/simc/build/simc", width=20) == "…/simc/build/simc"
+
+
+def test_a_single_target_boss_offers_no_add_padding(monkeypatch):
+    """Sszorak (2026-10-20): the boss page offered "Pad the adds" when no prep pack was there; the local corpus'
+    template knows the fight has no add wave."""
+    from types import SimpleNamespace
+
+    from paf import pack, web
+    from paf.fight import Fight
+
+    enc = SimpleNamespace(id=3420, name="Sszorak")
+    monkeypatch.setattr(pack, "load", lambda *a, **k: None)
+    monkeypatch.setattr(Fight, "load", classmethod(lambda cls, p: SimpleNamespace(add_waves=[])))
+    assert web.fight_has_no_adds(enc, 4, "heroic", "Elemental")
+    monkeypatch.setattr(Fight, "load", classmethod(lambda cls, p: SimpleNamespace(add_waves=[object()])))
+    assert not web.fight_has_no_adds(enc, 4, "heroic", "Elemental")
