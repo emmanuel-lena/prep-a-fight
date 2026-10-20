@@ -27,6 +27,7 @@ REDIRECT = f"http://127.0.0.1:{PORT}/callback"
 # the app's public client on Warcraft Logs (not a secret; PAF_WCL_PUBLIC_CLIENT="" hides the login)
 PUBLIC_CLIENT_ID = os.environ.get("PAF_WCL_PUBLIC_CLIENT", "01a12525-5a69-7292-a435-04b1b8202589")
 WAIT = 600.0  # seconds the callback server waits for the player
+SCOPE = "view-user-profile"  # the account's own characters, for the first run (issue #11)
 REFRESH_EARLY = 3600.0  # refresh this long before the token expires
 
 _state: dict = {"status": "", "error": "", "url": ""}  # status: "" | waiting | ok | error
@@ -99,7 +100,7 @@ def _challenge(verifier: str) -> str:
 
 def authorize_url(client_id: str, state: str, verifier: str) -> str:
     return AUTHORIZE_URL + "?" + urllib.parse.urlencode({
-        "client_id": client_id, "redirect_uri": REDIRECT, "response_type": "code", "scope": "",
+        "client_id": client_id, "redirect_uri": REDIRECT, "response_type": "code", "scope": SCOPE,
         "state": state, "code_challenge": _challenge(verifier), "code_challenge_method": "S256"})
 
 

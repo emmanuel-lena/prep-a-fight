@@ -47,3 +47,5 @@ body:has(.ob:not(.story))>main{grid-column:1;display:grid;align-content:start;pa
 .recap li.bad::before{content:"\2717";color:var(--neg)} /* an error is never ticked green */
 .raid-help{min-height:4.2em}
 .ob input.bad:focus{outline-color:var(--neg)} /* an error stays red under the focus ring */
+.ob-acc{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px} .ob-acc form{margin:0}
+.ob-acc small{color:var(--muted);margin-left:4px} .ob-acc button[disabled]{opacity:.7}

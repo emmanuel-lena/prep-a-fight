@@ -55,6 +55,35 @@ def find_character(name: str, server: str, region: str) -> dict:
     return out
 
 
+ACCOUNT = """query { userData { currentUser { characters { name server { slug region { slug } } } } } }"""
+
+
+def account_characters(client=None) -> list[tuple[str, str, str]]:
+    """(name, server slug, region) of the characters of the player's Warcraft Logs account, when they logged in
+    with it (scope view-user-profile; an older login without it gives none): several at once, no typing."""
+    from paf import wcllogin
+
+    if not wcllogin.logged_in():
+        return []
+    try:
+        from paf.wcl import WCLClient
+
+        data = (client or WCLClient()).query(ACCOUNT, {}, cache_ttl=3600)
+    except Exception:  # noqa: BLE001 - the search by name stays
+        return []
+    return characters_of(data)
+
+
+def characters_of(data: dict) -> list[tuple[str, str, str]]:
+    user = ((data or {}).get("userData") or {}).get("currentUser") or {}
+    out = []
+    for c in user.get("characters") or []:
+        srv = c.get("server") or {}
+        if c.get("name") and srv.get("slug"):
+            out.append((c["name"], srv["slug"], ((srv.get("region") or {}).get("slug") or "eu").lower()))
+    return sorted(set(out))
+
+
 def _say(text: str) -> str:
     """A sentence of a JSON answer in the player's language (pages are translated when sent, JSON is not)."""
     from html import escape, unescape
@@ -115,6 +144,18 @@ def page_body() -> str:
         f"character {char.name}" if char else "",
         f"guild {guild}" if guild else "") if x)  # what is set already, said on the last step
     skip = "<button type='button' class='btn ghost skip'>Skip</button>"
+    mine = account_characters()  # logged in with Warcraft Logs: the account's characters, one click each
+    acc_tab = "<button type='button' role='tab' class='on' data-tab='acc'>From your account</button>" if mine else ""
+    acc_forms = ("<div class='ob-tab' data-tab='acc'><p class='small muted'>Your Warcraft Logs account's characters: "
+                 "add one or several (their latest logged boss fight gives their gear and talents; no bags).</p>"
+                 "<div class='ob-acc'>" + "".join(
+                     f"<form class='ob-form' data-to='/onboard/character' data-stay='1'>"
+                     f"<input type='hidden' name='name' value='{esc(n)}'><input type='hidden' name='server' "
+                     f"value='{esc(sv)}'><input type='hidden' name='region' value='{esc(rg)}'>"
+                     f"<button class='btn ghost'>Add {esc(n)} <small>{esc(sv)}-{esc(rg.upper())}</small></button>"
+                     f"<p class='ob-err' role='alert'></p></form>" for n, sv, rg in mine)
+                 + "</div><div class='ob-actions'><button type='button' class='btn go next'>Next &rarr;</button>"
+                 + skip + "</div></div>") if mine else ""
     key_form = f"""{connect_block() + "<div class='ob-actions'>" + skip + "</div><details class='ob-own' open><summary>Or use your own API key</summary>"
  if wcllogin.available() else ""}
 <p>The app reads the top players' logs with <b>your own</b> free Warcraft Logs API key (each player has an hourly quota, so the key is not shared).</p>
@@ -149,15 +190,15 @@ def page_body() -> str:
 
 <section class="ob-step" data-step="character">
 <h1>Your character</h1>{have_char}
-<div class="ob-tabs" role="tablist"><button type="button" role="tab" class="on" data-tab="simc">Paste /simc (recommended)</button>
-<button type="button" role="tab" data-tab="wcl">Quick: from Warcraft Logs</button></div>
+<div class="ob-tabs" role="tablist">{acc_tab}<button type="button" role="tab"{'' if mine else ' class="on"'} data-tab="simc">Paste /simc (recommended)</button>
+<button type="button" role="tab" data-tab="wcl">Quick: from Warcraft Logs</button></div>{acc_forms}
 <form class="ob-form ob-tab" data-tab="wcl" data-to="/onboard/character" hidden>
 <p class="small muted">Its latest logged boss fight gives its gear and talents. No bags: for Top Gear, paste /simc.</p>
 <div class="row"><input name="name" placeholder="Character name" required><input name="server" placeholder="Server" required>
 <select name="region" aria-label="Region">{regions}</select></div>
 <p class="ob-err" role="alert"></p>
 <div class="ob-actions">{keep_char_wcl if char else '<button class="btn go">Find my character</button>' + skip}</div></form>
-<form class="ob-form ob-tab" data-tab="simc" data-to="/onboard/simc" method="post" action="/profile">
+<form class="ob-form ob-tab" data-tab="simc" data-to="/onboard/simc" method="post" action="/profile"{' hidden' if mine else ''}>
 <p class="small muted">In game: type <code>/simc</code>, then Ctrl+A, Ctrl+C, and paste here (it includes your bags).</p>
 <textarea name="simc" required placeholder="Paste the /simc export here"></textarea>
 <p class="ob-err" role="alert"></p>
@@ -228,6 +269,9 @@ root.querySelectorAll('.ob-form').forEach(function(f){ f.addEventListener('submi
     .then(function(j){ f.classList.remove('busy');
       if (!j.ok) { err.textContent = j.error || 'Something went wrong.'; return; }
       var step = f.closest('.ob-step').dataset.step;
+      if (f.dataset.stay) {  // one of several: marked added, the step stays for the others
+        var b = f.querySelector('button'); b.disabled = true; b.textContent = 'Added: ' + j.name + ' (' + j.spec + ')';
+        done[step] = (done[step] && done[step] !== true ? done[step] + ', ' : '') + j.name; return; }
       done[step] = j.what || (j.name ? j.name + ' (' + j.spec + ')' : true); next(); })
     .catch(function(){ f.classList.remove('busy'); err.textContent = 'The app did not answer: try again.'; });
 }); });
