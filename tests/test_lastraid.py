@@ -116,4 +116,17 @@ def test_a_boss_in_two_difficulties_keeps_its_own_review(home, monkeypatch):
 
 def test_a_pull_comparison_says_best_pull_not_b():
     assert lastraid._ab("Share of the raid's damage on Vashnik: 59% in B, 54% in A.") == (
-        "Share of the raid's damage on Vashnik: 59% in your best pull, 54% in the other one.")
+        "Share of the raid's damage on Vashnik: 59% in your best pull, 54% in your weaker pull.")
+    assert lastraid._ab("Ixuu: active 99% of the pull in B, 89% in A.", "Ixuu") == (
+        "You: active 99% of the pull in your best pull, 89% in your weaker pull.")
+
+
+def test_the_headline_of_a_raid(tmp_path, monkeypatch):
+    """Ixuu's last raid (2026-10-18): 35 pulls of Sszorak mythic, best at 58%; Home and Reclear say it in one line."""
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    monkeypatch.setattr(lastraid, "load", lambda: {"ixuu-rogue": {"bosses": [
+        {"name": "Sszorak", "difficulty": "mythic", "kill": False, "best": 57.62},
+        {"name": "Vashnik the Malignant", "difficulty": "heroic", "kill": True, "best": 0}]}})
+    assert lastraid.headline("ixuu-rogue") == (
+        "Sszorak mythic, your best pull got it to 58%; Vashnik the Malignant heroic killed.")
+    assert lastraid.headline("nobody") == ""

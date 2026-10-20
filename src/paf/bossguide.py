@@ -162,10 +162,12 @@ def summary_html(sections: list[Section], role: str = "damage", full_link: str =
     mine = next((c for c in over.children if _same_role(c.title, role)), None)
     others = [c for c in over.children if c is not mine and c.text]
     sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z])", readable(over.text)) if over.text else []
-    out = ["<div class='over'>" + "".join(f"<p>{e(x)}</p>" for x in sentences) + "</div>" if sentences else ""]
+    out = []  # your part first, then the story of the fight
     if mine and mine.text:
         out.append(f"<h3>For you, as {ROLE_AS.get(role, 'a player')}</h3><ul>"
                    + "".join(f"<li>{e(readable(b))}</li>" for b in bullets(mine.text)) + "</ul>")
+    if sentences:
+        out.append("<h3>The fight</h3><div class='over'>" + "".join(f"<p>{e(x)}</p>" for x in sentences) + "</div>")
     for c in others:  # the other roles: one short paragraph each (what the raid around you does)
         out.append(f"<p class='others'><b>{e(c.title)}:</b> "
                    + " ".join(e(readable(b)) for b in bullets(c.text)) + "</p>")

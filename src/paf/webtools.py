@@ -198,12 +198,35 @@ def settings_form() -> str:
     return out
 
 
+def short_path(path: str, width: int = 22) -> str:  # 22 mono characters fit the Status column
+    """A path cut at its start to fit the Status column, its end kept (the program's name is the part one checks):
+    "C:\\Users\\x\\AppData\\Local\\paf\\simc\\simc.exe" -> "…\\paf\\simc\\simc.exe"."""
+    if len(path) <= width:
+        return path
+    sep = "\\" if "\\" in path else "/"
+    parts, out = path.split(sep), ""
+    for part in reversed(parts):
+        if out and len(part) + 1 + len(out) + 2 > width:  # "…" and the separator count too
+            break
+        out = part + (sep + out if out else "")
+    return "…" + sep + out
+
+
+def path_html(path: str) -> str:
+    """A path in the Status table: its end, the whole one on hover or keyboard focus (and selectable to copy)."""
+    short = short_path(path)
+    if short == path:
+        return f"<span class='path'>{e(path)}</span>"
+    return (f"<span class='path cut' tabindex='0' title='{e(path)}'><span class='p-short'>{e(short)}</span>"
+            f"<span class='p-full'>{e(path)}</span></span>")
+
+
 def settings_page(message: str = "") -> str:
     from paf.cache import cache_root, size
     from paf.simc_install import find_simc
 
     exe = find_simc(None)
-    simc = e(str(exe)) if exe else "<span class='neg'>not installed</span>"
+    simc = path_html(str(exe)) if exe else "<span class='neg'>not installed</span>"
     quota = ""
     try:
         from paf.wcl import WCLClient
@@ -256,7 +279,7 @@ autocomplete="off"></label>
 <button class="btn ghost">Save and test</button></form>
 <p class="tiny muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p>{alt}</div>
 <h2>Status</h2><div class="set-status"><table class="status">
-<tr><td>SimulationCraft</td><td class="small"><div class="val"><span class="path">{simc}</span>
+<tr><td>SimulationCraft</td><td class="small"><div class="val">{simc}
 <form method="post" action="/tool/setup">
 <button class="btn ghost" title="Downloads the latest SimulationCraft nightly into the app; a build of your own
 stays where it is">Get nightly</button></form></div></td></tr>
@@ -265,7 +288,7 @@ stays where it is">Get nightly</button></form></div></td></tr>
 <tr><td>Warcraft Logs</td><td class="small">{quota}</td></tr>
 <tr><td>Caches (sims, logs)</td><td class="small">{size(cache_root()) / 1e6:,.0f} MB
 (cap {settings.get('cache_max_mb')} MB)</td></tr>
-<tr><td>Data folder</td><td class="small"><span class="path">{e(str(data_dir()))}</span></td></tr></table></div>
+<tr><td>Data folder</td><td class="small">{path_html(str(data_dir()))}</td></tr></table></div>
 <p class="muted small">Every tool the prep runs also has <a href="/tools">its own page</a>.</p>
 </div></div>
 <script>(function(){{var d=new Set();

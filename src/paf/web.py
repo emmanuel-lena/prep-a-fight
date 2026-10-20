@@ -529,7 +529,8 @@ def boss_cards(items: list[dict], order: tuple[str, ...] = (), spec: bool = True
         cls = (x.get("spec") or "").split(" ")[-1].lower()
         ic = icons.img(icons.CLASS_ICON.format(cls=cls), "medium", "bc-ic") if cls else "<span class='bc-ic'></span>"
         who = e(x["spec"] or "Your sheet") + " " if spec else ""  # under "Your sheets as X": said once
-        return (f'<a class="bcard" href="/view/{e(x["key"])}">{ic}<span class="bc-txt">{who}'
+        ic = ic if spec else ""
+        return (f'<a class="bcard{"" if spec else " own"}" href="/view/{e(x["key"])}">{ic}<span class="bc-txt">{who}'
                 f'{diff_pill(x["difficulty"])}{"" if "prep" in x["files"] else " <span class=muted>no sim yet</span>"}'
                 f'</span><span class="bc-when">{ago(x["mtime"])}</span></a>')
     groups: dict[str, list[dict]] = {}
@@ -831,7 +832,7 @@ def characters_page() -> str:
                   f'<span class="cc-spec">{e(c.spec.title())} {e(c.class_name.title())}</span><span>{badge} '
                   f'<span class="muted small">&middot; updated <span>{ago(c.mtime)}</span></span></span></div><div class="cc-act">{play}'
                   f'<a class="btn ghost" href="#simc-box" onclick="setTimeout(function(){{document.getElementById(\'simc-box\').focus()}},50)">Paste a new export</a>'
-                  f'<details class="rm"><summary class="cc-rm">Remove</summary><div class="rm-ask">'
+                  f'<details class="rm"><summary class="btn ghost cc-rm">Remove</summary><div class="rm-ask">'
                   f'<span>Remove this character? Its /simc export is deleted.</span>'
                   f'<form method="post" action="/character/remove"><input type="hidden" name="slug" value="{e(c.slug)}">'
                   f'<button class="btn danger">Yes, remove it</button></form>'
@@ -937,7 +938,7 @@ def reclear_page() -> str:
     from paf import characters, lastraid, workshop
 
     slug = characters.current_slug()
-    card = lastraid.card(slug) if slug else ""
+    card = lastraid.card(slug, heading=False) if slug else ""  # the lead says it
     if card:
         last = card + lastraid.CARD_JS
     else:
@@ -945,8 +946,12 @@ def reclear_page() -> str:
                 "the log is up on Warcraft Logs? Look now:</p>"
                 "<form method='post' action='/lastraid/again'><button class='btn go'>Look for my last raid now</button>"
                 "</form></section>")
-    lead = ("Your last raid, read against the top players of your spec: what cost you the most, boss by boss, and "
-            "where to look in the log." if card else "No raid of yours read yet: the app looks for your character's "
+    said = lastraid.headline(slug) if slug else ""
+    priced = "lr-pt" in card  # what cost you the most is said once the points are priced (issue #24)
+    lead = (e(said) + (" Below, what cost you the most on each boss, against the top players of your spec, and where to "
+                       "look in the log." if priced else " Below, your best pull against your weaker one, and where to "
+                       "look in the log.") if card and said else "Your last raid, read against the top players of your spec: what "
+            "cost you the most, boss by boss, and where to look in the log." if card else "No raid of yours read yet: the app looks for your character's "
             "latest log of the current raid each time it starts.")
     return (f"<div class='rc'><header class='rc-head'><h1>Reclear</h1><p class='lead'>{lead}</p>"
             f"</header>{last}<h2>Dig deeper into your play</h2><p class='muted'>Each one starts from your raid's latest "
@@ -1118,18 +1123,22 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
     else:
         pick = ((f'<p class="start-say">Every boss is ready this week in {where}: pick one to prepare again.</p>'
                  if encs else "") + f'<select name="boss" aria-label="Boss" class="big">{options}</select>')
-    week = (f'<aside class="hero-week"><h2>This week in {where}</h2><p class="hw-n"><b>{len(ready)}</b> of '
-            f'{len(encs)} bosses ready</p>{queue_strip(diff)}</aside>') if encs else ""
     diffs = "".join(f'<label class="seg"><input type="radio" name="difficulty" value="{d}"{" checked" if d == diff else ""}>'
                     f'<span>{e(DIFF_LABELS.get(d, d))}</span></label>' for d in settings.DIFFICULTIES if d != "lfr")
     ic = icons.img(icons.CLASS_ICON.format(cls=loaded.class_name.lower()), "large", "me-ic")
     items = prepared()
     board = raid_board(encs, loaded.class_name, loaded.spec)
+    last_side = ""
     try:
         from paf import characters, lastraid
 
-        last = lastraid.card(characters.current_slug())
-        last = last + lastraid.CARD_JS if last else ""
+        slug = characters.current_slug()
+        last, said = lastraid.card(slug), lastraid.headline(slug)
+        if said and "data-reading" not in last:  # read: one line beside the prep, the details on Reclear
+            last = (f"<section class='lr lr-row'><h2>Your last raid</h2><p class='lr-line'>{e(said)} "
+                    "<a href='/reclear'>Your pulls, read &rarr;</a></p></section>")
+        else:
+            last = last + lastraid.CARD_JS if last else ""
     except Exception:  # noqa: BLE001 - the home always shows
         last = ""
     me = f"{loaded.spec}-{loaded.class_name}".lower().replace(" ", "-")
@@ -1140,15 +1149,15 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
              f'<div class="sheets">{boss_cards(own, order, spec=False)}</div>' if own else "")
             + (f'<h2>Your other specs&#39; sheets</h2><div class="sheets">{boss_cards(rest, order)}</div>' if rest else ""))
     g = settings.get("guild")
-    return f"""<section class="home-hero"><form method="get" action="/boss" class="start"><h1>Prepare a boss</h1>
+    return f"""<section class="home-hero"><div><form method="get" action="/boss" class="start"><h1>Prepare a boss</h1>
 <p class="me">{ic}<span>for <b>{e(loaded.name)}</b>, {e(loaded.spec.title())} {e(loaded.class_name.title())}\
 {(" &middot; " + e(g)) if g else ""}</span></p>{pick}
 <div class="segs" role="radiogroup" aria-label="Difficulty">{diffs}</div>
 <button class="btn go">Prepare <span class="go-boss">{e(nxt.name if nxt else (encs[0].name if encs else "this boss"))}</span>
-&rarr;</button></form>{week}</section>
+&rarr;</button></form>{queue_strip(diff) if encs else ""}</div>{last_side}</section>
 <script>(function(){{var s=document.querySelector('.start select'),b=document.querySelector('.go-boss');
 if(s&&b)s.addEventListener('change',function(){{b.textContent=s.options[s.selectedIndex].text}})}})()</script>
-{board}{last}{mine}"""
+{last}{board}{mine}"""
 
 
 def boss_page(boss_id: str, difficulty: str) -> bytes:
@@ -1504,7 +1513,21 @@ def _fresh_header(text: str) -> str:
     elif lines and lines[0].startswith("# Boss notes for ") and "rerun" in lines[0]:
         lines[0:1] = [lines[0].split(" Uncomment", 1)[0],
                       "# Remove the # of a line to use it, save, then prepare the fight again."]
-    return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+    return "\n".join(_wrap_comment(x) for x in lines) + ("\n" if text.endswith("\n") else "")
+
+
+COMMENT_WIDTH = 110  # characters: a longer comment line is cut in the editor (it does not wrap: aligned columns)
+
+
+def _wrap_comment(line: str) -> str:
+    """A long comment line of a saved plan or notes file, cut at word breaks under its own indent: files saved
+    before a comment was shortened keep it otherwise. A line the player uses (no #) is never touched."""
+    if not line.startswith("#") or len(line) <= COMMENT_WIDTH:
+        return line
+    import textwrap
+
+    indent = line[:len(line) - len(line[1:].lstrip())]
+    return "\n".join(textwrap.wrap(line, COMMENT_WIDTH, subsequent_indent=indent, break_long_words=False))
 
 
 def notes_block(enc, difficulty: str) -> str:

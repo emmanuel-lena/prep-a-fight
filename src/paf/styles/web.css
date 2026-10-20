@@ -332,3 +332,36 @@ main a:not(.btn):not(.bcard):not(.ws-card):not(.rb-d){text-decoration:underline;
 .lr-boss header b{font:600 19px/1.3 var(--font-reading)}
 .lr-killed{font:600 19px/1.3 var(--font-reading);text-transform:none;letter-spacing:0;color:var(--fg);margin:20px 0 6px}
 .status .btn{font:600 14px var(--font-display);padding:7px 14px;min-width:0;width:100%} .status .val form{width:170px}
+/* round 9 */
+textarea[name=plan],textarea[name=notes]{white-space:pre;overflow-x:auto;max-height:none;field-sizing:content}
+.adv,.adv textarea{max-width:110ch}
+.status td:first-child{white-space:nowrap}
+.bcard.own{grid-template-columns:1fr auto}
+.rl-boss h4 small{font:400 13px var(--font-body);color:var(--muted)}
+.lr>div,.lr .lr-killed{max-width:1000px} .lr-line{max-width:80ch;font-size:16px}
+.hero-week .rq{margin-top:56px}
+/* round 10 */
+.adv,.adv textarea{max-width:none}
+.rl-grid{columns:auto;display:block;max-width:1000px}
+.status{table-layout:fixed;width:100%} .status td:first-child{width:150px} .status .val form{width:160px}
+.lr h3{max-width:80ch}
+.home-hero>div>.rq{margin:14px 0 0}
+body.has-side>main .hero-week.lr h2{font-size:30px;line-height:1.15;margin:4px 0 8px}
+/* round 11 */
+.home-hero .rq{justify-content:flex-start} .home-hero .rq-txt{flex:0 1 auto}
+@media (min-width:1100px){.home-hero{grid-template-columns:minmax(0,1fr)}}
+.status .btn{white-space:nowrap} .status .val form{width:176px}
+.ws-cards{max-width:1000px} .lr-grid{max-width:80ch}
+.lr-row{margin:6px 0 0} .lr-row h2{margin-top:10px}
+/* round 12 */
+.status .val{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:12px;align-items:center}
+.status .val form{width:auto} .status .btn{width:100%;min-width:0}
+.status td.small{overflow:hidden}
+.home-hero .rq:not(.on) .rq-head{display:none}
+.rm>summary.btn.cc-rm{color:var(--fg);text-decoration:none;font-size:inherit;padding:9px 16px} .rm>summary.btn.cc-rm:hover{color:var(--neg);border-color:var(--neg)}
+.status td:first-child{width:140px} .status .val{grid-template-columns:minmax(0,1fr) 176px}
+.status .path{display:block;white-space:nowrap} .status .path .p-full{display:none}
+.status .path.cut:hover,.status .path.cut:focus{white-space:normal;overflow-wrap:anywhere}
+.status .path.cut:hover .p-short,.status .path.cut:focus .p-short{display:none} .status .path.cut:hover .p-full,.status .path.cut:focus .p-full{display:inline}
+.rm>summary.btn.cc-rm:focus-visible{color:var(--neg);border-color:var(--neg)}
+.status .path:not(:hover):not(:focus){overflow:hidden;text-overflow:ellipsis} .status .val{column-gap:14px}

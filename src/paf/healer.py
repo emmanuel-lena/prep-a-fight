@@ -44,6 +44,7 @@ RAID_KILLS = 40
 STEP = 5.0
 SPIKE = 1.6  # a moment with this many times the median raid damage
 SPIKE_GAP = 15.0
+WAVE = 1.2  # without any SPIKE, the waves of raid damage at this many times the median are the moments to plan for
 COOLDOWN_GAP = 45.0  # a spell cast at most once in this many seconds (median) is a cooldown
 QE_LIVE = "https://questionablyepic.com/live/"
 
@@ -154,15 +155,20 @@ def moments(curve: list[float], boss_casts: list[tuple[str, list[float]]], top: 
     if not base:
         return []
     found: list[Moment] = []
-    for i, v in enumerate(curve):
-        if v < SPIKE * base or (i and curve[i - 1] > v) or (i + 1 < len(curve) and curve[i + 1] > v):
-            continue
-        t = i * STEP
-        if found and t - found[-1].t < SPIKE_GAP:
-            if v > found[-1].dtps:
-                found[-1] = Moment(t, v, v / base)
-            continue
-        found.append(Moment(t, v, v / base))
+    for level in (SPIKE, WAVE):  # Vashnik: no single big hit, the raid damage comes in waves (x1.3)
+        for i, v in enumerate(curve):
+            if v < level * base or (i and curve[i - 1] > v) or (i + 1 < len(curve) and curve[i + 1] > v):
+                continue
+            t = i * STEP
+            if found and t - found[-1].t < SPIKE_GAP:
+                if v > found[-1].dtps:
+                    found[-1] = Moment(t, v, v / base)
+                continue
+            found.append(Moment(t, v, v / base))
+        if found:
+            break
+    if found and max(m.ratio for m in found) < SPIKE:
+        found = sorted(sorted(found, key=lambda m: -m.ratio)[:3], key=lambda m: m.t)  # the three highest waves
     for m in found:
         near = [(m.t - x, name) for name, times in boss_casts if name not in skip for x in times if -2 <= m.t - x <= 8]
         if near:
@@ -389,7 +395,7 @@ def journal_lead(lines: list[str], who: str) -> str:
 
 def jobs_lead(roles: list) -> str:
     """The deeper tab's answer: the healer specs whose job stands out on this boss."""
-    lines = [f"{r.spec}: {r.jobs[0]}" for r in roles if r.jobs and not r.jobs[0].startswith("close to")]
+    lines = [f"the {r.spec} {r.jobs[0]}" for r in roles if r.jobs and not r.jobs[0].startswith("close to")]
     if not lines:
         return "<p class='lead'>No healer spec stands out on this boss: every one does a share of the same job.</p>"
     return "<p class='lead'>What stands out here: " + "; ".join(e(x) for x in lines) + ".</p>"
@@ -476,7 +482,9 @@ def render_sheet(h: HealerPrep) -> str:
         at = {_mmss(m.t) for m in h.moments}  # a cooldown kept for the hits: most of its presses answer one
         used = [c.name for c in heals if c.times and sum(1 for n in c.near if n and n.split(" ", 1)[0] in at)
                 >= len(c.times) / 2]
-        lead = (f"<p class='lead'>The raid's big hits come at {hits}"
+        opening = ("No single big hit: the raid damage comes in waves, the highest at "
+                   if max(m.ratio for m in h.moments) < SPIKE else "The raid's big hits come at ")
+        lead = (f"<p class='lead'>{opening}{hits}"
                 + (f"; the top {e(h.spec)}s spend {e(', '.join(used[:3]))} on them." if used else ".") + "</p>")
     you = []
     own = "ranked by their healing" in (h.role_sample or "")

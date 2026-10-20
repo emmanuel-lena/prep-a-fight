@@ -317,3 +317,22 @@ def test_finding_a_character_needs_the_key(tmp_path, monkeypatch):
     monkeypatch.delenv("WCL_CLIENT_SECRET", raising=False)
     out = onboarding.find_character("Someone", "Kazzak", "eu")
     assert not out["ok"] and "Warcraft Logs key first" in out["error"]
+
+
+def test_a_long_saved_comment_is_wrapped_in_the_editor():
+    """A notes file saved before 0.8.16 (Nek'zali heroic): its 160-character comment on the Echo of Jawae was cut off
+    in the editor; it shows on two lines, and a line the player uses is left as is."""
+    long = ("#   Echo of Jawae: a boss-type unit with no damage amp in the game data: modeled as a separate target "
+            "with its own health while it is up. If it shares the boss's health, write its amp:")
+    out = web._fresh_header(long + "\nadd Echo of Jawae " + "x" * 120 + "\n").splitlines()
+    assert len(out) == 3 and all(len(x) <= 110 for x in out[:2]) and out[1].startswith("#   ")
+    assert out[2] == "add Echo of Jawae " + "x" * 120
+
+
+def test_a_long_path_keeps_its_end():
+    from paf.webtools import short_path
+
+    assert short_path("/home/dev/.paf") == "/home/dev/.paf"
+    assert short_path("C:\\Users\\Someone\\AppData\\Local\\prep-a-fight\\simc\\1210-01\\simc.exe") == (
+        "…\\1210-01\\simc.exe")
+    assert short_path("/home/dev/simc/build/simc", width=20) == "…/simc/build/simc"

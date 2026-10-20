@@ -25,6 +25,7 @@ from html import escape as e
 from pathlib import Path
 
 from paf.config import data_dir
+from paf.theme import diff_pill
 
 FIGHTS = """query($c:String!){ reportData { report(code:$c) { startTime
   fights(killType: Encounters) { id encounterID difficulty kill bossPercentage startTime endTime } } } }"""
@@ -267,14 +268,16 @@ def sentences(b: dict, player: str) -> list[str]:
                        + (f"; padding talents: {', '.join(me['pad_talents'])}" if me.get("pad_talents") else "") + ".")
     d = _result(b["jobs"].get("diff"))
     if d:  # B is the better pull of the two (paf.pulldiff.player_pair, default_pair)
-        out += [_ab(h["text"]) for h in d.get("highlights", [])]
+        out += [_ab(h["text"], player) for h in d.get("highlights", [])]
     return out
 
 
-def _ab(text: str) -> str:
-    """A pull comparison's sentence for the home page, where "A" and "B" mean nothing."""
+def _ab(text: str, player: str = "") -> str:
+    """A pull comparison's sentence for the page, where "A" and "B" mean nothing and the player is "you"."""
     text = re.sub(r"\bin B\b", "in your best pull", text)
-    text = re.sub(r"\bin A\b", "in the other one", text)
+    text = re.sub(r"\bin A\b", "in your weaker pull", text)
+    if player and text.lower().startswith(player.lower() + ":"):
+        text = "You:" + text[len(player) + 1:]
     return text
 
 
@@ -317,7 +320,22 @@ def common(per_boss: list[list[str]]) -> list[str]:
     return out
 
 
-def card(slug: str) -> str:
+def headline(slug: str) -> str:
+    """One sentence on the last raid read for this character: each boss, killed or how low the best pull got it
+    ('' when nothing was read). The home page's line and Reclear's lead."""
+    cur = load().get(slug)
+    if not cur or not cur.get("bosses"):
+        return ""
+
+    def one(b: dict) -> str:
+        what = f"{b['name']} {b['difficulty']}"
+        if b.get("kill"):
+            return f"{what} killed"
+        return f"{what}, your best pull got it to {b['best']:.0f}%" if b.get("best") is not None else f"{what}, not killed"
+    return "; ".join(one(b) for b in cur["bosses"]) + "."
+
+
+def card(slug: str, heading: bool = True) -> str:
     """'Your last raid' for the home page ('' when nothing was read for this character)."""
     from datetime import datetime
 
@@ -333,7 +351,7 @@ def card(slug: str) -> str:
     done = sum(len(b["jobs"]) for b in cur["bosses"])
     when = datetime.fromtimestamp(cur["date"]).strftime("%A %d %B") if cur.get("date") else ""
     night = f"<a href='/job/{e(cur['night'])}'>the night, pull by pull</a> &middot; " if cur.get("night") else ""
-    head = (f"<h2>Your last raid</h2><p class='lr-sub'>{e(when)} &middot; {_pulls(cur['pulls'])} &middot; {night}"
+    head = (("<h2>Your last raid</h2>" if heading else "") + f"<p class='lr-sub'>{e(when)} &middot; {_pulls(cur['pulls'])} &middot; {night}"
             f"<a href='{e(URL.format(cur['report']))}' target='_blank' rel='noopener'>the log</a></p>")
     if not cur["bosses"]:
         return f"<section class='lr' id='lastraid'>{head}<p>No boss of the current raid in this log.</p></section>"
@@ -358,7 +376,7 @@ def card(slug: str) -> str:
             body = ("<ul>" + "".join(_li(s) for s in says) + "</ul>") if says else \
                 "<p class='muted small'>Nothing stands out.</p>"
         card_html = (f"<article class='lr-boss{' kill' if b['kill'] else ''}'><header><b>{e(b['name'])}</b>"
-                 f"<span class='pill'>{e(b['difficulty'])}</span><span class='lr-state'>{state_txt}</span></header>"
+                 f"{diff_pill(b['difficulty'])}<span class='lr-state'>{state_txt}</span></header>"
                  f"{body}<nav class='lr-links'>{links}<a href='/boss?boss={b['boss']}&amp;difficulty={e(b['difficulty'])}'>"
                  f"The prep</a></nav></article>")
         if b["kill"]:

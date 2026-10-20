@@ -372,28 +372,21 @@ def page_body(difficulty: str) -> str:
                   f"{copy_button(text(sh, difficulty), 'Copy for Discord')}"
                   f"{copy_button(text(sh, difficulty, mrt=True), 'Copy MRT note')}</header>"
                   f"<h4>Who hits what</h4><ul>{tg or '<li>Everyone on the boss: no add to assign.</li>'}</ul>"
-                  + (f"<h4>Talents to change</h4><ul>{bd}</ul>" if bd else
+                  + (f"<h4>Talents to change <small>(the top players' builds, not a sim)</small></h4><ul>{bd}</ul>" if bd else
                      "<h4>Talents to change</h4><p class='small muted'>Nobody, from what the log shows.</p>")
                   + lust_block(sh, difficulty) + "</article>")
     allbtn = (copy_button("\n\n".join(text(sh, difficulty) for sh in everything), "Copy every boss for Discord")
               if everything else "")
     miss = (f"<p class='small muted'>Not prepared yet, so no sheet: {e(', '.join(missing))}. "
             f"<a href='/raid/prepare?difficulty={e(difficulty)}'>Prepare the whole raid</a> first.</p>" if missing else "")
-    adds = {p for sh in everything for t in sh["targets"] for p in t["players"]}  # named on an add
-    changes = sum(len(sh["builds"]) for sh in everything)
     n = len(everything)
     answer = (f"<p class='lead'>{n} {'boss' if n == 1 else 'bosses'} ready to copy for Discord"
-              + (f", {len(missing)} still to prepare" if missing else "") + f", for the {len(state['players']) - len(bench)} "
-              f"players of your raid: "
-              + (f"{len(adds)} {'player hits' if len(adds) == 1 else 'players hit'} the adds" if adds else
-                 "everyone stays on the boss")
-              + (f", {changes} talent {'change' if changes == 1 else 'changes'}." if changes else
-                 ", nobody changes talents.") + "</p>") if n else ""
+              + (f", {len(missing)} still to prepare" if missing else "")
+              + f", for the {len(state['players']) - len(bench)} players of your raid.</p>") if n else ""
     if answer:  # the answer is the page's lead; what the page does goes
         head = head.replace(lead, answer)
     words = ("<p class='rl-words'>Padding talents: the build for an add (more targets); boss talents: the build for "
-             "single target. Both come from the builds the top players of each spec play on an add or on the boss, "
-             "not from a sim. The MRT note is the text the Method Raid Tools addon shows in game.</p>"
+             "single target. The MRT note is the text the Method Raid Tools addon shows in game.</p>"
              ) if everything else ""
     return (head + roster + f"<h2>Boss by boss</h2><div class='rl-all'>{allbtn}</div>{miss}{words}<div class='rl-grid'>{cards}</div>"
             f"{_tools()}{COPY_JS}")

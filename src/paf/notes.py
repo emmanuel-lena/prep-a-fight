@@ -120,8 +120,9 @@ def notes_template(fight: Fight) -> str:
         if w.scalable or base in seen:
             continue
         seen.add(base)
-        lines.append(f"#   {base}: a boss-type unit with no damage amp in the game data: modeled as a separate target "
-                     "with its own health while it is up. If it shares the boss's health, write its amp:")
+        lines.append(f"#   {base}: a boss-type unit with no damage amp in the game data,")
+        lines.append("#   modeled as a separate target with its own health while it is up.")
+        lines.append("#   If it shares the boss's health, write its amp:")
         lines.append(f"# amp {base} 1")
     cands: dict[str, list] = {}
     for v in fight.candidate_vulnerable:

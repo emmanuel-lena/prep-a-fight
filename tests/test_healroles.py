@@ -80,3 +80,14 @@ def test_a_healer_who_never_attacks_is_still_counted():
     con.executemany("INSERT INTO heal_stat VALUES ('r',1,?,?,?,100,30,10,0.3,0)",
                     [(1, "Paladin", "Holy"), (2, "Evoker", "Preservation")])
     assert [c.label for c in healroles.comps(con, 3470, 4, min_kills=1)] == ["Holy Paladin + Preservation Evoker"]
+
+
+def test_waves_are_the_moments_without_a_big_hit():
+    """Vashnik heroic (2026-10-20): no spike at x1.6 the median raid damage, waves at x1.3: the three highest are
+    the moments (the sheet said "no big moment: steady raid damage" under a curve of waves)."""
+    from paf import healer
+
+    curve = [10, 10, 13, 10, 10, 10, 12.5, 10, 10, 10, 13.5, 10, 10, 10, 12.2, 10, 10, 10]
+    found = healer.moments(curve, [])
+    assert [round(m.ratio, 2) for m in found] == [1.3, 1.25, 1.35]
+    assert max(m.ratio for m in found) < healer.SPIKE

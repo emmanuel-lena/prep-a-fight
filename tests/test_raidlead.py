@@ -44,8 +44,8 @@ def test_bench(tmp_path, monkeypatch):
 
 
 def test_the_page_opens_on_the_answer(tmp_path, monkeypatch):
-    """Nek'zali heroic, a real roster (2026-10-20): three players named on the Restless Amani (an add the whole raid
-    may also hit) and two talent changes; the answer counts the three, never "everyone stays on the boss"."""
+    """Nek'zali heroic, a real roster (2026-10-20): the page opens on what is ready to copy, never on "everyone stays on
+    the boss" while three players are named on the Restless Amani (an add the whole raid may also hit)."""
     from types import SimpleNamespace
 
     from paf import web
@@ -64,5 +64,5 @@ def test_the_page_opens_on_the_answer(tmp_path, monkeypatch):
     monkeypatch.setattr(raidlead, "sheet", lambda state, x, diff: sh)
     monkeypatch.setattr(raidlead, "lust_block", lambda sh, difficulty: "")
     page = raidlead.page_body("heroic")
-    assert ("1 boss ready to copy for Discord, for the 4 players of your raid: 3 players hit the adds, 2 talent "
-            "changes.") in page
+    assert "1 boss ready to copy for Discord, for the 4 players of your raid.</p>" in page
+    assert "everyone stays on the boss" not in page and "Frosty, Ssamii, Tristy" in page
