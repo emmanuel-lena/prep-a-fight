@@ -364,6 +364,7 @@ def render_sheet(p: TankPrep) -> str:
         build_lead,
         comps_table,
         cooldowns_html,
+        count,
         curve_svg,
         journal_lead,
         moments_html,
@@ -376,7 +377,7 @@ def render_sheet(p: TankPrep) -> str:
 
     mit = "".join(f"<li><b>{e(n)}</b><small>up {u:.0%} of the kill for the top tanks</small></li>"
                   for n, u in p.mitigation) + "".join(
-        f"<li><b>{e(n)}</b><small>pressed {k:.1f} times a kill by {u:.0%} of the top tanks</small></li>"
+        f"<li><b>{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top tanks</small></li>"
         for n, u, k in p.short_defs)
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]
     others = [replace(c, near=["" for _ in c.near]) for c in p.cooldowns  # no buster to answer; taunts: the swaps

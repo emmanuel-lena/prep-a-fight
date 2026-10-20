@@ -960,7 +960,8 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
 
     worn = {n for n, _i, _s in h.trinkets}
     # every long cooldown fewer than half of them press (Pain Suppression, 34%): 25-50% fell between the two lists
-    h.rare = sorted((c for c in healer.cooldowns(tl, found, min_users=0.02, max_users=0.5) if c.name not in worn),
+    h.rare = sorted((c for c in healer.cooldowns(tl, found, min_users=0.02, max_users=0.5)
+                     if c.name not in worn and not healer._item(c.spell_id)),  # potions crowded out Healing Tide
                     key=lambda c: -c.users)[:5]
     step("The top raids' healers: their compositions and what each spec does here")
     healroles.fetch_heal_roles(client, con, enc.id, diff)

@@ -247,6 +247,29 @@ def moments(curve: list[float], boss_casts: list[tuple[str, list[float]]], top: 
 
 
 
+def count(x: float) -> str:
+    """A count a kill: "8", not "8.0" (a median of whole casts); "2.5" when it is a mean."""
+    return f"{x:.0f}" if abs(x - round(x)) < 0.05 else f"{x:.1f}"
+
+
+def _item(spell_id: int) -> bool:
+    try:
+        from paf.gamedata import item_spells
+
+        return spell_id in item_spells()
+    except Exception:  # noqa: BLE001 - offline: kept
+        return False
+
+
+def _external(spell_id: int) -> str:
+    try:
+        from paf.gamedata import external_kind
+
+        return external_kind(spell_id)
+    except Exception:  # noqa: BLE001 - offline: unknown
+        return ""
+
+
 def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None = None,
               min_users: float = 0.5, max_users: float = 1.01) -> list[Cooldown]:
     """The cooldowns of the top players (spells with a cooldown of COOLDOWN_GAP s or more in the game data, that most
@@ -369,7 +392,7 @@ def _more(c: Cooldown) -> str:
 
 def cooldowns_html(cds: list[Cooldown]) -> str:
     return "".join(
-        f"<li><b>{e(c.name)}</b><small>pressed by {c.users:.0%} of the top players &middot; {c.per_kill:.1f} a kill</small>"
+        f"<li><b>{e(c.name)}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill</small>"
         "<span class='when'>" + ("".join(f"<span class='chip'>{_mmss(t)}{_near(n)}</span>"
                                         for t, n in zip(c.times, c.near, strict=False))
                                 or "<small>when they need it: no moment most of them share</small>")
@@ -612,7 +635,8 @@ def jobs_lead(roles: list, mine: str = "") -> str:
 NUMS_NOTE = ("Each number is per player of the spec, the median of the kills read: its share of the kill's "
              "healing; the share of its own healing that lands on the tanks, and in the raid's damage spikes; its "
              "overheal; its dispels a minute; externals, the protective cooldowns it casts on another player (Life "
-             "Cocoon, Ironbark, Time Dilation...) a kill.")
+             "Cocoon, Ironbark, Time Dilation...) a kill. A cooldown cast on themselves is not counted as given: the "
+             "fight tab's count of the same spell can be higher.")
 
 
 def _nums(r) -> list[str]:
@@ -683,10 +707,11 @@ def render_sheet(h: HealerPrep) -> str:
     mine = next((r for r in h.roles if r.spec == h.spec), None)
     worn = {n for n, _i, _s in h.trinkets}  # an on-use trinket is no class cooldown
     items = [c for c in h.cooldowns if c.name in worn]
-    heals = [c for c in h.cooldowns if not is_defensive(c.spell_id, c.name) and c not in items]
+    own = [c for c in h.cooldowns if c in items or not _item(c.spell_id)]  # a potion is no class cooldown
+    heals = [c for c in own if not is_defensive(c.spell_id, c.name) and c not in items]
     svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight, and the top players' healing "
                     "cooldowns", heals)
-    defs = [c for c in h.cooldowns if c not in heals and c not in items]
+    defs = [c for c in own if c not in heals and c not in items]
     lead = ""
     if h.moments:
         shown = h.moments[:3]
@@ -700,7 +725,8 @@ def render_sheet(h: HealerPrep) -> str:
         # a cooldown said for a moment only when the top players' usual press answers it (paf.healer.ANSWER)
         answers = []
         for m in shown:
-            mine_here = [c.name for c in heals if any(n and n.split(" ", 1)[0] == _mmss(m.t) for n in c.near)]
+            mine_here = [c.name for c in heals if any(n and n.split(" ", 1)[0] == _mmss(m.t) for n in c.near)
+                         and _external(c.spell_id) != "damage"]  # Power Infusion lines up, it heals nothing
             if mine_here:
                 answers.append(f"{_mmss(m.t)}: {_and(mine_here[:3])}")
         lead = (f"<p class='lead'>The raid takes the most damage at {hits}."
@@ -774,7 +800,7 @@ def render_sheet(h: HealerPrep) -> str:
     shown = sorted((r for r in h.roles if r.spec == h.spec or r.spec in enough), key=lambda r: r.spec != h.spec)
     others = "".join(role_card(r, h.roles, r.spec == h.spec, chips=r.spec != h.spec) for r in shown)
     few = [p.spec for p in h.presence if p.spec not in {r.spec for r in shown}]
-    deeper_first: list[str] = [jobs_lead(h.roles, h.spec)]
+    deeper_first: list[str] = [jobs_lead(shown, h.spec)]  # the cards below only: a spec too rare has no claim
     if h.presence:
         have = next((x for x in h.presence if x.spec == h.spec), None)
         if have and have.share >= 0.99:  # the corpus is your spec's top players' kills: they all have one

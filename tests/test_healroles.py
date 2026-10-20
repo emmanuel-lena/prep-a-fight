@@ -74,7 +74,7 @@ def test_compositions_and_jobs(monkeypatch):
     assert any("spikes: 50%" in j for j in shaman.jobs) and not any("wastes" in j for j in shaman.jobs)
     # Power Infusion is a damage dealer's buff, said last; Guardian Spirit the protective external
     assert priest.externals == 0.5 and priest.buffs == 1.0 and priest.buff_spells == ["Power Infusion"]
-    assert priest.jobs[-1] == "buffs a damage dealer: Power Infusion 1.0 a kill"
+    assert priest.jobs == ["nothing stands out against the other healers"]  # a buff is no healing job
     assert priest.cd_names[0] == ("Power Infusion", 1.0, [125.0])
     assert shaman.externals == 0 and shaman.raid_cds == 2.0  # Spirit Link, and Touch of Death on the boss
     assert rs["Restoration Druid"].jobs == ["nothing stands out against the other healers"]

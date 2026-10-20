@@ -109,6 +109,13 @@ INV_RANGED_RIGHT = 26
 
 
 @cache
+@cache
+def item_spells() -> frozenset[int]:
+    """The spells an item casts when used (potions, flasks, trinkets): no class cooldown."""
+    return frozenset(int(r["SpellID"]) for r in table_rows("ItemEffect") if (r.get("SpellID") or "0").isdigit()
+                     and int(r["SpellID"]))
+
+
 def item_inventory_types() -> dict[int, int]:
     return {int(r["ID"]): int(r["InventoryType"] or 0) for r in table_rows("Item") if r.get("ID", "").isdigit()}
 

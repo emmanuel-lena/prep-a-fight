@@ -488,10 +488,6 @@ def press_moments(per_player: list[list[float]], keep: int, end: float | None = 
     return sorted(times), sorted(alt)
 
 
-def _and(names: list[str]) -> str:
-    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
-
-
 def jobs(r: Role, everyone: list[Role]) -> list[str]:
     """What this spec does on the boss, from its numbers against the other healer specs measured."""
     others = [o for o in everyone if o is not r]
@@ -517,8 +513,7 @@ def jobs(r: Role, everyone: list[Role]) -> list[str]:
         out.append(f"gives externals: {r.externals:.1f} a kill on other players")
     # not jobs: the count of long cooldowns compares kits, not what the boss asks; low overheal is the spec's trait
     # on every boss (Restoration Shaman on 14 of 14 sheets). Both stay in the card's numbers.
-    if r.buffs >= 1 and r.buffs >= ref("buffs") * 1.5:  # last: a damage dealer's buff, not a healing job
-        out.append(f"buffs a damage dealer: {_and(r.buff_spells)} {r.buffs:.1f} a kill")
+    # a damage dealer's buff (Power Infusion) is no healing job of the boss: the card's numbers say it
     if not out:
         out.append("nothing stands out against the other healers")
     return out
