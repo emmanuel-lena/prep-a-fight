@@ -424,7 +424,7 @@ def render_sheet(p: TankPrep) -> str:
         f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"
         f"{mit or '<li>Not measured yet.</li>'}</ul>",
         f"<h2>Tank swaps</h2><p>Each top tank taunts about <b>{p.taunts_per_kill:.0f}</b> times a kill after the pull"
-        f"{f'; the {len(p.swaps)} swap moments most top raids share (of about {2 * p.taunts_per_kill:.0f} swaps a kill)' if swap else '.'}"
+        f"{'; the swap moments most top raids share' if swap else '.'}"
         f"{_cause(common, p.stacks) if swap and one else ''}"
         f"{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
                                                           f"</li></ul>" if swap else "")
