@@ -1796,6 +1796,10 @@ class Handler(BaseHTTPRequestHandler):
                 from paf import onboarding
 
                 self._send(page("Welcome", f"<style>{onboarding.CSS}</style>{onboarding.page_body()}{onboarding.JS}"))
+            elif url.path == "/wcl/quota":
+                from paf.webtools import quota_html
+
+                self._send(quota_html().encode(), ctype="text/html; charset=utf-8")
             elif url.path == "/wcl/status":
                 import json
 

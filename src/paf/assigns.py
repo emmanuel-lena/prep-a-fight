@@ -14,6 +14,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from paf.corpus.analyze import canonical_waves, kills_filter
+from paf.corpus.memo import by_corpus
 from paf.corpus.template import moving_seconds
 from paf.fight import Fight, Window
 
@@ -161,6 +162,7 @@ def boss_mechanic_names(con: sqlite3.Connection, encounter_id: int, difficulty: 
     return out
 
 
+@by_corpus
 def load_mechanics(con: sqlite3.Connection, encounter_id: int, difficulty: int, spec: str) -> list[Mechanic]:
     """Assignable boss mechanics of a boss (needs `paf mechanics BOSS --corpus` data)."""
     from paf.gamedata import spell_names

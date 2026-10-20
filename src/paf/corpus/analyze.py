@@ -11,6 +11,8 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 
+from paf.corpus.memo import by_corpus
+
 KILLABLE_DEATH_RATE = 0.5  # add types that die at least this often are "real" adds, the rest are mechanics
 WAVE_GAP = 8.0  # seconds without a new spawn that close a wave within a kill
 CLUSTER_GAP = 12.0  # seconds between wave starts that separate two canonical waves across kills
@@ -52,6 +54,7 @@ class Report:
     talents: list[tuple[str, float, float | None]]  # name, pick rate, add share delta (picked - not)
 
 
+@by_corpus
 def main_boss(con: sqlite3.Connection, encounter_id: int, difficulty: int, default: str) -> str:
     """The boss unit that takes the most damage in the kills (an encounter is not always named after its
     boss: The Coiled Altar is Zul'jan, then Zul'jan and Hex Lord Malacrass)."""

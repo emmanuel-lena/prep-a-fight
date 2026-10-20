@@ -52,6 +52,19 @@ def _quota_file() -> Path:
     return data_dir() / "cache" / "wcl_quota.json"
 
 
+def _used_up() -> None:
+    """Warcraft Logs refused for the quota: the shared read says so at once (a page trusting a recent read would
+    otherwise announce points a prep spent a minute ago)."""
+    q = last_quota()
+    if not q or float(q.get("reset_at") or 0) <= time.time():
+        return
+    try:
+        _quota_file().write_text(json.dumps({**q, "spent": q.get("limit", 3600), "read_at": time.time()}),
+                                 encoding="utf-8")
+    except OSError:
+        pass
+
+
 def last_quota() -> dict | None:
     """The quota as last read by any process of the app (spent, limit, reset_at, read_at), or None."""
     try:
@@ -71,10 +84,31 @@ def quota_sentence() -> str:
     return "Your Warcraft Logs quota is used up for this hour: it comes back within the hour."
 
 
+QUOTA_FRESH = 120.0  # seconds: a read of the quota this recent, by any process of the app, is good enough for a page
+
+
+def fresh_quota() -> dict | None:
+    """The last read of the quota when it is recent (a page answers without a Warcraft Logs round trip, issue #30)."""
+    q = last_quota()
+    return q if q and time.time() - float(q.get("read_at") or 0) < QUOTA_FRESH else None
+
+
+def quota_line(client=None) -> str:
+    """The quota said for Settings ("120 / 3600 points used this hour (reset in 12 min)"), recent read first."""
+    q = fresh_quota()
+    if q:
+        spent, limit, reset = q["spent"], q["limit"], q["reset_at"] - time.time()
+    else:
+        rl = (client or WCLClient()).rate_limit()
+        spent, limit, reset = rl["pointsSpentThisHour"], rl["limitPerHour"], rl["pointsResetIn"]
+    return f"{spent:.0f} / {limit} points used this hour (reset in {max(1, round(reset / 60))} min)"  # never "0 min"
+
+
 def quota_left(client=None) -> tuple[float, float]:
-    """(points left, minutes to the reset) without ever waiting: asked when a client is given, else (or when Warcraft
-    Logs refuses) the last read of any process of the app; a fresh hour when nothing is known."""
-    if client is not None:
+    """(points left, minutes to the reset) without ever waiting: asked when a client is given and no recent read
+    exists, else (or when Warcraft Logs refuses) the last read of any process of the app; a fresh hour when nothing
+    is known."""
+    if client is not None and fresh_quota() is None:
         try:
             rl = client.rate_limit()
             return max(0.0, rl["limitPerHour"] - rl["pointsSpentThisHour"]), rl["pointsResetIn"] / 60
@@ -219,6 +253,8 @@ class WCLClient:
                     self._token = None
                     self._token_file().unlink(missing_ok=True)
                 continue
+            if status == 429:
+                _used_up()
             if status == 429 and not self.wait_for_quota:  # a page: say it, never wait
                 raise WCLError(quota_sentence())
             if status == 429 and attempt == self.max_retries and quota_waits < QUOTA_WAITS:

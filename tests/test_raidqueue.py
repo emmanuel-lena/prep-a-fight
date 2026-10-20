@@ -57,7 +57,7 @@ def test_a_stop_asked_meanwhile_is_kept(home):
     assert raidqueue.load()["stop"] is True
 
 
-def test_the_estimate_shares_one_quota(monkeypatch):
+def test_the_estimate_shares_one_quota(home, monkeypatch):
     from paf import estimate
 
     def plan(con, enc, diff, cls, spec, client=None):

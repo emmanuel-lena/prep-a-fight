@@ -24,6 +24,7 @@ from html import escape as e
 from pathlib import Path
 
 from paf.config import data_dir
+from paf.corpus.memo import by_corpus
 
 TALENT_GAP = 0.15  # as paf.wipe: a talent taken this much more on one side is a side's talent
 SHOWN = 3
@@ -194,9 +195,18 @@ def builds(state: dict, enc_id: int, diff: int, roles: dict[str, str], names: di
     return out
 
 
+@by_corpus
+def _references(con, encounter_id: int, diff: int, boss: str) -> list:
+    """The top raids' targets and who hits them: the corpus only, so kept while it is unchanged (issue #30)."""
+    from paf import comp, raidreview
+
+    targets, _habits = raidreview.references(con, encounter_id, diff, boss)
+    return comp.references(con, encounter_id, diff, targets)
+
+
 def sheet(state: dict, enc, diff: int) -> dict | None:
     """One boss for the roster (the benched players out): who hits what, builds."""
-    from paf import comp, raidreview
+    from paf import comp
     from paf.corpus import db
     from paf.corpus.analyze import main_boss
     from paf.raidneed import RaidComp
@@ -207,9 +217,7 @@ def sheet(state: dict, enc, diff: int) -> dict | None:
     bench = set(state.get("bench") or [])
     players = [(n, s, d) for n, s, d in state.get("players") or [] if n not in bench]
     rc = RaidComp(state.get("report", ""), state.get("roster_from", ""), players, {}, 0.0, False)
-    boss = main_boss(con, enc.id, diff, enc.name)
-    targets, _habits = raidreview.references(con, enc.id, diff, boss)
-    refs = comp.references(con, enc.id, diff, targets)
+    refs = _references(con, enc.id, diff, main_boss(con, enc.id, diff, enc.name))
     rows = comp.assign(rc, refs)
     roles: dict[str, str] = {}
     for a in rows:

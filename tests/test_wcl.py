@@ -173,5 +173,8 @@ def test_an_estimate_knows_the_quota_is_used_up_without_waiting(tmp_path, monkey
                          "limitPerHour": 3600, "pointsSpentThisHour": 3000, "pointsResetIn": 1200}}})]))
     prep.rate_limit()  # a prep read it 10 kills ago
     page = WCLClient("id", "secret", cache_dir=tmp_path / "wcl2", transport=FakeWCL([(429, {})]))
+    monkeypatch.setattr(wcl, "QUOTA_FRESH", 0.0)  # the read is old: the page asks
     left, reset = wcl.quota_left(page)
     assert left == 0.0 and 19 <= reset <= 20  # used up now, back in the 20 minutes the prep read
+    monkeypatch.setattr(wcl, "QUOTA_FRESH", 120.0)  # recent: refused once, said by the shared read (issue #30)
+    assert wcl.quota_left(page)[0] == 0.0 and wcl.fresh_quota()["spent"] == 3600

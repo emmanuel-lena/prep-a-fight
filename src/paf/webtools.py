@@ -221,21 +221,29 @@ def path_html(path: str) -> str:
             f"<span class='p-full'>{e(path)}</span></span>")
 
 
+def quota_html() -> str:
+    """The Warcraft Logs quota line of Settings, or why it cannot be read."""
+    try:
+        from paf.wcl import quota_line
+
+        return e(quota_line())
+    except Exception as ex:  # noqa: BLE001 - shown as is
+        return f"<span class='neg'>{e(str(ex)[:160])}</span>"
+
+
 def settings_page(message: str = "") -> str:
     from paf.cache import cache_root, size
     from paf.simc_install import find_simc
 
     exe = find_simc(None)
     simc = path_html(str(exe)) if exe else "<span class='neg'>not installed</span>"
-    quota = ""
-    try:
-        from paf.wcl import WCLClient
+    from paf.wcl import fresh_quota
 
-        rl = WCLClient().rate_limit()
-        quota = (f"{rl['pointsSpentThisHour']:.0f} / {rl['limitPerHour']} points used this hour "
-                 f"(reset in {max(1, round(rl['pointsResetIn'] / 60))} min)")  # never "0 min"
-    except Exception as ex:  # noqa: BLE001 - shown as is
-        quota = f"<span class='neg'>{e(str(ex)[:160])}</span>"
+    # a recent read says it at once; else the line comes from /wcl/quota after the page is shown (issue #30)
+    quota = quota_html() if fresh_quota() else (
+        "<span class='quota-line muted'>reading&hellip;</span><script>fetch('/wcl/quota').then(function(r){"
+        "return r.text()}).then(function(t){document.querySelector('.quota-line').outerHTML=t})"
+        ".catch(function(){})</script>")
     msg = f"<p class='notice small' role='status'>{e(message)}</p>" if message else ""
     from paf import wcllogin
     from paf.web import connect_block
