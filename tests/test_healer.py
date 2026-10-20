@@ -183,7 +183,7 @@ def test_every_healer_spec_in_one_table():
                              dispels=1.1, externals=0.0, buffs=0.0, buff_spells=[], players=38,
                              jobs=["removes Essence Rend"], cd_names=[("Ascendance", 1, [(35.0, 0.38)], 0.9)])
     table = healer.roles_table([shaman, disc], "Restoration Shaman")
-    assert "<th>Buffs on others /kill</th>" in table and "1.4 <small>Power Infusion</small>" in table
+    assert "<th>Buffs given a kill</th>" in table and "1.4 <small>Power Infusion</small>" in table
     assert "Restoration Shaman <small>(you)</small>" in table and "&ndash;" in table
     more = healer.roles_more([shaman, disc], "Restoration Shaman")
     assert "removes Essence Rend" in more and "Ascendance" not in more  # your own times are on the fight tab
@@ -241,3 +241,17 @@ def test_a_ramp_answers_the_hit_after_it(monkeypatch):
     assert ("Evangelism is their ramp ahead of the 0:40, 2:10 and 3:35 hits: 100% about 0:24, 100% about 1:42, "
             "100% about 3:15") in sheet
     assert "0:24 &middot; 16 s before the 0:40 hit" in sheet and "1:42 &middot; 28 s before the 2:10 hit" in sheet
+
+
+def test_a_held_press_is_not_back_from_cooldown():
+    # Vashnik heroic, Disc: Evangelism at 2:07, 123 s after 0:04 with a 90 s cooldown, is held (it may answer 2:10);
+    # Tranquility at 2:45, 123 s after 0:42 with a 120 s cooldown, is back as soon as it can be
+    assert not healer.back_from_cooldown(127.0, 127.0, [4.0, 127.0], 93.0, 90.0)
+    assert healer.back_from_cooldown(165.0, 165.0, [42.0, 165.0], 123.0, 120.0)
+    assert not healer.back_from_cooldown(42.0, 42.0, [42.0, 165.0], 123.0, 120.0)  # the first press
+
+
+def test_the_talents_they_differ_on_most_when_none_splits_them():
+    # Holy Paladin: no talent taken by 35-65% of them, so the change tab names the ones they differ on most
+    page = healer.split_html([("Tower of Radiance", 0.22)], 100, "Holy Paladin", wide=True)
+    assert "differ on most</h2>" in page and "None is taken by 35 to 65% of them" in page

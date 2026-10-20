@@ -825,6 +825,9 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
               if is_defensive(c.spell_id, c.name)],
         character=getattr(profile, "name", "") or "")
     p.split, p.split_players = healer.contested(con, enc.id, diff, spec)
+    if not p.split:  # no talent 35-65%: the ones they differ on most, said as such
+        p.split, p.split_players = healer.contested(con, enc.id, diff, spec, lo=0.15, hi=0.85, shown=6)
+        p.split_wide = bool(p.split)
     p.builds = healer.build_rows(builds, p.split)  # the most played build's side of each split
     p.short_defs = short_defs
     p.hero = healer.hero_split(con, enc.id, diff, spec)
@@ -966,6 +969,9 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         x.on_others = shares.get(x.spell_id, -1.0)
     h.casts = {n: len(ts) for n, ts in tl.boss_casts}
     h.split, h.split_players = healer.contested(con, enc.id, diff, spec)
+    if not h.split:  # no talent 35-65%: the ones they differ on most, said as such
+        h.split, h.split_players = healer.contested(con, enc.id, diff, spec, lo=0.15, hi=0.85, shown=6)
+        h.split_wide = bool(h.split)
     h.builds = healer.build_rows(builds, h.split)  # the most played build's side of each split
     from paf.gamedata import dispel_type
     from paf.mechanics import walk
@@ -986,6 +992,9 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     worn = {n for n, _i, _s in h.trinkets}
     # every long cooldown fewer than half of them press (Pain Suppression, 34%): 25-50% fell between the two lists
     # no potion (they crowded out Healing Tide Totem) nor spell on enemies; worn trinkets go to their own section
+    worn_items = {n for n, _i, _s in h.trinkets}
+    h.potions = [c for c in healer.cooldowns(tl, found, min_users=0.25) if healer._item(c.spell_id)
+                 and c.name not in worn_items]  # a mana potion 43% drink: on the fight tab, as the tank's
     h.rare = sorted((c for c in healer.cooldowns(tl, found, min_users=0.02, max_users=0.5)
                      if c.name in worn or not (healer._item(c.spell_id) or healer._enemy(c.spell_id))),
                     key=lambda c: -c.users)[:5]

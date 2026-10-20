@@ -77,6 +77,7 @@ class TankPrep:
     # for a cooldown, too short for an uptime (Spell Reflection, Demoralizing Shout)
     split: list = field(default_factory=list)  # (talent, share picked) the top players split on
     split_players: int = 0
+    split_wide: bool = False  # no talent 35-65%: the talents they differ on most (paf.healer.split_html)
 
 
 def ensure_table(con) -> None:
@@ -444,18 +445,20 @@ def render_sheet(p: TankPrep) -> str:
         def answer(m: Moment) -> tuple | None:  # the most shared press for a hit (Spell Reflection, 41% at 0:33,
             return max(((n, t, sp) for n, ts, sps in answers for t, sp in zip(ts, sps, strict=False)  # before
                         if -ANSWER[0] <= t - m.t <= ANSWER[1] and sp), key=lambda x: x[2], default=None)  # Shield Wall)
+        big = answer(m)  # the biggest moment and its answer first, then the other hits in time order
         lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({m.ratio:.1f}&times; the "
-                    f"usual damage" + ("" if own else ", raid damage the tanks take too") + ").")
-        # every dot in time order: its most shared press, or one clause for those with none (Vashnik read 2:10,
-        # 2:55, then 1:35, and "no defensive" twice)
-        pairs = [(x, answer(x)) for x in sorted(p.moments, key=lambda x: x.t)]
+                    f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
+                    + (f"; {big[2]:.0%} of the top {e(p.spec)}s press {e(big[0])} for it (about {_mmss(big[1])})."
+                       if big else f"; no defensive of theirs is shared for it{landed_in(m, defs)}."))
+        # the other dots in time order: their most shared press, or one clause for those with none
+        pairs = [(x, answer(x)) for x in sorted(p.moments, key=lambda x: x.t) if x is not m]
         said = [f"for the {_mmss(x.t)} hit, {a[2]:.0%} press {e(a[0])} (about {_mmss(a[1])})" for x, a in pairs if a]
-        answered = {(a[0], a[1]) for _x, a in pairs if a}  # the chart draws these full
+        answered = {(a[0], a[1]) for a in [big, *(a for _x, a in pairs)] if a}  # the chart draws these full
         bare = [f"the {_mmss(x.t)} hit{landed_in(x, defs)}" for x, a in pairs if not a]
         if said:
             lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 0:35 hit, 41% press Spell Reflection"
         if bare:
-            lead.append(f"No defensive is shared for {_and(bare)}.")
+            lead.append(f"No defensive is shared for {_and(bare)}" + (" either." if not big else "."))
         # a hit that comes with a swap (Vashnik's 1:35 and 2:55, after Dripping Fangs): the time is the link
         with_swap = [(x, w) for x in p.moments for w in p.swaps if abs(w - x.t) <= ANSWER[0]]
         # said only when swaps are rare enough for it to mean something: one every 28 s (Vashnik) lands within 5 s
@@ -504,10 +507,10 @@ def render_sheet(p: TankPrep) -> str:
         + "".join(f"<p><b>Taunts stop working with {e(n)}:</b> {e(t)} <span class='muted'>(The Encounter Journal; "
                   + (f"never reached in the {k} top kills read" if not hit and k else
                      f"reached in {hit} of the {k} top kills read" if k else "not measured") + ".)</span></p>"
-                  for n, t, hit, k in p.no_taunt)]
+                  for n, t, hit, k in p.no_taunt if hit or not k)]  # never reached: one line on the boss tab
     change = [build_lead(p.builds, p.spec, p.split_players or p.kills, p.split),
               talents_html(p.builds, p.split_players or p.kills, f"{p.spec}s", p.hero),
-              split_html(p.split, p.split_players, p.spec) if p.split else "",
+              split_html(p.split, p.split_players, p.spec, p.split_wide) if p.split else "",
               f"<h2>Trinkets the top {e(p.spec)}s play</h2><ul class='hl2'>"
               f"{trinkets_html(p.trinkets) or '<li>No gear yet.</li>'}</ul>",
               ]  # the lead says no sim weighs them
@@ -521,6 +524,8 @@ def render_sheet(p: TankPrep) -> str:
                f"{_and([f'{e(n)} ({s:.0%})' for n, s in p.hitters[:3]])} of their damage taken.</p>"
                if p.hitters else journal_lead(p.journal, "tanks"))
     boss = [top_hit, f"<h2>The abilities that hit the top tanks the most</h2><ul class='hl2'>{hit or '<li>Not measured yet.</li>'}</ul>"]
+    boss += [f"<p class='small muted'>Taunts stop working with {e(n)} (the Encounter Journal), never reached in the "
+             f"{k} top kills read.</p>" for n, _t, hit, k in p.no_taunt if not hit and k]
     if jr:
         boss.append(f"<h2>What the Encounter Journal asks tanks</h2><ul class='hl2'>{jr}</ul>")
     if p.abilities:  # every ability, the tanks' in full and the others' named
@@ -534,7 +539,7 @@ def render_sheet(p: TankPrep) -> str:
                       + (", ".join(f"{e(x.spec)} (in {x.share:.0%} of the kills)"
                                    for x in sorted(mates, key=lambda x: -x.share)[:3])
                          if mates else "no other tank spec often") + "."
-                      + "".join(f" Kills with a {e(x.spec)} beside you are "
+                      + "".join(f" Kills with a {e(x.spec)} beside them are "
                                 f"{abs(int(x.duration_with) - int(x.duration_without))} s "
                                 f"{'shorter' if x.duration_with < x.duration_without else 'longer'}, beyond the noise (a "
                                 f"reading, not a verdict: the raids that bring one differ in other ways too)."
@@ -551,6 +556,8 @@ def render_sheet(p: TankPrep) -> str:
         fight.append(f"<h2>Your damage cooldowns</h2><ul class='hl2'>{cooldowns_html(damage, set())}</ul>")
     if items:
         fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{cooldowns_html(items, set())}</ul>")
+    if used:  # the healers' sheets have theirs on the fight tab too
+        fight.append(f"<h2>Potions</h2><ul class='hl2'>{cooldowns_html(used, set())}</ul>")
     if p.presence:
         if have and have.share >= 0.99:  # the corpus is this spec's kills
             line = f"These are the top {e(p.spec)}s' kills; the table tells which tanks play beside them."
@@ -566,8 +573,6 @@ def render_sheet(p: TankPrep) -> str:
                       "differ in other ways too, and a few kills move a mean of deaths.</p>")
     byline = (f"{e(p.character or p.spec)} &middot; {e(p.spec)} &middot; from {p.kills} top kills (median "
               f"{_mmss(p.duration)}) &middot; no tank sim")
-    if used:  # last: the lead talks about the table above them
-        deeper.append(f"<h2>Consumables</h2><ul class='hl2'>{cooldowns_html(used, set())}</ul>")
     return sheet_page(p.boss, p.difficulty, byline, p.class_name,
                       {"fight": fight, "change": change, "boss": boss, "deeper": deeper}, theme.style("healer"),
                       UNSIMMED)
