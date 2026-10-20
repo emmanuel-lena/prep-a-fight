@@ -31,4 +31,4 @@
 .hrole.mine{border-top:2px solid var(--fg)} .hrole h3{font:600 19px/1.3 var(--font-reading)}
 .rd .ml{font-size:12px;fill:var(--fg)}
 .rd .md{stroke:var(--muted);stroke-dasharray:2 4;opacity:.7} .rd .mdl{fill:var(--muted);font-size:11px}
-.panel>.card{max-width:1000px}
+.panel>.card,.panel>.card:has(svg.rd){max-width:1000px}

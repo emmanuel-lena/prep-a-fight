@@ -803,7 +803,8 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
         rare=[c for c in healer.cooldowns(tl, found, min_users=0.25, max_users=0.5)
               if is_defensive(c.spell_id, c.name)],
         character=getattr(profile, "name", "") or "")
-    p.abilities = _role_journal(enc.id, diff_name, "tank", tl)
+    p.abilities = _role_journal(enc.id, diff_name, "tank", tl, {  # another role's ability that hits the tanks too
+        n: f"{s:.0%} of the damage the top tanks take" for n, s in hitters if s >= 0.05})
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(tank.render_sheet(p), encoding="utf-8")
@@ -816,7 +817,7 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     return 0
 
 
-def _role_journal(encounter_id: int, diff_name: str, role: str, tl) -> str:
+def _role_journal(encounter_id: int, diff_name: str, role: str, tl, also: dict[str, str] | None = None) -> str:
     """The Encounter Journal's stages for a healer's or a tank's sheet: that role's abilities in full, the others'
     named (paf.bossguide), with the boss's cast times from the top kills."""
     from paf import bossguide
@@ -827,7 +828,7 @@ def _role_journal(encounter_id: int, diff_name: str, role: str, tl) -> str:
         return ""
     return bossguide.abilities_html(sections, timings=dict(tl.boss_casts),
                                     icon_map=icons_for(bossguide.spell_refs(sections)), role=role,
-                                    difficulty=diff_name)
+                                    difficulty=diff_name, also=also)
 
 
 def _prep_healer(args: argparse.Namespace, profile=None) -> int:

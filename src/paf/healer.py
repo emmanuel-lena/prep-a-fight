@@ -44,6 +44,7 @@ RAID_KILLS = 40
 STEP = 5.0
 SPIKE = 1.6  # a moment with this many times the median raid damage
 SPIKE_GAP = 15.0
+ANSWER = (10.0, 8.0)  # seconds before and after a moment (a 5 s step) a press answers it
 WAVE = 1.2  # without any SPIKE, the waves of raid damage at this many times the median are the moments to plan for
 COOLDOWN_GAP = 45.0  # a spell cast at most once in this many seconds (median) is a cooldown
 QE_LIVE = "https://questionablyepic.com/live/"
@@ -206,7 +207,8 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         near = []
         for t in times:
             m = min(found, key=lambda m: abs(m.t - t), default=None)
-            near.append(f"{_mmss(m.t)} {m.boss_spell}".strip() if m and abs(m.t - t) <= 20 else "")
+            ok = m is not None and -ANSWER[0] <= t - m.t <= ANSWER[1]  # pressed for the hit: just before or in it
+            near.append(f"{_mmss(m.t)} {m.boss_spell}".strip() if ok else "")
         out.append(Cooldown(a.name, a.id, a.users, a.per_kill, times, near, alt))
     return sorted(out, key=lambda c: -c.users)
 
@@ -269,7 +271,8 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
 
 
 def moments_html(found: list[Moment], what: str) -> str:
-    return "".join(f"<li><b>{_mmss(m.t)}</b><span>{e(m.boss_spell) if m.boss_spell else what}</span>"
+    """what: kept for the callers; a moment no boss cast explains shows its time only."""
+    return "".join(f"<li><b>{_mmss(m.t)}</b><span>{e(m.boss_spell) if m.boss_spell else ''}</span>"
                    f"<small>&times;{m.ratio:.1f} the fight's median</small></li>" for m in found)
 
 
@@ -293,7 +296,7 @@ def _near(n: str) -> str:
     return f" &middot; {e(name)}" if name else f" &middot; the {e(t)} hit"
 
 
-SHOWN_TALENTS = 5
+SHOWN_TALENTS = 60  # every difference shown: nothing folded behind "+N more"
 
 
 def build_rows(builds: list) -> list[tuple[int, str, str, str]]:
@@ -399,6 +402,9 @@ def build_lead(builds: list, spec: str, players: int) -> str:
 def journal_lead(lines: list[str], who: str) -> str:
     """The boss tab's answer: the abilities the Encounter Journal asks this role to handle."""
     names = list(dict.fromkeys(re.findall(r"\[([^\]]+)\]", " ".join(lines))))
+    if not names and lines:  # the journal's notes without spell links: said as they are, just below
+        return (f"<p class='lead'>The Encounter Journal has {len(lines)} notes for {who} on this boss, just below; "
+                f"every ability follows, yours in full, the others named.</p>")
     if not names:
         return f"<p class='lead'>The Encounter Journal asks {who} nothing in particular on this boss.</p>"
     return (f"<p class='lead'>What the Encounter Journal asks {who} to handle here: {e(', '.join(names[:5]))}. Every "
@@ -556,7 +562,7 @@ def render_sheet(h: HealerPrep) -> str:
               f"the logs, not sims.</p><div class='hroles'>{others or '<p>Not measured yet.</p>'}</div>"
               + (f"<p class='small muted'>Too few healers measured: {e(', '.join(few))}.</p>" if few else ""),
               (f"<h2>The healer compositions played most</h2>{comps_table(h.comps, n_kills)}" if h.comps else "")]
-    byline = (f"{e(h.character or h.spec)} &middot; {e(h.spec)} &middot; {h.kills} top {e(h.spec)} kills, "
-              f"{h.role_kills} read for the healers' jobs &middot; a {_mmss(h.duration)} fight")
+    byline = (f"{e(h.character or h.spec)} &middot; {e(h.spec)} &middot; {h.kills} top kills &middot; "
+              f"a {_mmss(h.duration)} fight")  # the healers' jobs say their own sample
     return sheet_page(h.boss, h.difficulty, byline, h.class_name,
                       {"fight": fight, "change": change, "boss": boss, "deeper": deeper}, theme.style("healer"))

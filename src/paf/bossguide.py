@@ -43,7 +43,8 @@ def readable(text: str, difficulty: str = "heroic") -> str:
     t = re.sub(r"\bX (sec|seconds?)\b", r"a few \1", t)
     t = re.sub(r"\b(?:inflicting|deals?|dealing) X\b", lambda m: m.group(0)[:-2], t)
     t = re.sub(r"\bX (\w+ damage)", r"\1", t)
-    t = re.sub(r"\b(absorbs the next|healing|absorbing) X\b", r"\1", t)  # "absorbs the next X healing"
+    t = re.sub(r"\bthe next X healing\b", "an amount of incoming healing", t)
+    t = re.sub(r"\b(healing|absorbing) X\b", r"\1 an amount", t)
     t = re.sub(r"\bX or fewer\b", "only a few", t)
     t = re.sub(r"\bX or more\b", "enough", t)
     t = re.sub(r"\bthe \.", "a player.", t)
@@ -211,6 +212,8 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
     if m:
         who = "interrupted" if m.kind == "interrupt" else f"{m.players_per_kill:.0f} players hit per kill"
         facts.append(who + (f", ~{m.cost:g} s of movement for you" if m.cost else ""))
+    if s.title in ctx["also"]:
+        facts.append(e(ctx["also"][s.title]))
     if s.title.lower() in ctx["burst"]:
         facts.append(f"<b>burst window: the boss takes x{ctx['burst'][s.title.lower()]:g} damage</b>")
     text = readable(s.text or ctx["describe"](s.spell_id), ctx["difficulty"])
@@ -227,12 +230,12 @@ ROLE_OTHERS = {"tank": "the tanks", "healer": "the healers", "damage": "the dama
 def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] | None = None,
                    mechanics: list | None = None, burst: dict[str, float] | None = None,
                    icon_map: dict[str, str] | None = None, role: str | None = None,
-                   difficulty: str = "heroic") -> str:
+                   difficulty: str = "heroic", also: dict[str, str] | None = None) -> str:
     """Every stage and unit of the journal with its abilities; facts from the logs when known."""
     ctx = {"timings": {k.lower(): v for k, v in (timings or {}).items()},
            "mechanics": {m.name.lower(): m for m in (mechanics or [])},
            "burst": {k.lower(): v for k, v in (burst or {}).items()}, "icons": icon_map or {},
-           "describe": describe, "difficulty": difficulty}
+           "describe": describe, "difficulty": difficulty, "also": also or {}}
     def key(s: Section) -> tuple:
         return s.kind, s.title, readable(s.text), tuple(s.flags)
 
@@ -254,7 +257,8 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
                 skip = depth  # another difficulty's ability ("On Mythic difficulty, ..."), and what sits under it
                 continue
             mine = [f for f in s.flags if f in ROLE_OTHERS]
-            if role and s.kind == "ability" and mine and role not in mine:  # another role's job: named, not told
+            if role and s.kind == "ability" and mine and role not in mine and s.title not in (also or {}):
+                # another role's job: named, not told (unless it hits you too: also)
                 others.setdefault(mine[0], []).append(s.title)
                 skip = depth
                 continue

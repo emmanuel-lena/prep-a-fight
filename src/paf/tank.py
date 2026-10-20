@@ -257,8 +257,11 @@ def render_sheet(p: TankPrep) -> str:
     if p.moments:
         m = max(p.moments, key=lambda x: x.ratio)
         press = next(((c.name, t) for c in defs for t in c.times if abs(t - m.t) <= 20), None)
-        lead.append(f"The tanks' biggest damage: {e(m.boss_spell or 'tank damage')} at {_mmss(m.t)} (&times;{m.ratio:.1f} the fight's median)"
-                    + (f"; the top {e(p.spec)}s press {e(press[0])} at {_mmss(press[1])}." if press else "."))
+        some = next(((c.name, t) for c in defs for t in c.alt if abs(t - m.t) <= 20), None)
+        lead.append(f"The tanks' biggest damage: {e(m.boss_spell or 'tank damage')} at {_mmss(m.t)} (&times;{m.ratio:.1f} "
+                    f"the fight's median)" + (f"; the top {e(p.spec)}s press {e(press[0])} at {_mmss(press[1])}." if press
+                    else f"; most top {e(p.spec)}s press no defensive at it"
+                    + (f" (some press {e(some[0])} at {_mmss(some[1])})." if some else ".")))
     if p.swaps:
         lead.append(f"Each of them taunts about {p.taunts_per_kill:.0f} times a kill after the pull"
                     + (f", most often after {e(common)}." if one else
