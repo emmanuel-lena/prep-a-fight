@@ -304,7 +304,8 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
     return sorted(out, key=lambda c: -c.users)
 
 
-def trinkets(con, encounter_id: int, difficulty: int, top: int = 50) -> list[tuple[str, int, float]]:
+def trinkets(con, encounter_id: int, difficulty: int, top: int = 100) -> list[tuple[str, int, float]]:
+    """(trinket, item id, share of the top players wearing it): the same 100 kills as the cooldowns' presses."""
     from paf.corpus.analyze import kills_filter
 
     where, params = kills_filter(encounter_id, difficulty)
@@ -721,7 +722,7 @@ def render_sheet(h: HealerPrep) -> str:
     from paf.prep_report import sheet_page
 
     worn = {n for n, _i, _s in h.trinkets}  # an on-use trinket is no class cooldown
-    items = [c for c in h.cooldowns if c.name in worn]
+    items = [c for c in h.cooldowns + h.rare if c.name in worn]  # an on-use trinket, however many press it
     own = [c for c in h.cooldowns if c in items or not _item(c.spell_id)]  # a potion is no class cooldown
     heals = [c for c in own if not is_defensive(c.spell_id, c.name) and c not in items]
     svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight, and the top players' healing "
@@ -756,10 +757,11 @@ def render_sheet(h: HealerPrep) -> str:
         f"{moments_html(h.moments, 'raid damage') or '<li>No big moment: steady raid damage.</li>'}</ul></div>",
         f"<h2>Your long cooldowns, where the top {e(h.spec)}s press them</h2><ul class='hl2'>"
         f"{cooldowns_html(heals) or '<li>Not enough top players in the corpus yet.</li>'}</ul>"]
-    if h.rare:  # a big cooldown the top players skip is information too (Healing Tide Totem: 3 kills in 100)
+    rare = [c for c in h.rare if c not in items]
+    if rare:  # a big cooldown the top players skip is information too (Healing Tide Totem: 3 kills in 100)
         fight.append(f"<p class='small muted'>Fewer than half of the top {e(h.spec)}s press "
                      + ", ".join(f"{e(c.name)} ({c.users:.0%}, {_and([_mmss(t) for t in c.times]) or 'no shared moment'})"
-                                 for c in h.rare) + " on this boss.</p>")
+                                 for c in rare) + " on this boss.</p>")
     if defs:
         fight.append(f"<h2>Your defensives</h2><ul class='hl2'>{cooldowns_html(defs)}</ul>")
     if items:
