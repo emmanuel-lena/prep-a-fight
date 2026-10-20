@@ -957,11 +957,11 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         if kind and (s.title, kind) not in h.dispellable:
             h.dispellable.append((s.title, kind))
     h.dispels_checked = True
-    from paf.defensives import is_defensive
 
     worn = {n for n, _i, _s in h.trinkets}
-    h.rare = sorted((c for c in healer.cooldowns(tl, found, min_users=0.02, max_users=0.25)
-                     if c.name not in worn and not is_defensive(c.spell_id, c.name)), key=lambda c: -c.users)[:3]
+    # every long cooldown fewer than half of them press (Pain Suppression, 34%): 25-50% fell between the two lists
+    h.rare = sorted((c for c in healer.cooldowns(tl, found, min_users=0.02, max_users=0.5) if c.name not in worn),
+                    key=lambda c: -c.users)[:5]
     step("The top raids' healers: their compositions and what each spec does here")
     healroles.fetch_heal_roles(client, con, enc.id, diff)
     from paf.gamedata import spell_names

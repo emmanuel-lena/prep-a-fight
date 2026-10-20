@@ -732,8 +732,9 @@ def render_sheet(h: HealerPrep) -> str:
         f"<h2>Your long cooldowns, where the top {e(h.spec)}s press them</h2><ul class='hl2'>"
         f"{cooldowns_html(heals) or '<li>Not enough top players in the corpus yet.</li>'}</ul>"]
     if h.rare:  # a big cooldown the top players skip is information too (Healing Tide Totem: 3 kills in 100)
-        fight.append(f"<p class='small muted'>Few top {e(h.spec)}s press "
-                     + ", ".join(f"{e(c.name)} ({c.users:.0%})" for c in h.rare) + " on this boss.</p>")
+        fight.append(f"<p class='small muted'>Fewer than half of the top {e(h.spec)}s press "
+                     + ", ".join(f"{e(c.name)} ({c.users:.0%}, {_and([_span((t, *sp)) for t, sp in zip(c.times, c.spans, strict=False)]) or 'no shared moment'})"
+                                 for c in h.rare) + " on this boss.</p>")
     if defs:
         fight.append(f"<h2>Your defensives</h2><ul class='hl2'>{cooldowns_html(defs)}</ul>")
     if items:
