@@ -404,7 +404,7 @@ def render_sheet(p: TankPrep) -> str:
                     f"of their damage taken.")
     if p.moments:
         m = max(p.moments, key=lambda x: x.ratio)
-        own = m.boss_spell in {n for n, _s in p.hitters[:3]}
+        own = bool(set(moment_names(m)) & {n for n, _s in p.hitters[:3]})  # any of its abilities a tank hitter
         answers = [(c.name, c.times) for c in defs if not c.every] + [(n, ts) for n, _u, _k, ts, _ev in p.short_defs]
         press = next(((n, t) for n, ts in answers for t in ts if -ANSWER[0] <= t - m.t <= ANSWER[1]), None)
         lead.append(f"Their biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({m.ratio:.1f}&times; the "
