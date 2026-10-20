@@ -514,7 +514,7 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
     deaths = any(p.deaths_with is not None for p in pres)
 
     def dd(a, b) -> str:
-        return "" if a is None else f"{a:g}" + ("" if b is None else f" <small>({b:g} without)</small>")
+        return "" if a is None else f"{a:.1f}" + ("" if b is None else f" <small>({b:.1f} without)</small>")
     rows = ""
     for p in pres:
         if p.spec == mine and p.share >= 0.99:  # the corpus is this spec's kills: its row says nothing
@@ -540,10 +540,10 @@ def comps_table(comps: list, n_kills: int) -> str:
     deaths = any(c.deaths is not None for c in comps)
     rows = "".join(
         f"<tr><td>{e(c.label)}</td><td class='n'>{c.kills} ({_pct(c.share)})</td><td class='n'>{_mmss(c.duration)}</td>"
-        + (f"<td class='n'>{'' if c.deaths is None else f'{c.deaths:g}'}</td>" if deaths else "") + "</tr>"
+        + (f"<td class='n'>{'' if c.deaths is None else f'{c.deaths:.1f}'}</td>" if deaths else "") + "</tr>"
         for c in comps)
     return ("<table class='hcomp'><thead><tr><th>Healers</th><th>Top kills</th><th>Median kill</th>"
-            + ("<th>Median deaths</th>" if deaths else "") + f"</tr></thead><tbody>{rows}</tbody></table>"
+            + ("<th>Deaths a kill</th>" if deaths else "") + f"</tr></thead><tbody>{rows}</tbody></table>"
             f"<p class='small muted'>Of {n_kills} top kills read. Exact compositions played at least 5 times; the "
             f"other {n_kills - sum(c.kills for c in comps)} kills play rarer ones.</p>")
 

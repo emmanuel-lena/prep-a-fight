@@ -209,7 +209,7 @@ class Comp:
     kills: int
     share: float  # of the corpus' kills
     duration: float  # median kill time (s)
-    deaths: float | None  # median deaths, on the kills read (None: none read)
+    deaths: float | None  # mean deaths, on the kills read (None: none read)
 
     @property
     def label(self) -> str:
@@ -263,7 +263,8 @@ def comps(con: sqlite3.Connection, encounter_id: int, difficulty: int, min_kills
         if len(rows) < min_kills:
             continue
         ds = [x for _d, x in rows if x is not None]
-        out.append(Comp(specs, len(rows), len(rows) / n, st.median(d for d, _x in rows), st.median(ds) if ds else None))
+        out.append(Comp(specs, len(rows), len(rows) / n, st.median(d for d, _x in rows),
+                        round(st.mean(ds), 1) if ds else None))  # deaths: a mean, as in the presence table
     return sorted(out, key=lambda c: -c.kills)
 
 
