@@ -238,5 +238,6 @@ def test_a_ramp_answers_the_hit_after_it(monkeypatch):
     h = healer.HealerPrep("Boss", "heroic", "Discipline Priest", 10, 270.0, [100.0] * 54, found, [cd], [], [], [],
                           [])
     sheet = healer.render_sheet(h)
-    assert "for the 0:40 hit, 100% press Evangelism (about 0:24, a ramp ahead of it)" in sheet
+    assert ("Evangelism is their ramp ahead of the 0:40, 2:10 and 3:35 hits: 100% about 0:24, 100% about 1:42, "
+            "100% about 3:15") in sheet
     assert "0:24 &middot; 16 s before the 0:40 hit" in sheet and "1:42 &middot; 28 s before the 2:10 hit" in sheet

@@ -696,9 +696,9 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None) -> str:
     return "".join(
         f"<li><b>{e(_shown(c.name))}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill"
         + (f", {_pct(c.on_others)} of them on another player" if 0 <= c.on_others < 0.95 else "") + "</small>"
-        "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, tie(c, t, n))}{_share(sp)}{_or(c, t, answered)}"
+        "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, tie(c, t, n))}{_share(sp)}"
                                         + (" &middot; back from cooldown" if c.rhythm and k and not c.why else "")
-                                        + "</span>"
+                                        + f"{_or(c, t, answered)}</span>"
                                         for k, (t, n, sp) in enumerate(zip(c.times, c.near,
                                                                            c.support or [0.0] * len(c.times),
                                                                            strict=False)))
@@ -1225,7 +1225,17 @@ def render_sheet(h: HealerPrep) -> str:
                 return hit, f"for the {_mmss(hit)} hit, {_pct(sp)} press {e(_shown(n))} (about {_mmss(t)}{ramp_of(c)})"
             return ps[0][0], (f"{which(n, press, ps[0][3])} goes on " + _and(
                 [f"the {_mmss(hit)} hit ({_pct(sp)}, about {_mmss(t)})" for hit, t, sp, _c in ps], "or"))
-        answers = [x for _t, x in sorted(clause(k, ps) for k, ps in by_press.items())]
+        # a ramp button answering several hits is one clause (Evangelism thrice in a row read as a list)
+        ramps: dict[str, list] = {}
+        for k, ps in by_press.items():
+            if len(k) == 2 and len(ps) == 1 and ps[0][3].ramp:
+                ramps.setdefault(k[0], []).append(ps[0])
+        ramps = {n: sorted(ps) for n, ps in ramps.items() if len(ps) > 1}
+        answers = [x for _t, x in sorted(
+            [clause(k, ps) for k, ps in by_press.items() if not (len(k) == 2 and k[0] in ramps)]
+            + [(ps[0][0], f"{e(_shown(n))} is their ramp ahead of the {_and([_mmss(p[0]) for p in ps])} hits: "
+                          + ", ".join(f"{_pct(sp)} about {_mmss(t)}" for _hit, t, sp, _c in ps))
+               for n, ps in ramps.items()])]
         end = len(h.curve) * STEP
         long = "".join(f" {'From ' + _mmss(a) + ' to the end' if b >= end - STEP else _mmss(a) + ' to ' + _mmss(b)}, "
                        f"the raid takes about {r:.1f}&times; the usual damage without a break."
