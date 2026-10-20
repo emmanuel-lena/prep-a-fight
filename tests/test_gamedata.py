@@ -78,3 +78,18 @@ def test_a_movement_button_is_a_speed_buff_and_nothing_else(monkeypatch):
         assert gamedata.is_speed(190784) and not gamedata.is_speed(443028)
     finally:
         gamedata.same_name_spells.cache_clear()
+
+
+def test_a_utility_button_is_a_pure_dispel_a_knockback_or_a_move(monkeypatch):
+    # Mass Dispel (dispel, trigger, dummy) and Ring of Peace (knockback) are utility; Revival dispels and heals
+    effects = {32375: [{"Effect": "38"}, {"Effect": "64"}, {"Effect": "3"}],
+               116844: [{"Effect": "179"}], 142895: [{"Effect": "144"}],
+               115310: [{"Effect": "38"}, {"Effect": "10"}]}
+    names = {32375: "Mass Dispel", 116844: "Ring of Peace", 142895: "Ring of Peace", 115310: "Revival"}
+    monkeypatch.setattr(gamedata, "_filtered_rows", lambda table, col, value: effects.get(value, []))
+    monkeypatch.setattr(gamedata, "spell_names", lambda locale="": names)
+    gamedata.same_name_spells.cache_clear()
+    try:
+        assert gamedata.is_utility(32375) and gamedata.is_utility(116844) and not gamedata.is_utility(115310)
+    finally:
+        gamedata.same_name_spells.cache_clear()

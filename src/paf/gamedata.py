@@ -61,6 +61,20 @@ def is_speed(spell_id: int) -> bool:
             and not effects & {"2", "10", "136"})
 
 
+def is_utility(spell_id: int) -> bool:
+    """A utility button, no healing cooldown: a pure dispel (effect 38, Mass Dispel), a knockback (effects 98, 144 in
+    the spells of its name, Ring of Peace) with no heal nor damage, or a movement button (is_speed)."""
+    own = {r.get("Effect") for r in _filtered_rows("SpellEffect", "SpellID", spell_id)}
+    name = spell_names().get(spell_id)
+    rows = [r for i in {spell_id, *(same_name_spells().get(name, []) if name else [])}
+            for r in _filtered_rows("SpellEffect", "SpellID", i)]
+    effects = {r.get("Effect") for r in rows}
+    # nothing but the dispel (Mass Dispel: dispel, trigger, dummy); Revival dispels and heals, Blessing of
+    # Sacrifice dispels and protects
+    return (("38" in own and own <= {"38", "64", "3"})
+            or (bool(effects & {"98", "144"}) and not effects & {"2", "10", "136"}) or is_speed(spell_id))
+
+
 @cache
 def talent_entry_names() -> dict[int, str]:
     """TraitNodeEntry id (what Warcraft Logs reports as talentID) -> talent name."""

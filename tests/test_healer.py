@@ -183,7 +183,7 @@ def test_every_healer_spec_in_one_table():
                              dispels=1.1, externals=0.0, buffs=0.0, buff_spells=[], players=38,
                              jobs=["removes Essence Rend"], cd_names=[("Ascendance", 1, [(35.0, 0.38)], 0.9)])
     table = healer.roles_table([shaman, disc], "Restoration Shaman")
-    assert "<th>On another player, a kill</th>" in table and "1.4 <small>Power Infusion</small>" in table
+    assert "<th>Buffs /kill</th>" in table and "1.4 <small>Power Infusion</small>" in table
     assert "Restoration Shaman <small>(you)</small>" in table and "&ndash;" in table
     more = healer.roles_more([shaman, disc], "Restoration Shaman")
     assert "removes Essence Rend" in more and "Ascendance" not in more  # your own times are on the fight tab

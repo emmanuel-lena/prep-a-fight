@@ -402,6 +402,7 @@ def render_sheet(p: TankPrep) -> str:
         count,
         curve_svg,
         journal_lead,
+        landed_in,
         moments_html,
         presence_table,
         split_html,
@@ -432,7 +433,7 @@ def render_sheet(p: TankPrep) -> str:
         causes = ["" for _ in p.swaps]
     swap = "".join(f"<span class='chip'>{_mmss(t)}{f' after {e(c)}' if c and not (one and c == common) else ''}</span>"
                    for t, c in zip(p.swaps, causes, strict=False))
-    lead = []
+    lead, answered = [], set()
     if p.moments:
         m = max(p.moments, key=lambda x: x.ratio)
         own = bool(set(moment_names(m)) & {n for n, _s in p.hitters[:3]})  # any of its abilities a tank hitter
@@ -447,19 +448,22 @@ def render_sheet(p: TankPrep) -> str:
         lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({m.ratio:.1f}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
                     + (f"; {press[2]:.0%} of the top {e(p.spec)}s press {e(press[0])} then (about {_mmss(press[1])})."
-                       if press else f"; most top {e(p.spec)}s press no defensive for it."))
+                       if press else f"; no defensive of theirs is shared for it{landed_in(m, defs)}."))
         # every other dot: its most shared press, or none (Vashnik's 2:55, Spell Reflection 24%)
         rest = [(x, answer(x)) for x in p.moments if x is not m]
         said = [f"for the {_mmss(x.t)} hit, {a[2]:.0%} press {e(a[0])} (about {_mmss(a[1])})" for x, a in rest if a]
         answered = {(a[0], a[1]) for a in [press, *(a for _x, a in rest)] if a}  # the chart draws these full
-        bare = [_mmss(x.t) for x, a in rest if not a]
+        bare = [f"the {_mmss(x.t)} hit{landed_in(x, defs)}" for x, a in rest if not a]
         if said:
             lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 3:55 hit, 24% press Shield Wall"
         if bare:
-            lead.append(f"No defensive most of them share for the {_and(bare)} hit{'s' if len(bare) > 1 else ''}.")
+            lead.append(f"No defensive is shared for {_and(bare)}.")
         # a hit that comes with a swap (Vashnik's 1:35 and 2:55, after Dripping Fangs): the time is the link
         with_swap = [(x, w) for x in p.moments for w in p.swaps if abs(w - x.t) <= ANSWER[0]]
-        if with_swap:
+        # said only when swaps are rare enough for it to mean something: one every 28 s (Vashnik) lands within 5 s
+        # of any time one time in three
+        chance = len(p.swaps) * 2 * ANSWER[0] / max(p.duration, 1)
+        if with_swap and chance < 1 / 3:
             lead.append(f"The {_and([_mmss(x.t) for x, _w in with_swap])} hit{'s' if len(with_swap) > 1 else ''} "
                         f"{'come' if len(with_swap) > 1 else 'comes'} with a tank swap (at "
                         f"{_and([_mmss(w) for _x, w in with_swap])}).")
@@ -487,7 +491,7 @@ def render_sheet(p: TankPrep) -> str:
         f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><p class='small muted'>A button pressed on "
         f"cooldown or about every minute, a potion or a trinket is never tied to a hit: it lands near one by its "
         f"rhythm. A time is shown when a quarter or more of those who press it share it.</p><ul class='hl2'>"
-        f"{cooldowns_html(defs) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
+        f"{cooldowns_html(defs, answered) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
            f"</p>" if p.rare else ""),
         f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"
@@ -545,11 +549,9 @@ def render_sheet(p: TankPrep) -> str:
     used = [c for c in rest if _item(c.spell_id)]  # potions: the deeper tab
     damage = [c for c in rest if c not in used]  # Avatar, Shield Charge: pressed by all of them, the fight tab
     if damage:
-        fight.append(f"<h2>Your damage cooldowns</h2><ul class='hl2'>{cooldowns_html(damage)}</ul>")
+        fight.append(f"<h2>Your damage cooldowns</h2><ul class='hl2'>{cooldowns_html(damage, set())}</ul>")
     if items:
-        fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{cooldowns_html(items)}</ul>")
-    if used:
-        deeper.append(f"<h2>Consumables</h2><ul class='hl2'>{cooldowns_html(used)}</ul>")
+        fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{cooldowns_html(items, set())}</ul>")
     if p.presence:
         if have and have.share >= 0.99:  # the corpus is this spec's kills
             line = f"These are the top {e(p.spec)}s' kills; the table tells which tanks play beside them."
@@ -565,6 +567,8 @@ def render_sheet(p: TankPrep) -> str:
                       "differ in other ways too, and a few kills move a mean of deaths.</p>")
     byline = (f"{e(p.character or p.spec)} &middot; {e(p.spec)} &middot; from {p.kills} top kills (median "
               f"{_mmss(p.duration)}) &middot; no tank sim")
+    if used:  # last: the lead talks about the table above them
+        deeper.append(f"<h2>Consumables</h2><ul class='hl2'>{cooldowns_html(used, set())}</ul>")
     return sheet_page(p.boss, p.difficulty, byline, p.class_name,
                       {"fight": fight, "change": change, "boss": boss, "deeper": deeper}, theme.style("healer"),
                       UNSIMMED)
