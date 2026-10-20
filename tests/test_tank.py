@@ -3,7 +3,7 @@ import sqlite3
 
 from paf import healer, tank
 from paf.corpus.db import SCHEMA
-from paf.tank import stack_peaks
+from paf.tank import debuff_cycles
 
 
 def corpus():
@@ -43,14 +43,23 @@ def test_tank_busters_hitters_and_swaps():
 
 
 
-def test_the_stacks_a_tank_swaps_at():
-    """Vashnik heroic: Dripping Fangs stacks on the tank, then falls off when the other tank takes the boss; each
-    cycle's peak is the count the top tanks swap at (a one-stack debuff is no stacking debuff)."""
-    ev = [{"type": "applydebuff", "abilityGameID": 1, "targetID": 7},
-          {"type": "applydebuffstack", "abilityGameID": 1, "targetID": 7, "stack": 2},
-          {"type": "applydebuffstack", "abilityGameID": 1, "targetID": 7, "stack": 3},
-          {"type": "removedebuff", "abilityGameID": 1, "targetID": 7},
-          {"type": "applydebuff", "abilityGameID": 2, "targetID": 7},
-          {"type": "removedebuff", "abilityGameID": 2, "targetID": 7},
-          {"type": "applydebuffstack", "abilityGameID": 1, "targetID": 9, "stack": 5}]
-    assert stack_peaks(ev, 7) == [(1, 3)]
+def test_the_debuffs_a_tank_swaps_on():
+    """Vashnik heroic (2026-10-20): Dripping Fangs is one debuff on the tank (no stacks) that stays until the swap;
+    a stacking debuff gives its peak; another player's debuffs are not the tank's."""
+    ev = [{"type": "applydebuff", "abilityGameID": 1, "targetID": 7, "timestamp": 0},
+          {"type": "applydebuffstack", "abilityGameID": 1, "targetID": 7, "stack": 3, "timestamp": 5000},
+          {"type": "removedebuff", "abilityGameID": 1, "targetID": 7, "timestamp": 9000},
+          {"type": "applydebuff", "abilityGameID": 2, "targetID": 7, "timestamp": 10000},
+          {"type": "removedebuff", "abilityGameID": 2, "targetID": 7, "timestamp": 38000},
+          {"type": "applydebuff", "abilityGameID": 1, "targetID": 9, "timestamp": 1000}]
+    assert debuff_cycles(ev, 7) == [(1, 3, 9.0), (2, 1, 28.0)]
+
+
+def test_the_debuff_the_tanks_swap_on():
+    from paf.tank import swap_debuff
+
+    nek = {"Hollowing Strikes": (8, 29.4), "Corpse Blight": (6, 28.8), "Possession Barrage": (1, 2.0)}
+    assert swap_debuff(nek, {"Hollowing Strikes", "Possession Barrage"}) == "Hollowing Strikes"
+    vash = {"Virulent Fumes": (1, 0.7), "Dripping Fangs": (1, 32.0)}
+    assert swap_debuff(vash, {"Dripping Fangs"}) == "Dripping Fangs"
+    assert swap_debuff(vash, set()) == ""

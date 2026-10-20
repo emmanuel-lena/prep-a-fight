@@ -810,6 +810,8 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
 
     names = {**spell_names(), **dict(con.execute("SELECT id, name FROM ability").fetchall())}
     p.stacks = tank.stacks(con, enc.id, diff, names)
+    roles = bossguide.ability_roles(bossguide.load(enc.id, diff_name))
+    p.swap_debuff = tank.swap_debuff(p.stacks, {n for n, r in roles.items() if "tank" in r})
     healroles.fetch_heal_roles(client, con, enc.id, diff)  # each kill's deaths (and its healers), as for a healer
     p.presence = healroles.presence(con, enc.id, diff, role=healroles.TANKS)
     p.comps = healroles.comps(con, enc.id, diff, role=healroles.TANKS)

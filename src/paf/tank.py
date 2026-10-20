@@ -55,7 +55,8 @@ class TankPrep:
     class_name: str = ""
     character: str = ""
     abilities: str = ""  # the Encounter Journal's stages, the tanks' abilities in full (paf.bossguide), html
-    stacks: dict = field(default_factory=dict)  # stacking debuff on the top tanks -> the stacks they swap at
+    stacks: dict = field(default_factory=dict)  # debuff on the top tanks -> (peak stacks, seconds each cycle)
+    swap_debuff: str = ""  # the tank ability whose debuff the tanks swap on (measured on them)
     split: list = field(default_factory=list)  # (talent, share picked) the top players split on
     split_players: int = 0
 
@@ -171,75 +172,81 @@ def swaps(con, encounter_id: int, difficulty: int) -> tuple[list[float], float]:
 
 
 PULL_TAUNT = 5.0  # seconds: a taunt this early picks the boss up, it is no swap
-STACK_KILLS = 6  # kills read for the stacking debuffs on the top tanks: ~1 page of events each
+STACK_KILLS = 6  # kills read for the boss debuffs on the top tanks: ~1 page of events each
 
 
 def fetch_stacks(client, con, encounter_id: int, difficulty: int, kills: int = STACK_KILLS,
                  log=lambda s: print(s, flush=True)) -> int:
-    """The stacking debuffs on the ranked tank of a few kills: for each one, the stacks it reaches before it falls
-    off (each cycle's peak), the count a swap happens at (Vashnik's Dripping Fangs)."""
+    """The debuffs on the ranked tank of a few kills, each cycle (application to fall): its peak stacks and how
+    long it stays. What a swap answers: Vashnik's Dripping Fangs is one debuff (no stacks) that lasts until the
+    other tank taunts. WCL's targetID filter returns nothing on Debuffs: read them all, keep the tank's."""
     from paf.corpus.analyze import kills_filter
+    from paf.healroles import BOUNDS
     from paf.wcl import WCLError
 
-    con.executescript("CREATE TABLE IF NOT EXISTS tank_stack(report TEXT, fight_id INT, ability_id INT, peak INT);"
-                      "CREATE TABLE IF NOT EXISTS tank_stack_status(report TEXT, fight_id INT, "
-                      "PRIMARY KEY(report, fight_id));")
+    ensure_debuff_tables(con)
     where, params = kills_filter(encounter_id, difficulty)
-    have = con.execute(f"SELECT COUNT(*) FROM tank_stack_status s JOIN fight f USING(report, fight_id) WHERE {where}",
+    have = con.execute(f"SELECT COUNT(*) FROM tank_debuff_status s JOIN fight f USING(report, fight_id) WHERE {where}",
                        params).fetchone()[0]
     todo = con.execute(
         f"SELECT f.report, f.fight_id, r.actor_id FROM fight f JOIN ranked r USING(report, fight_id) "
-        f"LEFT JOIN tank_stack_status s USING(report, fight_id) WHERE {where} AND s.report IS NULL "
+        f"LEFT JOIN tank_debuff_status s USING(report, fight_id) WHERE {where} AND s.report IS NULL "
         f"AND r.actor_id IS NOT NULL ORDER BY f.report LIMIT ?", (*params, max(0, kills - have))).fetchall()
-    from paf.healroles import BOUNDS
-
     for rep, fid, actor in todo:
         try:
             fr = client.query(BOUNDS, {"c": rep, "f": [fid]}, cache_ttl=0)["reportData"]["report"]["fights"][0]
             events = list(client.events(rep, fid, fr["startTime"], fr["endTime"], data_type="Debuffs",
-                                        target_id=actor, cache=False))
+                                        hostility="Friendlies", cache=False))
         except (WCLError, KeyError, TypeError, IndexError, OSError) as e:
             log(f"  tank debuffs skipped: {str(e)[:100]}")
             continue
-        con.executemany("INSERT INTO tank_stack VALUES(?,?,?,?)",
-                        [(rep, fid, a, p) for a, p in stack_peaks(events, actor)])
-        con.execute("INSERT OR REPLACE INTO tank_stack_status VALUES(?,?)", (rep, fid))
+        con.executemany("INSERT INTO tank_debuff VALUES(?,?,?,?,?)",
+                        [(rep, fid, a, p, d) for a, p, d in debuff_cycles(events, actor)])
+        con.execute("INSERT OR REPLACE INTO tank_debuff_status VALUES(?,?)", (rep, fid))
         con.commit()
     return len(todo)
 
 
-def stack_peaks(events: list[dict], actor: int) -> list[tuple[int, int]]:
-    """(debuff, peak stacks) of each cycle of a stacking debuff on the tank: from its application to its fall."""
-    now: dict[int, int] = {}
+def ensure_debuff_tables(con) -> None:
+    con.executescript("CREATE TABLE IF NOT EXISTS tank_debuff(report TEXT, fight_id INT, ability_id INT, peak INT, "
+                      "seconds REAL);"
+                      "CREATE TABLE IF NOT EXISTS tank_debuff_status(report TEXT, fight_id INT, "
+                      "PRIMARY KEY(report, fight_id));")
+
+
+def debuff_cycles(events: list[dict], actor: int) -> list[tuple[int, int, float]]:
+    """(debuff, peak stacks, seconds) of each cycle of a debuff on the tank: from its application to its fall."""
+    now: dict[int, list] = {}
     out = []
     for ev in events:
         if ev.get("targetID") != actor:
             continue
-        a, kind = ev.get("abilityGameID"), ev.get("type")
+        a, kind, t = ev.get("abilityGameID"), ev.get("type"), ev.get("timestamp", 0)
         if kind == "applydebuff":
-            now[a] = 1
-        elif kind == "applydebuffstack":
-            now[a] = max(now.get(a, 0), int(ev.get("stack") or 0))
+            now[a] = [1, t]
+        elif kind == "applydebuffstack" and a in now:
+            now[a][0] = max(now[a][0], int(ev.get("stack") or 0))
         elif kind == "removedebuff" and a in now:
-            if now[a] >= 2:
-                out.append((a, now[a]))
-            del now[a]
+            peak, start = now.pop(a)
+            out.append((a, peak, round((t - start) / 1000, 1)))
     return out
 
 
-def stacks(con, encounter_id: int, difficulty: int, names: dict[int, str]) -> dict[str, int]:
-    """Debuff name -> the median stacks the top tanks swap at (a stacking debuff seen on at least 3 kills)."""
+def stacks(con, encounter_id: int, difficulty: int, names: dict[int, str]) -> dict[str, tuple[int, float]]:
+    """Debuff name -> (median peak stacks, median seconds on the tank), for a debuff seen on at least 3 kills."""
     from paf.corpus.analyze import kills_filter
 
-    con.executescript("CREATE TABLE IF NOT EXISTS tank_stack(report TEXT, fight_id INT, ability_id INT, peak INT);")
+    ensure_debuff_tables(con)
     where, params = kills_filter(encounter_id, difficulty)
-    per: dict[int, list[int]] = defaultdict(list)
+    per: dict[int, list[tuple[int, float]]] = defaultdict(list)
     seen: dict[int, set] = defaultdict(set)
-    for rep, fid, a, p in con.execute(f"SELECT t.report, t.fight_id, t.ability_id, t.peak FROM tank_stack t "
-                                      f"JOIN fight f USING(report, fight_id) WHERE {where}", params):
-        per[a].append(p)
+    for rep, fid, a, p, d in con.execute(f"SELECT t.report, t.fight_id, t.ability_id, t.peak, t.seconds "
+                                         f"FROM tank_debuff t JOIN fight f USING(report, fight_id) WHERE {where}",
+                                         params):
+        per[a].append((p, d))
         seen[a].add((rep, fid))
-    return {names.get(a, f"spell {a}"): round(st.median(v)) for a, v in per.items() if len(seen[a]) >= 3}
+    return {names.get(a, f"spell {a}"): (round(st.median(p for p, _ in v)), st.median(d for _, d in v))
+            for a, v in per.items() if len(seen[a]) >= 3}
 
 
 def swap_causes(swaps: list[float], boss_casts: list[tuple[str, list[float]]], before: float = 8.0) -> list[str]:
@@ -293,10 +300,22 @@ fight.</p>
     return page(f"{p.boss} prep", body)
 
 
+def swap_debuff(stacks: dict, tank_abilities: set[str]) -> str:
+    """The debuff the tanks swap on: of the journal's tank abilities measured on the top tanks, a stacking one first
+    (Nek'zali: Hollowing Strikes, 8 stacks), else the one that stays the longest (Vashnik: Dripping Fangs, 32 s)."""
+    mine = {n: v for n, v in stacks.items() if n in tank_abilities and v[1] >= 10}
+    if not mine:
+        return ""
+    return max(mine, key=lambda n: (mine[n][0] >= 2, mine[n][0], mine[n][1]))
+
+
 def _cause(common: str, stacks: dict) -> str:
-    """What most swaps follow: the stacks they happen at when measured, else a timing."""
+    """What most swaps follow, measured on the top tanks: the stacks of a stacking debuff, or a debuff without
+    stacks and how long it stays; else a timing."""
     if common in stacks:
-        return f" (most of them at about {stacks[common]} stacks of {e(common)}, measured on the top tanks)"
+        peak, secs = stacks[common]
+        return (f" (most of them at about {peak} stacks of {e(common)}, measured on the top tanks)" if peak >= 2 else
+                f" (most of them right after {e(common)}: a debuff on the tank, no stacks, about {secs:.0f} s each)")
     return f" (most of them right after {e(common)}: a timing in the logs)"
 
 
@@ -331,6 +350,8 @@ def render_sheet(p: TankPrep) -> str:
     named = [c for c in causes if c]
     common = max(set(named), key=named.count) if named else ""
     one = bool(common) and named.count(common) >= len(causes) / 2  # one ability behind most swaps: said once
+    if p.swap_debuff:  # measured on the top tanks: what they swap on, whatever cast comes just before
+        common, one = p.swap_debuff, True
     swap = "".join(f"<span class='chip'>{_mmss(t)}{f' after {e(c)}' if c and not (one and c == common) else ''}</span>"
                    for t, c in zip(p.swaps, causes, strict=False))
     lead = []
@@ -344,8 +365,10 @@ def render_sheet(p: TankPrep) -> str:
                     + (f" (some press {e(some[0])} at {_mmss(some[1])})." if some else ".")))
     if p.swaps:
         lead.append(f"Each of them taunts about {p.taunts_per_kill:.0f} times a kill after the pull"
-                    + ((f", most often right after {e(common)}, at about {p.stacks[common]} stacks of it." if common in
-                        p.stacks else f", most often right after {e(common)} (a timing, not a measured cause).")
+                    + ((f", most often at about {p.stacks[common][0]} stacks of {e(common)}." if common in p.stacks
+                        and p.stacks[common][0] >= 2 else f", swapping after each {e(common)} (a debuff on the tank, "
+                        f"about {p.stacks[common][1]:.0f} s)." if common in p.stacks
+                        else f", most often right after {e(common)} (a timing, not a measured cause).")
                        if one else
                        f", the first time at {_mmss(p.swaps[0])}" + (f" after {e(causes[0])}." if causes[0] else ".")))
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + [
