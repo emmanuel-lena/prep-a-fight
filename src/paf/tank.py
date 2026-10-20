@@ -439,8 +439,9 @@ def render_sheet(p: TankPrep) -> str:
         own = bool(set(moment_names(m)) & {n for n, _s in p.hitters[:3]})  # any of its abilities a tank hitter
         answers = ([(c.name, c.times, c.support or [0.0] * len(c.times)) for c in defs if not c.every]
                    + [(n, ts, sps) for n, _u, _k, ts, _ev, sps in p.short_defs])
-        press = next(((n, t, sp) for n, ts, sps in answers for t, sp in zip(ts, sps, strict=False)
-                      if -ANSWER[0] <= t - m.t <= ANSWER[1]), None)
+        press = max(((n, t, sp) for n, ts, sps in answers for t, sp in zip(ts, sps, strict=False)
+                     if -ANSWER[0] <= t - m.t <= ANSWER[1]), key=lambda x: x[2], default=None)  # the most shared
+        # (Spell Reflection, 41% at 0:33, before Shield Wall's 24%)
         lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({m.ratio:.1f}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
                     + (f"; {press[2]:.0%} of the top {e(p.spec)}s press {e(press[0])} then (about {_mmss(press[1])})."
@@ -505,7 +506,8 @@ def render_sheet(p: TankPrep) -> str:
                       + (", ".join(f"{e(x.spec)} (in {x.share:.0%} of the kills)"
                                    for x in sorted(mates, key=lambda x: -x.share)[:3])
                          if mates else "no other tank spec often") + "."
-                      + "".join(f" Kills with a {e(x.spec)} beside you are {abs(x.duration_with - x.duration_without):.0f} s "
+                      + "".join(f" Kills with a {e(x.spec)} beside you are "
+                                f"{abs(int(x.duration_with) - int(x.duration_without))} s "
                                 f"{'shorter' if x.duration_with < x.duration_without else 'longer'}, beyond the noise (a "
                                 f"reading, not a verdict: the raids that bring one differ in other ways too)."
                                 for x in mates if x.kills >= 15 and x.duration_without and not x.duration_close)

@@ -516,7 +516,7 @@ def _personal(ab: int, names: dict[int, str] | None) -> bool:
     return enemy or is_defensive(ab, (names or {}).get(ab))
 
 
-PULL = 15.0  # seconds: a cooldown pressed on cooldown goes out at the pull
+PULL = 20.0  # seconds: a cooldown pressed on cooldown goes out at the pull (Celestial Conduit at 0:16)
 DEATH_KILLS = 15  # kills with their deaths read under which a mean of deaths is not shown (as paf.healer.FEW_KILLS)
 CADENCE = 0.75  # pressed this share of the most casts its usual gap allows: on cooldown, no moment kept for a hit
 
