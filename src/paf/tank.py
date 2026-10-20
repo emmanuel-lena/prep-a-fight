@@ -444,18 +444,16 @@ def render_sheet(p: TankPrep) -> str:
         def answer(m: Moment) -> tuple | None:  # the most shared press for a hit (Spell Reflection, 41% at 0:33,
             return max(((n, t, sp) for n, ts, sps in answers for t, sp in zip(ts, sps, strict=False)  # before
                         if -ANSWER[0] <= t - m.t <= ANSWER[1] and sp), key=lambda x: x[2], default=None)  # Shield Wall)
-        press = answer(m)
         lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({m.ratio:.1f}&times; the "
-                    f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
-                    + (f"; {press[2]:.0%} of the top {e(p.spec)}s press {e(press[0])} then (about {_mmss(press[1])})."
-                       if press else f"; no defensive of theirs is shared for it{landed_in(m, defs)}."))
-        # every other dot: its most shared press, or none (Vashnik's 2:55, Spell Reflection 24%)
-        rest = [(x, answer(x)) for x in p.moments if x is not m]
-        said = [f"for the {_mmss(x.t)} hit, {a[2]:.0%} press {e(a[0])} (about {_mmss(a[1])})" for x, a in rest if a]
-        answered = {(a[0], a[1]) for a in [press, *(a for _x, a in rest)] if a}  # the chart draws these full
-        bare = [f"the {_mmss(x.t)} hit{landed_in(x, defs)}" for x, a in rest if not a]
+                    f"usual damage" + ("" if own else ", raid damage the tanks take too") + ").")
+        # every dot in time order: its most shared press, or one clause for those with none (Vashnik read 2:10,
+        # 2:55, then 1:35, and "no defensive" twice)
+        pairs = [(x, answer(x)) for x in sorted(p.moments, key=lambda x: x.t)]
+        said = [f"for the {_mmss(x.t)} hit, {a[2]:.0%} press {e(a[0])} (about {_mmss(a[1])})" for x, a in pairs if a]
+        answered = {(a[0], a[1]) for _x, a in pairs if a}  # the chart draws these full
+        bare = [f"the {_mmss(x.t)} hit{landed_in(x, defs)}" for x, a in pairs if not a]
         if said:
-            lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 3:55 hit, 24% press Shield Wall"
+            lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 0:35 hit, 41% press Spell Reflection"
         if bare:
             lead.append(f"No defensive is shared for {_and(bare)}.")
         # a hit that comes with a swap (Vashnik's 1:35 and 2:55, after Dripping Fangs): the time is the link
@@ -468,7 +466,7 @@ def render_sheet(p: TankPrep) -> str:
                         f"{'come' if len(with_swap) > 1 else 'comes'} with a tank swap (at "
                         f"{_and([_mmss(w) for _x, w in with_swap])}).")
     if p.swaps:
-        lead.append(f"Each top tank taunts about {p.taunts_per_kill:.0f} times a kill after the pull (adds included)"
+        lead.append(f"Each top tank taunts about {p.taunts_per_kill:.0f} times a kill after the pull (swaps on adds count)"
                     + ((f", most often at about {p.stacks[common][0]} stacks of {e(common)}." if common in p.stacks
                         and p.stacks[common][0] >= 2 else f", swapping after each {e(common)} (the debuff lasts "
                         f"about {p.stacks[common][1]:.0f} s; they never take a second stack)." if common in p.stacks
@@ -488,10 +486,11 @@ def render_sheet(p: TankPrep) -> str:
         f"outline: another press of the same button) and the swaps. A dot is the tanks' biggest damage, whatever "
         f"casts it.</p><ul class='hl2'>"
         f"{moments_html(p.moments, 'tank damage') or '<li>No big moment: steady damage.</li>'}</ul></div>",
-        f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><p class='small muted'>A button pressed on "
-        f"cooldown or about every minute, a potion or a trinket is never tied to a hit: it lands near one by its "
-        f"rhythm. A time is shown when a quarter or more of those who press it share it.</p><ul class='hl2'>"
+        f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
         f"{cooldowns_html(defs, answered) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
+        "<p class='small muted'>Only the lead ties a press to a hit; a button on cooldown, a potion or a trinket says "
+        "why it is not. A time is shown when a quarter of those who press the button share it; its share is of all "
+        "the top players.</p>"
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
            f"</p>" if p.rare else ""),
         f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"
