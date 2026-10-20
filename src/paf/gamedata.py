@@ -163,6 +163,16 @@ def item_spells() -> frozenset[int]:
                      and int(r["SpellID"]))
 
 
+@cache
+def worn_item_spells() -> frozenset[int]:
+    """The spells an equipped item casts (a trinket: InventoryType set), apart from a potion's or a healthstone's
+    (a consumable, InventoryType 0): ItemEffect -> ItemXItemEffect -> Item."""
+    spell_of = {r["ID"]: int(r["SpellID"]) for r in table_rows("ItemEffect") if (r.get("SpellID") or "0").isdigit()}
+    inv = item_inventory_types()
+    return frozenset(spell_of[r["ItemEffectID"]] for r in table_rows("ItemXItemEffect")
+                     if r.get("ItemEffectID") in spell_of and inv.get(int(r.get("ItemID") or 0), 0))
+
+
 def item_inventory_types() -> dict[int, int]:
     return {int(r["ID"]): int(r["InventoryType"] or 0) for r in table_rows("Item") if r.get("ID", "").isdigit()}
 

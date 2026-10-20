@@ -234,21 +234,24 @@ def test_a_ramp_answers_the_hit_after_it(monkeypatch):
     tl = SimpleNamespace(abilities=[ab], duration=270.0, players=players)
     found = [healer.Moment(t, 1000.0, 5.0, "Caustic Surge") for t in (40.0, 130.0, 215.0)]
     cd = healer.cooldowns(tl, found, {1: (90.0, 1)})[0]
-    assert cd.ramp and cd.near == ["0:40 Caustic Surge", "2:10 Caustic Surge", "3:35 Caustic Surge"]
+    assert cd.ramp and cd.near == ["0:40 Caustic Surge", "", ""]  # the next two come back from cooldown
     h = healer.HealerPrep("Boss", "heroic", "Discipline Priest", 10, 270.0, [100.0] * 54, found, [cd], [], [], [],
                           [])
     sheet = healer.render_sheet(h)
-    assert ("Evangelism is their ramp ahead of the 0:40, 2:10 and 3:35 hits: 100% about 0:24, 100% about 1:42, "
-            "100% about 3:15") in sheet
-    assert "0:24 &middot; 16 s before the 0:40 hit" in sheet and "1:42 &middot; 28 s before the 2:10 hit" in sheet
+    assert "for the 0:40 hit, 100% press Evangelism (about 0:24, a ramp ahead of it)" in sheet
+    assert ("their next Evangelism comes back from cooldown 28 s ahead of the 2:10 hit (about 1:42) and 20 s "
+            "ahead of the 3:35 hit (about 3:15)") in sheet
+    assert "0:24 &middot; 16 s before the 0:40 hit" in sheet
+    assert "1:42 &middot; 100% of the top players &middot; back from cooldown" in sheet
 
 
-def test_a_held_press_is_not_back_from_cooldown():
-    # Vashnik heroic, Disc: Evangelism at 2:07, 123 s after 0:04 with a 90 s cooldown, is held (it may answer 2:10);
-    # Tranquility at 2:45, 123 s after 0:42 with a 120 s cooldown, is back as soon as it can be
-    assert not healer.back_from_cooldown(127.0, 127.0, [4.0, 127.0], 93.0, 90.0)
-    assert healer.back_from_cooldown(165.0, 165.0, [42.0, 165.0], 123.0, 120.0)
-    assert not healer.back_from_cooldown(42.0, 42.0, [42.0, 165.0], 123.0, 120.0)  # the first press
+def test_back_from_cooldown_is_read_per_player():
+    # Vashnik heroic, Disc: some press Evangelism at 0:04 then 1:42 (98 s, its cooldown 90): back as soon as it can
+    # be, although the 0:04 and 2:07 moments are 123 s apart; others hold their first to 0:24
+    per_player = [[4.0, 102.0, 195.0]] * 6 + [[24.0, 127.0]] * 4
+    assert healer.back_share(per_player, 102.0, 90.0) == 1.0
+    assert healer.back_share(per_player, 127.0, 90.0) == 0.0  # 103 s after 0:24: held
+    assert healer.back_share(per_player, 24.0, 90.0) == 0.0  # a first press
 
 
 def test_the_talents_they_differ_on_most_when_none_splits_them():

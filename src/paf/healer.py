@@ -82,7 +82,8 @@ class Cooldown:
     alt_of: list[float] = field(default_factory=list)  # the moment (same press of the kill) each habit replaces
     why: str = ""  # why it is never tied to a hit, said on its row
     rhythm: float = 0.0  # after its first press, pressed again as soon as it is back, about every this many seconds
-    cd: float = 0.0  # its cooldown in the game data (paf.healer.back_from_cooldown)
+    cd: float = 0.0  # its cooldown in the game data
+    back: list = field(default_factory=list)  # its times most players press as soon as it is back (back_share)
     ramp: bool = False  # pressed 8 to 30 s before the hits it answers (paf.healer.RAMP): a ramp, said so
     on_others: float = -1.0  # an external: the share of its casts on another player (Life Cocoon 0.81); -1 unread
 
@@ -350,7 +351,14 @@ def _item_why(name: str, spell_id: int) -> str:
     """Why an item's use is no answer to a hit: a potion is the pull's, a trinket its rhythm's."""
     from paf.tracker import kind
 
-    return "a potion" if kind(name, spell_id) else "a trinket, placed by its rhythm"
+    if k := kind(name, spell_id):
+        return "a healthstone" if k == "healthstone" else "a potion"
+    try:  # by the game data: a worn item's spell is a trinket's, any other a consumable's (Lightfused Mana Potion)
+        from paf.gamedata import worn_item_spells
+
+        return "a trinket, placed by its rhythm" if spell_id in worn_item_spells() else "a potion"
+    except Exception:  # noqa: BLE001 - offline
+        return "a trinket, placed by its rhythm"
 
 
 def _moving(spell_id: int) -> bool:
@@ -459,12 +467,13 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         why = ("" if every else "cast on another player" if _external(sid) else "a cast-while-moving button"
                if _moving(sid) else "a movement button" if _speed(sid) else _item_why(name, sid) if _item(sid) else "about every minute" if per_kill >= 4
                else "")
+        back = {x for x in [*times, *alt] if back_share(per_player, x, cd) > 0.5}  # pressed as soon as it is back
         tied = not (every or why)  # on cooldown, a 1-minute button, a
         near = []  # buff on one player, a cast-while-moving: near a hit by chance, not kept for it
         for t in times:
             m = min(found, key=lambda m: abs(m.t - t), default=None)
             ok = (tied and m is not None and -ANSWER[0] <= t - m.t <= ANSWER[1]  # pressed for the hit: before or in
-                  and not back_from_cooldown(t, t, times, rhythm, cd))  # it; not a press as soon as it is back
+                  and t not in back)  # it; not a press made as soon as it is back
             near.append(f"{_mmss(m.t)} {m.boss_spell}".strip() if ok else "")
         n_all = max(1, len(tl.players))  # the share of all the top players pressing it within 8 s of each moment
         support = [sum(1 for ts in per_player if any(abs(x - t) <= 8 for x in ts)) / n_all for t in times]
@@ -478,10 +487,10 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
                 and alt_of[i] in times]  # of a moment still shown
         alt, alt_support, alt_of = [alt[i] for i in kept], [alt_support[i] for i in kept], [alt_of[i] for i in kept]
         alt_near = []  # another habit answers a hit too (Aura Mastery at 0:36 for 28%: the 0:35 hit)
-        for t, k in zip(alt, alt_of, strict=False):
+        for t in alt:
             m = min(found, key=lambda m: abs(m.t - t), default=None)
             ok = (tied and m is not None and -ANSWER[0] <= t - m.t <= ANSWER[1]
-                  and not back_from_cooldown(t, k, times, rhythm, cd))
+                  and t not in back)
             alt_near.append(f"{_mmss(m.t)} {m.boss_spell}".strip() if ok else "")
         # a ramp: pressed 8 to 30 s before the hits, on two of them at least and on most presses (Disc's
         # Evangelism at 0:24, 1:42, 3:15 for Vashnik's 0:40, 2:10, 3:35): its job is the hit after it (the owner)
@@ -494,12 +503,15 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
             hit = {m.t for t in [*times, *alt] if (m := ahead(t))}
             if len(hit) >= 2:
                 ramp = True
-                near = [n or (f"{_mmss(m.t)} {m.boss_spell}".strip() if (m := ahead(t)) else "")
+                # a press made as soon as it is back is its cooldown's, even ahead of a hit: no answer (the
+                # lead says where those land)
+                near = [n or (f"{_mmss(m.t)} {m.boss_spell}".strip() if t not in back and (m := ahead(t)) else "")
                         for t, n in zip(times, near, strict=False)]
-                alt_near = [n or (f"{_mmss(m.t)} {m.boss_spell}".strip() if (m := ahead(t)) else "")
-                            for t, n in zip(alt, alt_near, strict=False)]
+                alt_near = [n or (f"{_mmss(m.t)} {m.boss_spell}".strip() if t not in back and (m := ahead(t))
+                                  else "") for t, n in zip(alt, alt_near, strict=False)]
         out.append(Cooldown(name, sid, users, per_kill, times, near, alt, every, support, alt_support, alt_near,
-                            alt_of, why, rhythm if len(times) > 1 else 0.0, cd=cd, ramp=ramp))
+                            alt_of, why, rhythm if len(times) > 1 else 0.0, cd=cd, ramp=ramp,
+                            back=sorted(x for x in back if x in times or x in alt)))
     return sorted(out, key=lambda c: -c.users)
 
 
@@ -642,12 +654,12 @@ def _or(c: Cooldown, t: float, answered: set | None = None) -> str:
 BACK = 8.0  # seconds past its cooldown a press still counts as pressed as soon as it is back
 
 
-def back_from_cooldown(t: float, press: float, presses: list[float], rhythm: float, cd: float) -> bool:
-    """A press (or another habit of it) made as soon as the button is back after the press before it: a button
-    with a rhythm, and this time within its cooldown plus BACK of the previous press. Evangelism at 2:07, 123 s
-    after 0:04 with a 90 s cooldown, is held, not back from cooldown, and may answer the 2:10 hit."""
-    before = [x for x in presses if x < press]
-    return bool(rhythm and cd and before) and t - max(before) <= cd + BACK
+def back_share(per_player: list[list[float]], t: float, cd: float) -> float:
+    """Of the players pressing a button about t (within 8 s), the share whose own press before it is within its
+    cooldown plus BACK: they press it as soon as it is back. Read per player, never between moments (Evangelism's
+    0:04 and 2:07 moments are 123 s apart, yet its players press it 90-102 s after their own last one)."""
+    near = [(x, max((y for y in ts if y < x), default=None)) for ts in per_player for x in ts if abs(x - t) <= 8]
+    return (sum(1 for x, y in near if y is not None and x - y <= cd + BACK) / len(near)) if near and cd else 0.0
 
 
 def landed_in(m: Moment, cds: list[Cooldown]) -> str:
@@ -660,11 +672,10 @@ def landed_in(m: Moment, cds: list[Cooldown]) -> str:
             continue                                                  # nothing for the raid's hit
         if c.why:  # an external (Life Cocoon), a 1-minute button (Nature's Swiftness): no raid answer to name
             continue
-        for t, sp, press in [*zip(c.times, c.support or [], c.times, strict=False),
-                             *zip(c.alt, c.alt_support or [], c.alt_of or c.alt, strict=False)]:
-            if -ANSWER[0] <= t - m.t <= ANSWER[1]:  # a habit is its press's: back from cooldown after the first
+        for t, sp in [*zip(c.times, c.support or [], strict=False), *zip(c.alt, c.alt_support or [], strict=False)]:
+            if -ANSWER[0] <= t - m.t <= ANSWER[1]:  # each time read on its own players (back_share)
                 why = (c.why or ("on cooldown" if c.every else "back from cooldown"
-                                 if back_from_cooldown(t, press, c.times, c.rhythm, c.cd) else ""))
+                                 if t in c.back else ""))
                 if why:
                     near.append((sp, c, t, why))
     if not near:
@@ -714,7 +725,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None) -> str:
            ", all on another player" if c.on_others >= 0.95 else "") + "</small>"
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, tie(c, t, n))}{_share(sp)}"
                                         + (" &middot; back from cooldown"
-                                           if back_from_cooldown(t, t, c.times, c.rhythm, c.cd) and not c.why else "")
+                                           if t in c.back and not c.why else "")
                                         + f"{_or(c, t, answered)}</span>"
                                         for k, (t, n, sp) in enumerate(zip(c.times, c.near,
                                                                            c.support or [0.0] * len(c.times),
@@ -1263,6 +1274,16 @@ def render_sheet(h: HealerPrep) -> str:
             + [(ps[0][0], f"{e(_shown(n))} is their ramp ahead of the {_and([_mmss(p[0]) for p in ps])} hits: "
                           + ", ".join(f"{_pct(sp)} about {_mmss(t)}" for _hit, t, sp, _c in ps))
                for n, ps in ramps.items()])]
+        # a ramp's later presses made as soon as it is back still land ahead of hits (Disc's Evangelism 1:42 and
+        # 3:15 on its 90 s cooldown): said as such, no answer, so a timer the boss and the button share is plain
+        for c in heals:
+            later = [(t, m) for t in sorted({*c.times, *c.alt}) if c.ramp and t in c.back
+                     for m in [min((x for x in shown if x.t > t), key=lambda x: x.t - t, default=None)]
+                     if m is not None and RAMP[0] <= m.t - t <= RAMP[1]]
+            if later:
+                answers.append(f"their next {e(_shown(c.name))} comes back from cooldown "
+                               + _and([f"{int(m.t - t)} s ahead of the {_mmss(m.t)} hit (about {_mmss(t)})"
+                                       for t, m in later]))
         end = len(h.curve) * STEP
         long = "".join(f" {'From ' + _mmss(a) + ' to the end' if b >= end - STEP else _mmss(a) + ' to ' + _mmss(b)}, "
                        f"the raid takes about {r:.1f}&times; the usual damage without a break."
@@ -1276,7 +1297,10 @@ def render_sheet(h: HealerPrep) -> str:
             so "no cooldown" never sits next to a chip in the hit."""
             m = next(x for x in shown if _mmss(x.t) == hit)
             return landed_in(m, h.cooldowns)
-        bare_said = _and([f"the {b} hit{landed(b)}" for b in bare])
+        # each hit with its own bracket: "the 2:10 hit, nor the 3:40 hit (35% have...)", never one bracket read
+        # as covering both
+        said_each = [f"the {b} hit{landed(b)}" for b in bare]
+        bare_said = said_each[0] + "".join(f", nor {x}" for x in said_each[1:]) if said_each else ""
         lead = (f"<p class='lead'>Big raid damage at {hits}.{long}{from_dispel}"
                 + (f" Among the top {e(h.spec)}s, {'; '.join(answers)}." if answers else "")
                 + (f" No cooldown is kept for {bare_said}." if bare else "") + "</p>")
@@ -1327,7 +1351,7 @@ def render_sheet(h: HealerPrep) -> str:
         fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{cooldowns_html(items, answered)}</ul>")
     potions = h.potions or [c for c in h.cooldowns if _item(c.spell_id) and c not in items]  # as the tank's
     if potions:
-        fight.append(f"<h2>Potions</h2><ul class='hl2'>{cooldowns_html(potions, set())}</ul>")
+        fight.append(f"<h2>Consumables</h2><ul class='hl2'>{cooldowns_html(potions, set())}</ul>")
     if utility:
         fight.append("<p class='small muted'>Also pressed, no healing cooldown: "
                      + ", ".join(f"{e(_shown(c.name))} ({_pct(c.users)} of them, "

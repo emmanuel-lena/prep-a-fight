@@ -396,6 +396,7 @@ def render_sheet(p: TankPrep) -> str:
     from paf.defensives import is_defensive
     from paf.healer import (
         SWAP_LANE,
+        _chip,
         _share,
         build_lead,
         comps_table,
@@ -415,13 +416,19 @@ def render_sheet(p: TankPrep) -> str:
     )
     from paf.prep_report import sheet_page
 
-    mit = "".join(f"<li><b>{e(n)}</b><small>up {u:.0%} of the kill for the top tanks</small></li>"
-                  for n, u in p.mitigation) + "".join(
-        f"<li><b>{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top players"
-        + (f" &middot; on cooldown, about every {ev:.0f} s" if ev else "") + "</small>"
-        + (f"<span class='when'>{''.join(f'<span class=chip>{_mmss(t)}{_share(sp)}</span>' for t, sp in zip(ts, sps, strict=False))}</span>"
-           if ts else "")
-        + "</li>" for n, u, k, ts, ev, sps in p.short_defs)
+    def mit_html(answered: set) -> str:
+        """Active mitigation and the short defensives; a chip says its hit for the lead's presses only, as the
+        cooldown rows (Spell Reflection at 0:33 for the 0:35 hit)."""
+        def hit_of(n: str, t: float) -> str:
+            m = next((m for m in p.moments if (n, t) in answered and -ANSWER[0] <= t - m.t <= ANSWER[1]), None)
+            return f"{_mmss(m.t)} hit" if m else ""
+        return "".join(f"<li><b>{e(n)}</b><small>up {u:.0%} of the kill for the top tanks</small></li>"
+                       for n, u in p.mitigation) + "".join(
+            f"<li><b>{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top players"
+            + (f" &middot; on cooldown, about every {ev:.0f} s" if ev else "") + "</small>"
+            + ("<span class='when'>" + "".join(f"<span class='chip'>{_chip(t, hit_of(n, t))}{_share(sp)}</span>"
+                                               for t, sp in zip(ts, sps, strict=False)) + "</span>" if ts else "")
+            + "</li>" for n, u, k, ts, ev, sps in p.short_defs)
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]
     others = [replace(c, near=["" for _ in c.near]) for c in p.cooldowns  # no buster to answer; taunts: the swaps
               if c not in defs and not _taunt(c.spell_id)]
@@ -497,7 +504,7 @@ def render_sheet(p: TankPrep) -> str:
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
            f"</p>" if p.rare else ""),
         f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"
-        f"{mit or '<li>Not measured yet.</li>'}</ul>",
+        f"{mit_html(answered) or '<li>Not measured yet.</li>'}</ul>",
         f"<h2>Tank swaps</h2><p>{'The swap moments most top raids share' if swap else 'No swap moment most top raids share.'}"
         f"{_cause(common, p.stacks) if swap and one else ''}"
         f"{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
@@ -557,7 +564,7 @@ def render_sheet(p: TankPrep) -> str:
     if items:
         fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{cooldowns_html(items, set())}</ul>")
     if used:  # the healers' sheets have theirs on the fight tab too
-        fight.append(f"<h2>Potions</h2><ul class='hl2'>{cooldowns_html(used, set())}</ul>")
+        fight.append(f"<h2>Consumables</h2><ul class='hl2'>{cooldowns_html(used, set())}</ul>")
     if p.presence:
         if have and have.share >= 0.99:  # the corpus is this spec's kills
             line = f"These are the top {e(p.spec)}s' kills; the table tells which tanks play beside them."
