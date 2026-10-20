@@ -804,6 +804,15 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
               if is_defensive(c.spell_id, c.name)],
         character=getattr(profile, "name", "") or "")
     p.split, p.split_players = healer.contested(con, enc.id, diff, spec)
+    step("The stacks the top tanks swap at, and the deaths of each composition")
+    tank.fetch_stacks(client, con, enc.id, diff)  # their stacking debuffs, a few kills
+    from paf.gamedata import spell_names
+
+    names = {**spell_names(), **dict(con.execute("SELECT id, name FROM ability").fetchall())}
+    p.stacks = tank.stacks(con, enc.id, diff, names)
+    healroles.fetch_heal_roles(client, con, enc.id, diff)  # each kill's deaths (and its healers), as for a healer
+    p.presence = healroles.presence(con, enc.id, diff, role=healroles.TANKS)
+    p.comps = healroles.comps(con, enc.id, diff, role=healroles.TANKS)
     p.abilities = _role_journal(enc.id, diff_name, "tank", tl, {  # another role's ability that hits the tanks too
         n: f"{s:.0%} of the damage the top tanks take" for n, s in hitters if s >= 0.05})
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"

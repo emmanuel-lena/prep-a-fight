@@ -3,6 +3,7 @@ import sqlite3
 
 from paf import healer, tank
 from paf.corpus.db import SCHEMA
+from paf.tank import stack_peaks
 
 
 def corpus():
@@ -39,3 +40,17 @@ def test_tank_busters_hitters_and_swaps():
     page = tank.render(p)
     assert "What hits you, and when" in page and "Crush" in page and "Tank swaps" in page
     assert "Shield Wall" in page and "Shield Block" in page and "Taunt at 3 stacks." in page
+
+
+
+def test_the_stacks_a_tank_swaps_at():
+    """Vashnik heroic: Dripping Fangs stacks on the tank, then falls off when the other tank takes the boss; each
+    cycle's peak is the count the top tanks swap at (a one-stack debuff is no stacking debuff)."""
+    ev = [{"type": "applydebuff", "abilityGameID": 1, "targetID": 7},
+          {"type": "applydebuffstack", "abilityGameID": 1, "targetID": 7, "stack": 2},
+          {"type": "applydebuffstack", "abilityGameID": 1, "targetID": 7, "stack": 3},
+          {"type": "removedebuff", "abilityGameID": 1, "targetID": 7},
+          {"type": "applydebuff", "abilityGameID": 2, "targetID": 7},
+          {"type": "removedebuff", "abilityGameID": 2, "targetID": 7},
+          {"type": "applydebuffstack", "abilityGameID": 1, "targetID": 9, "stack": 5}]
+    assert stack_peaks(ev, 7) == [(1, 3)]

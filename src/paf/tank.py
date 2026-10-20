@@ -55,6 +55,7 @@ class TankPrep:
     class_name: str = ""
     character: str = ""
     abilities: str = ""  # the Encounter Journal's stages, the tanks' abilities in full (paf.bossguide), html
+    stacks: dict = field(default_factory=dict)  # stacking debuff on the top tanks -> the stacks they swap at
     split: list = field(default_factory=list)  # (talent, share picked) the top players split on
     split_players: int = 0
 
@@ -170,6 +171,75 @@ def swaps(con, encounter_id: int, difficulty: int) -> tuple[list[float], float]:
 
 
 PULL_TAUNT = 5.0  # seconds: a taunt this early picks the boss up, it is no swap
+STACK_KILLS = 6  # kills read for the stacking debuffs on the top tanks: ~1 page of events each
+
+
+def fetch_stacks(client, con, encounter_id: int, difficulty: int, kills: int = STACK_KILLS,
+                 log=lambda s: print(s, flush=True)) -> int:
+    """The stacking debuffs on the ranked tank of a few kills: for each one, the stacks it reaches before it falls
+    off (each cycle's peak), the count a swap happens at (Vashnik's Dripping Fangs)."""
+    from paf.corpus.analyze import kills_filter
+    from paf.wcl import WCLError
+
+    con.executescript("CREATE TABLE IF NOT EXISTS tank_stack(report TEXT, fight_id INT, ability_id INT, peak INT);"
+                      "CREATE TABLE IF NOT EXISTS tank_stack_status(report TEXT, fight_id INT, "
+                      "PRIMARY KEY(report, fight_id));")
+    where, params = kills_filter(encounter_id, difficulty)
+    have = con.execute(f"SELECT COUNT(*) FROM tank_stack_status s JOIN fight f USING(report, fight_id) WHERE {where}",
+                       params).fetchone()[0]
+    todo = con.execute(
+        f"SELECT f.report, f.fight_id, r.actor_id FROM fight f JOIN ranked r USING(report, fight_id) "
+        f"LEFT JOIN tank_stack_status s USING(report, fight_id) WHERE {where} AND s.report IS NULL "
+        f"AND r.actor_id IS NOT NULL ORDER BY f.report LIMIT ?", (*params, max(0, kills - have))).fetchall()
+    from paf.healroles import BOUNDS
+
+    for rep, fid, actor in todo:
+        try:
+            fr = client.query(BOUNDS, {"c": rep, "f": [fid]}, cache_ttl=0)["reportData"]["report"]["fights"][0]
+            events = list(client.events(rep, fid, fr["startTime"], fr["endTime"], data_type="Debuffs",
+                                        target_id=actor, cache=False))
+        except (WCLError, KeyError, TypeError, IndexError, OSError) as e:
+            log(f"  tank debuffs skipped: {str(e)[:100]}")
+            continue
+        con.executemany("INSERT INTO tank_stack VALUES(?,?,?,?)",
+                        [(rep, fid, a, p) for a, p in stack_peaks(events, actor)])
+        con.execute("INSERT OR REPLACE INTO tank_stack_status VALUES(?,?)", (rep, fid))
+        con.commit()
+    return len(todo)
+
+
+def stack_peaks(events: list[dict], actor: int) -> list[tuple[int, int]]:
+    """(debuff, peak stacks) of each cycle of a stacking debuff on the tank: from its application to its fall."""
+    now: dict[int, int] = {}
+    out = []
+    for ev in events:
+        if ev.get("targetID") != actor:
+            continue
+        a, kind = ev.get("abilityGameID"), ev.get("type")
+        if kind == "applydebuff":
+            now[a] = 1
+        elif kind == "applydebuffstack":
+            now[a] = max(now.get(a, 0), int(ev.get("stack") or 0))
+        elif kind == "removedebuff" and a in now:
+            if now[a] >= 2:
+                out.append((a, now[a]))
+            del now[a]
+    return out
+
+
+def stacks(con, encounter_id: int, difficulty: int, names: dict[int, str]) -> dict[str, int]:
+    """Debuff name -> the median stacks the top tanks swap at (a stacking debuff seen on at least 3 kills)."""
+    from paf.corpus.analyze import kills_filter
+
+    con.executescript("CREATE TABLE IF NOT EXISTS tank_stack(report TEXT, fight_id INT, ability_id INT, peak INT);")
+    where, params = kills_filter(encounter_id, difficulty)
+    per: dict[int, list[int]] = defaultdict(list)
+    seen: dict[int, set] = defaultdict(set)
+    for rep, fid, a, p in con.execute(f"SELECT t.report, t.fight_id, t.ability_id, t.peak FROM tank_stack t "
+                                      f"JOIN fight f USING(report, fight_id) WHERE {where}", params):
+        per[a].append(p)
+        seen[a].add((rep, fid))
+    return {names.get(a, f"spell {a}"): round(st.median(v)) for a, v in per.items() if len(seen[a]) >= 3}
 
 
 def swap_causes(swaps: list[float], boss_casts: list[tuple[str, list[float]]], before: float = 8.0) -> list[str]:
@@ -223,6 +293,13 @@ fight.</p>
     return page(f"{p.boss} prep", body)
 
 
+def _cause(common: str, stacks: dict) -> str:
+    """What most swaps follow: the stacks they happen at when measured, else a timing."""
+    if common in stacks:
+        return f" (most of them at about {stacks[common]} stacks of {e(common)}, measured on the top tanks)"
+    return f" (most of them right after {e(common)}: a timing in the logs)"
+
+
 def render_sheet(p: TankPrep) -> str:
     """The tank's sheet in the four sections of every role's sheet (issue #27): The fight (what hits you and when,
     your defensives where the top tanks press them, the swaps), What to change (mitigation, talents, trinkets), The
@@ -267,7 +344,9 @@ def render_sheet(p: TankPrep) -> str:
                     + (f" (some press {e(some[0])} at {_mmss(some[1])})." if some else ".")))
     if p.swaps:
         lead.append(f"Each of them taunts about {p.taunts_per_kill:.0f} times a kill after the pull"
-                    + (f", most often right after {e(common)} (a timing, not a measured cause)." if one else
+                    + ((f", most often right after {e(common)}, at about {p.stacks[common]} stacks of it." if common in
+                        p.stacks else f", most often right after {e(common)} (a timing, not a measured cause).")
+                       if one else
                        f", the first time at {_mmss(p.swaps[0])}" + (f" after {e(causes[0])}." if causes[0] else ".")))
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + [
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the top tanks "
@@ -280,7 +359,7 @@ def render_sheet(p: TankPrep) -> str:
         f"<h2>Active mitigation the top tanks keep up</h2><ul class='hl2'>{mit or '<li>Not measured yet.</li>'}</ul>",
         f"<h2>Tank swaps</h2><p>Each top tank taunts about <b>{p.taunts_per_kill:.0f}</b> times a kill after the pull"
         f"{'; with the other tank, the swaps come at these moments' if swap else '.'}"
-        f"{f' (most of them right after {e(common)}: a timing in the logs, the stacks are not counted)' if swap and one else ''}"
+        f"{_cause(common, p.stacks) if swap and one else ''}"
         f"{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
                                                           f"</li></ul>" if swap else "")]
     change = [build_lead(p.builds, p.spec, p.kills, p.split),
@@ -320,8 +399,10 @@ def render_sheet(p: TankPrep) -> str:
             line = f"Few top raids bring a {e(p.spec)} on this boss."
         deeper.append(f"<h2>The top raids' tanks</h2><p>{line}</p>{presence_table(p.presence, p.spec, 'Tank')}"
                       + comps_table(p.comps, p.kills).replace("Healers", "Tanks"))
-        deeper.append("<p class='small muted'>Not measured yet for tanks: the deaths of each composition (the healers' "
-                      "table has them), and why a spec's kills run longer (a reading, not a verdict).</p>")
+        deaths = any(x.deaths_with is not None for x in p.presence)
+        deeper.append("<p class='small muted'>" + ("" if deaths else "The deaths of each composition are not read yet. ")
+                      + "A spec's longer kills are a reading, not a verdict: the raids that bring it differ in other "
+                      "ways too.</p>")
     byline = (f"{e(p.character or p.spec)} &middot; {e(p.spec)} &middot; {p.kills} top tank kills &middot; "
               f"a {_mmss(p.duration)} fight")
     return sheet_page(p.boss, p.difficulty, byline, p.class_name,
