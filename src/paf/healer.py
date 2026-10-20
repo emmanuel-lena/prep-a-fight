@@ -106,6 +106,7 @@ class HealerPrep:
     casts: dict = field(default_factory=dict)  # boss ability -> its casts in the typical kill (timing evidence)
     split: list = field(default_factory=list)  # (talent, share picked) the top players split on (contested)
     split_players: int = 0
+    dispel_delay: tuple | None = None  # (median s after the boss casts it, dispels measured), paf.healroles
     named_by_damage: bool = False  # the moments are named by the raid's damage taken by ability (measured)
 
 
@@ -467,8 +468,8 @@ def _pct(v: float) -> str:
 def role_card(r, everyone: list, mine: bool, chips: bool = True) -> str:
     """One healer spec's job on the boss, with its numbers and how many healers they come from. chips: its long
     cooldowns' usual times (left out on your own card: the fight tab gives yours, from the top players of your spec)."""
-    cds = "".join(f"<span class='chip'>{e(n)} {', '.join(_mmss(t) for t in ts) or ''}</span>"
-                  for n, _k, ts in r.cd_names[:5]) if chips else ""
+    cds = "".join([f"<span class='chip'>{e(n)} {', '.join(_mmss(t) for t in ts)}</span>"
+                   for n, _k, ts in r.cd_names if ts][:5]) if chips else ""
     return (f"<article class='hrole'><h3>{e(r.spec)}{' <small>(you)</small>' if mine else ''}</h3>"
             f"<ul class='jobs'>{''.join(f'<li>{e(j)}</li>' for j in r.jobs)}</ul>"
             f"<p class='nums'>{' · '.join(_nums(r))}</p>" + (f"<p class='when'>{cds}</p>" if cds else "")
@@ -544,29 +545,36 @@ def journal_lead(lines: list[str], who: str) -> str:
             f"ability follows, yours in full, the others named.</p>")
 
 
-def jobs_lead(roles: list) -> str:
-    """The deeper tab's answer: the healer specs whose job stands out on this boss."""
-    # a healing job of this boss: not "close to the others", nor Power Infusion given on every boss
-    lines = [f"the {r.spec} {r.jobs[0]}" for r in roles
-             if r.jobs and not r.jobs[0].startswith(("close to", "buffs a damage dealer"))]
+def _job(r) -> str:
+    """A spec's healing job of this boss, or "": not "nothing stands out", nor Power Infusion given on every boss."""
+    return next((j for j in r.jobs if not j.startswith(("nothing stands out", "buffs a damage dealer"))), "")
+
+
+def jobs_lead(roles: list, mine: str = "") -> str:
+    """The deeper tab's answer: your spec's job first, then the other healer specs whose job stands out."""
+    you = next((r for r in roles if r.spec == mine), None)
+    head = ""
+    if you:
+        head = (f"Your spec here: the {you.spec} {_job(you)}. " if _job(you) else
+                "Your spec here: nothing stands out against the other healers. ")
+    lines = [f"the {r.spec} {_job(r)}" for r in roles if r.spec != mine and _job(r)]
     if not lines:
-        return "<p class='lead'>No healer spec stands out on this boss: every one does a share of the same job.</p>"
-    return "<p class='lead'>What stands out here: " + "; ".join(e(x) for x in lines) + ".</p>"
+        return f"<p class='lead'>{e(head)}No other healer spec stands out on this boss.</p>"
+    return f"<p class='lead'>{e(head)}The others: " + "; ".join(e(x) for x in lines) + ".</p>"
+
+
+NUMS_NOTE = ("Each number is per player of the spec, the median of the kills read: its share of the kill's "
+             "healing; the share of its own healing that lands on the tanks, and in the raid's damage spikes; its "
+             "overheal; its dispels a minute; externals, the protective cooldowns it casts on another player (Life "
+             "Cocoon, Ironbark, Time Dilation...) a kill.")
 
 
 def _nums(r) -> list[str]:
-    """A healer spec's numbers, each said once: one a job line already gives is left out."""
-    said = " ".join(r.jobs)
-    out = [f"{_pct(r.healing)} of the healers' healing", f"{_pct(r.tank)} of its healing on the tanks"]
-    if "spike" not in said:
-        out.append(f"{_pct(r.spike)} of it in the raid's damage spikes (the marked moments)")
-    if "overheal" not in said:
-        out.append(f"{_pct(r.overheal)} overheal")
-    out.append(f"{r.dispels:.1f} dispels a minute")
-    if "external" not in said:
-        out.append(f"{r.externals:.1f} externals a kill (protective cooldowns cast on another player)")
-    if r.buffs and "buffs" not in said:
-        out.append(f"{r.buffs:.1f} damage buffs given a kill ({', '.join(r.buff_spells)})")
+    """A healer spec's numbers, all of them, the same on every card (NUMS_NOTE says what each is)."""
+    out = [f"{_pct(r.healing)} of the kill's healing", f"{_pct(r.tank)} on the tanks", f"{_pct(r.spike)} in spikes",
+           f"{_pct(r.overheal)} overheal", f"{r.dispels:.1f} dispels a minute", f"{r.externals:.1f} externals a kill"]
+    if r.buffs:
+        out.append(f"{r.buffs:.1f} {_and(r.buff_spells)} a kill on another player")
     return out
 
 
@@ -686,8 +694,10 @@ def render_sheet(h: HealerPrep) -> str:
                   f"To weigh a talent or an item for your character, use <a href=\"{QE_LIVE}\" target=\"_blank\" "
                   f"rel=\"noopener\">QE Live</a>.</p>")
     jr = "".join(f"<li>{e(_plain(x))}</li>" for x in h.journal)
-    first = ([f"<p class='lead'>Your measured job here: dispel {e(h.dispelled[0][0])} ({h.dispelled[0][1]:.1f} a kill "
-              f"in the top kills)." + (f" {e(h.dispel_text)}" if h.dispel_text else "") + "</p>"]
+    when = (f", a median {h.dispel_delay[0]:.0f} s after the boss casts it" if h.dispel_delay else "")
+    first = ([f"<p class='lead'>Your measured job here: dispel {e(h.dispelled[0][0])}. The top {e(h.spec)} of each "
+              f"kill removes it {h.dispelled[0][1]:.1f} times ({h.dispel_kills} kills read){when}."
+              + (f" {e(h.dispel_text)}" if h.dispel_text else "") + "</p>"]
              if h.dispelled and h.dispelled[0][1] >= 1 else [journal_lead(h.journal, "healers")])
     boss = first + (
         [f"<h2>What the Encounter Journal asks healers</h2><ul class='hl2'>{jr}</ul>"] if jr else [])
@@ -708,9 +718,11 @@ def render_sheet(h: HealerPrep) -> str:
                     "(which ones is not measured yet).</p>")
     if h.abilities:  # every ability, the healers' in full and the others' named
         boss.append(f"<h2>Every ability, phase by phase</h2><div class='stages'>{h.abilities}</div>")
-    others = "".join(role_card(r, h.roles, r.spec == h.spec, chips=r.spec != h.spec) for r in h.roles)
-    few = [p.spec for p in h.presence if p.spec not in {r.spec for r in h.roles}]
-    deeper_first: list[str] = [jobs_lead(h.roles)]
+    enough = {p.spec for p in h.presence if p.kills >= FEW_KILLS} if h.presence else {r.spec for r in h.roles}
+    shown = sorted((r for r in h.roles if r.spec == h.spec or r.spec in enough), key=lambda r: r.spec != h.spec)
+    others = "".join(role_card(r, h.roles, r.spec == h.spec, chips=r.spec != h.spec) for r in shown)
+    few = [p.spec for p in h.presence if p.spec not in {r.spec for r in shown}]
+    deeper_first: list[str] = [jobs_lead(h.roles, h.spec)]
     if h.presence:
         have = next((x for x in h.presence if x.spec == h.spec), None)
         if have and have.share >= 0.99:  # the corpus is your spec's top players' kills: they all have one
@@ -725,12 +737,15 @@ def render_sheet(h: HealerPrep) -> str:
                       f"{presence_table(h.presence, h.spec)}")
     deeper = deeper_first + [f"<h2>Every healer spec's job on this boss</h2><p class='small muted'>Measured on {h.role_kills} "
               f"{e(h.role_sample or 'top kills')}: each healer against the other healers of the same kill; a job "
-              f"shows only when a number stands out beyond the sample's noise. The sample matters: kills ranked by a "
-              f"healer's healing are slower, with more to heal, than the fastest kills. No healing engine: these are "
-              f"the logs, not sims.</p><div class='hroles'>{others or '<p>Not measured yet.</p>'}</div>"
+              f"shows only when a number stands out beyond the sample's noise. {NUMS_NOTE} The sample matters: kills "
+              f"ranked by a healer's healing are slower, with more to heal, than the fastest kills. No healing "
+              f"engine: these are the logs, not sims.</p><div class='hroles'>{others or '<p>Not measured yet.</p>'}</div>"
               + (f"<p class='small muted'>Too few healers measured: {e(', '.join(few))}.</p>" if few else ""),
               (f"<h2>The healer compositions played most</h2>{comps_table(h.comps, n_kills)}" if h.comps else "")]
-    byline = (f"{e(h.character or h.spec)} &middot; {e(h.spec)} &middot; {h.kills} top kills &middot; "
-              f"a {_mmss(h.duration)} fight")  # the healers' jobs say their own sample
+    # every sample said once, at the top: the timings and talents, the healers' comparison; read, not simmed
+    byline = (f"{e(h.character or h.spec)} &middot; {e(h.spec)} &middot; {h.kills} top kills for the timings and "
+              f"talents, median {_mmss(h.duration)}"
+              + (f" &middot; {h.role_kills} for the healers' comparison" if h.role_kills else "")
+              + " &middot; read from the logs, no healing sim")
     return sheet_page(h.boss, h.difficulty, byline, h.class_name,
                       {"fight": fight, "change": change, "boss": boss, "deeper": deeper}, theme.style("healer"))

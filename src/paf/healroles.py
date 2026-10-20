@@ -28,7 +28,8 @@ from paf.gamedata import external_kind
 from paf.wcl import WCLClient, WCLError
 
 KILLS = 40  # kills read per boss (about 6 points each): enough healers of each spec to compare
-LONG_CD = 90.0  # seconds: a healer's spell with at least this cooldown is a raid cooldown or an external
+LONG_CD = 60.0  # seconds: a healer's spell with at least this cooldown is a raid cooldown or an external (Time
+# Dilation and Ironbark are 60-90 s: at 90 the externals missed them)
 SPIKE = 1.5  # a graph point where the raid takes this many times its median damage is a spike
 
 HEALERS = {("Shaman", "Restoration"), ("Druid", "Restoration"), ("Paladin", "Holy"), ("Priest", "Holy"),
@@ -41,6 +42,7 @@ CREATE TABLE IF NOT EXISTS heal_stat(report TEXT, fight_id INT, actor_id INT, cl
   overheal REAL, tank REAL, spike REAL, dispels INT, PRIMARY KEY(report, fight_id, actor_id));
 CREATE TABLE IF NOT EXISTS heal_dispel(report TEXT, fight_id INT, aura_id INT, n INT);  -- the ranked healer removed
 CREATE TABLE IF NOT EXISTS heal_dispel_status(report TEXT, fight_id INT, PRIMARY KEY(report, fight_id));
+CREATE TABLE IF NOT EXISTS heal_dispel_time(report TEXT, fight_id INT, aura_id INT, t REAL);  -- each removal
 CREATE TABLE IF NOT EXISTS heal_cast(report TEXT, fight_id INT, actor_id INT, ability_id INT, t REAL, on_other INT);
 CREATE TABLE IF NOT EXISTS heal_kill(report TEXT, fight_id INT, deaths INT, spike_share REAL,
   PRIMARY KEY(report, fight_id));
@@ -167,7 +169,7 @@ def fetch_heal_roles(client: WCLClient, con: sqlite3.Connection, encounter_id: i
     return len(todo)
 
 
-DISPEL_KILLS = 6  # kills read for what the top healers dispel: ~1 page of events each
+DISPEL_KILLS = KILLS  # the same kills as the rest of the comparison (~1 page of events each)
 
 
 def fetch_dispels(client: WCLClient, con: sqlite3.Connection, encounter_id: int, difficulty: int,
@@ -191,9 +193,12 @@ def fetch_dispels(client: WCLClient, con: sqlite3.Connection, encounter_id: int,
         except (WCLError, KeyError, TypeError, IndexError, OSError) as e:
             log(f"  dispels skipped: {str(e)[:100]}")
             continue
-        counts = Counter(ev.get("extraAbilityGameID") for ev in events
-                         if ev.get("type") in ("dispel", "removedebuff") and ev.get("extraAbilityGameID"))
+        removed = [ev for ev in events if ev.get("type") in ("dispel", "removedebuff") and ev.get("extraAbilityGameID")]
+        counts = Counter(ev["extraAbilityGameID"] for ev in removed)
         con.executemany("INSERT INTO heal_dispel VALUES(?,?,?,?)", [(rep, fid, a, n) for a, n in counts.items()])
+        con.executemany("INSERT INTO heal_dispel_time VALUES(?,?,?,?)", [
+            (rep, fid, ev["extraAbilityGameID"], round((ev["timestamp"] - fr["startTime"]) / 1000, 1))
+            for ev in removed])
         con.execute("INSERT OR REPLACE INTO heal_dispel_status VALUES(?,?)", (rep, fid))
         con.commit()
     return len(todo)
@@ -209,6 +214,28 @@ def dispelled(con: sqlite3.Connection, encounter_id: int, difficulty: int, names
     rows = con.execute(f"SELECT d.aura_id, SUM(d.n) FROM heal_dispel d JOIN fight f USING(report, fight_id) "
                        f"WHERE {where} GROUP BY d.aura_id ORDER BY 2 DESC LIMIT ?", (*params, top)).fetchall()
     return [(names.get(a, f"spell {a}"), s / n) for a, s in rows if n], n
+
+
+def dispel_delay(con: sqlite3.Connection, encounter_id: int, difficulty: int, aura: str,
+                 names: dict[int, str], window: float = 60.0) -> tuple[float, int] | None:
+    """(median seconds, dispels measured) between the boss's cast of `aura` (same name) and the top healers'
+    removal of it: when they dispel, which the player needs before what the dispel sets off. None: not measured."""
+    ensure_tables(con)
+    where, params = kills_filter(encounter_id, difficulty)
+    ids = {i for i, n in names.items() if n == aura}
+    casts: dict[tuple[str, int], list[float]] = defaultdict(list)
+    for rep, fid, ab, t in con.execute(f"SELECT e.report, e.fight_id, e.ability_id, e.t FROM enemy_cast e "
+                                       f"JOIN fight f USING(report, fight_id) WHERE {where} AND e.type='cast'", params):
+        if ab in ids:
+            casts[(rep, fid)].append(t)
+    delays = []
+    for rep, fid, ab, t in con.execute(f"SELECT d.report, d.fight_id, d.aura_id, d.t FROM heal_dispel_time d "
+                                       f"JOIN fight f USING(report, fight_id) WHERE {where}", params):
+        if ab in ids:
+            before = [t - c for c in casts.get((rep, fid), []) if 0 <= t - c <= window]
+            if before:
+                delays.append(min(before))
+    return (st.median(delays), len(delays)) if len(delays) >= 5 else None
 
 
 # --- compositions -----------------------------------------------------------------------------------------------
@@ -460,7 +487,7 @@ def jobs(r: Role, everyone: list[Role]) -> list[str]:
     if r.buffs >= 1 and r.buffs >= ref("buffs") * 1.5:  # last: a damage dealer's buff, not a healing job
         out.append(f"buffs a damage dealer: {_and(r.buff_spells)} {r.buffs:.1f} a kill")
     if not out:
-        out.append("close to the other healers on every number below")
+        out.append("nothing stands out against the other healers")
     return out
 
 

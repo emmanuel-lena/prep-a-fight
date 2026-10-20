@@ -958,6 +958,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     healroles.fetch_dispels(client, con, enc.id, diff)  # what the top healers really remove, a few kills
     h.dispelled, h.dispel_kills = healroles.dispelled(con, enc.id, diff, names)
     h.dispel_text = _dispel_text(sections, h.dispelled[0][0], diff_name) if h.dispelled else ""
+    h.dispel_delay = healroles.dispel_delay(con, enc.id, diff, h.dispelled[0][0], names) if h.dispelled else None
     h.roles = healroles.roles(con, enc.id, diff, names)
     n, dur, dead = healroles.sample(con, enc.id, diff)
     h.role_kills = n
