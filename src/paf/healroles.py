@@ -392,7 +392,7 @@ class Role:
     dispels: float  # median dispels per minute
     raid_cds: float  # long cooldowns cast on themselves, the raid or an enemy, per kill
     externals: float  # protective long cooldowns cast on another player (paf.gamedata.external_kind), per kill
-    cd_names: list[tuple[str, float, list]] = field(default_factory=list)  # (spell, per kill, its moments)
+    cd_names: list[tuple[str, float, list]] = field(default_factory=list)  # (spell, per kill, (moment, share) shared)
     jobs: list[str] = field(default_factory=list)  # what the numbers say this spec does on this boss
     se: dict[str, float] = field(default_factory=dict)  # standard error of each number (its healers' spread)
     buffs: float = 0.0  # damage buffs cast on another player (Power Infusion), per kill
@@ -473,11 +473,10 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
         if n < min_players:
             continue
         mid = st.median(durs.values()) if durs else None
-        cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n,
-                press_moments(ps, max(1, round(sum(map(len, ps)) / len(ps))), mid)[0])
+        cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n, _shared(ps, n, mid))
                for ab, ps in cd_times[spec].items()  # pressed by half of them at least (Healing Tide Totem: 3%)
                if len(ps) / n >= 0.5 and not _personal(ab, names)
-               and sum(map(len, ps)) / len(ps) < 4]  # a 1-minute button (Nature's Swiftness) is no raid cooldown
+               and sum(map(len, ps)) / len(ps) < 3.5]  # a 1-minute button (Nature's Swiftness, 3.9) is no raid cooldown
         se = {k: (st.stdev(v) / len(v) ** 0.5 if len(v) > 1 else 0.0) for k, v in s.items()}
         out.append(Role(spec, n, st.median(s["healing"]), st.median(s["tank"]), st.median(s["spike"]),
                         st.median(s["overheal"]), st.median(s["dispels"]), st.mean(s["raid"]), st.mean(s["ext"]),
@@ -492,6 +491,15 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
         r.jobs = jobs(r, out)
         r.spike_cover = st.mean(cover) if cover else 0.0
     return sorted(out, key=lambda r: -r.players)
+
+
+def _shared(ps: list[list[float]], n: int, end: float | None) -> list[tuple[float, float]]:
+    """(moment, share of the spec's players pressing it within 8 s) for a card: the moments a quarter of those who
+    press it share at least, as the fight tab's (a card showed Ascendance 0:51 for 23% as "most of them")."""
+    times = press_moments(ps, max(1, round(sum(map(len, ps)) / len(ps))), end)[0]
+    users = len(ps) / n if n else 0
+    out = [(t, sum(1 for ts in ps if any(abs(x - t) <= 8 for x in ts)) / n) for t in times]
+    return [(t, sp) for t, sp in out if sp >= 0.25 * users]
 
 
 def _personal(ab: int, names: dict[int, str] | None) -> bool:
