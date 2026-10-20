@@ -75,7 +75,7 @@ def test_every_cast_a_kill_is_said():
     players = [{"casts": {1: [4.0, 60.0 + 25 * i]}} for i in range(8)]  # the 2nd spread over three minutes
     tl = SimpleNamespace(abilities=[ab], duration=280.0, players=players)
     cd = healer.cooldowns(tl, [], {1: (180.0, 1)})[0]
-    assert cd.times == [4.0] and "+1 more when they need it" in healer.cooldowns_html([cd])
+    assert cd.times == [4.0] and "+1 more, timing varies" in healer.cooldowns_html([cd])
 
 
 def test_no_moment_after_the_kill():

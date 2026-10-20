@@ -266,7 +266,7 @@ def moments(curve: list[float], boss_casts: list[tuple[str, list[float]]], top: 
         if v < WAVE * base or (i and curve[i - 1] > v) or (i + 1 < len(curve) and curve[i + 1] > v):
             continue
         t = i * STEP
-        if found and t - found[-1].t < SPIKE_GAP:
+        if found and t - found[-1].t <= SPIKE_GAP:  # 15 s apart is one stretch (the tanks' 3:25, 3:40, 3:55)
             if v > found[-1].dtps:
                 found[-1] = Moment(t, v, v / base)
             continue
@@ -370,6 +370,8 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         if every and (any(abs((y - x) - every) > 0.15 * every for x, y in pairwise(times))
                       or (cd and every > 1.15 * cd)):  # held past its cooldown (the Vessel every 118 s, cooldown 90)
             every = 0.0  # its moments are not a cooldown apart: the top players hold it (the Vessel at 0:03, 2:02)
+        if every and len(times) > 1:  # said from the moments shown, so the number matches them
+            every = st.median(y - x for x, y in pairwise(times))
         tied = not (every or per_kill >= 4 or _external(sid) or _moving(sid))  # on cooldown, a 1-minute button, a
         near = []  # buff on one player, a cast-while-moving: near a hit by chance, not kept for it
         for t in times:
@@ -464,6 +466,11 @@ def moments_html(found: list[Moment], what: str) -> str:
                    f"<small>{m.ratio:.1f}&times; the usual damage</small></li>" for m in found)
 
 
+def _shown(name: str) -> str:
+    """A spell's name without the log's internal suffix ("Stasis (Store)" -> "Stasis")."""
+    return re.sub(r"\s*\([^)]*\)$", "", name) or name
+
+
 def _more(c: Cooldown) -> str:
     """The casts a kill no shared moment shows ("+1"): the count always matches the "a kill" number."""
     n = round(c.per_kill) - len(c.times)
@@ -479,12 +486,12 @@ def _or(c: Cooldown, t: float) -> str:
 
 def cooldowns_html(cds: list[Cooldown]) -> str:
     return "".join(
-        f"<li><b>{e(c.name)}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill</small>"
+        f"<li><b>{e(_shown(c.name))}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill</small>"
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, n)}{_or(c, t)}</span>"
                                         for t, n in zip(c.times, c.near, strict=False))
-                                or "<small>when they need it: no moment most of them share</small>")
+                                or "<small>timing varies: no moment most of them share</small>")
         + (f"<small class='alt'>on cooldown, about every {c.every:.0f} s</small>" if c.every else
-           f"<small class='alt'>{_more(c)} more when they need it</small>" if c.times and _more(c) else "")
+           f"<small class='alt'>{_more(c)} more, timing varies</small>" if c.times and _more(c) else "")
         + "</span></li>"
         for c in cds)
 
@@ -504,11 +511,12 @@ def _chip(t: float, n: str) -> str:
         return _mmss(t)
     hit = n.partition(" ")[0]
     m, _, sec = hit.partition(":")
-    gap = t - (int(m) * 60 + int(sec))
-    # said with its offset from the hit's start: "4 s into" a reactive press, "3 s before" a planned one
-    return _mmss(t) + (f" &middot; as the {e(hit)} hit starts" if abs(gap) < 1 else
-                       f" &middot; {-gap:.0f} s before the {e(hit)} hit" if gap < 0 else
-                       f" &middot; {gap:.0f} s into the {e(hit)} hit")
+    gap = int(t) - (int(m) * 60 + int(sec))  # from the seconds shown: "0:42 · 2 s into the 0:40 hit"
+    # said with its offset from the hit's start: "4 s into" its 5 s window, "3 s before", "2 s after" it
+    return _mmss(t) + (f" &middot; as the {e(hit)} hit starts" if gap == 0 else
+                       f" &middot; {-gap} s before the {e(hit)} hit" if gap < 0 else
+                       f" &middot; {gap} s into the {e(hit)} hit" if gap < STEP else
+                       f" &middot; {gap - int(STEP)} s after the {e(hit)} hit")
 
 
 SHOWN_TALENTS = 60  # every class and spec difference shown (a hero tree is named, not listed): no "+N more"
@@ -727,7 +735,9 @@ def split_html(split: list, players: int, spec: str) -> str:
     """The talents the top players split on, with how often each is picked: what the builds above hide."""
     return (f"<h2>The talents the top {e(spec)}s split on</h2><p>Picked by this share of the {players} players "
             "read; the closest to half first:</p><ul class='hl2 split'>"
-            + "".join(f"<li><b>{e(n)}</b><small>{s:.0%}</small></li>" if s >= 0 else f"<li><b>{e(n)}</b></li>"
+            + "".join(f"<li><b>{e(n)}</b><small>{s:.0%}</small></li>" if s >= 0 else
+                      "<li>" + " / ".join(f"<b>{e(a)}</b> <small>{b}</small>" for a, _, b in
+                                          (x.rpartition(" ") for x in n.split(" / "))) + "</li>"
                       for n, s in split) + "</ul>")
 
 
@@ -973,18 +983,16 @@ def render_sheet(h: HealerPrep) -> str:
         deeper_first.append(f"<h2>Healers in the top {e(h.spec)}s' kills</h2><p>{line} Each healer spec in the {n_kills} "
                       f"kills read, with it and without it (a reading, not a verdict on the spec):</p>"
                       f"{presence_table(h.presence, h.spec)}")
-    deeper = deeper_first + [f"<h2>Every healer spec's job on this boss</h2><p class='small muted'>Measured on {h.role_kills} "
+    deeper = deeper_first + [f"<h2>What each healer spec brings here</h2><p class='small muted'>Measured on {h.role_kills} "
               f"{e(h.role_sample or 'top kills')}: each spec's median player against the other healers of the same "
               f"kill; a job shows when a number stands out beyond the noise.{_pace(h)} {NUMS_NOTE}</p><div class='hroles'>{others or '<p>Not measured yet.</p>'}</div>"
               + (f"<p class='small muted'>Too few healers measured: {e(', '.join(few))}.</p>" if few else ""),
               (f"<h2>The healer compositions played most</h2>{comps_table(h.comps, n_kills)}"
                if comps_table(h.comps, n_kills) else "")]
     # every sample said once, at the top: the timings and talents, the healers' comparison; read, not simmed
-    byline = (f"{e(h.character or h.spec)} &middot; {e(h.spec)} &middot; {h.kills} top kills for the timings and "
-              f"talents, median {_mmss(h.duration)}"
-              + (f" &middot; {h.role_kills} for the healers' comparison"
-                 + (f", median {_mmss(h.role_median)}" if h.role_median else "") if h.role_kills else "")
-              + " &middot; read from the logs, no healing sim")
+    byline = (f"{e(h.character or h.spec)} &middot; {e(h.spec)} &middot; from {h.kills} top kills (median "
+              f"{_mmss(h.duration)})" + (f", healers compared on {h.role_kills}" if h.role_kills else "")
+              + " &middot; no healing sim")
     return sheet_page(h.boss, h.difficulty, byline, h.class_name,
                       {"fight": fight, "change": change, "boss": boss, "deeper": deeper}, theme.style("healer"),
                       UNSIMMED)

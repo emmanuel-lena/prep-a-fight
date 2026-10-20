@@ -161,7 +161,7 @@ def tank_busters(curve: list[float], by: dict[str, list[float]], top: int = 8) -
             continue
         t = i * STEP
         name = max(by, key=lambda a: by[a][i] if i < len(by[a]) else 0.0, default="")
-        if found and t - found[-1].t < SPIKE_GAP:
+        if found and t - found[-1].t <= SPIKE_GAP:  # 15 s apart is one stretch (Stage Two's 3:25, 3:40, 3:55)
             if v > found[-1].dtps:
                 found[-1] = Moment(t, v, v / base, name)
             continue
@@ -422,7 +422,7 @@ def render_sheet(p: TankPrep) -> str:
         press = next(((n, t) for n, ts in answers for t in ts if -ANSWER[0] <= t - m.t <= ANSWER[1]), None)
         lead.append(f"Their biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({m.ratio:.1f}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
-                    + (f"; the top {e(p.spec)}s press {e(press[0])} for it." if press
+                    + (f"; the top {e(p.spec)}s who press {e(press[0])} press it then ({_mmss(press[1])})." if press
                        else f"; most top {e(p.spec)}s press no defensive for it."))
     if p.swaps:
         lead.append(f"Each of them taunts about {p.taunts_per_kill:.0f} times a kill after the pull (adds included)"
@@ -500,8 +500,8 @@ def render_sheet(p: TankPrep) -> str:
         deeper.append("<p class='small muted'>" + ("" if deaths else "The deaths of each composition are not read yet. ")
                       + "A spec's longer kills or extra deaths are a reading, not a verdict: the raids that bring it "
                       "differ in other ways too, and a few kills move a mean of deaths.</p>")
-    byline = (f"{e(p.character or p.spec)} &middot; {e(p.spec)} &middot; {p.kills} top kills for the timings and "
-              f"talents, median {_mmss(p.duration)} &middot; read from the logs, no tank sim")
+    byline = (f"{e(p.character or p.spec)} &middot; {e(p.spec)} &middot; from {p.kills} top kills (median "
+              f"{_mmss(p.duration)}) &middot; no tank sim")
     return sheet_page(p.boss, p.difficulty, byline, p.class_name,
                       {"fight": fight, "change": change, "boss": boss, "deeper": deeper}, theme.style("healer"),
                       UNSIMMED)

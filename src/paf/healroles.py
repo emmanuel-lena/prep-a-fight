@@ -448,7 +448,8 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
         cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n,
                 press_moments(ps, max(1, round(sum(map(len, ps)) / len(ps))), mid)[0])
                for ab, ps in cd_times[spec].items()  # pressed by half of them at least (Healing Tide Totem: 3%)
-               if len(ps) / n >= 0.5 and not _personal(ab, names)]
+               if len(ps) / n >= 0.5 and not _personal(ab, names)
+               and sum(map(len, ps)) / len(ps) < 4]  # a 1-minute button (Nature's Swiftness) is no raid cooldown
         se = {k: (st.stdev(v) / len(v) ** 0.5 if len(v) > 1 else 0.0) for k, v in s.items()}
         out.append(Role(spec, n, st.median(s["healing"]), st.median(s["tank"]), st.median(s["spike"]),
                         st.median(s["overheal"]), st.median(s["dispels"]), st.mean(s["raid"]), st.mean(s["ext"]),
@@ -533,9 +534,11 @@ def jobs(r: Role, everyone: list[Role]) -> list[str]:
         return st.median(getattr(o, attr) for o in others) or 0.0
 
     def clear(attr: str, lower: bool = False) -> bool:
-        """The gap to the other healers is beyond this spec's sampling noise (two standard errors)."""
+        """The gap to the other healers is beyond the noise of the difference: two standard errors of it, this
+        spec's and the others' (a 4-point gap at "±4%" was called a job)."""
         gap = (ref(attr) - getattr(r, attr)) if lower else (getattr(r, attr) - ref(attr))
-        return gap > 2 * r.se.get(attr, 0.0)
+        theirs = st.median(o.se.get(attr, 0.0) for o in others)
+        return gap > 2 * (r.se.get(attr, 0.0) ** 2 + theirs ** 2) ** 0.5
     out = []
     if r.tank >= max(TANK_FLOOR, ref("tank") * TANK_HEALER) and clear("tank"):
         out.append(f"heals the tanks: {r.tank:.0%} of its healing goes on them, ±{2 * r.se.get('tank', 0):.0%} "
