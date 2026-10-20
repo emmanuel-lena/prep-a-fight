@@ -205,7 +205,7 @@ def render(p: TankPrep) -> str:
 <p class="lead">{e(p.spec)}: the tank's prep, from {p.kills} kills of the top tanks of your spec. A {_mmss(p.duration)}
 fight.</p>
 <section class="hp-sec"><h2>What hits you, and when</h2>{svg}
-<p class="small muted">Damage the top tanks take per second, median of the kills; a dot marks a tank buster.</p>
+<p class="small muted">Damage the top tanks take per second, median of the kills; a dot marks the tanks' biggest damage, whatever casts it.</p>
 <ul class="hl2">{moments_html(p.moments, "tank damage") or '<li>No big moment: steady damage.</li>'}</ul></section>
 <section class="hp-sec"><h2>The abilities that hit you the most</h2><ul class="hl2">{hit or '<li>Not measured yet.</li>'}</ul>
 </section>
@@ -248,30 +248,35 @@ def render_sheet(p: TankPrep) -> str:
     others = [replace(c, near=["" for _ in c.near]) for c in p.cooldowns if c not in defs]  # no buster to answer
     svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight")
     causes = p.swap_after or ["" for _ in p.swaps]
-    swap = "".join(f"<span class='chip'>{_mmss(t)}{f' after {e(c)}' if c else ''}</span>"
+    named = [c for c in causes if c]
+    common = max(set(named), key=named.count) if named else ""
+    one = bool(common) and named.count(common) >= len(causes) / 2  # one ability behind most swaps: said once
+    swap = "".join(f"<span class='chip'>{_mmss(t)}{f' after {e(c)}' if c and not (one and c == common) else ''}</span>"
                    for t, c in zip(p.swaps, causes, strict=False))
     lead = []
     if p.moments:
         m = max(p.moments, key=lambda x: x.ratio)
         press = next(((c.name, t) for c in defs for t in c.times if abs(t - m.t) <= 20), None)
-        lead.append(f"The hardest hit: {e(m.boss_spell or 'tank damage')} at {_mmss(m.t)} (&times;{m.ratio:.1f} the fight's median)"
+        lead.append(f"The tanks' biggest damage: {e(m.boss_spell or 'tank damage')} at {_mmss(m.t)} (&times;{m.ratio:.1f} the fight's median)"
                     + (f"; the top {e(p.spec)}s press {e(press[0])} at {_mmss(press[1])}." if press else "."))
     if p.swaps:
-        lead.append(f"They taunt about {p.taunts_per_kill:.0f} times a kill after the pull, the first time at "
-                    f"{_mmss(p.swaps[0])}" + (f" after {e(causes[0])}." if causes and causes[0] else "."))
+        lead.append(f"Each of them taunts about {p.taunts_per_kill:.0f} times a kill after the pull"
+                    + (f", most often after {e(common)}." if one else
+                       f", the first time at {_mmss(p.swaps[0])}" + (f" after {e(causes[0])}." if causes[0] else ".")))
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + [
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the top tanks "
-        f"take per second, median of the kills; a dot marks a tank buster.</p><ul class='hl2'>"
+        f"take per second, median of the kills; a dot marks the tanks' biggest damage, whatever casts it.</p><ul class='hl2'>"
         f"{moments_html(p.moments, 'tank damage') or '<li>No big moment: steady damage.</li>'}</ul></div>",
         f"<h2>Your defensives and raid cooldowns, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
         f"{cooldowns_html(defs) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
            f"</p>" if p.rare else ""),
         f"<h2>Active mitigation the top tanks keep up</h2><ul class='hl2'>{mit or '<li>Not measured yet.</li>'}</ul>",
-        f"<h2>Tank swaps</h2><p>The top tanks taunt about <b>{p.taunts_per_kill:.0f}</b> times a kill after the pull"
-        f"{'; the moments where most of them do (a kill may skip one):' if swap else '.'}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
+        f"<h2>Tank swaps</h2><p>Each top tank taunts about <b>{p.taunts_per_kill:.0f}</b> times a kill after the pull"
+        f"{'; with the other tank, the swaps come at these moments' if swap else '.'}"
+        f"{f' (most of them after {e(common)})' if swap and one else ''}{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
                                                           f"</li></ul>" if swap else "")]
-    change = [build_lead(p.builds, p.spec),
+    change = [build_lead(p.builds, p.spec, p.kills),
               f"<h2>Talents the top tanks play</h2><ul class='hl2'>{builds_html(p.builds) or '<li>No build yet.</li>'}"
               f"</ul>",
               f"<h2>Trinkets the top tanks play</h2><ul class='hl2'>"
@@ -297,7 +302,7 @@ def render_sheet(p: TankPrep) -> str:
                       + (", ".join(f"{e(x.spec)} ({x.share:.0%})" for x in sorted(mates, key=lambda x: -x.share)[:3])
                          if mates else "no other tank spec often") + ".</p>")
     if others:
-        deeper.append(f"<h2>Your other cooldowns</h2><ul class='hl2'>{cooldowns_html(others)}</ul>")
+        deeper.append(f"<h2>Your other cooldowns and consumables</h2><ul class='hl2'>{cooldowns_html(others)}</ul>")
     if p.presence:
         if have and have.share >= 0.99:  # the corpus is this spec's kills
             line = f"These are the top {e(p.spec)}s' kills; the table tells which tanks play beside them."

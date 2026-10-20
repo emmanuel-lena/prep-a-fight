@@ -826,7 +826,8 @@ def _role_journal(encounter_id: int, diff_name: str, role: str, tl) -> str:
     if not sections:
         return ""
     return bossguide.abilities_html(sections, timings=dict(tl.boss_casts),
-                                    icon_map=icons_for(bossguide.spell_refs(sections)), role=role)
+                                    icon_map=icons_for(bossguide.spell_refs(sections)), role=role,
+                                    difficulty=diff_name)
 
 
 def _prep_healer(args: argparse.Namespace, profile=None) -> int:
@@ -2014,7 +2015,7 @@ def _boss_guide(d, con, enc, diff: int, diff_name: str, spec: str, tl, fight, pk
     else:
         _corpus_actions(d, con, enc, diff, spec, sections, mechs)
     d.guide_abilities = bossguide.abilities_html(sections, timings=dict(tl.boss_casts), mechanics=mechs,
-                                                 burst=burst, icon_map=gicons, role="damage")
+                                                 burst=burst, icon_map=gicons, role="damage", difficulty=diff_name)
     return mechs
 
 

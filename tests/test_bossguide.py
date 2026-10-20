@@ -83,3 +83,19 @@ def test_a_unit_told_before_shows_only_what_changes():
     assert "As in Stage One; what changes:" in inter and "Ancient spirits" not in inter
     assert "as in Stage One, now deadly" in inter and "A corpse lingers." not in inter
     assert "Also, as in Stage One: Corpse Blight." in inter
+
+
+def test_another_difficultys_sentences_are_left_out():
+    """Vashnik heroic (2026-10-20): the journal's "On Mythic difficulty, ..." abilities showed on a heroic sheet, and
+    "absorbs the next X healing" kept its game variable."""
+    from paf.bossguide import readable
+
+    stage = sec(4, "Stage One", "stage", children=[
+        sec(5, "Siphoning Infection", "ability", "A blood venom that absorbs the next X healing."),
+        sec(6, "Exploding Infection", "ability", "On Mythic difficulty, this gains a stack every 1.5 sec."),
+        sec(7, "Imbibe", "ability", "Vashnik drinks. On Mythic difficulty, Imbibe conjures a totem.")])
+    heroic = abilities_html([stage], difficulty="heroic")
+    assert "absorbs the next healing" in heroic and "Exploding Infection" not in heroic
+    assert "Vashnik drinks." in heroic and "conjures a totem" not in heroic
+    assert "Exploding Infection" in abilities_html([stage], difficulty="mythic")
+    assert readable("On Heroic difficulty, the rite burns.", "normal") == ""

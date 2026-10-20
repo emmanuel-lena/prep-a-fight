@@ -1229,7 +1229,8 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
         guide = f"<h2>The boss in 60 seconds</h2>{bossguide.summary_html(sections, mine)}"
         journal = (f"<section class='boss-journal'><h2>Every ability, from the Encounter Journal</h2><p class='adv-lede'>Timings "
                    f"and how many players are hit come from the ranked kills.</p><div class='stages'>"
-                   f"{bossguide.abilities_html(sections, mechanics=mechs, icon_map=gicons, role=mine)}</div></section>")
+                   f"{bossguide.abilities_html(sections, mechanics=mechs, icon_map=gicons, role=mine, difficulty=difficulty)}"
+                   "</div></section>")
     try:  # where the data will come from, and how long: from what will really happen (paf.estimate)
         from paf import estimate
 

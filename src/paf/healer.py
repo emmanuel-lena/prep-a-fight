@@ -259,8 +259,12 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
                     for n, t in phases if t > 0)  # the phase changes, named
     ticks = "".join(f"<text x='{x(t)}' y='{H - 6}' class='tk'>{int(t // 60)}:00</text>"
                     for t in range(0, int(span) + 1, 60))
+    pos = [v for v in curve if v > 0]
+    med = st.median(pos) if pos else 0.0  # the scale the moments are read against (x1.6 the fight's median)
+    median = (f"<line class='md' x1='{L}' x2='{W - 10}' y1='{y(med)}' y2='{y(med)}'/>"
+              f"<text x='{L - 4}' y='{float(y(med)) + 4:.1f}' class='mdl' text-anchor='end'>median</text>") if med else ""
     return (f"<svg viewBox='0 0 {W} {H}' class='rd' role='img' aria-label='{e(label)}'>"
-            f"<line class='ax' x1='{L}' x2='{W - 10}' y1='{H - B}' y2='{H - B}'/>{lines}{ticks}"
+            f"<line class='ax' x1='{L}' x2='{W - 10}' y1='{H - B}' y2='{H - B}'/>{median}{lines}{ticks}"
             f"<polyline points='{pts}'/>{marks}</svg>")
 
 
@@ -272,19 +276,21 @@ def moments_html(found: list[Moment], what: str) -> str:
 def cooldowns_html(cds: list[Cooldown]) -> str:
     return "".join(
         f"<li><b>{e(c.name)}</b><small>pressed by {c.users:.0%} of the top players &middot; {c.per_kill:.1f} a kill</small>"
-        "<span class='when'>" + "".join(f"<span class='chip'>{_mmss(t)}{_near(n)}</span>"
-                                       for t, n in zip(c.times, c.near, strict=False))
+        "<span class='when'>" + ("".join(f"<span class='chip'>{_mmss(t)}{_near(n)}</span>"
+                                        for t, n in zip(c.times, c.near, strict=False))
+                                or "<small>when they need it: no moment most of them share</small>")
         + (f"<small class='alt'>some press it at {', '.join(_mmss(t) for t in c.alt)} instead</small>"
            if c.alt else "") + "</span></li>"
         for c in cds)
 
 
 def _near(n: str) -> str:
-    """ "0:35 Possession Barrage" -> " · Possession Barrage": the moment a press answers."""
+    """ "0:35 Possession Barrage" -> " · Possession Barrage": the moment a press answers ("0:35" alone: the 0:35 hit,
+    no boss cast to name it)."""
     if not n:
         return ""
-    _t, _, name = n.partition(" ")
-    return f" &middot; {e(name)}" if name else ""
+    t, _, name = n.partition(" ")
+    return f" &middot; {e(name)}" if name else f" &middot; the {e(t)} hit"
 
 
 SHOWN_TALENTS = 5
@@ -373,15 +379,21 @@ def role_card(r, everyone: list, mine: bool, chips: bool = True) -> str:
             + f"<p class='small muted'>{r.players} {e(r.spec)}s in the kills read.</p></article>")
 
 
-def build_lead(builds: list, spec: str) -> str:
+def _and(items: list[str]) -> str:
+    """'a', 'a and b', 'a, b and c'."""
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1] if items else ""
+
+
+def build_lead(builds: list, spec: str, players: int) -> str:
     """The change tab's answer: the most played build, and whether the top players agree on one."""
     if not builds:
         return ""
     top = builds[0]
     total = sum(b[0] for b in builds)
-    return (f"<p class='lead'>The most played build of the top {e(spec)}s: {e(top[1])}, by {top[0]} of them"
-            + (f"; the {len(builds)} builds below cover {total} players, the others are scattered" if len(builds) > 1
-               else "") + ".</p>")
+    return (f"<p class='lead'>The most played build of the top {e(spec)}s: {e(top[1])}, by {top[0]} of the "
+            f"{players} players read" + (f"; the {len(builds)} builds below cover {total} of them, the other "
+                                        f"{players - total} play builds of their own" if len(builds) > 1 else "")
+            + ".</p>")
 
 
 def journal_lead(lines: list[str], who: str) -> str:
@@ -411,7 +423,8 @@ def _nums(r) -> list[str]:
         out.append(f"{_pct(r.overheal)} overheal")
     out.append(f"{r.dispels:.1f} dispels a minute")
     if "external" not in said:
-        out.append(f"{r.externals:.1f} externals a kill (long cooldowns cast on another player)")
+        out.append(f"{r.externals:.1f} externals a kill (long cooldowns cast on another player, damage buffs "
+                   f"like Power Infusion included)")
     return out
 
 
@@ -460,7 +473,8 @@ def comps_table(comps: list, n_kills: int) -> str:
         for c in comps)
     return ("<table class='hcomp'><thead><tr><th>Healers</th><th>Top kills</th><th>Median kill</th>"
             + ("<th>Median deaths</th>" if deaths else "") + f"</tr></thead><tbody>{rows}</tbody></table>"
-            f"<p class='small muted'>Of {n_kills} top kills read. Exact compositions played at least 5 times.</p>")
+            f"<p class='small muted'>Of {n_kills} top kills read. Exact compositions played at least 5 times; the "
+            f"other {n_kills - sum(c.kills for c in comps)} kills play rarer ones.</p>")
 
 
 def render_sheet(h: HealerPrep) -> str:
@@ -478,14 +492,14 @@ def render_sheet(h: HealerPrep) -> str:
     defs = [c for c in h.cooldowns if c not in heals and c not in items]
     lead = ""
     if h.moments:
-        hits = " and ".join(f"{_mmss(m.t)} ({e(m.boss_spell or 'raid damage')})" for m in h.moments[:3])
+        hits = _and([f"{_mmss(m.t)} ({e(m.boss_spell)})" if m.boss_spell else _mmss(m.t) for m in h.moments[:3]])
         at = {_mmss(m.t) for m in h.moments}  # a cooldown kept for the hits: most of its presses answer one
         used = [c.name for c in heals if c.times and sum(1 for n in c.near if n and n.split(" ", 1)[0] in at)
                 >= len(c.times) / 2]
         opening = ("No single big hit: the raid damage comes in waves, the highest at "
                    if max(m.ratio for m in h.moments) < SPIKE else "The raid's big hits come at ")
         lead = (f"<p class='lead'>{opening}{hits}"
-                + (f"; the top {e(h.spec)}s spend {e(', '.join(used[:3]))} on them." if used else ".") + "</p>")
+                + (f"; the top {e(h.spec)}s press {e(_and(used[:3]))} at them." if used else ".") + "</p>")
     you = []
     own = "ranked by their healing" in (h.role_sample or "")
     if mine is not None:
@@ -497,7 +511,7 @@ def render_sheet(h: HealerPrep) -> str:
         f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Damage the "
         f"raid takes per second, median of the top kills; a dot marks a big moment.</p><ul class='hl2'>"
         f"{moments_html(h.moments, 'raid damage') or '<li>No big moment: steady raid damage.</li>'}</ul></div>",
-        f"<h2>Your healing cooldowns, where the top {e(h.spec)}s press them</h2><ul class='hl2'>"
+        f"<h2>Your long cooldowns, where the top {e(h.spec)}s press them</h2><ul class='hl2'>"
         f"{cooldowns_html(heals) or '<li>Not enough top players in the corpus yet.</li>'}</ul>"]
     if h.rare:  # a big cooldown the top players skip is information too (Healing Tide Totem: 3 kills in 100)
         fight.append(f"<p class='small muted'>Few top {e(h.spec)}s press "
@@ -507,7 +521,7 @@ def render_sheet(h: HealerPrep) -> str:
     if items:
         fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{cooldowns_html(items)}</ul>")
     n_kills = h.role_kills or h.kills
-    change = [build_lead(h.builds, h.spec)]
+    change = [build_lead(h.builds, h.spec, h.kills)]
     change.append(f"<h2>Talents the top {e(h.spec)}s play</h2><ul class='hl2'>"
                   f"{builds_html(h.builds) or '<li>No build yet.</li>'}</ul>")
     trk = trinkets_html(h.trinkets) or "<li>No gear yet.</li>"

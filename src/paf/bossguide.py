@@ -34,6 +34,8 @@ def readable(text: str, difficulty: str = "heroic") -> str:
         return m.group(2) if did in ids else (m.group(3) or "")
     t = re.sub(r"\$\?((?:DIFF\d+\|?)+)\[([^\]]*)\](?:\[([^\]]*)\])?", by_diff, text or "")
     t = re.sub(r"\[([^\]]+)\]", r"\1", t)
+    for other in [d for d in ("Heroic", "Mythic") if not _applies(d, difficulty)]:  # another difficulty's sentence
+        t = re.sub(rf"(?:^|(?<=[.!?] ))On {other} difficulty,.*?[.!?](?=\s|$)\s*", "", t)  # "every 1.5 sec."
     t = re.sub(r" by X%", "", t)
     t = re.sub(r"\bX% of\b", "a share of", t)
     t = re.sub(r"\bX%", "some", t)
@@ -41,10 +43,18 @@ def readable(text: str, difficulty: str = "heroic") -> str:
     t = re.sub(r"\bX (sec|seconds?)\b", r"a few \1", t)
     t = re.sub(r"\b(?:inflicting|deals?|dealing) X\b", lambda m: m.group(0)[:-2], t)
     t = re.sub(r"\bX (\w+ damage)", r"\1", t)
+    t = re.sub(r"\b(absorbs the next|healing|absorbing) X\b", r"\1", t)  # "absorbs the next X healing"
     t = re.sub(r"\bX or fewer\b", "only a few", t)
     t = re.sub(r"\bX or more\b", "enough", t)
     t = re.sub(r"\bthe \.", "a player.", t)
     return t if t == text else re.sub(r"\s{2,}", " ", t)
+
+
+def _applies(level: str, difficulty: str) -> bool:
+    """A journal sentence "On Heroic difficulty, ..." applies to heroic and mythic; "On Mythic ..." to mythic."""
+    order = ("lfr", "normal", "heroic", "mythic")
+    d = (difficulty or "heroic").lower()
+    return order.index(d) >= order.index(level.lower()) if d in order else True
 
 
 def _blocks(html: str, start: int) -> list[tuple[int, int, int]]:
@@ -203,7 +213,7 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
         facts.append(who + (f", ~{m.cost:g} s of movement for you" if m.cost else ""))
     if s.title.lower() in ctx["burst"]:
         facts.append(f"<b>burst window: the boss takes x{ctx['burst'][s.title.lower()]:g} damage</b>")
-    text = readable(s.text or ctx["describe"](s.spell_id))
+    text = readable(s.text or ctx["describe"](s.spell_id), ctx["difficulty"])
     body = f"<div class='small ab-d'>{e(text)}</div>" if text else ""
     pic = icons.img(ctx["icons"].get(s.title, ""), "small")
     fact = f"<div class='small muted'>{' &middot; '.join(facts)}</div>" if facts else ""
@@ -216,12 +226,13 @@ ROLE_OTHERS = {"tank": "the tanks", "healer": "the healers", "damage": "the dama
 
 def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] | None = None,
                    mechanics: list | None = None, burst: dict[str, float] | None = None,
-                   icon_map: dict[str, str] | None = None, role: str | None = None) -> str:
+                   icon_map: dict[str, str] | None = None, role: str | None = None,
+                   difficulty: str = "heroic") -> str:
     """Every stage and unit of the journal with its abilities; facts from the logs when known."""
     ctx = {"timings": {k.lower(): v for k, v in (timings or {}).items()},
            "mechanics": {m.name.lower(): m for m in (mechanics or [])},
            "burst": {k.lower(): v for k, v in (burst or {}).items()}, "icons": icon_map or {},
-           "describe": describe}
+           "describe": describe, "difficulty": difficulty}
     def key(s: Section) -> tuple:
         return s.kind, s.title, readable(s.text), tuple(s.flags)
 
@@ -239,6 +250,9 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
             if skip is not None and depth > skip:  # under an ability of another role: named with it
                 continue
             skip = None
+            if s.kind == "ability" and s.text and not readable(s.text, difficulty).strip():
+                skip = depth  # another difficulty's ability ("On Mythic difficulty, ..."), and what sits under it
+                continue
             mine = [f for f in s.flags if f in ROLE_OTHERS]
             if role and s.kind == "ability" and mine and role not in mine:  # another role's job: named, not told
                 others.setdefault(mine[0], []).append(s.title)
@@ -271,7 +285,8 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
                 told = seen.get(key(s), top.title) != top.title
                 rows.append(f'<div class="unit" style="margin-left:{min(depth, 1) * 14}px">{e(s.title)}</div>'
                             + (f"<p class='small muted unit-d' style='margin-left:{min(depth, 1) * 14}px'>"
-                               + (f"As in {e(seen[key(s)])}; what changes:" if told else e(readable(s.text)))
+                               + (f"As in {e(seen[key(s)])}; what changes:" if told
+                                  else e(readable(s.text, difficulty)))
                                + "</p>" if s.text else ""))
         head = e(top.title) + "".join(f' <span class="pill">{SHOWN_FLAGS[f]}</span>'
                                        for f in top.flags if f in SHOWN_FLAGS)
