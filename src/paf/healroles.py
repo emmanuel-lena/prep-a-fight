@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS heal_stat(report TEXT, fight_id INT, actor_id INT, cl
   overheal REAL, tank REAL, spike REAL, dispels INT, PRIMARY KEY(report, fight_id, actor_id));
 CREATE TABLE IF NOT EXISTS heal_dispel(report TEXT, fight_id INT, aura_id INT, n INT);  -- the ranked healer removed
 CREATE TABLE IF NOT EXISTS heal_dispel_status(report TEXT, fight_id INT, PRIMARY KEY(report, fight_id));
-CREATE TABLE IF NOT EXISTS heal_dispel_time(report TEXT, fight_id INT, aura_id INT, t REAL);  -- each removal
+CREATE TABLE IF NOT EXISTS heal_dispel_time(report TEXT, fight_id INT, aura_id INT, t REAL, delay REAL);
 CREATE TABLE IF NOT EXISTS heal_cast(report TEXT, fight_id INT, actor_id INT, ability_id INT, t REAL, on_other INT);
 CREATE TABLE IF NOT EXISTS heal_kill(report TEXT, fight_id INT, deaths INT, spike_share REAL,
   PRIMARY KEY(report, fight_id));
@@ -69,6 +69,8 @@ HEAL_TWINS = f"""DELETE FROM heal_cast WHERE rowid IN (SELECT a.rowid FROM heal_
 
 def ensure_tables(con: sqlite3.Connection) -> None:
     con.executescript(SCHEMA)
+    if "delay" not in {r[1] for r in con.execute("PRAGMA table_info(heal_dispel_time)")}:  # 0.8.18's first try
+        con.execute("ALTER TABLE heal_dispel_time ADD COLUMN delay REAL")
     con.execute(HEAL_TWINS)
 
 
@@ -195,9 +197,22 @@ def fetch_dispels(client: WCLClient, con: sqlite3.Connection, encounter_id: int,
             continue
         removed = [ev for ev in events if ev.get("type") in ("dispel", "removedebuff") and ev.get("extraAbilityGameID")]
         counts = Counter(ev["extraAbilityGameID"] for ev in removed)
+        landed: dict[tuple[int, int], list[float]] = defaultdict(list)  # (debuff, player) -> when it landed
+        try:  # the debuff they remove the most: when it landed on each player, for how long they wait to dispel
+            for aura, _n in counts.most_common(1):
+                for ev in client.events(rep, fid, fr["startTime"], fr["endTime"], data_type="Debuffs",
+                                        ability_id=aura, filter_expression="type='applydebuff'", cache=False):
+                    landed[(aura, ev.get("targetID"))].append(ev["timestamp"])
+        except (WCLError, KeyError, TypeError, OSError) as e:
+            log(f"  dispel timing skipped: {str(e)[:100]}")
+
+        def delay(ev, landed=landed) -> float | None:
+            before = [ev["timestamp"] - t for t in landed.get((ev["extraAbilityGameID"], ev.get("targetID")), [])
+                      if 0 <= ev["timestamp"] - t <= 60000]
+            return round(min(before) / 1000, 1) if before else None
         con.executemany("INSERT INTO heal_dispel VALUES(?,?,?,?)", [(rep, fid, a, n) for a, n in counts.items()])
-        con.executemany("INSERT INTO heal_dispel_time VALUES(?,?,?,?)", [
-            (rep, fid, ev["extraAbilityGameID"], round((ev["timestamp"] - fr["startTime"]) / 1000, 1))
+        con.executemany("INSERT INTO heal_dispel_time VALUES(?,?,?,?,?)", [
+            (rep, fid, ev["extraAbilityGameID"], round((ev["timestamp"] - fr["startTime"]) / 1000, 1), delay(ev))
             for ev in removed])
         con.execute("INSERT OR REPLACE INTO heal_dispel_status VALUES(?,?)", (rep, fid))
         con.commit()
@@ -217,24 +232,15 @@ def dispelled(con: sqlite3.Connection, encounter_id: int, difficulty: int, names
 
 
 def dispel_delay(con: sqlite3.Connection, encounter_id: int, difficulty: int, aura: str,
-                 names: dict[int, str], window: float = 60.0) -> tuple[float, int] | None:
-    """(median seconds, dispels measured) between the boss's cast of `aura` (same name) and the top healers'
-    removal of it: when they dispel, which the player needs before what the dispel sets off. None: not measured."""
+                 names: dict[int, str]) -> tuple[float, int] | None:
+    """(median seconds, dispels measured) between the debuff landing on a player and the top healer removing it
+    from that player: when they dispel, which the player needs before what the dispel sets off. None: too few."""
     ensure_tables(con)
     where, params = kills_filter(encounter_id, difficulty)
     ids = {i for i, n in names.items() if n == aura}
-    casts: dict[tuple[str, int], list[float]] = defaultdict(list)
-    for rep, fid, ab, t in con.execute(f"SELECT e.report, e.fight_id, e.ability_id, e.t FROM enemy_cast e "
-                                       f"JOIN fight f USING(report, fight_id) WHERE {where} AND e.type='cast'", params):
-        if ab in ids:
-            casts[(rep, fid)].append(t)
-    delays = []
-    for rep, fid, ab, t in con.execute(f"SELECT d.report, d.fight_id, d.aura_id, d.t FROM heal_dispel_time d "
-                                       f"JOIN fight f USING(report, fight_id) WHERE {where}", params):
-        if ab in ids:
-            before = [t - c for c in casts.get((rep, fid), []) if 0 <= t - c <= window]
-            if before:
-                delays.append(min(before))
+    delays = [d for ab, d in con.execute(f"SELECT d.aura_id, d.delay FROM heal_dispel_time d JOIN fight f "
+                                         f"USING(report, fight_id) WHERE {where} AND d.delay IS NOT NULL", params)
+              if ab in ids]
     return (st.median(delays), len(delays)) if len(delays) >= 5 else None
 
 

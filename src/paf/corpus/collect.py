@@ -134,8 +134,9 @@ def enumerate_kills(client: WCLClient, enc: Encounter, difficulty: int, cls: str
     return merged[:count]
 
 
-def without_twins(casts: list[dict], actor: int) -> list[dict]:
+def without_twins(casts: Iterable[dict], actor: int) -> list[dict]:
     """The casts without the copy logged on the caster of a spell cast on another player (paf.corpus.db.TWINS)."""
+    casts = list(casts)  # read twice: a generator of events (paf.wcl.WCLClient.events) would be empty the second time
     others = [(ev.get("abilityGameID"), ev["timestamp"]) for ev in casts
               if ev.get("type") == "cast" and ev.get("targetID") not in (None, actor)]
     return [ev for ev in casts if not (ev.get("type") == "cast" and ev.get("targetID") == actor and any(

@@ -106,7 +106,7 @@ class HealerPrep:
     casts: dict = field(default_factory=dict)  # boss ability -> its casts in the typical kill (timing evidence)
     split: list = field(default_factory=list)  # (talent, share picked) the top players split on (contested)
     split_players: int = 0
-    dispel_delay: tuple | None = None  # (median s after the boss casts it, dispels measured), paf.healroles
+    dispel_delay: tuple | None = None  # (median s after it lands, dispels measured), paf.healroles.dispel_delay
     named_by_damage: bool = False
     hero: list = field(default_factory=list)  # (hero tree, share of the top players), paf.healer.hero_split  # the moments are named by the raid's damage taken by ability (measured)
 
@@ -702,7 +702,8 @@ def render_sheet(h: HealerPrep) -> str:
     if mine is not None:
         you = [f"<h2>How you heal, against the other healers</h2>{role_card(mine, h.roles, True, chips=False)}"
                f"<p class='small muted'>From {h.role_kills} {e(h.role_sample or 'top kills')}."
-               + (" Kills ranked by your spec's healing: your share of the healing is inflated." if own else "")
+               + (" These are the kills where your spec healed the most: its share looks higher than in a usual kill."
+                  if own else "")
                + "</p>"]
     fight = ([lead] if lead else []) + you + [
         f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Damage the "
@@ -731,7 +732,7 @@ def render_sheet(h: HealerPrep) -> str:
                   f"To weigh a talent or an item for your character, use <a href=\"{QE_LIVE}\" target=\"_blank\" "
                   f"rel=\"noopener\">QE Live</a>.</p>")
     jr = "".join(f"<li>{e(_plain(x))}</li>" for x in h.journal)
-    when = (f", a median {h.dispel_delay[0]:.0f} s after the boss casts it" if h.dispel_delay else "")
+    when = (f", a median {h.dispel_delay[0]:.0f} s after it lands on the player" if h.dispel_delay else "")
     first = ([f"<p class='lead'>Your measured job here: dispel {e(h.dispelled[0][0])}. The top {e(h.spec)} of each "
               f"kill removes it {h.dispelled[0][1]:.1f} times ({h.dispel_kills} kills read){when}."
               + (f" {e(h.dispel_text)}" if h.dispel_text else "") + "</p>"]
@@ -753,8 +754,13 @@ def render_sheet(h: HealerPrep) -> str:
         boss.append("<h2>What you can dispel here</h2><p>No ability of this boss is dispellable at this difficulty, "
                     "in the Encounter Journal or the game data: the dispels in the top kills go to other debuffs "
                     "(which ones is not measured yet).</p>")
-    if h.abilities:  # every ability, the healers' in full and the others' named
-        boss.append(f"<h2>Every ability, phase by phase</h2><div class='stages'>{h.abilities}</div>")
+    if h.abilities:  # every ability, the healers' in full and the others' named; your measured job tagged on it
+        stages = h.abilities
+        if h.dispelled and h.dispelled[0][1] >= 1:
+            name, k = h.dispelled[0]
+            stages = stages.replace(f"<b>{e(name)}</b>", f"<b>{e(name)}</b> <span class=\"pill gold\">you dispel "
+                                    f"it: {k:.1f} a kill</span>", 1)
+        boss.append(f"<h2>Every ability, phase by phase</h2><div class='stages'>{stages}</div>")
     enough = {p.spec for p in h.presence if p.kills >= FEW_KILLS} if h.presence else {r.spec for r in h.roles}
     shown = sorted((r for r in h.roles if r.spec == h.spec or r.spec in enough), key=lambda r: r.spec != h.spec)
     others = "".join(role_card(r, h.roles, r.spec == h.spec, chips=r.spec != h.spec) for r in shown)
