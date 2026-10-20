@@ -44,6 +44,17 @@ class Estimate:
         return f"{what} About {max(1, round(self.minutes))} min.{wait}"
 
 
+    @property
+    def lead(self) -> str:
+        """The boss page's answer, one sentence: how long, and from what."""
+        what = {"pack_local": "from the prep pack already on your computer",
+                "pack_shared": "from a prep pack another player shared this week",
+                "corpus": "from the top kills already on your computer",
+                "collect": f"after downloading the top {self.kills} kills of your spec from Warcraft Logs"}[self.source]
+        wait = f", {round(self.wait)} min of it waiting for your Warcraft Logs quota" if self.wait >= 1 else ""
+        return f"About {max(1, round(self.minutes))} min to prepare, {what}{wait}."
+
+
 def sims_minutes() -> float:
     import statistics as st
 

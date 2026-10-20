@@ -6,13 +6,18 @@
 .fold:not([open])>summary::after{content:"\2026 \203A";color:var(--accent)}
 .unit .clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .ab{padding:8px 0;border-top:1px solid var(--line)} .ab .pill{font-size:11px;padding:1px 7px;margin-left:4px}
-.unit{padding:10px 0 2px;font-weight:700;color:var(--muted);text-transform:uppercase;font-size:12px;
-  letter-spacing:.04em}
+.unit{padding:10px 0 2px;font:600 12px var(--font-display);color:var(--muted);text-transform:uppercase;
+  letter-spacing:.08em}
 /* every ability shown, nothing folded (DESIGN.md): the unit's description reads as text, not as a label */
-.stage>h3{font-size:17px;margin:0 0 6px}
+.stages{max-width:80ch}
+.stage{margin:0 0 28px}
+.stage>h3{font:600 20px/1.3 var(--font-reading);margin:0 0 8px;letter-spacing:0}
+.stage .also{margin:4px 0 0;font-style:italic}
 .unit-d{margin:2px 0 6px;max-width:80ch}
 .ab-d{max-width:80ch;margin-top:2px}
-.guide .other-role{font-size:14px;color:var(--muted);margin:14px 0 4px}
+.stages .ab-d,.stages .unit-d{font-size:15px;line-height:1.55}
+.guide h3,.guide .other-role{font:600 17px/1.3 var(--font-reading);color:var(--fg);margin:16px 0 4px}
+.guide ul.small.muted{font-size:14px;color:var(--fg)}
 .ics{vertical-align:-4px;margin-right:6px}
 .stage>.abg:first-child>.ab:first-child{border-top:0;padding-top:0}
 /* each ability group separated by a line under it, so a column never starts on a stray rule */
@@ -20,6 +25,6 @@
 .stage>.abg{border-bottom:1px solid var(--line);padding-bottom:4px;margin-bottom:8px}
 .stage>.abg:last-child{border-bottom:0}
 /* a unit's abilities read as the unit's: a rule down their side, the boss's own abilities after it stand clear */
-.abg:has(>.unit){border-left:3px solid var(--line);padding-left:10px;margin-left:2px}
-.abg>.unit{font-weight:700;margin-bottom:2px}
+.abg:has(>.unit){border-left:1px solid var(--line);padding-left:10px;margin-left:2px}
+.abg>.unit{margin-bottom:2px}
 .stage>.abg{border-bottom:0;margin-bottom:16px} /* groups apart by space: no rule left hanging at a column's foot */

@@ -8,7 +8,7 @@ web
 
 ## Users
 
-Every raider is meant to be served by the tool: the casual and the mythic / parse player, the raid leader, healers and tanks. We start with the **casual heroic and mythic raider** of World of Warcraft, who raids two or three evenings a week, wants to know what to do on a boss in five minutes before the pull, and is put off by tables, jargon and walls of numbers. When needs conflict, design for this player first; the details stay one click away, folded.
+Every raider is meant to be served by the tool: the casual and the mythic / parse player, the raid leader, healers and tanks. We start with the **casual heroic and mythic raider** of World of Warcraft, who raids two or three evenings a week, wants to know what to do on a boss in five minutes before the pull, and is put off by tables, jargon and walls of numbers. When needs conflict, design for this player first; the details come right below the answer, shown, never folded.
 
 Also served, built for as the tool grows:
 - the mythic / parse player, who reads logs and wants every number and option (in the detailed tabs and the tools);
@@ -62,7 +62,7 @@ The sims run on **the real fight rebuilt from the top players' logs**, not on a 
 
 ## Product Principles
 
-1. **The player first, the expert one click away**: lead with what to do, in sentences; tables and raw numbers are folded details.
+1. **The player first, the expert just below**: lead with what to do, in sentences; tables and raw numbers come after the sentence that reads them, shown on the page, never folded.
 2. **Honest numbers**: every gain comes with its noise or confidence; under the noise, say nothing stands out; never invent a fact or a strategy the data does not show.
 3. **The real fight**: everything is measured on the boss as the top raids play it, not on a dummy.
 4. **Local at the core**: the sims and the prep run on the player's computer; accounts, if they come, stay optional.

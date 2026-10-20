@@ -189,10 +189,12 @@ def settings_form() -> str:
                          if k not in listed)
     out = ""
     for group, folded, rows in groups:
-        fields = "".join(
-            f"<div class='set-row{' set-check' if settings.SETTINGS[k].choices == ('on', 'off') else ''}'>"
-            f"<label for='s-{e(k)}'>{e(label)}</label>{_setting_control(k)}"
-            f"{f'<p class=set-help>{e(help_)}</p>' if help_ else ''}</div>" for k, label, help_ in rows)
+        def row(k: str, label: str, help_: str) -> str:
+            check = settings.SETTINGS[k].choices == ("on", "off")  # a checkbox goes before its label
+            lab, ctl = f"<label for='s-{e(k)}'>{e(label)}</label>", _setting_control(k)
+            return (f"<div class='set-row{' set-check' if check else ''}'>" + (ctl + lab if check else lab + ctl)
+                    + (f"<p class='set-help'>{e(help_)}</p>" if help_ else "") + "</div>")
+        fields = "".join(row(k, label, help_) for k, label, help_ in rows)
         out += (f"<details class='set-group' open><summary>{e(group)}</summary>{fields}</details>" if folded else
                 f"<fieldset class='set-group'><legend>{e(group)}</legend>{fields}</fieldset>")
     return out
@@ -230,25 +232,29 @@ def settings_page(message: str = "") -> str:
                    + connect_block(lead=False, ghost=True))
     else:
         account = connect_block(lead=False)
-    account = (f"<h2>Warcraft Logs</h2><div class='card'>{account}</div>" if wcllogin.available() else "")
-    return f"""<h1>Settings</h1><p class="lead">Your raid, the app, your Warcraft Logs access and where things stand.
-</p>{msg}<div class="set-cols"><div>
+    account = (f"<h2>Warcraft Logs</h2><div class='card'>{account}<hr class='set-hr'>" if wcllogin.available() else "")
+    said = ["SimulationCraft installed" if exe else "SimulationCraft <b>not installed</b> (Get nightly, below)"]
+    said.append("Warcraft Logs connected with your account" if wcllogin.logged_in() else
+                "Warcraft Logs read with your own key" if cid else "Warcraft Logs <b>not connected</b> (below)")
+    ok = exe and (wcllogin.logged_in() or cid)
+    return f"""<h1>Settings</h1><p class="lead">{"All set" if ok else "Not ready yet"}: {", ".join(said)}.</p>
+{msg}<div class="set-cols"><div><h2>Your raid and the app</h2>
 <form method="post" action="/settings" class="card settings">{settings_form()}
 <div class="cta"><button class="btn go">Save</button><span class="dirty-note">Unsaved changes</span></div></form>
 </div><div>
-{account if account else "<h2>Warcraft Logs</h2>"}<div class="card"><h3 class="card-h">Your API key</h3>
+{account if account else "<h2>Warcraft Logs</h2><div class='card'>"}<h3 class="card-h">Your API key</h3>
 <p class="small measure">{current} To use another one (a new
 client, or a regenerated secret): create or open it on <a href="https://www.warcraftlogs.com/api/clients"
 target="_blank" rel="noopener">warcraftlogs.com/api/clients</a>, then paste both values.
 It is tested before it replaces the old one.</p>
 <form method="post" action="/credentials" class="row"><input type="hidden" name="back" value="settings">
-<input name="id" class="key-in" placeholder="Client ID" aria-label="Client ID" required>
-<input name="secret" class="key-in" type="password" placeholder="Client Secret" aria-label="Client Secret" required
-autocomplete="off">
+<label class="key-l">Client ID<input name="id" class="key-in" required></label>
+<label class="key-l">Client Secret<input name="secret" class="key-in" type="password" required
+autocomplete="off"></label>
 <button class="btn ghost">Save and test</button></form>
 <p class="tiny muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p></div>
-<h2>Status</h2><div class="card"><table class="status">
-<tr><td>SimulationCraft</td><td class="small"><div class="val"><span>{simc}</span>
+<h2>Status</h2><div class="set-status"><table class="status">
+<tr><td>SimulationCraft</td><td class="small"><div class="val"><span class="path">{simc}</span>
 <form method="post" action="/tool/setup">
 <button class="btn ghost" title="Downloads the latest SimulationCraft nightly into the app; a build of your own
 stays where it is">Get nightly</button></form></div></td></tr>
@@ -257,9 +263,8 @@ stays where it is">Get nightly</button></form></div></td></tr>
 <tr><td>Warcraft Logs</td><td class="small">{quota}</td></tr>
 <tr><td>Caches (sims, logs)</td><td class="small">{size(cache_root()) / 1e6:,.0f} MB
 (cap {settings.get('cache_max_mb')} MB)</td></tr>
-<tr><td>Data folder</td><td class="small">{e(str(data_dir()))}</td></tr></table></div>
-<h2>Every tool</h2><div class="card"><p class="small">The prep of a boss runs them all; each one is also on its own
-page, to dig further.</p><p><a class="btn ghost" href="/tools">See every tool &rarr;</a></p></div>
+<tr><td>Tools</td><td class="small"><a href="/tools">Every tool, each on its own page</a></td></tr>
+<tr><td>Data folder</td><td class="small"><span class="path">{e(str(data_dir()))}</span></td></tr></table></div>
 </div></div>
 <script>(function(){{var d=new Set();
 document.querySelectorAll('.set-cols form').forEach(function(f){{

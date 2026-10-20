@@ -81,21 +81,8 @@ th.n{text-align:right}
 .major .sev{background:var(--fg)!important;color:var(--bg)!important}
 .sugg .gain small{display:block;font:500 11px var(--font-body);color:var(--muted);text-align:right;text-transform:none}
 
-/* the sheet's boss tab: the journal's stages side by side on a wide window */
-.panel .stages{display:grid;gap:16px;align-items:start}
-@media (min-width:1300px){.panel .stages{grid-template-columns:repeat(2,minmax(0,1fr))} .panel .stages .stage{margin:0}}
-@media (min-width:1300px){.panel .stages{display:block;column-count:2;column-gap:16px} .panel .stages .stage{break-inside:avoid;margin:0 0 16px}}
-@media (min-width:1300px){.panel .stages .stage{break-inside:auto;-webkit-box-decoration-break:clone;box-decoration-break:clone}
-  .panel .stages .ab,.panel .stages .unit,.panel .stages .unit-d{break-inside:avoid} .panel .stages .stage>h3{break-after:avoid}}
 .panel a.ws-card,.panel a.ws-card b,.panel a.ws-card .ws-txt{color:var(--fg)}
 /* the journal: one card per stage, full width, its abilities in two columns inside (no stage loses its name) */
-.panel .stages{display:grid!important;grid-template-columns:minmax(0,1fr)!important;column-count:auto!important;gap:16px}
-.panel .stages .stage{margin:0}
-@media (min-width:1100px){.panel .stages .stage{column-count:2;column-gap:32px}
-  .panel .stages .stage>h3,.panel .stages .stage>p:not(.unit-d){column-span:all} .panel .stages .unit{break-after:avoid}
-  .panel .stages .ab,.panel .stages .unit,.panel .stages .unit-d{break-inside:avoid}}
-.panel .stages .ab-d,.panel .stages .unit-d{max-width:80ch}
-.panel .stages .abg{break-inside:avoid}
 .boss-top{display:grid;gap:8px 28px;align-items:start}
 @media (min-width:1100px){.boss-top{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 .boss-top>div>h2:first-child{margin-top:8px}

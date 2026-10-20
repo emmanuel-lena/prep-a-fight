@@ -297,10 +297,10 @@ def test_simple_home_once_set_up(tmp_path, monkeypatch):
     rep.mkdir()
     (rep / "prep-the-altar-heroic-elemental-shaman.html").write_text("<title>The Altar prep</title>")
     page = web.home().decode()
-    assert "Prepare a boss</h1>" in page and "Let's go" in page and 'name="difficulty" value="mythic"' in page
-    assert "Every prep sheet" in page and "The Altar" in page and "just now" in page
+    assert "Prepare a boss</h1>" in page and 'class="go-boss"' in page and 'name="difficulty" value="mythic"' in page
+    assert "Your sheets as Elemental Shaman" in page and "The Altar" in page and "just now" in page
     assert "Change your character" not in page  # the character, the raid and the key live in Characters and Settings
-    assert "%" not in page.split("Every prep sheet", 1)[1].split("</details>", 1)[0]  # no numbers on the cards
+    assert "%" not in page.split("Your sheets as", 1)[1].split("</section>", 1)[0]  # no numbers on the rows
 
 
 def test_ago():

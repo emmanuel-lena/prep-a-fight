@@ -151,6 +151,9 @@ def _same_role(title: str, role: str) -> bool:
     return bool(want) and title.lower().rstrip("s") == want.lower().rstrip("s")
 
 
+ROLE_AS = {"damage": "a damage dealer", "healer": "a healer", "tank": "a tank"}
+
+
 def summary_html(sections: list[Section], role: str = "damage", full_link: str = "") -> str:
     """The overview and what your role does, from the journal."""
     over = next((s for s in sections if s.kind == "overview"), None)
@@ -160,7 +163,7 @@ def summary_html(sections: list[Section], role: str = "damage", full_link: str =
     others = [c for c in over.children if c is not mine and c.text]
     out = [f"<p>{e(readable(over.text))}</p>" if over.text else ""]
     if mine and mine.text:
-        out.append(f"<h3>What the journal tells {e(mine.title.lower())}</h3><ul>"
+        out.append(f"<h3>For you, as {ROLE_AS.get(role, 'a player')}</h3><ul>"
                    + "".join(f"<li>{e(readable(b))}</li>" for b in bullets(mine.text)) + "</ul>")
     for c in others:  # the other roles: shown, smaller (what the raid around you does)
         out.append(f"<h3 class='other-role'>{e(c.title)}</h3><ul class='small muted'>"
@@ -213,12 +216,25 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
            "mechanics": {m.name.lower(): m for m in (mechanics or [])},
            "burst": {k.lower(): v for k, v in (burst or {}).items()}, "icons": icon_map or {},
            "describe": describe}
+    def key(s: Section) -> tuple:
+        return s.kind, s.title, readable(s.text), tuple(s.flags)
+
+    def again(s: Section) -> bool:  # told word for word in an earlier stage, and everything under it too
+        return key(s) in seen and all(again(c) for c in s.children)
+
+    seen: dict[tuple, str] = {}  # what a stage repeats from an earlier one: named, not described twice
     cards = []
     for top in sections:
         if top.kind == "overview":
             continue
-        rows = []
+        rows, repeated = [], {}
         for depth, s in walk(top.children):
+            if s.kind in ("ability", "creature") and again(s):
+                if s.kind == "ability":
+                    repeated.setdefault(seen[key(s)], []).append(s.title)
+                continue
+            if s.kind in ("ability", "creature"):
+                seen.setdefault(key(s), top.title)
             if s.kind == "ability":
                 rows.append(_ability(s, depth, ctx))
             elif s.kind == "creature":
@@ -231,7 +247,9 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
         if top.kind == "ability":
             rows.insert(0, _ability(top, 0, ctx))
         title = "" if top.kind == "ability" else f"<h3>{head}</h3>"  # an ability's card: its row names it
-        cards.append(f'<section class="card stage">{title}{intro}{grouped("".join(rows))}</section>')
+        also = "".join(f"<p class='small muted also'>Also, as in {e(where)}: {e(', '.join(dict.fromkeys(names)))}.</p>"
+                       for where, names in repeated.items())
+        cards.append(f'<section class="stage">{title}{intro}{grouped("".join(rows))}{also}</section>')
     return "".join(cards)
 
 

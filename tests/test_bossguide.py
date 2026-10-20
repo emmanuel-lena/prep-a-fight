@@ -30,3 +30,23 @@ def test_summary_and_abilities():
     assert "Stage One" in a and "Overview" not in a
     assert "around 2:00, 4:31" in a and "boss takes x2 damage" in a
     assert "interrupted, ~1 s of movement for you" in a and ">interrupt</span>" in a
+
+
+def test_a_stage_names_what_it_repeats():
+    """Nek'zali's Stage Two repeats Stage One's abilities word for word: named once, not described twice; one that
+    changes (a new flag) is described again."""
+    well = sec(5, "Soulcoil Well", "ability", "A well of necrotic energy.", children=[
+        sec(6, "Soulcoil Rite", "ability", "The rite's power afflicts players.")])
+    rage = sec(7, "Uncoiled Rage", "ability", "She gains her full potential.", ["deadly"])
+    one = sec(4, "Stage One", "stage", children=[well, rage, sec(8, "Vessel", "ability", "A corpse lingers.")])
+    two = sec(9, "Stage Two", "stage", children=[
+        sec(10, "Soulcoil Well", "ability", "A well of necrotic energy.", children=[
+            sec(11, "Soulcoil Rite", "ability", "The rite's power afflicts players.")]),
+        sec(12, "Uncoiled Rage", "ability", "She gains her full potential.", ["deadly"]),
+        sec(13, "Vessel", "ability", "A corpse lingers.", ["deadly"]),
+        sec(14, "Invoke", "ability", "She calls the cultists.")])
+    a = abilities_html([one, two])
+    second = a[a.index("Stage Two"):]
+    assert "Also, as in Stage One: Soulcoil Well, Soulcoil Rite, Uncoiled Rage." in second
+    assert "A well of necrotic energy." not in second and "She calls the cultists." in second
+    assert "A corpse lingers." in second  # deadly now: told again

@@ -285,8 +285,10 @@ def text(sh: dict, difficulty: str, mrt: bool = False) -> str:
 def _tools() -> str:
     from paf import workshop
 
-    return (f"<h2>Dig deeper into a log</h2>{workshop.cards(('review', 'comp', 'raid', 'night'))}"
-            f"<h2>The boss, for your assignments</h2>{workshop.cards(('assigns', 'mechanics'))}{workshop.CSS}")
+    return (f"<h2>Dig deeper into your raid's log</h2>{workshop.cards(('review', 'comp', 'raid', 'night'))}"
+            f"<h2>The boss, for your assignments</h2>{workshop.cards(('assigns', 'mechanics'))}"
+            "<p class='muted'>Your own play, pull by pull, is on <a href='/reclear'>Reclear</a>.</p>"
+            f"{workshop.CSS}")
 
 
 def page_body(difficulty: str) -> str:
@@ -310,10 +312,14 @@ def page_body(difficulty: str) -> str:
                        "<script>setTimeout(function(){location.reload()},10000)</script>")
     if not state.get("players"):
         err = f"<p class='notice'>{e(state['error'])}</p>" if state.get("error") else ""
-        return head + (f"{err}<div class='rl-start'><p>The roster comes from your raid's last log: your last raid "
-                       f"(read when the app starts), else your guild's latest log (Settings).</p>"
+        g = settings.get("guild")
+        src = (f"your last raid (read when the app starts), else the latest log of {e(g)}" if g else
+               "your last raid (read when the app starts), else your guild's latest log (set it in "
+               "<a href='/settings'>Settings</a>)")
+        return head + (f"{err}<section class='rl-start'><h2>First, your raid's roster</h2><p>Every answer on this "
+                       f"page starts from who is in your raid. The button reads {src}: about a minute.</p>"
                        f"<form method='post' action='/raidlead/read'><input type='hidden' name='difficulty' "
-                       f"value='{e(difficulty)}'><button class='btn go'>Read my raid's roster</button></form></div>"
+                       f"value='{e(difficulty)}'><button class='btn go'>Read my raid's roster</button></form></section>"
                        + _tools())
     bench = set(state.get("bench") or [])
     chips = "".join(

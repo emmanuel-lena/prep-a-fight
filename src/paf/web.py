@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import html
 import os
-import re
 import subprocess
 import sys
 import threading
@@ -521,22 +520,24 @@ def ago(mtime: float, now: float | None = None) -> str:
 DIFF_LABELS = {"lfr": "LFR", "normal": "Normal", "heroic": "Heroic", "mythic": "Mythic"}
 
 
-def boss_cards(items: list[dict], limit: int = 6) -> str:
-    """The prepared bosses as plain cards: the boss, the difficulty, when; the numbers stay in the sheet."""
+def boss_cards(items: list[dict], order: tuple[str, ...] = ()) -> str:
+    """The prepared bosses as a ruled list, one group per boss in the raid's order: the spec, the difficulty, when;
+    the numbers stay in the sheet."""
     from paf import icons
 
-    def card(x: dict) -> str:
+    def row(x: dict) -> str:
         cls = (x.get("spec") or "").split(" ")[-1].lower()
-        ic = icons.img(icons.CLASS_ICON.format(cls=cls), "medium", "bc-ic") if cls else ""
-        return (f'<a class="bcard" href="/view/{e(x["key"])}">{ic}<span class="bc-txt"><b>{e(x["name"])}</b>'
-                f'<span class="bc-meta">{diff_pill(x["difficulty"])}'
-                f' {e(x["spec"] or "")}{"" if "prep" in x["files"] else " · top players&#39; timelines only"}</span></span>'
-                f'<span class="bc-when">{ago(x["mtime"])}</span></a>')
-    head = "".join(card(x) for x in items[:limit])
-    rest = items[limit:]
-    more = (f'<details class="bc-more" open><summary>{len(rest)} more</summary><div class="bcards">'
-            + "".join(card(x) for x in rest) + "</div></details>") if rest else ""
-    return f'<div class="bcards">{head}</div>{more}'
+        ic = icons.img(icons.CLASS_ICON.format(cls=cls), "medium", "bc-ic") if cls else "<span class='bc-ic'></span>"
+        return (f'<a class="bcard" href="/view/{e(x["key"])}">{ic}<span class="bc-txt">{e(x["spec"] or "Your sheet")}'
+                f' {diff_pill(x["difficulty"])}{"" if "prep" in x["files"] else " <span class=muted>no sim yet</span>"}'
+                f'</span><span class="bc-when">{ago(x["mtime"])}</span></a>')
+    groups: dict[str, list[dict]] = {}
+    for x in items:
+        groups.setdefault(x["name"], []).append(x)
+    rank = {n: i for i, n in enumerate(order)}
+    names = sorted(groups, key=lambda n: (rank.get(n, len(rank)), n))
+    return "".join(f'<section class="bgroup"><h3>{e(n)}</h3><div class="bcards">{"".join(row(x) for x in groups[n])}'
+                   f'</div></section>' for n in names)
 
 
 TABS = (("prep", "Prep sheet"), ("timeline", "Top players' timelines"))
@@ -799,7 +800,7 @@ def characters_strip() -> str:
     return f'<div class="chars">{chips}{add}</div>'
 
 
-ADD_FORM = ('<form method="post" action="/profile" class="add-form"><p class="small muted">In game, on that character: '
+ADD_FORM = ('<form method="post" action="/profile" class="add-form"><p class="add-help">In game, on that character: '
             'type <code>/simc</code>, then Ctrl+A, Ctrl+C, and paste here. Paste it again after a gear change to '
             'update it.</p><textarea name="simc" required placeholder="Paste the /simc export here"></textarea>'
             '<p><button class="btn go">Add this character</button></p></form>')
@@ -815,28 +816,45 @@ def characters_page() -> str:
         logs = (f'<form method="post" action="/character/autologs" class="cc-logs"><input type="hidden" name="slug" '
                 f'value="{e(c.slug)}"><input type="hidden" name="on" value="{"0" if c.slug in auto else "1"}">'
                 f'<label><input type="checkbox"{" checked" if c.slug in auto else ""} onchange="this.form.submit()"> '
-                f'Read my last raid when the app starts</label></form>')
+                f'<span>Read my last raid when the app starts: <a href="/reclear">Reclear</a> shows what it cost you</span>'
+                f'</label></form>')
         ic = icons.img(icons.CLASS_ICON.format(cls=c.class_name.lower()), "large", "cc-ic")
-        badge = ('<span class="pill">from a log: no bags</span>' if c.imported else
-                 f'<span class="pill">{c.bags} items in bags</span>')
-        play = ('<span class="pill on">active</span>' if c.current else
+        badge = ('<span class="muted small">from a log: no bags</span>' if c.imported else
+                 f'<span class="muted small">{c.bags} items in bags</span>')
+        play = ('<span class="cc-on">Playing now</span>' if c.current else
                 f'<form method="post" action="/character/select"><input type="hidden" name="slug" value="{e(c.slug)}">'
                 f'<button class="btn ghost">Play this character</button></form>')
         cards += (f'<div class="ccard{" on" if c.current else ""}">{ic}<div class="cc-txt"><b>{e(c.name)}'
                   f'{(" <small class=muted>" + e(c.realm) + "</small>") if c.realm else ""}</b>'
                   f'<span class="cc-spec">{e(c.spec.title())} {e(c.class_name.title())}</span><span>{badge} '
-                  f'<span class="muted small">updated <span>{ago(c.mtime)}</span></span></span></div><div class="cc-act">{play}'
-                  f'<a class="btn ghost" href="#add">Update</a>'
-                  f'<details class="rm"><summary class="btn ghost danger">Remove</summary><div class="rm-ask">'
+                  f'<span class="muted small">&middot; updated <span>{ago(c.mtime)}</span></span></span></div><div class="cc-act">{play}'
+                  f'<a class="btn ghost" href="#add">Paste a new export</a>'
+                  f'<details class="rm"><summary class="cc-rm">Remove</summary><div class="rm-ask">'
                   f'<span>Remove this character? Its /simc export is deleted.</span>'
                   f'<form method="post" action="/character/remove"><input type="hidden" name="slug" value="{e(c.slug)}">'
                   f'<button class="btn danger">Yes, remove it</button></form>'
                   '<button type="button" class="btn ghost" onclick="this.closest(\'details\').open=false">Keep it'
                   f'</button></div></details></div>{logs}</div>')
     empty = "" if cards else "<p class='muted'>No character yet: add your first one below.</p>"
-    return (f"<h1>Your characters</h1><p class='lead'>One /simc export per character: switch in one click, paste "
-            f"again after a gear change.</p><div class='ccards'>{cards}</div>{empty}"
-            f"<h2 id='add'>+ Add a character</h2><div class='card'>{ADD_FORM}</div>")
+    cur = next((c for c in characters.all_characters() if c.current), None)
+    lead = (f"You play <b>{e(cur.name)}</b>, {e(cur.spec.title())} {e(cur.class_name.title())}"
+            + (f" ({e(cur.realm)})" if cur.realm else "") + ". Switch in one click; paste a new /simc export after a "
+            "gear change." if cur else "One /simc export per character: switch in one click.")
+    have = {c.name.lower() for c in characters.all_characters()}
+    from paf import onboarding, wcllogin
+
+    mine = [x for x in onboarding.account_characters() if x[0].lower() not in have]
+    acc = ("<p class='add-help'>From your Warcraft Logs account, in one click (their latest logged boss fight gives "
+           "their gear and talents, no bags):</p><div class='acc-add'>" + "".join(
+               f"<form method='post' action='/character/import'><input type='hidden' name='name' value='{e(n)}'>"
+               f"<input type='hidden' name='server' value='{e(sv)}'><input type='hidden' name='region' value='{e(rg)}'>"
+               f"<button class='btn ghost'>Add {e(n)} <small>{e(sv)}-{e(rg.upper())}</small></button></form>"
+               for n, sv, rg in mine) + "</div><p class='add-help'>Or, with your bags:</p>") if mine else (
+        "" if wcllogin.logged_in() or not wcllogin.available() else
+        "<p class='add-help'>Or <a href='/settings'>connect Warcraft Logs</a> to add your account's characters in one "
+        "click.</p>")
+    return (f"<h1>Your characters</h1><p class='lead'>{lead}</p><div class='ccards'>{cards}</div>{empty}"
+            f"<h2 id='add'>Add a character</h2>{acc}{ADD_FORM}")
 
 
 DIFF_SHAPES = (("normal", "tri"), ("heroic", "sq"), ("mythic", "penta"))  # WoW's green, blue, purple
@@ -920,15 +938,16 @@ def reclear_page() -> str:
     if card:
         last = card + lastraid.CARD_JS
     else:
-        last = ("<section class='rc-empty'><h2>No raid read yet</h2><p>Each time it starts, the app reads your "
+        last = ("<section class='rc-empty'><h2>No raid of yours read yet</h2><p>Each time it starts, the app reads your "
                 "character's latest log of the current raid and shows here what cost you the most on each boss. "
-                "Raid with your character logged on Warcraft Logs, then come back.</p>"
+                "Once someone in your raid has uploaded the night's log to Warcraft Logs, come back.</p>"
                 "<form method='post' action='/lastraid/again'><button class='btn go'>Look for my last raid now</button>"
                 "</form></section>")
     return (f"<div class='rc'><header class='rc-head'><h1>Reclear</h1><p class='lead'>Your last raid, read against "
             f"the top players of your spec: what cost you the most, boss by boss, and where to look in the log.</p>"
-            f"</header>{last}<h2>Dig deeper into a log</h2>"
-            f"{workshop.cards(('rotation', 'diff', 'wipe', 'night', 'review', 'comp'))}</div>{workshop.CSS}")
+            f"</header>{last}<h2>Dig deeper into your own log</h2>"
+            f"{workshop.cards(('rotation', 'diff', 'wipe'))}<p class='muted'>The raid's pulls, player by player, and "
+            f"your raid night are on <a href='/raidlead'>Raid lead</a>.</p></div>{workshop.CSS}")
 
 
 def raid_prepare_page(difficulty: str) -> bytes:
@@ -1041,7 +1060,7 @@ def raid_board(encs, class_name: str, spec: str) -> str:
                 f"else{{this.dataset.r=1;this.src+='?r=1'}}\">")  # one retry, then the initial
     items = ""
     for i, x in enumerate(encs, 1):
-        states, ready = "", False
+        states, ready, here = "", False, ""
         for diff, shape in DIFF_SHAPES:
             key = f"{_slug(x.name)}-{diff}-{mine}"
             item = done.get(key)
@@ -1058,16 +1077,20 @@ def raid_board(encs, class_name: str, spec: str) -> str:
                 ready = ready or not stale
             else:
                 href, state, word = f"/boss?boss={x.id}&amp;difficulty={diff}", "no", "prepare"
+            if diff == settings.get("difficulty"):  # said under the portrait, without pointing at it
+                here = (f"<small class='rb-st {state}'>"
+                        f"{'not prepared' if state == 'no' else 'ready ' + word if state == 'ok' else 'redo after reset' if state == 'old' else word}"
+                        "</small>")
             states += (f"<a class='rb-d {state}' href='{href}'><span class='rb-frame {shape}'><span class='rb-in'>"
                        f"{portrait(x)}</span></span><b>{e(DIFF_LABELS.get(diff, diff))}</b><small>{word}</small></a>")
         items += (f"<div class='rb-boss{'' if ready else ' grey'}' tabindex='0'><span class='rb-face'>{portrait(x)}"
-                  f"<span class='rb-n'>{i}</span></span><span class='rb-name'>{e(x.name)}</span>"
+                  f"<span class='rb-n'>{i}</span></span><span class='rb-name'>{e(x.name)}</span>{here}"
                   f"<div class='rb-pop' role='group' aria-label='{e(x.name)}'><b class='rb-title'>{e(x.name)}</b>"
                   f"<div class='rb-ds'>{states}</div></div></div>")
-    return (f"<h2 class='h-mine'>Your raid, boss by boss</h2>{queue_strip(settings.get('difficulty'))}"
-            f"<div class='rb-row'>{items}</div>{QUEUE_JS}{RB_JS}"
-            "<p class='small muted rb-legend'><span>Point at a boss to see its three difficulties; click one to open "
-            "its sheet or start its prep. A grey boss is not prepared for this week yet.</span></p>")
+    return (f"<h2 class='h-mine'>Your raid, boss by boss</h2>"
+            f"<p class='rb-legend'>Under each boss, where it stands in {e(DIFF_LABELS.get(settings.get('difficulty'), ''))} "
+            "this week; point at it for the other difficulties, click one to open its sheet or start its prep.</p>"
+            f"<div class='rb-row'>{items}</div>{queue_strip(settings.get('difficulty'))}{QUEUE_JS}{RB_JS}")
 
 
 def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
@@ -1103,14 +1126,23 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
         last = last + lastraid.CARD_JS if last else ""
     except Exception:  # noqa: BLE001 - the home always shows
         last = ""
-    mine = f'<h2>Every prep sheet ({len(items)})</h2>{boss_cards(items, limit=len(items))}' if items else ""
+    me = f"{loaded.spec}-{loaded.class_name}".lower().replace(" ", "-")
+    order = tuple(x.name for x in encs)
+    own = [x for x in items if x["key"].endswith("-" + me)]  # the active character's spec first, the others after
+    rest = [x for x in items if x not in own]
+    mine = ((f'<h2>Your sheets as {e(loaded.spec.title())} {e(loaded.class_name.title())}</h2>'
+             f'<div class="sheets">{boss_cards(own, order)}</div>' if own else "")
+            + (f'<h2>Your other specs&#39; sheets</h2><div class="sheets">{boss_cards(rest, order)}</div>' if rest else ""))
     g = settings.get("guild")
-    return f"""<section class="home-hero"><div class="me">{ic}<div><b>{e(loaded.name)}</b>
-<span>{e(loaded.spec.title())} {e(loaded.class_name.title())}{(" &middot; " + e(g)) if g else ""}</span></div></div>
-<form method="get" action="/boss" class="start"><h1>Prepare a boss</h1>{week}
+    return f"""<section class="home-hero"><form method="get" action="/boss" class="start"><h1>Prepare a boss</h1>
+<p class="me">{ic}<span>for <b>{e(loaded.name)}</b>, {e(loaded.spec.title())} {e(loaded.class_name.title())}\
+{(" &middot; " + e(g)) if g else ""}</span></p>{week}
 <select name="boss" aria-label="Boss" class="big">{options}</select>
 <div class="segs" role="radiogroup" aria-label="Difficulty">{diffs}</div>
-<button class="btn go">Let's go &rarr;</button></form></section>
+<button class="btn go">Prepare <span class="go-boss">{e(nxt.name if nxt else (encs[0].name if encs else "this boss"))}</span>
+&rarr;</button></form></section>
+<script>(function(){{var s=document.querySelector('.start select'),b=document.querySelector('.go-boss');
+if(s&&b)s.addEventListener('change',function(){{b.textContent=s.options[s.selectedIndex].text}})}})()</script>
 {board}{last}{mine}"""
 
 
@@ -1177,7 +1209,7 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
     if sections:
         gicons = icons_for(bossguide.spell_refs(sections))
         guide = f"<h2>The boss in 60 seconds</h2>{bossguide.summary_html(sections, 'damage')}"
-        journal = (f"<section class='boss-journal'><h2>Every ability, from the Encounter Journal</h2><p class='small muted'>Timings "
+        journal = (f"<section class='boss-journal'><h2>Every ability, from the Encounter Journal</h2><p class='adv-lede'>Timings "
                    f"and how many players are hit come from the ranked kills.</p><div class='stages'>"
                    f"{bossguide.abilities_html(sections, mechanics=mechs, icon_map=gicons)}</div></section>")
     try:  # where the data will come from, and how long: from what will really happen (paf.estimate)
@@ -1186,9 +1218,6 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
         est = estimate.plan(con, enc.id, diff, settings.get("class"), spec, WCLClient())
     except Exception:  # noqa: BLE001 - an estimate never breaks the page
         est = None
-    est_html = (f"<p class='est-line'><b>{'Ready fast' if est.source != 'collect' else 'First prep'}:</b> "
-                + re.sub(r"(About [^.]*\.)$", r"<span class='nw'>\1</span>", e(est.sentence[:1].lower() + est.sentence[1:]))
-                + "</p>") if est else ""
     raid_now = current_raid(enc, difficulty)
     g = settings.get("guild")
     raid_said = f"the latest public log of {g}" if g else ""
@@ -1217,10 +1246,10 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
 <small>The prep reads your raid's log: if the others already cover the adds, you stay on the boss.</small></span></label>
 """ + f'</div><div class="ob-actions">{nxt}</div></section>')
     body = f"""<div class="boss-cols"><div class="boss-main"><h1>{e(enc.name)} {diff_pill(difficulty)}</h1>
-<p class="lead">{last.strip() or ""}</p>{est_html}
+<p class="lead">{e(est.lead) if est else ""}</p>{f'<p class="last-sheet">{last.strip()}</p>' if last.strip() else ""}
 <form method="post" action="/prep" class="ob story" data-boss="{enc.id}-{e(difficulty)}">
 <input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
-<ol class="ob-dots" aria-hidden="true"><li></li><li></li><li></li><li></li></ol>
+<div class="ob-where" aria-hidden="true"><ol class="ob-dots"><li></li><li></li><li></li><li></li></ol><span class="ob-n">Step <b>1</b> of 4</span></div>
 {goal_html}
 <section class="ob-step" data-step="assigns"><h2><span class="vh">Step 2 of 4: </span>Are you assigned to something?</h2>{assigns}
 <p class="small muted ob-note">Each assignment is simulated: its moves and its downtime change your cooldown plan and your gear.</p>
@@ -1249,10 +1278,12 @@ the raid log link (step 3) or leave it empty first.</span></div>
 </form></div>
 {(f"<aside class='boss-guide'>{guide}</aside>") if guide else ""}</div>{journal}
 {_story_css()}{STORY_JS}
-<h2>Advanced</h2>
-<section class="card adv"><h3>Your fight plan: your own movements, Bloodlust, Power Infusion</h3>
+<h2>What you know that the logs cannot</h2>
+<p class="adv-lede">Two plain-text notes the next prep of this boss reads: your own fight plan, and what you know about the
+boss itself. Both are optional; the prep works from the logs without them.</p>
+<section class="adv"><h3>Your fight plan: your own movements, Bloodlust, Power Infusion</h3>
 {plan_block(enc, difficulty)}</section>
-<section class="card adv"><h3>What you know about this boss: damage amps, targets to ignore</h3>
+<section class="adv"><h3>What you know about this boss: damage amps, targets to ignore</h3>
 {notes_block(enc, difficulty)}</section>"""
     return page(enc.name, body)
 
@@ -1293,6 +1324,7 @@ function show(i, back){
   at = Math.max(0, Math.min(steps.length - 1, i));
   steps.forEach(function(s, j){ s.classList.toggle('on', j === at); s.classList.toggle('back', !!back); });
   dots.forEach(function(d, j){ d.classList.toggle('on', j <= at); });
+  var n = f.querySelector('.ob-n b'); if (n) n.textContent = at + 1;
   if (steps[at].dataset.step === 'go') recap();
   var hp = steps[at].querySelector('#raid-help');  // measured once shown: it keeps that height, no button moves under a click
   if (hp) {  // the help speaks of the goal picked: the 'Let my raid decide' clause only for that goal
@@ -1841,6 +1873,16 @@ class Handler(BaseHTTPRequestHandler):
 
                 characters.save(text)  # a new character, or an update of a known one; now the active one
                 self._redirect("/")
+            elif self.path == "/character/import":  # one of your Warcraft Logs account's characters (Characters)
+                from paf import onboarding
+
+                f = {k: v[0] for k, v in form.items()}
+                out = onboarding.find_character(f.get("name", ""), f.get("server", ""), f.get("region", "eu"))
+                if not out.get("ok"):
+                    self._send(page("Not added", f"<p>{e(out.get('error') or 'Not found.')} "
+                                                 "<a href='/characters'>Back</a></p>"), 400)
+                    return
+                self._redirect("/characters")
             elif self.path in ("/character/select", "/character/remove"):
                 from paf import characters
 

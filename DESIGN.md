@@ -128,13 +128,13 @@ components:
 
 The app is opened in the calm before a raid night: a few minutes with a boss sheet, then the pull. The system carries that hour. Deep grape and plum night tones hold the structure, a soft violet glow sits behind the page, and gold is kept for what matters on this boss: the key number, the selected choice, the line to remember. The dark theme is the signature look; the light theme gets the same care and the same hierarchy, never an inversion.
 
-It is calm and reassuring rather than loud. A casual raider should feel the page is on their side: plain sentences first, the details folded, nothing that shouts. The game is present in the details, not in costume: the display face has a slight angular, HUD-like cut, difficulty uses the game's rarity colors and shapes, and the whole app takes the class color of the active character.
+It is calm and reassuring rather than loud. A casual raider should feel the page is on their side: plain sentences first, the details below them, nothing that shouts. The game is present in the details, not in costume: the display face has a slight angular, HUD-like cut, difficulty uses the game's rarity colors and shapes, and the whole app takes the class color of the active character.
 
 Density is moderate: one column of readable prose (68 to 80 characters) with data blocks that align on tabular figures.
 
 **Key Characteristics:**
 - Night tones for structure, gold for emphasis, the class color as the active character's signature.
-- Sentences before numbers; tables and raw data are folded details.
+- Sentences before numbers; tables and raw data come after the sentence that reads them, never folded.
 - Surfaces sit lightly above a glowing ground (soft shadow, slight blur).
 - Gently rounded, pill-shaped controls; one filled button per screen.
 - Every color that carries meaning also carries a label or a shape.
@@ -179,7 +179,7 @@ A night palette of grapes and lavender with two golds, plus the game's own class
 ### Hierarchy
 - **Display** (Fraunces 600, 30px, 1.15; 22px under 640px): the page title, usually the boss name with its difficulty pill.
 - **Reading** (Fraunces 400 to 600, 17 to 26px): the prep sheet's section headings and lede, the tools' answers, the onboarding.
-- **Headline** (600, 17px, uppercase, 0.06em, muted): section headings. Quiet signposts, not shouts.
+- **Headline** (serif reading face, 600, 22px app sections, 26px sheet sections, sentence case): section headings, written as a sentence that says what the section answers. The uppercase display face (600, 15 to 17px, 0.06em, muted) stays for group labels inside a card.
 - **Title** (600, 16px): card and block titles.
 - **Body** (400, 15px, 1.6): sentences, held to 68ch for the lead and 80ch otherwise.
 - **Label** (600, 11 to 12px, uppercase, 0.05 to 0.08em): pills, table headers, KPI labels.
@@ -227,7 +227,7 @@ Clear and reassuring; one filled button per screen.
 - **Style:** a pill with the difficulty's word and its rarity shape before it (a green triangle, a blue square, a purple pentagon), Ink text; `theme.diff_pill`. Never gold: gold is a selection.
 
 ### Settings form
-- **Style:** groups in words (Your raid, The app, then an Advanced fold for the engine, the quota and the caches); each row a human label, its control, and one muted line of help under it (72ch); on/off settings are checkboxes; one filled Save.
+- **Style:** groups in words (Your raid, The app, then an Advanced group for the engine, the quota and the caches, shown like the others); each row a human label, its control, and one muted line of help under it (72ch); on/off settings are checkboxes; one filled Save.
 
 ### Cards / Containers
 - **Corner Style:** 10px.
@@ -256,7 +256,8 @@ Numbered steps in accent-ringed circles; KPI tiles with an uppercase label, a la
 
 ### Do:
 - **Do** take every color from the tokens, in both themes, and the accent from the active character's class when there is one.
-- **Do** open each block with a sentence and fold the tables in `details`.
+- **Do** open each block with a sentence, then show its table under it: no `details` folds, the player said so twice.
+- **Do** title the app's sections with serif sentences (`body.has-side>main h2`); keep the uppercase display face for small labels inside a card.
 - **Do** pair every color that means something with a word or a shape (difficulty, gain or loss, state).
 - **Do** use tabular figures for every number that lines up.
 - **Do** respect reduced motion: transitions off, the minute view as plain sections.
