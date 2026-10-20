@@ -797,9 +797,9 @@ def hero_split(con, encounter_id: int, difficulty: int, spec: str) -> list[tuple
     return [(t, n / total) for t, n in trees.most_common()] if total else []
 
 
-def _and(items: list[str]) -> str:
+def _and(items: list[str], word: str = "and") -> str:
     """'a', 'a and b', 'a, b and c'."""
-    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1] if items else ""
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + f" {word} " + items[-1] if items else ""
 
 
 def build_lead(builds: list, spec: str, players: int, split: list | None = None) -> str:
@@ -1021,12 +1021,19 @@ def render_sheet(h: HealerPrep) -> str:
         # one cooldown per hit, the one most of them press then; the other habits are on its row below
         best: dict[float, tuple] = {}
         for n, hs in by_name.items():
-            for hit, t, sp, _press, _c in hs:
+            for hit, t, sp, press, _c in hs:
                 if hit not in best or sp > best[hit][2]:
-                    best[hit] = (n, t, sp)
-        lead_names = list(dict.fromkeys(n for n, _t, _sp in best.values()))
-        answers = [f"for the {_mmss(hit)} hit, {_pct(sp)} press {e(_shown(n))} (about {_mmss(t)})"
-                   for hit, (n, t, sp) in sorted(best.items())]
+                    best[hit] = (n, t, sp, press)
+        lead_names = list(dict.fromkeys(b[0] for b in best.values()))
+        # one press answering two hits (Aura Mastery at 0:36 for some, 1:19 for others) is said once, as a choice
+        by_press: dict[tuple, list] = {}
+        for hit, (n, t, sp, press) in sorted(best.items()):
+            by_press.setdefault((n, press), []).append((hit, t, sp))
+        answers = [f"for the {_mmss(ps[0][0])} hit, {_pct(ps[0][2])} press {e(_shown(n))} (about {_mmss(ps[0][1])})"
+                   if len(ps) == 1 else
+                   f"{e(_shown(n))} is pressed once, "
+                   + _and([f"for the {_mmss(hit)} hit by {_pct(sp)} (about {_mmss(t)})" for hit, t, sp in ps], "or")
+                   for (n, _press), ps in sorted(by_press.items(), key=lambda kv: kv[1][0][0])]
         end = len(h.curve) * STEP
         long = "".join(f" {'From ' + _mmss(a) + ' to the end' if b >= end - STEP else _mmss(a) + ' to ' + _mmss(b)}, "
                        f"the raid takes about {r:.1f}&times; the usual damage without a break."

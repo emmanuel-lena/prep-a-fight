@@ -139,3 +139,16 @@ def test_the_two_sides_of_a_choice_node_are_one_cooldown(monkeypatch):
     tl = SimpleNamespace(abilities=[rev, res], duration=280.0, players=players)
     cds = healer.cooldowns(tl, [], {115310: (180.0, 1), 388615: (180.0, 1)})
     assert [(c.name, round(c.users, 1)) for c in cds] == [("Revival / Restoral", 1.0)]
+
+
+def test_one_press_for_either_hit_is_said_once():
+    # Nek'zali heroic, Holy Paladin: one Aura Mastery a kill, at 0:36 for some top players, 1:19 for others
+    ab = SimpleNamespace(id=1, name="Aura Mastery", users=1.0, per_kill=1.0)
+    players = [{"casts": {1: [79.0]}} for _ in range(5)] + [{"casts": {1: [36.0]}} for _ in range(4)]
+    tl = SimpleNamespace(abilities=[ab], duration=240.0, players=players)
+    found = [healer.Moment(35.0, 1000.0, 5.0, "Soulcoil Rite"), healer.Moment(75.0, 1100.0, 5.0, "Soulcoil Rite")]
+    cds = healer.cooldowns(tl, found, {1: (180.0, 1)})
+    h = healer.HealerPrep("Boss", "heroic", "Holy Paladin", 9, 240.0, [100.0] * 48, found, cds, [], [], [], [])
+    sheet = healer.render_sheet(h)
+    assert "Aura Mastery is pressed once, for the 0:35 hit by 44% (about 0:36) or for the 1:15 hit by 56%" in sheet
+    assert "for the 1:15 hit, 56% press" not in sheet
