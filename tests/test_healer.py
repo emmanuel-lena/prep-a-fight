@@ -115,3 +115,15 @@ def test_a_held_press_is_not_on_cooldown():
     cd = healer.cooldowns(tl, [], {7: (90.0, 1)})[0]
     gaps = [y - x for x, y in zip(cd.times, cd.times[1:], strict=False)]
     assert cd.every == 0.0 or all(abs(g - cd.every) <= 0.15 * cd.every for g in gaps)
+
+
+def test_a_channel_s_ticks_do_not_bury_its_cast():
+    """Holy Priest, Nek'zali: Divine Hymn's cast (64843) and its ticks (64844, the same name, about 10 a cast) were
+    one row, too many casts for a cooldown: the spec's main raid cooldown vanished from the sheet."""
+    cast = SimpleNamespace(id=64843, name="Divine Hymn", users=1.0, per_kill=2.0)
+    ticks = SimpleNamespace(id=64844, name="Divine Hymn", users=1.0, per_kill=20.0)
+    players = [{"casts": {64843: [36.0, 190.0], 64844: [36.0 + i for i in range(10)] + [190.0 + i for i in range(10)]}}
+               for _ in range(6)]
+    tl = SimpleNamespace(abilities=[cast, ticks], duration=285.0, players=players)
+    cds = healer.cooldowns(tl, [], {64843: (180.0, 1), 64844: (0.0, 1)})
+    assert [(c.name, c.per_kill) for c in cds] == [("Divine Hymn", 2)]

@@ -343,8 +343,10 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
             base = spell_cooldowns()
         except Exception:  # noqa: BLE001 - offline: no game data, the casts' rarity alone
             base = {}
-    groups: dict[str, list] = {}  # one spell under several ids (Lay on Hands 633 and its talented 471195): one row
-    for a in tl.abilities:
+    groups: dict[str, list] = {}  # one spell under several ids (Lay on Hands 633 and its talented 471195): one row;
+    for a in tl.abilities:          # an id cast too often for a cooldown is another spell of the same name (Divine
+        if tl.duration and a.per_kill > max(1.0, tl.duration / COOLDOWN_GAP):  # Hymn's ticks, 64844, buried 64843)
+            continue
         groups.setdefault(a.name, []).append(a)
     out = []
     for name, abs_ in groups.items():
@@ -363,7 +365,9 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         sid = max(abs_, key=lambda a: a.users).id
         times, alt = press_moments(per_player, max(1, round(per_kill)), tl.duration)
         every = on_cadence(per_player, per_kill, tl.duration)
-        if every and any(abs((y - x) - every) > 0.15 * every for x, y in pairwise(times)):
+        cd = max((base or {}).get(i, (0.0, 1))[0] for i in ids)
+        if every and (any(abs((y - x) - every) > 0.15 * every for x, y in pairwise(times))
+                      or (cd and every > 1.15 * cd)):  # held past its cooldown (the Vessel every 118 s, cooldown 90)
             every = 0.0  # its moments are not a cooldown apart: the top players hold it (the Vessel at 0:03, 2:02)
         tied = not (every or per_kill >= 4 or _external(sid) or _moving(sid))  # on cooldown, a 1-minute button, a
         near = []  # buff on one player, a cast-while-moving: near a hit by chance, not kept for it
@@ -428,8 +432,9 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
     lines = "".join(f"<line class='ph' x1='{x(t)}' x2='{x(t)}' y1='22' y2='{H - B}'/>"
                     f"<text x='{float(x(t)) + 4:.1f}' y='18' class='pn'>{e(n.split(':')[0])}</text>"
                     for n, t in phases if t > 0)  # the phase changes, named
-    end_anchor = " text-anchor='end'"  # the last tick inside the right edge (5:00 of a 5:02 fight was cut)
-    ticks = "".join(f"<text x='{x(t)}' y='{H - 6}' class='tk'{end_anchor if t > span - 20 else ''}>"
+    end_anchor = " text-anchor='end'"  # the last tick inside the right edge (5:00 of a 5:02 fight was cut), the
+    mid = " text-anchor='middle'"       # others centred on their minute, the first from the axis's start
+    ticks = "".join(f"<text x='{x(t)}' y='{H - 6}' class='tk'{end_anchor if t > span - 20 else mid if t else ''}>"
                     f"{int(t // 60)}:00</text>" for t in range(0, int(span) + 1, 60))
     pos = [v for v in curve if v > 0]
     med = st.median(pos) if pos else 0.0  # the scale the moments are read against (x1.6 the fight's median)
@@ -499,7 +504,8 @@ def _chip(t: float, n: str) -> str:
     hit = n.partition(" ")[0]
     m, _, sec = hit.partition(":")
     gap = t - (int(m) * 60 + int(sec))
-    return _mmss(t) + (" &middot; at the hit" if abs(gap) <= 2 else
+    # a moment is a STEP-long window from its time: a press within it, 3 s either side, is at the hit
+    return _mmss(t) + (" &middot; at the hit" if -3 <= gap <= STEP + 3 else
                        f" &middot; just before the {e(hit)} hit" if gap < 0 else f" &middot; after the {e(hit)} hit")
 
 
@@ -759,9 +765,10 @@ def jobs_lead(roles: list, mine: str = "") -> str:
     return f"<p class='lead'>{e(head)}The others: " + "; ".join(e(x) for x in lines) + ".</p>"
 
 
-NUMS_NOTE = ("On each card: the share of the kill's healing; of its own healing, the share on the tanks and in the "
-             "raid's spikes; overheal; dispels a minute; externals a kill (protective cooldowns cast on another "
-             "player, not on themselves).")
+NUMS_NOTE = ("On each card, the median player of the spec: the share of the kill's healing (medians over different "
+             "kills, they do not add up); of its own healing, the share on the tanks and in the raid's spikes; "
+             "overheal; dispels a minute, all of them; externals a kill (protective cooldowns cast on another player, "
+             "not on themselves).")
 
 
 def _nums(r) -> list[str]:
@@ -789,7 +796,7 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
 
     def dd(a, b) -> str:  # deaths are read on fewer kills: too few of them with this spec is said, not left blank
         return ("<small>too few kills</small>" if a is None else
-                f"{a:.1f}" + ("" if b is None else f" <small>({b:.1f} without)</small>"))
+                f"{a:.1f}" + (" <small>(too few without)</small>" if b is None else f" <small>({b:.1f} without)</small>"))
     rows = ""
     for p in pres:
         if p.spec == mine and p.share >= 0.99:  # the corpus is this spec's kills: its row says nothing
@@ -903,9 +910,13 @@ def render_sheet(h: HealerPrep) -> str:
                   + _and([_mmss(m.t) for m in h.moments if n in moment_names(m)]) + "."
                   for n in feeds)
     # a dispel every healer does: said as what the top players do, not as this spec's job (Dig deeper says those)
-    first = ([f"<p class='lead'>Dispel {e(h.dispelled[0][0])}: the top {e(h.spec)} of each kill removes it "
-              f"{h.dispelled[0][1]:.1f} times ({h.dispel_kills} kills read){when}."
-              + (f" {e(h.dispel_text)}" if h.dispel_text else "") + fed + "</p>"]
+    aura = h.dispelled[0][0] if h.dispelled else ""
+    both = (" The Encounter Journal also says it appears when the debuff expires."  # Essence Rend: both texts
+            if "removal" in (h.dispel_text or "").lower()
+            and any(aura in x and "expir" in x.lower() for x in h.journal) else "")
+    first = ([f"<p class='lead'>The top {e(h.spec)} of each kill removes {e(aura)} {h.dispelled[0][1]:.1f} times "
+              f"({h.dispel_kills} kills read){when}."
+              + (f" {e(h.dispel_text)}" if h.dispel_text else "") + both + fed + "</p>"]
              if h.dispelled and h.dispelled[0][1] >= 1 else [journal_lead(h.journal, "healers")])
     boss = first + (
         [f"<h2>What the Encounter Journal asks healers</h2><ul class='hl2'>{jr}</ul>"] if jr else [])

@@ -459,8 +459,7 @@ def render_sheet(p: TankPrep) -> str:
     jr = "".join(f"<li>{e(plain(x))}</li>" for x in p.journal)
     # the tank's answer here: the swap (the fight tab's lead, its last sentence), else the journal's ask
     # the boss tab's answer: the mechanic the swaps follow (the fight tab says the swaps), else the journal's ask
-    top_hit = (f"<p class='lead'>The swaps follow {e(common)}{_cause(common, p.stacks)}.</p>"
-               if p.swaps and one and common in p.stacks else journal_lead(p.journal, "tanks"))
+    top_hit = journal_lead(p.journal, "tanks")  # the swaps are the fight tab's; here what the journal asks tanks
     boss = [top_hit, f"<h2>The abilities that hit the top tanks the most</h2><ul class='hl2'>{hit or '<li>Not measured yet.</li>'}</ul>"]
     if jr:
         boss.append(f"<h2>What the Encounter Journal asks tanks</h2><ul class='hl2'>{jr}</ul>")
