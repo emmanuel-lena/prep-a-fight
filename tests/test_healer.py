@@ -45,8 +45,7 @@ def test_two_habits_are_not_one_plan():
     players = [{"casts": {1: [21.0, 150.0]}} for _ in range(5)] + [{"casts": {1: [41.0, 165.0]}} for _ in range(4)]
     tl = SimpleNamespace(abilities=[ab], duration=240.0, players=players)
     cd = healer.cooldowns(tl, [], {1: (120.0, 1)})[0]
-    assert cd.times == [21.0, 150.0] and cd.spans[0] == (21.0, 41.0)  # each player's 1st and 2nd cast
-    assert "0:21&ndash;0:41" in healer.cooldowns_html([cd])  # the players spread the 1st: a range, not a plan
+    assert cd.times[0] == 21.0 and 41.0 in cd.alt and all(t - 21.0 >= 100 for t in cd.times[1:])
 
 
 def test_a_moment_is_named_by_what_hits_the_raid():
@@ -70,8 +69,17 @@ def test_two_hits_near_the_same_height_are_both_kept():
     assert [m.t for m in healer.moments(curve, [])] == [35.0, 80.0]
 
 
-def test_a_cast_spread_over_a_minute_has_no_moment():
-    """Restoration Shaman card, Nek'zali: "Nature's Swiftness 1:12-2:00", "Divine Protection 1:10-2:38": a range
-    that wide names no moment."""
-    assert healer._span((95.0, 72.0, 120.0)) == "" and healer._span((40.0, 30.0, 50.0)) == "0:30&ndash;0:50"
-    assert healer._span((40.0, 38.0, 44.0)) == "0:40"
+def test_every_cast_a_kill_is_said():
+    """Holy Priest, Nek'zali: Divine Hymn "2.0 a kill" showed one moment; the second press is said, without a time."""
+    ab = SimpleNamespace(id=1, name="Divine Hymn", users=1.0, per_kill=2.0)
+    players = [{"casts": {1: [4.0, 60.0 + 25 * i]}} for i in range(8)]  # the 2nd spread over three minutes
+    tl = SimpleNamespace(abilities=[ab], duration=280.0, players=players)
+    cd = healer.cooldowns(tl, [], {1: (180.0, 1)})[0]
+    assert cd.times == [4.0] and "+1 more when they need it" in healer.cooldowns_html([cd])
+
+
+def test_no_moment_after_the_kill():
+    """Vashnik tank: Rallying Cry "4:32" in a 4:21 fight."""
+    ab = SimpleNamespace(id=1, name="Rallying Cry", users=1.0, per_kill=1.0)
+    tl = SimpleNamespace(abilities=[ab], duration=261.0, players=[{"casts": {1: [272.0]}} for _ in range(6)])
+    assert healer.cooldowns(tl, [], {1: (180.0, 1)})[0].times == []

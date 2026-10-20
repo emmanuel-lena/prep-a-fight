@@ -367,7 +367,7 @@ class Role:
     dispels: float  # median dispels per minute
     raid_cds: float  # long cooldowns cast on themselves, the raid or an enemy, per kill
     externals: float  # protective long cooldowns cast on another player (paf.gamedata.external_kind), per kill
-    cd_names: list[tuple[str, float, list]] = field(default_factory=list)  # (spell, per kill, paf.healroles.sequence)
+    cd_names: list[tuple[str, float, list]] = field(default_factory=list)  # (spell, per kill, its moments)
     jobs: list[str] = field(default_factory=list)  # what the numbers say this spec does on this boss
     se: dict[str, float] = field(default_factory=dict)  # standard error of each number (its healers' spread)
     buffs: float = 0.0  # damage buffs cast on another player (Power Infusion), per kill
@@ -446,7 +446,7 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
             continue
         mid = st.median(durs.values()) if durs else None
         cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n,
-                sequence(ps, max(1, round(sum(map(len, ps)) / len(ps))), mid))
+                press_moments(ps, max(1, round(sum(map(len, ps)) / len(ps))), mid)[0])
                for ab, ps in cd_times[spec].items() if sum(map(len, ps)) / n >= 0.5]
         se = {k: (st.stdev(v) / len(v) ** 0.5 if len(v) > 1 else 0.0) for k, v in s.items()}
         out.append(Role(spec, n, st.median(s["healing"]), st.median(s["tank"]), st.median(s["spike"]),
@@ -461,26 +461,31 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
     return sorted(out, key=lambda r: -r.players)
 
 
-SPREAD = 15.0  # seconds between the 25th and 75th percentile of a cast: above, the players spread it, a range is said
+def press_moments(per_player: list[list[float]], keep: int, end: float | None = None
+                  ) -> tuple[list[float], list[float]]:
+    """(the moments most top players press a cooldown at, other moments some press it at): the shared clusters of
+    their casts (paf.defensives.ranked_peaks, the best followed first), as many as their casts a kill. Two moments
+    closer than one player ever presses it twice (the 10th percentile of their own gaps) are two habits, not one
+    plan (Avenging Wrath "0:21, 0:41"): the second goes with the other habits; nothing after the kill's median end."""
+    from itertools import pairwise
 
+    from paf.defensives import ranked_peaks
 
-def sequence(per_player: list[list[float]], keep: int, end: float | None = None,
-             support: float = 0.3) -> list[tuple[float, float, float]]:
-    """(median, 25th, 75th percentile) of each player's 1st, 2nd... cast of a cooldown, as many as `keep`: one
-    player's sequence, never two players' habits pooled into a plan nobody plays (Avenging Wrath "0:21, 0:41", a
-    2-minute trinket 49 s apart). A cast most of them never reach, or after the kill's median end, is left out."""
-    out = []
     lists = [sorted(ts) for ts in per_player if ts]
-    for n in range(keep):
-        ts = sorted(p[n] for p in lists if len(p) > n)
-        if len(ts) < max(3, support * len(lists)):
-            break
-        q = st.quantiles(ts, n=4) if len(ts) > 1 else [ts[0]] * 3
-        med = round(st.median(ts), 1)
-        if end is not None and med > end:
-            break
-        out.append((med, round(q[0], 1), round(q[2], 1)))
-    return out
+    if not lists:
+        return [], []
+    gaps = sorted(y - x for ts in lists for x, y in pairwise(ts))
+    gap = gaps[len(gaps) // 10] * 0.9 if gaps else 0.0
+    times: list[float] = []
+    alt: list[float] = []
+    for t, _n in ranked_peaks(lists):
+        if end is not None and t > end:
+            continue
+        if len(times) < keep and all(abs(t - x) >= gap for x in times):
+            times.append(t)
+        else:
+            alt.append(t)
+    return sorted(times), sorted(alt)
 
 
 def _and(names: list[str]) -> str:
