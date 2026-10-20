@@ -28,6 +28,7 @@ from paf.gamedata import external_kind
 from paf.wcl import WCLClient, WCLError
 
 KILLS = 40  # kills read per boss (about 6 points each): enough healers of each spec to compare
+LONG_RATE = 1.1  # casts a minute: above, the median player of the spec uses the spell in its rotation
 LONG_CD = 60.0  # seconds: a healer's spell with at least this cooldown is a raid cooldown or an external (Time
 # Dilation and Ironbark are 60-90 s: at 90 the externals missed them)
 SPIKE = 1.5  # a graph point where the raid takes this many times its median damage is a spike
@@ -366,7 +367,7 @@ class Role:
     dispels: float  # median dispels per minute
     raid_cds: float  # long cooldowns cast on themselves, the raid or an enemy, per kill
     externals: float  # protective long cooldowns cast on another player (paf.gamedata.external_kind), per kill
-    cd_names: list[tuple[str, float, list[float]]] = field(default_factory=list)  # (spell, per kill, median times)
+    cd_names: list[tuple[str, float, list]] = field(default_factory=list)  # (spell, per kill, paf.healroles.sequence)
     jobs: list[str] = field(default_factory=list)  # what the numbers say this spec does on this boss
     se: dict[str, float] = field(default_factory=dict)  # standard error of each number (its healers' spread)
     buffs: float = 0.0  # damage buffs cast on another player (Power Infusion), per kill
@@ -378,7 +379,6 @@ TANK_FLOOR = 0.12  # ... and at least this share: a tank's sources are its top h
 # every healer measured on three bosses puts 4 to 10% on them
 SPIKE_HEALER = 1.25  # ... of the share in spikes: the burst healer
 DISPELLER = 2.0  # ... of the dispels: the dispeller
-LOW_OVERHEAL = 0.75  # ... of the overheal or less: the efficient one
 
 
 def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: dict[int, str] | None = None,
@@ -404,11 +404,20 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
         for ab, _t, _o in cs:
             users[ab].add(spec_of.get(key, ""))
     common = {ab for ab, specs in users.items() if len(specs) >= 3}  # three specs or more: a trinket, a potion
+    # a long cooldown as the players press it, not its base cooldown: Holy Word: Serenity is 60 s on paper and cast
+    # 7.8 times a minute (Holy Words cut it); a spell the median player of a spec casts more than LONG_RATE a minute
+    # is part of the rotation
+    rates: dict[tuple[str, int], list[float]] = defaultdict(list)
+    for key, cs in casts.items():
+        minutes = (durs.get(key[:2]) or 60) / 60
+        for ab, n in Counter(ab for ab, _t, _o in cs).items():
+            rates[(spec_of.get(key, ""), ab)].append(n / minutes)
+    rotation = {k for k, v in rates.items() if st.median(v) > LONG_RATE}
     # cast on another unit is not an external yet: the boss (Touch of Death), a dead player (a battle res)...
     kind = {ab: external_kind(ab) for ab in users}
     buff_casts: dict[str, Counter] = defaultdict(Counter)
     stats: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
-    cd_times: dict[str, dict[int, list[float]]] = defaultdict(lambda: defaultdict(list))
+    cd_times: dict[str, dict[int, list[list[float]]]] = defaultdict(lambda: defaultdict(list))  # per player-kill
     for k, hs in per_kill.items():
         total = sum(h[5] for h in hs) or 1
         minutes = (durs.get(k) or 1) / 60
@@ -420,20 +429,25 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
             s["spike"].append(spike)
             s["overheal"].append(over / (tot + over) if tot + over else 0)
             s["dispels"].append(disp / minutes)
-            mine = [c for c in casts.get((k[0], k[1], h[2]), []) if c[0] not in common]
+            mine = [c for c in casts.get((k[0], k[1], h[2]), []) if c[0] not in common and (spec, c[0]) not in rotation]
             s["raid"].append(sum(1 for a, _t, o in mine if not (o and kind[a])))
             s["ext"].append(sum(1 for a, _t, o in mine if o and kind[a] == "protective"))
             s["buff"].append(sum(1 for a, _t, o in mine if o and kind[a] == "damage"))
             buff_casts[spec].update(a for a, _t, o in mine if o and kind[a] == "damage")
+            own: dict[int, list[float]] = defaultdict(list)
             for ab, t, _o in mine:
-                cd_times[spec][ab].append(t)
+                own[ab].append(t)
+            for ab, ts in own.items():
+                cd_times[spec][ab].append(ts)
     out = []
     for spec, s in stats.items():
         n = len(s["healing"])
         if n < min_players:
             continue
-        cds = [((names or {}).get(ab, f"spell {ab}"), len(ts) / n, _peaks(ts)) for ab, ts in cd_times[spec].items()
-               if len(ts) / n >= 0.5]
+        mid = st.median(durs.values()) if durs else None
+        cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n,
+                sequence(ps, max(1, round(sum(map(len, ps)) / len(ps))), mid))
+               for ab, ps in cd_times[spec].items() if sum(map(len, ps)) / n >= 0.5]
         se = {k: (st.stdev(v) / len(v) ** 0.5 if len(v) > 1 else 0.0) for k, v in s.items()}
         out.append(Role(spec, n, st.median(s["healing"]), st.median(s["tank"]), st.median(s["spike"]),
                         st.median(s["overheal"]), st.median(s["dispels"]), st.mean(s["raid"]), st.mean(s["ext"]),
@@ -447,16 +461,26 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
     return sorted(out, key=lambda r: -r.players)
 
 
-def _peaks(times: list[float], gap: float = 20.0) -> list[float]:
-    """The usual moments of a set of cast times (clusters holding at least a fifth of them), medians."""
-    groups: list[list[float]] = []
-    for t in sorted(times):
-        if groups and t - groups[-1][-1] <= gap:
-            groups[-1].append(t)
-        else:
-            groups.append([t])
-    keep = [g for g in groups if len(g) >= max(2, len(times) / 5)]
-    return [round(st.median(g), 1) for g in keep]
+SPREAD = 15.0  # seconds between the 25th and 75th percentile of a cast: above, the players spread it, a range is said
+
+
+def sequence(per_player: list[list[float]], keep: int, end: float | None = None,
+             support: float = 0.3) -> list[tuple[float, float, float]]:
+    """(median, 25th, 75th percentile) of each player's 1st, 2nd... cast of a cooldown, as many as `keep`: one
+    player's sequence, never two players' habits pooled into a plan nobody plays (Avenging Wrath "0:21, 0:41", a
+    2-minute trinket 49 s apart). A cast most of them never reach, or after the kill's median end, is left out."""
+    out = []
+    lists = [sorted(ts) for ts in per_player if ts]
+    for n in range(keep):
+        ts = sorted(p[n] for p in lists if len(p) > n)
+        if len(ts) < max(3, support * len(lists)):
+            break
+        q = st.quantiles(ts, n=4) if len(ts) > 1 else [ts[0]] * 3
+        med = round(st.median(ts), 1)
+        if end is not None and med > end:
+            break
+        out.append((med, round(q[0], 1), round(q[2], 1)))
+    return out
 
 
 def _and(names: list[str]) -> str:
@@ -486,10 +510,8 @@ def jobs(r: Role, everyone: list[Role]) -> list[str]:
         out.append(f"dispels: {r.dispels:.1f} a minute (the other healers {ref('dispels'):.1f})")
     if r.externals >= 1 and r.externals >= ref("externals") * 1.5 and clear("externals"):
         out.append(f"gives externals: {r.externals:.1f} a kill on other players")
-    if r.raid_cds >= 1 and r.raid_cds >= ref("raid_cds") * 1.5 and clear("raid_cds"):
-        out.append(f"presses the most long cooldowns: {r.raid_cds:.1f} a kill")
-    if r.overheal <= ref("overheal") * LOW_OVERHEAL and clear("overheal", lower=True):
-        out.append(f"wastes little: {r.overheal:.0%} overhealing (the other healers {ref('overheal'):.0%})")
+    # not jobs: the count of long cooldowns compares kits, not what the boss asks; low overheal is the spec's trait
+    # on every boss (Restoration Shaman on 14 of 14 sheets). Both stay in the card's numbers.
     if r.buffs >= 1 and r.buffs >= ref("buffs") * 1.5:  # last: a damage dealer's buff, not a healing job
         out.append(f"buffs a damage dealer: {_and(r.buff_spells)} {r.buffs:.1f} a kill")
     if not out:

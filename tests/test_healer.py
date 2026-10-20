@@ -45,7 +45,8 @@ def test_two_habits_are_not_one_plan():
     players = [{"casts": {1: [21.0, 150.0]}} for _ in range(5)] + [{"casts": {1: [41.0, 165.0]}} for _ in range(4)]
     tl = SimpleNamespace(abilities=[ab], duration=240.0, players=players)
     cd = healer.cooldowns(tl, [], {1: (120.0, 1)})[0]
-    assert cd.times == [21.0, 150.0] and 41.0 in cd.alt
+    assert cd.times == [21.0, 150.0] and cd.spans[0] == (21.0, 41.0)  # each player's 1st and 2nd cast
+    assert "0:21&ndash;0:41" in healer.cooldowns_html([cd])  # the players spread the 1st: a range, not a plan
 
 
 def test_a_moment_is_named_by_what_hits_the_raid():

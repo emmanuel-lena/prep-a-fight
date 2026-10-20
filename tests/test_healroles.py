@@ -71,11 +71,11 @@ def test_compositions_and_jobs(monkeypatch):
     rs = {r.spec: r for r in healroles.roles(con, 3470, 4, {10060: "Power Infusion", 98008: "Spirit Link Totem"},
                                              min_players=5)}
     shaman, priest = rs["Restoration Shaman"], rs["Holy Priest"]
-    assert any("spikes: 50%" in j for j in shaman.jobs) and any("wastes little" in j for j in shaman.jobs)
+    assert any("spikes: 50%" in j for j in shaman.jobs) and not any("wastes" in j for j in shaman.jobs)
     # Power Infusion is a damage dealer's buff, said last; Guardian Spirit the protective external
     assert priest.externals == 0.5 and priest.buffs == 1.0 and priest.buff_spells == ["Power Infusion"]
     assert priest.jobs[-1] == "buffs a damage dealer: Power Infusion 1.0 a kill"
-    assert priest.cd_names[0] == ("Power Infusion", 1.0, [124.5])
+    assert priest.cd_names[0][:2] == ("Power Infusion", 1.0) and priest.cd_names[0][2][0][0] == 124.5
     assert shaman.externals == 0 and shaman.raid_cds == 2.0  # Spirit Link, and Touch of Death on the boss
     assert rs["Restoration Druid"].jobs == ["nothing stands out against the other healers"]
 
@@ -158,7 +158,7 @@ def test_power_infusion_is_no_job_of_the_boss():
     priest = healroles.Role("Holy Priest", 40, 0.2, 0.07, 0.2, 0.4, 0.6, 3, 0, jobs=[
         "buffs a damage dealer: Power Infusion 2.1 a kill"])
     shaman = healroles.Role("Restoration Shaman", 40, 0.2, 0.07, 0.2, 0.2, 0.6, 3, 0, jobs=[
-        "wastes little: 22% overhealing (the other healers 40%)"])
+        "answers the raid's damage spikes: 26% of its healing lands in them (the other healers 18%)"])
     assert jobs_lead([priest, shaman], "Holy Priest") == (
         "<p class='lead'>Your spec here: nothing stands out against the other healers. The others: the Restoration "
-        "Shaman wastes little: 22% overhealing (the other healers 40%).</p>")
+        "Shaman answers the raid&#x27;s damage spikes: 26% of its healing lands in them (the other healers 18%).</p>")

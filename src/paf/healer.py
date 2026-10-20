@@ -19,7 +19,7 @@ import statistics as st
 from collections import Counter
 from dataclasses import dataclass, field
 from html import escape as e
-from itertools import pairwise
+from itertools import zip_longest
 
 from paf import theme
 from paf.theme import diff_pill
@@ -73,6 +73,7 @@ class Cooldown:
     times: list[float]  # when most of them press it: as many moments as their casts a kill, the best followed
     near: list[str] = field(default_factory=list)  # the big moment each one answers, if any
     alt: list[float] = field(default_factory=list)  # other moments some of them press it at instead
+    spans: list[tuple[float, float]] = field(default_factory=list)  # each cast's 25th-75th percentile
 
 
 @dataclass
@@ -246,14 +247,13 @@ def moments(curve: list[float], boss_casts: list[tuple[str, list[float]]], top: 
     return sorted(sorted(found, key=lambda m: -m.ratio)[:top], key=lambda m: m.t)
 
 
-COOLDOWN_SLACK = 0.9  # two moments of a plan are at least this share of the players' shortest usual gap apart
 
 
 def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None = None,
               min_users: float = 0.5, max_users: float = 1.01) -> list[Cooldown]:
     """The cooldowns of the top players (spells with a cooldown of COOLDOWN_GAP s or more in the game data, that most
     of them cast; dispels, rotation spells and moves left out) and when most of them press each."""
-    from paf.defensives import ranked_peaks
+    from paf.healroles import SPREAD, sequence
 
     if base is None:
         try:
@@ -272,26 +272,18 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         seen.add(a.name)
         per_player = [p["casts"].get(a.name) or p["casts"].get(a.id) or [] for p in tl.players]
         per_player = [ts for ts in per_player if ts]
-        ranked = ranked_peaks(per_player) if per_player else []
-        keep = max(1, round(a.per_kill))
-        # the moments come from all the players: two closer than one player ever presses it twice are two habits,
-        # not one plan (Avenging Wrath at 0:21 and 0:41); the second goes with the other habits
-        gaps = sorted(y - x for ts in per_player for x, y in pairwise(sorted(ts)))
-        gap = gaps[len(gaps) // 10] * COOLDOWN_SLACK if gaps else 0.0
-        times: list[float] = []
-        alt = []
-        for t, _n in ranked:
-            if len(times) < keep and all(abs(t - x) >= gap for x in times):
-                times.append(t)
-            else:
-                alt.append(t)
-        times, alt = sorted(times), sorted(alt)
+        # one player's sequence (paf.healroles.sequence), every cast of it: the 2nd Divine Hymn is a call too
+        seq = sequence(per_player, max(1, round(a.per_kill)), tl.duration)
+        times = [m for m, _lo, _hi in seq]
+        spans = [(lo, hi) for _m, lo, hi in seq]
+        alt: list[float] = []
         near = []
-        for t in times:
+        for (t, (lo, hi)) in zip(times, spans, strict=True):
             m = min(found, key=lambda m: abs(m.t - t), default=None)
-            ok = m is not None and -ANSWER[0] <= t - m.t <= ANSWER[1]  # pressed for the hit: just before or in it
+            ok = (m is not None and hi - lo <= SPREAD  # a spread press answers no hit
+                  and -ANSWER[0] <= t - m.t <= ANSWER[1])  # pressed for the hit: just before or in it
             near.append(f"{_mmss(m.t)} {m.boss_spell}".strip() if ok else "")
-        out.append(Cooldown(a.name, a.id, a.users, a.per_kill, times, near, alt))
+        out.append(Cooldown(a.name, a.id, a.users, a.per_kill, times, near, alt, spans))
     return sorted(out, key=lambda c: -c.users)
 
 
@@ -365,6 +357,14 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
             f"<polyline points='{pts}'/>{marks}{cds}</svg>")
 
 
+def _span(cast: tuple[float, float, float]) -> str:
+    """A cast of one player's sequence (paf.healroles.sequence): its time, or the range the players spread it on."""
+    from paf.healroles import SPREAD
+
+    med, lo, hi = cast
+    return f"{_mmss(lo)}&ndash;{_mmss(hi)}" if hi - lo > SPREAD else _mmss(med)
+
+
 def _per_s(v: float) -> str:
     """A damage rate on the chart's axis: 1.4M/s, 820k/s."""
     return f"{v / 1e6:.1f}M/s" if v >= 1e6 else f"{v / 1e3:.0f}k/s"
@@ -379,8 +379,9 @@ def moments_html(found: list[Moment], what: str) -> str:
 def cooldowns_html(cds: list[Cooldown]) -> str:
     return "".join(
         f"<li><b>{e(c.name)}</b><small>pressed by {c.users:.0%} of the top players &middot; {c.per_kill:.1f} a kill</small>"
-        "<span class='when'>" + ("".join(f"<span class='chip'>{_mmss(t)}{_near(n)}</span>"
-                                        for t, n in zip(c.times, c.near, strict=False))
+        "<span class='when'>" + ("".join(f"<span class='chip'>{_span((t, *sp)) if sp else _mmss(t)}{_near(n)}</span>"
+                                        for t, n, sp in zip_longest(c.times, c.near, c.spans or [], fillvalue=None)
+                                        if t is not None)
                                 or "<small>when they need it: no moment most of them share</small>")
         + (f"<small class='alt'>some press it at {', '.join(_mmss(t) for t in c.alt)} instead</small>"
            if c.alt else "") + "</span></li>"
@@ -494,7 +495,7 @@ def _pct(v: float) -> str:
 def role_card(r, everyone: list, mine: bool, chips: bool = True) -> str:
     """One healer spec's job on the boss, with its numbers and how many healers they come from. chips: its long
     cooldowns' usual times (left out on your own card: the fight tab gives yours, from the top players of your spec)."""
-    cds = "".join([f"<span class='chip'>{e(n)} {', '.join(_mmss(t) for t in ts)}</span>"
+    cds = "".join([f"<span class='chip'>{e(n)} {', '.join(_span(x) for x in ts)}</span>"
                    for n, _k, ts in r.cd_names if ts][:5]) if chips else ""
     return (f"<article class='hrole'><h3>{e(r.spec)}{' <small>(you)</small>' if mine else ''}</h3>"
             f"<ul class='jobs'>{''.join(f'<li>{e(j)}</li>' for j in r.jobs)}</ul>"
