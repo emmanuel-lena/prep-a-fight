@@ -478,7 +478,9 @@ def journal_lead(lines: list[str], who: str) -> str:
 
 def jobs_lead(roles: list) -> str:
     """The deeper tab's answer: the healer specs whose job stands out on this boss."""
-    lines = [f"the {r.spec} {r.jobs[0]}" for r in roles if r.jobs and not r.jobs[0].startswith("close to")]
+    # a healing job of this boss: not "close to the others", nor Power Infusion given on every boss
+    lines = [f"the {r.spec} {r.jobs[0]}" for r in roles
+             if r.jobs and not r.jobs[0].startswith(("close to", "buffs a damage dealer"))]
     if not lines:
         return "<p class='lead'>No healer spec stands out on this boss: every one does a share of the same job.</p>"
     return "<p class='lead'>What stands out here: " + "; ".join(e(x) for x in lines) + ".</p>"

@@ -142,3 +142,15 @@ def test_what_the_top_healers_dispel_is_measured():
     assert healroles.fetch_dispels(Client(), con, 9, 4) == 2
     got, n = healroles.dispelled(con, 9, 4, {1: "Exploding Infection", 2: "Congealing Bolt"})
     assert n == 2 and got == [("Exploding Infection", 4.0), ("Congealing Bolt", 1.0)]
+
+
+def test_power_infusion_is_no_job_of_the_boss():
+    """Nek'zali heroic (2026-10-20): the Holy Priest's only job was Power Infusion, given on every boss."""
+    from paf.healer import jobs_lead
+
+    priest = healroles.Role("Holy Priest", 40, 0.2, 0.07, 0.2, 0.4, 0.6, 3, 0, jobs=[
+        "buffs a damage dealer: Power Infusion 2.1 a kill"])
+    shaman = healroles.Role("Restoration Shaman", 40, 0.2, 0.07, 0.2, 0.2, 0.6, 3, 0, jobs=[
+        "wastes little: 22% overhealing (the other healers 40%)"])
+    assert jobs_lead([priest, shaman]) == ("<p class='lead'>What stands out here: the Restoration Shaman wastes "
+                                           "little: 22% overhealing (the other healers 40%).</p>")
