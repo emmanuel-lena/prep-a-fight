@@ -53,8 +53,12 @@ def is_speed(spell_id: int) -> bool:
     damage (Divine Steed; not Avenging Wrath)."""
     name = spell_names().get(spell_id)
     ids = {spell_id, *(same_name_spells().get(name, []) if name else [])}
-    auras = {r.get("EffectAura") for i in ids for r in _filtered_rows("SpellEffect", "SpellID", i)}
-    return "31" in auras and not auras & {"108", "107", "79", "129"}  # spell mods, damage done, haste: throughput
+    rows = [r for i in ids for r in _filtered_rows("SpellEffect", "SpellID", i)]
+    auras, effects = {r.get("EffectAura") for r in rows}, {r.get("Effect") for r in rows}
+    # spell mods, damage done, haste, a periodic effect (Celestial Conduit's channel: it heals as you move), or a
+    # heal or damage of the same name: throughput, not a move
+    return ("31" in auras and not auras & {"108", "107", "79", "129", "23", "8", "3", "226"}
+            and not effects & {"2", "10", "136"})
 
 
 @cache

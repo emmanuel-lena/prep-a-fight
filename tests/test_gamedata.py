@@ -61,3 +61,20 @@ def test_a_filtered_table_keeps_its_own_rows_only(tmp_path, monkeypatch):
     assert [r["ID"] for r in gamedata._filtered_rows("SpellEffect", "SpellID", 100)] == ["1"]
     assert not gamedata.is_mitigation(100) and not gamedata.weakens_enemy(100)
     gamedata._filtered_rows.cache_clear()
+
+
+def test_a_movement_button_is_a_speed_buff_and_nothing_else(monkeypatch):
+    # Divine Steed: a scripted cast (a dummy) whose buff of the same name raises run speed; Celestial Conduit also
+    # raises it, but heals as a channel: throughput
+    effects = {190784: [{"Effect": "3", "EffectAura": "0"}],
+               221883: [{"Effect": "6", "EffectAura": "31"}, {"Effect": "6", "EffectAura": "87"}],
+               443028: [{"Effect": "6", "EffectAura": "31"}, {"Effect": "6", "EffectAura": "23"}],
+               443039: [{"Effect": "10", "EffectAura": "0"}]}
+    names = {190784: "Divine Steed", 221883: "Divine Steed", 443028: "Celestial Conduit", 443039: "Celestial Conduit"}
+    monkeypatch.setattr(gamedata, "_filtered_rows", lambda table, col, value: effects.get(value, []))
+    monkeypatch.setattr(gamedata, "spell_names", lambda locale="": names)
+    gamedata.same_name_spells.cache_clear()
+    try:
+        assert gamedata.is_speed(190784) and not gamedata.is_speed(443028)
+    finally:
+        gamedata.same_name_spells.cache_clear()
