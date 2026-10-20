@@ -803,6 +803,7 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
         rare=[c for c in healer.cooldowns(tl, found, min_users=0.25, max_users=0.5)
               if is_defensive(c.spell_id, c.name)],
         character=getattr(profile, "name", "") or "")
+    p.split, p.split_players = healer.contested(con, enc.id, diff, spec)
     p.abilities = _role_journal(enc.id, diff_name, "tank", tl, {  # another role's ability that hits the tanks too
         n: f"{s:.0%} of the damage the top tanks take" for n, s in hitters if s >= 0.05})
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"
@@ -873,7 +874,8 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     # a tank ability names a raid hit only when the journal says players take it (Nek'zali's Possession Barrage:
     # "damage to all players"); a bite on the tank every 30 s (Vashnik's Dripping Fangs) would name any wave
     skip = {n for n in tank_only if not re.search(r"\bplayers\b|\braid\b", text.get(n, ""), re.I)}
-    found = healer.moments(curve, tl.boss_casts, skip=skip)
+    raid = {n for n, t in text.items() if re.search(r"\ball players\b|\bthe raid\b", t, re.I)}
+    found = healer.moments(curve, tl.boss_casts, skip=skip, raid=raid)
     for m in found:
         if m.boss_spell in tank_only:
             m.boss_spell += ", aimed at the tank"
@@ -888,11 +890,23 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         healer.trinkets(con, enc.id, diff), bossguide.role_bullets(bossguide.load(enc.id, diff_name), "healer"),
         [(n, t) for n, t, _ in tl.phases], class_name=cls, character=getattr(profile, "name", "") or "")
     h.abilities = _role_journal(enc.id, diff_name, "healer", tl)
+    h.split, h.split_players = healer.contested(con, enc.id, diff, spec)
+    from paf.gamedata import dispel_type
     from paf.mechanics import walk
 
-    h.dispellable = list(dict.fromkeys(
-        (s.title, f) for _, s in walk(sections) if s.kind == "ability" and s.for_difficulty(diff_name)
-        for f in s.flags if f in ("magic", "curse", "poison", "disease")))
+    h.dispellable = []  # the journal's flags, else the spell's dispel type in the game data, at this difficulty
+    for _, s in walk(sections):
+        if s.kind != "ability" or not s.for_difficulty(diff_name) or (
+                s.text and not bossguide.readable(s.text, diff_name).strip()):  # another difficulty's ability
+            continue
+        kind = next((f for f in s.flags if f in ("magic", "curse", "poison", "disease")), "")
+        try:
+            kind = kind or (dispel_type(s.spell_id) if s.spell_id else "")
+        except OSError:
+            pass
+        if kind and (s.title, kind) not in h.dispellable:
+            h.dispellable.append((s.title, kind))
+    h.dispels_checked = True
     from paf.defensives import is_defensive
 
     worn = {n for n, _i, _s in h.trinkets}

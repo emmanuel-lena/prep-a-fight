@@ -199,6 +199,23 @@ def known_not_amp(spell_id: int, depth: int = 2) -> bool:
     return True
 
 
+DISPEL_TYPES = {"1": "magic", "2": "curse", "3": "disease", "4": "poison"}
+
+
+def dispel_type(spell_id: int, depth: int = 2) -> str:
+    """'magic', 'curse', 'disease' or 'poison' when the spell, or a spell it triggers (the debuff of a cast), can be
+    dispelled; '' otherwise (game data: SpellCategories.DispelType)."""
+    for r in _filtered_rows("SpellCategories", "SpellID", spell_id):
+        if r.get("DispelType") in DISPEL_TYPES:
+            return DISPEL_TYPES[r["DispelType"]]
+    if depth:
+        for r in _filtered_rows("SpellEffect", "SpellID", spell_id):
+            trig = int(r.get("EffectTriggerSpell") or 0)
+            if trig and (found := dispel_type(trig, depth - 1)):
+                return found
+    return ""
+
+
 def spell_description(spell_id: int, locale: str = "") -> str:
     rows = _filtered_rows("Spell", "ID", spell_id, locale)
     return (rows[0].get("Description_lang") or "") if rows else ""

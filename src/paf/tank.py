@@ -55,6 +55,8 @@ class TankPrep:
     class_name: str = ""
     character: str = ""
     abilities: str = ""  # the Encounter Journal's stages, the tanks' abilities in full (paf.bossguide), html
+    split: list = field(default_factory=list)  # (talent, share picked) the top players split on
+    split_players: int = 0
 
 
 def ensure_table(con) -> None:
@@ -238,6 +240,7 @@ def render_sheet(p: TankPrep) -> str:
         journal_lead,
         moments_html,
         presence_table,
+        split_html,
         trinkets_html,
     )
     from paf.prep_report import sheet_page
@@ -283,6 +286,7 @@ def render_sheet(p: TankPrep) -> str:
     change = [build_lead(p.builds, p.spec, p.kills),
               f"<h2>Talents the top tanks play</h2><ul class='hl2'>{builds_html(p.builds) or '<li>No build yet.</li>'}"
               f"</ul>",
+              split_html(p.split, p.split_players, p.spec) if p.split else "",
               f"<h2>Trinkets the top tanks play</h2><ul class='hl2'>"
               f"{trinkets_html(p.trinkets) or '<li>No gear yet.</li>'}</ul>",
               "<p class='small muted'>No tank sim: these are the top players' choices, not a recommendation.</p>"]

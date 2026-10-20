@@ -91,8 +91,11 @@ class HealerPrep:
     class_name: str = ""
     character: str = ""
     abilities: str = ""  # the Encounter Journal's stages, your role's abilities in full (paf.bossguide), html
-    dispellable: list = field(default_factory=list)  # (ability, debuff type) the Journal flags as dispellable
+    dispellable: list = field(default_factory=list)  # (ability, debuff type): the Journal's flags or the game data
+    dispels_checked: bool = False  # the journal and the game data were read for them (none found is information)
     rare: list = field(default_factory=list)  # long cooldowns few top players press (Cooldown): said, not hidden
+    split: list = field(default_factory=list)  # (talent, share picked) the top players split on (contested)
+    split_players: int = 0
 
 
 def ensure_table(con) -> None:
@@ -150,7 +153,7 @@ def raid_curve(con, encounter_id: int, difficulty: int, duration: float) -> list
 
 
 def moments(curve: list[float], boss_casts: list[tuple[str, list[float]]], top: int = 8,
-            skip: frozenset[str] | set[str] = frozenset()) -> list[Moment]:
+            skip: frozenset[str] | set[str] = frozenset(), raid: frozenset[str] | set[str] = frozenset()) -> list[Moment]:
     """The big moments of raid damage, the boss spell cast just before each (within 8 s). skip: abilities that cannot
     explain this damage (another role's: a tank buster under the raid's damage)."""
     base = st.median([v for v in curve if v > 0]) if any(curve) else 0.0
@@ -176,8 +179,9 @@ def moments(curve: list[float], boss_casts: list[tuple[str, list[float]]], top: 
         later = [(m.t - x, name) for name, times in boss_casts if name not in skip for x in times if 8 < m.t - x <= 30]
         if near:
             m.boss_spell = min(near)[1]
-        elif later:  # the damage that follows a cast (Vashnik: the waves 16 to 28 s after Imbibe), matched by timing
-            m.boss_spell = f"after {min(later)[1]}"
+        elif later:  # the damage that follows a cast (Vashnik: the waves 16 to 28 s after Imbibe), matched by timing;
+            hits = [c for c in later if c[1] in raid]  # an ability the journal says hits all players goes first
+            m.boss_spell = f"after {min(hits or later)[1]}"
     return sorted(sorted(found, key=lambda m: -m.ratio)[:top], key=lambda m: m.t)
 
 
@@ -268,10 +272,17 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
     pos = [v for v in curve if v > 0]
     med = st.median(pos) if pos else 0.0  # the scale the moments are read against (x1.6 the fight's median)
     median = (f"<line class='md' x1='{L}' x2='{W - 10}' y1='{y(med)}' y2='{y(med)}'/>"
-              f"<text x='{L - 4}' y='{float(y(med)) + 4:.1f}' class='mdl' text-anchor='end'>median</text>") if med else ""
+              f"<text x='{L - 4}' y='{float(y(med)) - 3:.1f}' class='mdl' text-anchor='end'>median</text>"
+              f"<text x='{L - 4}' y='{float(y(med)) + 9:.1f}' class='mdl' text-anchor='end'>{_per_s(med)}</text>"
+              ) if med else ""
     return (f"<svg viewBox='0 0 {W} {H}' class='rd' role='img' aria-label='{e(label)}'>"
             f"<line class='ax' x1='{L}' x2='{W - 10}' y1='{H - B}' y2='{H - B}'/>{median}{lines}{ticks}"
             f"<polyline points='{pts}'/>{marks}</svg>")
+
+
+def _per_s(v: float) -> str:
+    """A damage rate on the chart's axis: 1.4M/s, 820k/s."""
+    return f"{v / 1e6:.1f}M/s" if v >= 1e6 else f"{v / 1e3:.0f}k/s"
 
 
 def moments_html(found: list[Moment], what: str) -> str:
@@ -363,7 +374,7 @@ def render(h: HealerPrep) -> str:
 <p class="lead">{e(h.spec)}: the healer's prep, from {h.kills} kills of the top healers of your spec. A {_mmss(h.duration)}
 fight.</p>
 <section class="hp-sec"><h2>The raid damage, and its big moments</h2>{svg}
-<p class="small muted">Damage the raid takes per second, median of the top kills; a dot marks a big moment.</p>
+<p class="small muted">Damage the raid takes per second, median of the top kills; a dot marks a big moment, named after the boss cast just before it ("after X": 8 to 30 s before, matched by timing).</p>
 <ul class="hl2">{mom or '<li>No big moment: steady raid damage.</li>'}</ul></section>
 <section class="hp-sec"><h2>Your healing cooldowns, where the top healers press them</h2>
 <ul class="hl2">{cds or '<li>Not enough top players in the corpus yet.</li>'}</ul></section>
@@ -392,6 +403,34 @@ def role_card(r, everyone: list, mine: bool, chips: bool = True) -> str:
             + f"<p class='small muted'>{r.players} {e(r.spec)}s in the kills read.</p></article>")
 
 
+def contested(con, encounter_id: int, difficulty: int, spec: str, lo: float = 0.2, hi: float = 0.8,
+              shown: int = 10) -> tuple[list[tuple[str, float]], int]:
+    """The talents the top players of the spec split on (picked by lo to hi of them), the closest to half first,
+    and how many players were read: when most play a build of their own, these explain the builds."""
+    import json
+
+    from paf.corpus.analyze import kills_filter
+
+    try:
+        from paf.gamedata import talent_entry_names
+
+        names = talent_entry_names()
+    except Exception:  # noqa: BLE001 - offline: no names, no line
+        return [], 0
+    where, params = kills_filter(encounter_id, difficulty)
+    picks: dict[str, int] = {}
+    players = 0
+    for (tj,) in con.execute(f"SELECT r.talents_json FROM ranked r JOIN fight f USING(report, fight_id) WHERE {where} "
+                             f"AND r.spec=? AND r.actor_id IS NOT NULL", (*params, spec)):
+        got = {names.get(t["talentID"]) for t in json.loads(tj or "[]")} - {None, ""}
+        if got:
+            players += 1
+            for n in got:
+                picks[n] = picks.get(n, 0) + 1
+    split = [(n, c / players) for n, c in picks.items() if players and lo <= c / players <= hi]
+    return sorted(split, key=lambda x: abs(x[1] - 0.5))[:shown], players
+
+
 def _and(items: list[str]) -> str:
     """'a', 'a and b', 'a, b and c'."""
     return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1] if items else ""
@@ -407,6 +446,13 @@ def build_lead(builds: list, spec: str, players: int) -> str:
             f"{players} players read" + (f"; the {len(builds)} builds below cover {total} of them, the other "
                                         f"{players - total} play builds of their own" if len(builds) > 1 else "")
             + ".</p>")
+
+
+def split_html(split: list, players: int, spec: str) -> str:
+    """The talents the top players split on, with how often each is picked: what the builds above hide."""
+    return (f"<h2>The talents the top {e(spec)}s split on</h2><p>Picked by this share of the {players} players "
+            "read; the closest to half first:</p><ul class='hl2 split'>"
+            + "".join(f"<li><b>{e(n)}</b><small>{s:.0%}</small></li>" for n, s in split) + "</ul>")
 
 
 def journal_lead(lines: list[str], who: str) -> str:
@@ -508,7 +554,12 @@ def render_sheet(h: HealerPrep) -> str:
     defs = [c for c in h.cooldowns if c not in heals and c not in items]
     lead = ""
     if h.moments:
-        hits = _and([f"{_mmss(m.t)} ({e(m.boss_spell)})" if m.boss_spell else _mmss(m.t) for m in h.moments[:3]])
+        said = [m.boss_spell for m in h.moments[:3]]
+        if len(set(said)) == 1 and said[0]:  # the same cast before each: said once (Vashnik's three waves)
+            hits = (_and([_mmss(m.t) for m in h.moments[:3]]) + f", each {e(said[0])}"
+                    + (" (matched by timing)" if said[0].startswith("after ") else ""))
+        else:
+            hits = _and([f"{_mmss(m.t)} ({e(m.boss_spell)})" if m.boss_spell else _mmss(m.t) for m in h.moments[:3]])
         at = {_mmss(m.t) for m in h.moments}  # a cooldown kept for the hits: most of its presses answer one
         used = [c.name for c in heals if c.times and sum(1 for n in c.near if n and n.split(" ", 1)[0] in at)
                 >= len(c.times) / 2]
@@ -525,7 +576,8 @@ def render_sheet(h: HealerPrep) -> str:
                + "</p>"]
     fight = ([lead] if lead else []) + you + [
         f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Damage the "
-        f"raid takes per second, median of the top kills; a dot marks a big moment.</p><ul class='hl2'>"
+        f"raid takes per second, median of the top kills; a dot marks a big moment, named after the boss cast just "
+        f"before it (&quot;after X&quot;: 8 to 30 s before, matched by timing).</p><ul class='hl2'>"
         f"{moments_html(h.moments, 'raid damage') or '<li>No big moment: steady raid damage.</li>'}</ul></div>",
         f"<h2>Your long cooldowns, where the top {e(h.spec)}s press them</h2><ul class='hl2'>"
         f"{cooldowns_html(heals) or '<li>Not enough top players in the corpus yet.</li>'}</ul>"]
@@ -540,6 +592,8 @@ def render_sheet(h: HealerPrep) -> str:
     change = [build_lead(h.builds, h.spec, h.kills)]
     change.append(f"<h2>Talents the top {e(h.spec)}s play</h2><ul class='hl2'>"
                   f"{builds_html(h.builds) or '<li>No build yet.</li>'}</ul>")
+    if h.split:
+        change.append(split_html(h.split, h.split_players, h.spec))
     trk = trinkets_html(h.trinkets) or "<li>No gear yet.</li>"
     change.append(f"<h2>Trinkets the top {e(h.spec)}s play</h2><ul class='hl2'>{trk}</ul>"
                   f"<p class='small muted'>No healing sim: these are the top players' choices, not a recommendation. "
@@ -548,11 +602,15 @@ def render_sheet(h: HealerPrep) -> str:
     jr = "".join(f"<li>{e(_plain(x))}</li>" for x in h.journal)
     boss = [journal_lead(h.journal, "healers")] + (
         [f"<h2>What the Encounter Journal asks healers</h2><ul class='hl2'>{jr}</ul>"] if jr else [])
-    if h.dispellable:  # where the dispels most likely go: the Journal's flags, not a measure
-        boss.append("<h2>What you can dispel here</h2><p>The Encounter Journal flags "
+    if h.dispellable:  # where the dispels most likely go: the Journal's flags and the game data, not a measure
+        boss.append("<h2>What you can dispel here</h2><p>Dispellable on this boss at this difficulty: "
                     + _and([f"{e(n)} ({e(t)})" for n, t in h.dispellable])
                     + "; your spec's dispels in the top kills most likely go to them (not measured per debuff yet)."
                     "</p>")
+    elif h.dispels_checked:
+        boss.append("<h2>What you can dispel here</h2><p>No ability of this boss is dispellable at this difficulty, "
+                    "in the Encounter Journal or the game data: the dispels in the top kills go to other debuffs "
+                    "(which ones is not measured yet).</p>")
     if h.abilities:  # every ability, the healers' in full and the others' named
         boss.append(f"<h2>Every ability, phase by phase</h2><div class='stages'>{h.abilities}</div>")
     others = "".join(role_card(r, h.roles, r.spec == h.spec, chips=r.spec != h.spec) for r in h.roles)
