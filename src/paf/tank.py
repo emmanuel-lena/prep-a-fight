@@ -264,7 +264,7 @@ def render_sheet(p: TankPrep) -> str:
                     + (f" (some press {e(some[0])} at {_mmss(some[1])})." if some else ".")))
     if p.swaps:
         lead.append(f"Each of them taunts about {p.taunts_per_kill:.0f} times a kill after the pull"
-                    + (f", most often after {e(common)}." if one else
+                    + (f", most often right after {e(common)} (a timing, not a measured cause)." if one else
                        f", the first time at {_mmss(p.swaps[0])}" + (f" after {e(causes[0])}." if causes[0] else ".")))
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + [
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the top tanks "
@@ -277,7 +277,8 @@ def render_sheet(p: TankPrep) -> str:
         f"<h2>Active mitigation the top tanks keep up</h2><ul class='hl2'>{mit or '<li>Not measured yet.</li>'}</ul>",
         f"<h2>Tank swaps</h2><p>Each top tank taunts about <b>{p.taunts_per_kill:.0f}</b> times a kill after the pull"
         f"{'; with the other tank, the swaps come at these moments' if swap else '.'}"
-        f"{f' (most of them after {e(common)})' if swap and one else ''}{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
+        f"{f' (most of them right after {e(common)}: a timing in the logs, the stacks are not counted)' if swap and one else ''}"
+        f"{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
                                                           f"</li></ul>" if swap else "")]
     change = [build_lead(p.builds, p.spec, p.kills),
               f"<h2>Talents the top tanks play</h2><ul class='hl2'>{builds_html(p.builds) or '<li>No build yet.</li>'}"
@@ -315,6 +316,8 @@ def render_sheet(p: TankPrep) -> str:
             line = f"Few top raids bring a {e(p.spec)} on this boss."
         deeper.append(f"<h2>The top raids' tanks</h2><p>{line}</p>{presence_table(p.presence, p.spec, 'Tank')}"
                       + comps_table(p.comps, p.kills).replace("Healers", "Tanks"))
+        deeper.append("<p class='small muted'>Not measured yet for tanks: the deaths of each composition (the healers' "
+                      "table has them), and why a spec's kills run longer (a reading, not a verdict).</p>")
     byline = (f"{e(p.character or p.spec)} &middot; {e(p.spec)} &middot; {p.kills} top tank kills &middot; "
               f"a {_mmss(p.duration)} fight")
     return sheet_page(p.boss, p.difficulty, byline, p.class_name,

@@ -863,8 +863,20 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         print(f"No kill of {enc.name} {diff_name} for {spec} {cls} yet.")
         return 1
     curve = healer.raid_curve(con, enc.id, diff, tl.duration)
-    roles = bossguide.ability_roles(bossguide.load(enc.id, diff_name))  # a tank buster does not name a raid hit
-    found = healer.moments(curve, tl.boss_casts, skip={n for n, r in roles.items() if r == ["tank"]})
+    sections = bossguide.load(enc.id, diff_name)
+    roles = bossguide.ability_roles(sections)
+    from paf.mechanics import walk
+
+    text = {s.title: bossguide.readable(s.text or bossguide.describe(s.spell_id), diff_name)  # as the boss tab
+            for _, s in walk(sections) if s.kind == "ability"}
+    tank_only = {n for n, r in roles.items() if r == ["tank"]}
+    # a tank ability names a raid hit only when the journal says players take it (Nek'zali's Possession Barrage:
+    # "damage to all players"); a bite on the tank every 30 s (Vashnik's Dripping Fangs) would name any wave
+    skip = {n for n in tank_only if not re.search(r"\bplayers\b|\braid\b", text.get(n, ""), re.I)}
+    found = healer.moments(curve, tl.boss_casts, skip=skip)
+    for m in found:
+        if m.boss_spell in tank_only:
+            m.boss_spell += ", aimed at the tank"
     builds = top_builds(con, enc.id, diff, spec, n=3)
     try:
         fetch_codes(client, con, builds)
@@ -876,6 +888,11 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         healer.trinkets(con, enc.id, diff), bossguide.role_bullets(bossguide.load(enc.id, diff_name), "healer"),
         [(n, t) for n, t, _ in tl.phases], class_name=cls, character=getattr(profile, "name", "") or "")
     h.abilities = _role_journal(enc.id, diff_name, "healer", tl)
+    from paf.mechanics import walk
+
+    h.dispellable = list(dict.fromkeys(
+        (s.title, f) for _, s in walk(sections) if s.kind == "ability" and s.for_difficulty(diff_name)
+        for f in s.flags if f in ("magic", "curse", "poison", "disease")))
     from paf.defensives import is_defensive
 
     worn = {n for n, _i, _s in h.trinkets}

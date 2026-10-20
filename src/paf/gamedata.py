@@ -82,6 +82,21 @@ def talent_entries() -> dict[int, tuple[str, int, int, float, float]]:
     return out
 
 
+@cache
+def hero_trees() -> dict[int, str]:
+    """TraitNodeEntry id -> its hero talent tree's name ("Colossus"), for the entries of a hero tree only."""
+    names = {int(r["ID"]): r.get("Name_lang") or "" for r in table_rows("TraitSubTree") if r.get("ID", "").isdigit()}
+    sub_of = {int(r["ID"]): int(r.get("TraitSubTreeID") or 0) for r in table_rows("TraitNode")
+              if r.get("ID", "").isdigit()}
+    out = {}
+    for r in table_rows("TraitNodeXTraitNodeEntry"):
+        if r.get("TraitNodeEntryID", "").isdigit() and r.get("TraitNodeID", "").isdigit():
+            tree = names.get(sub_of.get(int(r["TraitNodeID"]), 0), "")
+            if tree:
+                out[int(r["TraitNodeEntryID"])] = tree
+    return out
+
+
 # InventoryType values (Item.db2)
 INV_ONE_HAND = 13
 INV_SHIELD = 14

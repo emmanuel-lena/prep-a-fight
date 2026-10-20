@@ -91,3 +91,16 @@ def test_waves_are_the_moments_without_a_big_hit():
     found = healer.moments(curve, [])
     assert [round(m.ratio, 2) for m in found] == [1.3, 1.25, 1.35]
     assert max(m.ratio for m in found) < healer.SPIKE
+
+
+def test_a_wave_is_named_after_the_cast_before_it():
+    """Vashnik heroic: Imbibe at 0:24, 1:48 and 3:12, the raid's waves at 0:40, 2:10 and 3:40 (16 to 28 s later):
+    each wave reads "after Imbibe", matched by timing; a cast within 8 s still names a hit directly."""
+    from paf import healer
+
+    curve = [10.0] * 50
+    for t in (40, 130, 220):
+        curve[int(t // healer.STEP)] = 13.0
+    found = healer.moments(curve, [("Imbibe", [24.0, 108.0, 192.0])])
+    assert [m.boss_spell for m in found] == ["after Imbibe"] * 3
+    assert healer.moments(curve, [("Soulcoil Ignition", [36.0])])[0].boss_spell == "Soulcoil Ignition"

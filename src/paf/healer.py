@@ -91,6 +91,7 @@ class HealerPrep:
     class_name: str = ""
     character: str = ""
     abilities: str = ""  # the Encounter Journal's stages, your role's abilities in full (paf.bossguide), html
+    dispellable: list = field(default_factory=list)  # (ability, debuff type) the Journal flags as dispellable
     rare: list = field(default_factory=list)  # long cooldowns few top players press (Cooldown): said, not hidden
 
 
@@ -172,8 +173,11 @@ def moments(curve: list[float], boss_casts: list[tuple[str, list[float]]], top: 
         found = sorted(sorted(found, key=lambda m: -m.ratio)[:3], key=lambda m: m.t)  # the three highest waves
     for m in found:
         near = [(m.t - x, name) for name, times in boss_casts if name not in skip for x in times if -2 <= m.t - x <= 8]
+        later = [(m.t - x, name) for name, times in boss_casts if name not in skip for x in times if 8 < m.t - x <= 30]
         if near:
             m.boss_spell = min(near)[1]
+        elif later:  # the damage that follows a cast (Vashnik: the waves 16 to 28 s after Imbibe), matched by timing
+            m.boss_spell = f"after {min(later)[1]}"
     return sorted(sorted(found, key=lambda m: -m.ratio)[:top], key=lambda m: m.t)
 
 
@@ -296,30 +300,36 @@ def _near(n: str) -> str:
     return f" &middot; {e(name)}" if name else f" &middot; the {e(t)} hit"
 
 
-SHOWN_TALENTS = 60  # every difference shown: nothing folded behind "+N more"
+SHOWN_TALENTS = 60  # every class and spec difference shown (a hero tree is named, not listed): no "+N more"
 
 
 def build_rows(builds: list) -> list[tuple[int, str, str, str]]:
     """(players, label, import string, what sets it apart from the most played build) of the top builds."""
     try:
-        from paf.gamedata import talent_entry_names
+        from paf.gamedata import hero_trees, talent_entry_names
 
-        names = talent_entry_names()
+        names, heroes = talent_entry_names(), hero_trees()
     except Exception:  # noqa: BLE001 - offline: the builds without their difference
-        names = {}
+        names, heroes = {}, {}
+
+    def hero(key) -> str:  # the hero tree a build plays: the one most of its hero talents belong to
+        trees = [heroes[t] for t in key if t in heroes]
+        return max(set(trees), key=trees.count) if trees else ""
     out = []
     for i, b in enumerate(builds):
         if i == 0 or not names:
             out.append((b.count, b.label, b.code or "", "the most played" if i == 0 else ""))
             continue
-        plus = sorted({names[t] for t in b.key - builds[0].key if names.get(t)})
-        minus = sorted({names[t] for t in builds[0].key - b.key if names.get(t)})
+        mine, base = hero(b.key), hero(builds[0].key)
+        other = mine and base and mine != base  # another hero tree: named, its own talents not listed one by one
+        plus = sorted({names[t] for t in b.key - builds[0].key if names.get(t) and not (other and t in heroes)})
+        minus = sorted({names[t] for t in builds[0].key - b.key if names.get(t) and not (other and t in heroes)})
 
         def few(xs: list[str]) -> str:  # another hero tree changes twenty talents: the first ones say enough
             return ", ".join(xs[:SHOWN_TALENTS]) + (f" (+{len(xs) - SHOWN_TALENTS} more)" if len(xs) > SHOWN_TALENTS
                                                     else "")
-        diff = "; ".join(x for x in (f"takes {few(plus)}" if plus else "", f"drops {few(minus)}" if minus else "")
-                         if x)
+        diff = "; ".join(x for x in (f"the {mine} hero tree instead of {base}" if other else "",
+                                     f"takes {few(plus)}" if plus else "", f"drops {few(minus)}" if minus else "") if x)
         out.append((b.count, b.label, b.code or "", diff))
     return out
 
@@ -538,6 +548,11 @@ def render_sheet(h: HealerPrep) -> str:
     jr = "".join(f"<li>{e(_plain(x))}</li>" for x in h.journal)
     boss = [journal_lead(h.journal, "healers")] + (
         [f"<h2>What the Encounter Journal asks healers</h2><ul class='hl2'>{jr}</ul>"] if jr else [])
+    if h.dispellable:  # where the dispels most likely go: the Journal's flags, not a measure
+        boss.append("<h2>What you can dispel here</h2><p>The Encounter Journal flags "
+                    + _and([f"{e(n)} ({e(t)})" for n, t in h.dispellable])
+                    + "; your spec's dispels in the top kills most likely go to them (not measured per debuff yet)."
+                    "</p>")
     if h.abilities:  # every ability, the healers' in full and the others' named
         boss.append(f"<h2>Every ability, phase by phase</h2><div class='stages'>{h.abilities}</div>")
     others = "".join(role_card(r, h.roles, r.spec == h.spec, chips=r.spec != h.spec) for r in h.roles)
