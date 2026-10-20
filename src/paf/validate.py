@@ -4,6 +4,7 @@ their logs) on the fight and compare with the DPS they actually did."""
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import statistics as st
 from dataclasses import dataclass, field
@@ -147,23 +148,37 @@ def validate(con: sqlite3.Connection, client: WCLClient, encounter_id: int, diff
             continue
         if prof is None:
             continue
-        if align and apls is None:
-            apls = aligned_apl(prof, fight, run_dir) or False
-        if apls:
-            default_lines, held_lines = apls
-            res = simc.run(simc.build_input(prof + "\n".join(default_lines) + "\n", fight.to_simc(),
-                                            {"held": held_lines}),
-                           run_dir / f"rank{r['rank_pos']}", target_error=target_error)
-            ps = next(p for p in res.profilesets if p.name == "held")
-            boss = ps.metrics.get("prioritydps")
-            checks.append(Check(r["rank_pos"], r["dps"], ps.dps.mean, boss.mean if boss else None,
-                                prof + "\n".join(held_lines) + "\n", res.baseline["dps"].mean))
-            continue
-        res = simc.run(simc.build_input(prof, fight.to_simc()), run_dir / f"rank{r['rank_pos']}",
-                       target_error=target_error)
-        boss = res.baseline.get("prioritydps")
-        checks.append(Check(r["rank_pos"], r["dps"], res.baseline["dps"].mean, boss.mean if boss else None, prof))
+        for _attempt in range(4):  # an item SimC's offline data lacks: its slot goes (the real stats are imposed)
+            try:
+                check, apls = _sim_player(r, prof, fight, run_dir, apls, align, target_error)
+            except simc.SimcError as ex:
+                slot = re.search(r"Slot '(\w+)': Error retrieving item", str(ex))
+                if not slot:
+                    break  # another failure: the next player
+                prof = "\n".join(x for x in prof.splitlines() if not x.startswith(slot[1] + "=")) + "\n"
+                continue
+            checks.append(check)
+            break
     return checks
+
+
+def _sim_player(r, prof: str, fight: Fight, run_dir: Path, apls, align: bool, target_error: float):
+    """One top player simmed on the fight: (Check, the aligned APLs to reuse)."""
+    if align and apls is None:
+        apls = aligned_apl(prof, fight, run_dir) or False
+    if apls:
+        default_lines, held_lines = apls
+        res = simc.run(simc.build_input(prof + "\n".join(default_lines) + "\n", fight.to_simc(),
+                                        {"held": held_lines}),
+                       run_dir / f"rank{r['rank_pos']}", target_error=target_error)
+        ps = next(p for p in res.profilesets if p.name == "held")
+        boss = ps.metrics.get("prioritydps")
+        return Check(r["rank_pos"], r["dps"], ps.dps.mean, boss.mean if boss else None,
+                     prof + "\n".join(held_lines) + "\n", res.baseline["dps"].mean), apls
+    res = simc.run(simc.build_input(prof, fight.to_simc()), run_dir / f"rank{r['rank_pos']}",
+                   target_error=target_error)
+    boss = res.baseline.get("prioritydps")
+    return Check(r["rank_pos"], r["dps"], res.baseline["dps"].mean, boss.mean if boss else None, prof), apls
 
 
 MOVEMENT_SCALES = (0.0, 0.25, 0.5, 0.75, 1.0)
