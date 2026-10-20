@@ -84,6 +84,16 @@ def db_path(cls: str | None = None, spec: str | None = None) -> Path:
     return p
 
 
+TWIN = 0.25  # seconds: no spell is cast twice this fast; a second event on the caster is the same cast's twin
+# A spell cast on another player is logged twice, once more on the caster (Power Infusion with its self copy,
+# Germination's Rejuvenation, Twin Flame, Chain Heal): the copy on the caster goes, the cast stays.
+TWINS = f"""DELETE FROM player_cast WHERE rowid IN (SELECT a.rowid FROM player_cast a JOIN player_cast b
+  ON a.report=b.report AND a.fight_id=b.fight_id AND a.actor_id=b.actor_id AND a.ability_id=b.ability_id
+  AND a.rowid!=b.rowid WHERE a.target_id=a.actor_id AND b.target_id IS NOT NULL AND b.target_id!=b.actor_id
+  AND abs(a.t-b.t)<={TWIN} AND a.type='cast' AND b.type='cast')"""
+DATA_VERSION = 1  # PRAGMA user_version: 1 = the twins removed
+
+
 MIGRATIONS = [
     ("player_cast", "target_id", "INT"),
     ("player_cast", "target_instance", "INT"),
@@ -100,6 +110,10 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
         cols = {r[1] for r in con.execute(f"PRAGMA table_info({table})")}
         if column not in cols:
             con.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
+    if con.execute("PRAGMA user_version").fetchone()[0] < DATA_VERSION:
+        con.execute(TWINS)
+        con.execute(f"PRAGMA user_version={DATA_VERSION}")
+        con.commit()
     return con
 
 

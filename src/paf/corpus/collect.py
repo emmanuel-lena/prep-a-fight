@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from paf.corpus.db import clear_fight_rows
+from paf.corpus.db import TWIN, clear_fight_rows
 from paf.encounters import Encounter
 from paf.wcl import WCLClient, WCLError
 
@@ -132,6 +132,14 @@ def enumerate_kills(client: WCLClient, enc: Encounter, difficulty: int, cls: str
         step = len(merged) / count
         merged = [merged[int(i * step)] for i in range(count)]
     return merged[:count]
+
+
+def without_twins(casts: list[dict], actor: int) -> list[dict]:
+    """The casts without the copy logged on the caster of a spell cast on another player (paf.corpus.db.TWINS)."""
+    others = [(ev.get("abilityGameID"), ev["timestamp"]) for ev in casts
+              if ev.get("type") == "cast" and ev.get("targetID") not in (None, actor)]
+    return [ev for ev in casts if not (ev.get("type") == "cast" and ev.get("targetID") == actor and any(
+        a == ev.get("abilityGameID") and abs(ts - ev["timestamp"]) <= TWIN * 1000 for a, ts in others))]
 
 
 def store_ranked(con: sqlite3.Connection, enc: Encounter, difficulty: int, cohort: str,
@@ -339,6 +347,7 @@ def write_kill(con: sqlite3.Connection, report: str, fight_id: int, p: dict[str,
                     [(*fk, *r) for r in p["damage"]])
     con.executemany("INSERT INTO enemy_cast VALUES(?,?,?,?,?,?,?)", [(*fk, *r) for r in p["enemy_casts"]])
     actor = p["ranked_actor"]
+    pcasts = without_twins(pcasts, actor)
     con.executemany(
         "INSERT INTO player_cast(report, fight_id, actor_id, ability_id, type, t, x, y, facing, target_id,"
         " target_instance) VALUES(?,?,?,?,?,?,?,?,?,?,?)",

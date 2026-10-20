@@ -216,3 +216,28 @@ def test_a_returning_unit_keeps_its_own_windows():
     assert opened_by_hit(102.0, 160.0, 92.0) == (92.0, 160.0)
     assert opened_by_hit(272.0, 316.0, 136.5) == (272.0, 316.0)
     assert opened_by_hit(124.0, 168.0, 136.5) == (124.0, 168.0)
+
+
+def test_a_spell_cast_on_another_player_is_one_cast():
+    """A Holy Priest's Power Infusion (2026-10-20 corpus): logged on its target at 4.027 s and on the priest at
+    4.049 s; the sheet said 6.0 a kill for 3 casts."""
+    from paf.corpus.collect import without_twins
+
+    casts = [{"type": "cast", "abilityGameID": 10060, "timestamp": 4027, "targetID": 11},
+             {"type": "cast", "abilityGameID": 10060, "timestamp": 4049, "targetID": 27},
+             {"type": "cast", "abilityGameID": 10060, "timestamp": 126236, "targetID": 27},  # on themselves: kept
+             {"type": "cast", "abilityGameID": 2061, "timestamp": 4100, "targetID": 27}]
+    assert [c["timestamp"] for c in without_twins(casts, 27)] == [4027, 126236, 4100]
+
+
+def test_the_twins_go_from_an_existing_corpus(tmp_path):
+    from paf.corpus import db
+
+    con = db.connect(tmp_path / "c.sqlite")
+    con.execute("PRAGMA user_version=0")
+    con.executemany("INSERT INTO player_cast(report, fight_id, actor_id, ability_id, type, t, target_id) "
+                    "VALUES ('r',1,27,10060,'cast',?,?)", [(4.027, 11), (4.049, 27), (126.2, 27)])
+    con.commit()
+    con.close()
+    con = db.connect(tmp_path / "c.sqlite")
+    assert [r[0] for r in con.execute("SELECT t FROM player_cast ORDER BY t")] == [4.027, 126.2]

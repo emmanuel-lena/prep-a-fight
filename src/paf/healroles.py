@@ -22,6 +22,8 @@ from dataclasses import dataclass, field
 from itertools import zip_longest
 
 from paf.corpus.analyze import kills_filter
+from paf.corpus.collect import without_twins
+from paf.corpus.db import TWIN
 from paf.gamedata import external_kind
 from paf.wcl import WCLClient, WCLError
 
@@ -57,8 +59,15 @@ TABLES = """query($c:String!,$f:[Int]!,$s:Float,$e:Float){ reportData { report(c
 } } }"""
 
 
+# a cast on another player is logged once more on the caster (Power Infusion's self copy): that copy goes
+HEAL_TWINS = f"""DELETE FROM heal_cast WHERE rowid IN (SELECT a.rowid FROM heal_cast a JOIN heal_cast b
+  ON a.report=b.report AND a.fight_id=b.fight_id AND a.actor_id=b.actor_id AND a.ability_id=b.ability_id
+  WHERE a.on_other=0 AND b.on_other=1 AND abs(a.t-b.t)<={TWIN})"""
+
+
 def ensure_tables(con: sqlite3.Connection) -> None:
     con.executescript(SCHEMA)
+    con.execute(HEAL_TWINS)
 
 
 def _spec(icon: str | None) -> tuple[str, str] | None:
@@ -139,9 +148,9 @@ def fetch_heal_roles(client: WCLClient, con: sqlite3.Connection, encounter_id: i
             r = client.query(TABLES, {"c": rep, "f": [fid], "s": fr["startTime"], "e": fr["endTime"]},
                              cache_ttl=0)["reportData"]["report"]
             rows, deaths, share = kill_stats(r)
-            casts = [c for x in rows for c in client.events(  # one healer at a time: WCL's source.id filter
+            casts = [c for x in rows for c in without_twins(client.events(  # one healer at a time: WCL's
                 rep, fid, fr["startTime"], fr["endTime"], data_type="Casts", hostility="Friendlies",
-                source_id=x[0], cache=False)]  # returns nothing
+                source_id=x[0], cache=False), x[0])]  # source.id filter returns nothing
         except (WCLError, KeyError, TypeError, IndexError, OSError) as e:
             log(f"  healing skipped: {str(e)[:100]}")
             continue

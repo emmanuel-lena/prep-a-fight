@@ -909,8 +909,11 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     skip = {n for n in tank_only if not re.search(r"\bplayers\b|\braid\b", text.get(n, ""), re.I)}
     raid = {n for n, t in text.items() if re.search(r"\ball players\b|\bthe raid\b", t, re.I)}
     found = healer.moments(curve, tl.boss_casts, skip=skip, raid=raid)
+    by = healer.raid_by_ability(con, enc.id, diff, tl.duration)
+    if by:  # measured: what hits the raid there
+        healer.name_by_damage(found, by)
     for m in found:
-        if m.boss_spell in tank_only:
+        if not by and m.boss_spell in tank_only:
             m.boss_spell += ", aimed at the tank"
     builds = top_builds(con, enc.id, diff, spec, n=3)
     try:
@@ -923,6 +926,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         healer.trinkets(con, enc.id, diff), bossguide.role_bullets(bossguide.load(enc.id, diff_name), "healer"),
         [(n, t) for n, t, _ in tl.phases], class_name=cls, character=getattr(profile, "name", "") or "")
     h.abilities = _role_journal(enc.id, diff_name, "healer", tl)
+    h.named_by_damage = bool(by)
     h.casts = {n: len(ts) for n, ts in tl.boss_casts}
     h.split, h.split_players = healer.contested(con, enc.id, diff, spec)
     from paf.gamedata import dispel_type

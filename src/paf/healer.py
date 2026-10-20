@@ -19,12 +19,17 @@ import statistics as st
 from collections import Counter
 from dataclasses import dataclass, field
 from html import escape as e
+from itertools import pairwise
 
 from paf import theme
 from paf.theme import diff_pill
 
 GRAPH = """query($c:String!,$f:[Int]!,$a:Float,$b:Float){ reportData { report(code:$c) {
   graph(fightIDs:$f, dataType:DamageTaken, hostilityType:Friendlies, startTime:$a, endTime:$b) } } }"""
+GRAPH_BY_ABILITY = """query($c:String!,$f:[Int]!,$a:Float,$b:Float){ reportData { report(code:$c) {
+  graph(fightIDs:$f, dataType:DamageTaken, hostilityType:Friendlies, viewBy:Ability, startTime:$a, endTime:$b) } } }"""
+NAMED = 0.4  # an ability doing this share of the raid's damage in a moment names it; below, the damage is mixed
+ALSO = 0.25  # ... and a second one this share is named with it
 BOUNDS = """query($c:String!,$f:[Int]!){ reportData { report(code:$c) { fights(fightIDs:$f) { startTime endTime } } } }"""
 
 
@@ -42,7 +47,8 @@ def series_of(g: dict) -> tuple[float, dict[str, list[float]]]:
     return (first.get("pointInterval") or STEP * 1000) / 1000, series
 RAID_KILLS = 40
 STEP = 5.0
-SPIKE = 1.6  # a moment with this many times the median raid damage
+SPIKE = 1.5  # a moment with this many times the median raid damage is a big hit
+RELATIVE = 0.85  # ... and every hit this close to the highest is one too (Nek'zali: 0:35 x1.62, 1:20 x1.57)
 SPIKE_GAP = 15.0
 ANSWER = (10.0, 8.0)  # seconds before and after a moment (a 5 s step) a press answers it
 WAVE = 1.2  # without any SPIKE, the waves of raid damage at this many times the median are the moments to plan for
@@ -100,12 +106,15 @@ class HealerPrep:
     casts: dict = field(default_factory=dict)  # boss ability -> its casts in the typical kill (timing evidence)
     split: list = field(default_factory=list)  # (talent, share picked) the top players split on (contested)
     split_players: int = 0
+    named_by_damage: bool = False  # the moments are named by the raid's damage taken by ability (measured)
 
 
 def ensure_table(con) -> None:
     con.execute("CREATE TABLE IF NOT EXISTS raid_damage(report TEXT, fight_id INT, step REAL, series TEXT, "
                 "PRIMARY KEY(report, fight_id))")
     con.execute("DELETE FROM raid_damage WHERE step > 10")  # read over the whole report by 0.6.23's first try
+    con.execute("CREATE TABLE IF NOT EXISTS raid_damage_ability(report TEXT, fight_id INT, step REAL, series TEXT, "
+                "PRIMARY KEY(report, fight_id))")
 
 
 def fetch_raid_damage(client, con, encounter_id: int, difficulty: int, limit: int = RAID_KILLS,
@@ -127,9 +136,55 @@ def fetch_raid_damage(client, con, encounter_id: int, difficulty: int, limit: in
         step, series = series_of(g.get("data", g) if isinstance(g, dict) else {})
         con.execute("INSERT OR REPLACE INTO raid_damage VALUES(?,?,?,?)", (rep, fid, step, json.dumps(series)))
     con.commit()
-    if todo:
-        log(f"  raid damage of {len(todo)} kills")
+    # the same kills' damage taken by ability: what hits the raid in each big moment (measured, not a cast's timing)
+    by = con.execute(f"SELECT d.report, d.fight_id FROM raid_damage d JOIN fight f USING(report, fight_id) "
+                     f"LEFT JOIN raid_damage_ability x USING(report, fight_id) WHERE {where} AND x.report IS NULL",
+                     params).fetchall()
+    for rep, fid in by:
+        a, b = fight_bounds(client, rep, fid)
+        g = client.query(GRAPH_BY_ABILITY, {"c": rep, "f": [fid], "a": a, "b": b},
+                         cache_ttl=86400)["reportData"]["report"]["graph"]
+        step, series = series_of(g.get("data", g) if isinstance(g, dict) else {})
+        con.execute("INSERT OR REPLACE INTO raid_damage_ability VALUES(?,?,?,?)", (rep, fid, step, json.dumps(series)))
+    con.commit()
+    if todo or by:
+        log(f"  raid damage of {max(len(todo), len(by))} kills")
     return len(todo)
+
+
+def raid_by_ability(con, encounter_id: int, difficulty: int, duration: float) -> dict[str, list[float]]:
+    """The raid's damage taken per ability, per STEP, summed over the kills read (shares compare, not levels)."""
+    from paf.corpus.analyze import kills_filter
+
+    ensure_table(con)
+    where, params = kills_filter(encounter_id, difficulty)
+    n = int(duration // STEP) + 1
+    out: dict[str, list[float]] = {}
+    for step, series in con.execute(f"SELECT x.step, x.series FROM raid_damage_ability x JOIN fight f "
+                                    f"USING(report, fight_id) WHERE {where}", params):
+        for name, values in json.loads(series).items():
+            row = out.setdefault(name, [0.0] * n)
+            for i, v in enumerate(values):
+                b = int(i * step // STEP)
+                if b < n:
+                    row[b] += v or 0
+    return out
+
+
+def name_by_damage(found: list[Moment], by: dict[str, list[float]], width: int = 2) -> None:
+    """Name each moment by what does the raid's damage there: its first ability when it does NAMED of it, with a
+    second one doing ALSO; else "mixed damage" and the two biggest (Nek'zali's 0:35: Soulcoil Rite 53%)."""
+    for m in found:
+        b = int(m.t // STEP)
+        w = sorted(((sum(v[b:b + width]), name) for name, v in by.items()), reverse=True)
+        total = sum(x for x, _ in w)
+        if not total:
+            continue
+        (a, first), (s, second) = w[0], (w[1] if len(w) > 1 else (0.0, ""))
+        if a / total >= NAMED:
+            m.boss_spell = f"{first} and {second}" if s / total >= ALSO else first
+        else:
+            m.boss_spell = f"mixed damage, most from {first} and {second}"
 
 
 def raid_curve(con, encounter_id: int, difficulty: int, duration: float) -> list[float]:
@@ -164,20 +219,20 @@ def moments(curve: list[float], boss_casts: list[tuple[str, list[float]]], top: 
     if not base:
         return []
     found: list[Moment] = []
-    for level in (SPIKE, WAVE):  # Vashnik: no single big hit, the raid damage comes in waves (x1.3)
-        for i, v in enumerate(curve):
-            if v < level * base or (i and curve[i - 1] > v) or (i + 1 < len(curve) and curve[i + 1] > v):
-                continue
-            t = i * STEP
-            if found and t - found[-1].t < SPIKE_GAP:
-                if v > found[-1].dtps:
-                    found[-1] = Moment(t, v, v / base)
-                continue
-            found.append(Moment(t, v, v / base))
-        if found:
-            break
-    if found and max(m.ratio for m in found) < SPIKE:
+    for i, v in enumerate(curve):
+        if v < WAVE * base or (i and curve[i - 1] > v) or (i + 1 < len(curve) and curve[i + 1] > v):
+            continue
+        t = i * STEP
+        if found and t - found[-1].t < SPIKE_GAP:
+            if v > found[-1].dtps:
+                found[-1] = Moment(t, v, v / base)
+            continue
+        found.append(Moment(t, v, v / base))
+    if found and max(m.ratio for m in found) < SPIKE:  # Vashnik: no single big hit, the raid damage comes in waves
         found = sorted(sorted(found, key=lambda m: -m.ratio)[:3], key=lambda m: m.t)  # the three highest waves
+    elif found:  # the hits near the highest, not only those above a line two samples put on either side of
+        highest = max(m.ratio for m in found)
+        found = [m for m in found if m.ratio >= max(SPIKE * 0.9, RELATIVE * highest)]
     for m in found:
         near = [(m.t - x, name) for name, times in boss_casts if name not in skip for x in times if -2 <= m.t - x <= 8]
         later = [(m.t - x, name) for name, times in boss_casts if name not in skip for x in times if 8 < m.t - x <= 30]
@@ -187,6 +242,9 @@ def moments(curve: list[float], boss_casts: list[tuple[str, list[float]]], top: 
             hits = [c for c in later if c[1] in raid]  # an ability the journal says hits all players goes first
             m.boss_spell = f"after {min(hits or later)[1]}"
     return sorted(sorted(found, key=lambda m: -m.ratio)[:top], key=lambda m: m.t)
+
+
+COOLDOWN_SLACK = 0.9  # two moments of a plan are at least this share of the players' shortest usual gap apart
 
 
 def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None = None,
@@ -214,8 +272,18 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         per_player = [ts for ts in per_player if ts]
         ranked = ranked_peaks(per_player) if per_player else []
         keep = max(1, round(a.per_kill))
-        times = sorted(t for t, _n in ranked[:keep])
-        alt = sorted(t for t, _n in ranked[keep:])
+        # the moments come from all the players: two closer than one player ever presses it twice are two habits,
+        # not one plan (Avenging Wrath at 0:21 and 0:41); the second goes with the other habits
+        gaps = sorted(y - x for ts in per_player for x, y in pairwise(sorted(ts)))
+        gap = gaps[len(gaps) // 10] * COOLDOWN_SLACK if gaps else 0.0
+        times: list[float] = []
+        alt = []
+        for t, _n in ranked:
+            if len(times) < keep and all(abs(t - x) >= gap for x in times):
+                times.append(t)
+            else:
+                alt.append(t)
+        times, alt = sorted(times), sorted(alt)
         near = []
         for t in times:
             m = min(found, key=lambda m: abs(m.t - t), default=None)
@@ -566,22 +634,23 @@ def render_sheet(h: HealerPrep) -> str:
     defs = [c for c in h.cooldowns if c not in heals and c not in items]
     lead = ""
     if h.moments:
-        said = [m.boss_spell for m in h.moments[:3]]
-        if len(set(said)) == 1 and said[0]:  # the same cast before each: said once (Vashnik's three waves)
-            cast = said[0].removeprefix("after ")
-            n = h.casts.get(cast, 0)
-            hits = (_and([_mmss(m.t) for m in h.moments[:3]]) + f", each {e(said[0])}"
-                    + (f" (matched by timing: {len(said)} of its {n} casts)" if said[0].startswith("after ") and n
-                       else " (matched by timing)" if said[0].startswith("after ") else ""))
+        shown = h.moments[:3]
+        said = [m.boss_spell for m in shown]
+        ratios = _and([f"&times;{m.ratio:.1f}" for m in shown])
+        if len(set(said)) == 1 and said[0] and len(shown) > 1:  # one ability each time: said once
+            hits = f"{_and([_mmss(m.t) for m in shown])}, each time {e(said[0])} ({ratios} the fight's median)"
         else:
-            hits = _and([f"{_mmss(m.t)} ({e(m.boss_spell)})" if m.boss_spell else _mmss(m.t) for m in h.moments[:3]])
-        at = {_mmss(m.t) for m in h.moments}  # a cooldown kept for the hits: most of its presses answer one
-        used = [c.name for c in heals if c.times and sum(1 for n in c.near if n and n.split(" ", 1)[0] in at)
-                >= len(c.times) / 2]
-        opening = ("No single big hit: the raid damage comes in waves, the highest at "
-                   if max(m.ratio for m in h.moments) < SPIKE else "The raid's big hits come at ")
-        lead = (f"<p class='lead'>{opening}{hits}"
-                + (f"; the top {e(h.spec)}s press {e(_and(used[:3]))} at them." if used else ".") + "</p>")
+            hits = _and([f"{_mmss(m.t)} ({e(m.boss_spell) + ', ' if m.boss_spell else ''}&times;{m.ratio:.1f})"
+                         for m in shown]) + " the fight's median"
+        # a cooldown said for a moment only when the top players' usual press answers it (paf.healer.ANSWER)
+        answers = []
+        for m in shown:
+            mine_here = [c.name for c in heals if any(n and n.split(" ", 1)[0] == _mmss(m.t) for n in c.near)]
+            if mine_here:
+                answers.append(f"{_mmss(m.t)}: {_and(mine_here[:3])}")
+        lead = (f"<p class='lead'>The raid takes the most damage at {hits}."
+                + (f" Around them the top {e(h.spec)}s press: {e('; '.join(answers))}." if answers else
+                   f" No healing cooldown of the top {e(h.spec)}s is kept for them.") + "</p>")
     you = []
     own = "ranked by their healing" in (h.role_sample or "")
     if mine is not None:
@@ -591,8 +660,10 @@ def render_sheet(h: HealerPrep) -> str:
                + "</p>"]
     fight = ([lead] if lead else []) + you + [
         f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Damage the "
-        f"raid takes per second, median of the top kills; a dot marks a big moment, named after the boss cast just "
-        f"before it (&quot;after X&quot;: 8 to 30 s before, matched by timing).</p><ul class='hl2'>"
+        f"raid takes per second, median of the top kills; a dot marks a big moment, "
+        + ("named after the ability doing the most of the raid's damage there, measured on the same kills"
+           if h.named_by_damage else "named after the boss cast just before it (&quot;after X&quot;: 8 to 30 s "
+           "before, matched by timing)") + f".</p><ul class='hl2'>"
         f"{moments_html(h.moments, 'raid damage') or '<li>No big moment: steady raid damage.</li>'}</ul></div>",
         f"<h2>Your long cooldowns, where the top {e(h.spec)}s press them</h2><ul class='hl2'>"
         f"{cooldowns_html(heals) or '<li>Not enough top players in the corpus yet.</li>'}</ul>"]

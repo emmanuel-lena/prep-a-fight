@@ -36,3 +36,34 @@ def test_cooldowns_where_the_top_healers_press_them():
     page = healer.render(h)
     assert "Your healing cooldowns" in page and "Spirit Link Totem" in page and "QE Live" in page
     assert "data-copy='ABC'" in page and "Dispel the poison." in page
+
+
+def test_two_habits_are_not_one_plan():
+    """Holy Paladin, Vashnik heroic: Avenging Wrath "0:21, 0:41", a 2-minute cooldown pooled over players who press
+    it at 0:21 and others at 0:41."""
+    ab = SimpleNamespace(id=1, name="Avenging Wrath", users=0.9, per_kill=2.0)
+    players = [{"casts": {1: [21.0, 150.0]}} for _ in range(5)] + [{"casts": {1: [41.0, 165.0]}} for _ in range(4)]
+    tl = SimpleNamespace(abilities=[ab], duration=240.0, players=players)
+    cd = healer.cooldowns(tl, [], {1: (120.0, 1)})[0]
+    assert cd.times == [21.0, 150.0] and 41.0 in cd.alt
+
+
+def test_a_moment_is_named_by_what_hits_the_raid():
+    """Nek'zali heroic, 0:35: the healer sheets said "Possession Barrage, aimed at the tank" (the cast just before);
+    the damage taken by ability says Soulcoil Rite 53%, Possession Barrage 31%."""
+    found = [healer.Moment(35.0, 1.6e6, 1.6), healer.Moment(75.0, 1.7e6, 1.7), healer.Moment(200.0, 1e6, 1.5)]
+    by = {"Soulcoil Rite": [0.0] * 7 + [53, 0] + [0.0] * 6 + [75, 0] + [0.0] * 24 + [32, 0],
+          "Possession Barrage": [0.0] * 7 + [31, 0] + [0.0] * 6 + [6, 0] + [0.0] * 24 + [31, 0],
+          "Corpse Blight": [0.0] * 7 + [16, 0] + [0.0] * 6 + [19, 0] + [0.0] * 24 + [37, 0]}
+    healer.name_by_damage(found, by)
+    assert [m.boss_spell for m in found] == [
+        "Soulcoil Rite and Possession Barrage", "Soulcoil Rite",
+        "mixed damage, most from Corpse Blight and Soulcoil Rite"]
+
+
+def test_two_hits_near_the_same_height_are_both_kept():
+    """Preservation Evoker's corpus, Nek'zali heroic: 0:35 x1.62 and 1:20 x1.57; a line at x1.6 kept one only, the
+    other healer sheets of the same boss both."""
+    curve = [100.0] * 60
+    curve[7], curve[16] = 162.0, 157.0
+    assert [m.t for m in healer.moments(curve, [])] == [35.0, 80.0]
