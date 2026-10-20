@@ -21,7 +21,7 @@ from dataclasses import dataclass, field, replace
 from html import escape as e
 
 from paf import theme
-from paf.healer import RAID_KILLS, RELATIVE, SPIKE, SPIKE_GAP, STEP, Cooldown, Moment, _mmss
+from paf.healer import ANSWER, RAID_KILLS, RELATIVE, SPIKE, SPIKE_GAP, STEP, Cooldown, Moment, _and, _mmss
 from paf.theme import diff_pill
 
 GRAPH = """query($c:String!,$f:[Int]!,$s:Int!,$a:Float,$b:Float){ reportData { report(code:$c) {
@@ -394,14 +394,17 @@ def render_sheet(p: TankPrep) -> str:
     swap = "".join(f"<span class='chip'>{_mmss(t)}{f' after {e(c)}' if c and not (one and c == common) else ''}</span>"
                    for t, c in zip(p.swaps, causes, strict=False))
     lead = []
+    if p.hitters:  # what hits the tanks over the fight first: their own danger, not the raid's
+        lead.append(f"What hits the top tanks the most: {_and([f'{e(n)} ({s:.0%})' for n, s in p.hitters[:2]])} "
+                    f"of their damage taken.")
     if p.moments:
         m = max(p.moments, key=lambda x: x.ratio)
-        press = next(((c.name, t) for c in defs for t in c.times if abs(t - m.t) <= 20), None)
-        some = next(((c.name, t) for c in defs for t in c.alt if abs(t - m.t) <= 20), None)
-        lead.append(f"The tanks' biggest damage: {e(m.boss_spell or 'tank damage')} at {_mmss(m.t)} (&times;{m.ratio:.1f} "
-                    f"the fight's median)" + (f"; the top {e(p.spec)}s press {e(press[0])} at {_mmss(press[1])}." if press
-                    else f"; most top {e(p.spec)}s press no defensive at it"
-                    + (f" (some press {e(some[0])} at {_mmss(some[1])})." if some else ".")))
+        own = m.boss_spell in {n for n, _s in p.hitters[:3]}
+        press = next(((c.name, t) for c in defs for t in c.times if -ANSWER[0] <= t - m.t <= ANSWER[1]), None)
+        lead.append(f"Their biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({m.ratio:.1f}&times; the "
+                    f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
+                    + (f"; the top {e(p.spec)}s press {e(press[0])} for it." if press
+                       else f"; most top {e(p.spec)}s press no defensive for it."))
     if p.swaps:
         lead.append(f"Each of them taunts about {p.taunts_per_kill:.0f} times a kill after the pull"
                     + ((f", most often at about {p.stacks[common][0]} stacks of {e(common)}." if common in p.stacks
@@ -425,7 +428,7 @@ def render_sheet(p: TankPrep) -> str:
         f"{_cause(common, p.stacks) if swap and one else ''}"
         f"{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
                                                           f"</li></ul>" if swap else "")
-        + "".join(f"<p><b>No swap then: {e(n)}.</b> {e(t)}</p>" for n, t in p.no_taunt)]
+        + "".join(f"<p><b>Taunts stop working with {e(n)}:</b> {e(t)}</p>" for n, t in p.no_taunt)]
     change = [build_lead(p.builds, p.spec, p.split_players or p.kills, p.split),
               talents_html(p.builds, p.split_players or p.kills, "tanks", p.hero),
               split_html(p.split, p.split_players, p.spec) if p.split else "",

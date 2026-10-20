@@ -939,6 +939,8 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         [(n, t) for n, t, _ in tl.phases], class_name=cls, character=getattr(profile, "name", "") or "")
     h.abilities = _role_journal(enc.id, diff_name, "healer", tl)
     h.named_by_damage = bool(by)
+    h.raid_kills = con.execute("SELECT COUNT(*) FROM raid_damage d JOIN fight f USING(report, fight_id) "
+                               "WHERE f.encounter_id=? AND f.difficulty=?", (enc.id, diff)).fetchone()[0]
     h.hero = healer.hero_split(con, enc.id, diff, spec)
     h.casts = {n: len(ts) for n, ts in tl.boss_casts}
     h.split, h.split_players = healer.contested(con, enc.id, diff, spec)
