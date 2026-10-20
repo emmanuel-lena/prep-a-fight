@@ -1089,10 +1089,10 @@ def jobs_lead(roles: list, mine: str = "") -> str:
     head = ""
     if you:
         head = (f"Your spec here: the {you.spec} {_job(you)}. " if _job(you) else
-                "Your spec here: nothing specific to this boss stands out against the other healers. ")
+                "Your spec here: nothing stands out against the other healers of the same kills. ")
     lines = [f"the {r.spec} {_job(r)}" for r in roles if r.spec != mine and _job(r)]
     if not lines:
-        return f"<p class='lead'>{e(head)}No other healer spec does a job specific to this boss.</p>"
+        return f"<p class='lead'>{e(head)}No other healer spec stands out either.</p>"
     return f"<p class='lead'>{e(head)}The others: " + "; ".join(e(x) for x in lines) + ".</p>"
 
 
@@ -1101,8 +1101,9 @@ def nums_note(roles: list) -> str:
     cover = next((r.spike_cover for r in roles if getattr(r, "spike_cover", 0)), 0.0)
     spikes = f", {_pct(cover)} of the fight" if cover else ""
     return ("Each row is the median of every player of the spec in these kills, a second one included (the boss "
-            "tab's dispels count the top one; externals and buffs: a mean, on others only); a job is a number three standard "
-            "errors from the other healers of the same kill. The shares come from different kills and do not add up; "
+            "tab's dispels count the top one; externals and buffs: a mean, on others only). A job is a spec doing more than the other healers of the same "
+            "kills, its own best healer left out, beyond chance over every spec and number (Benjamini-Hochberg, 5%) and "
+            "by a fifth at least: a habit of the spec may show on other bosses too. The shares come from different kills and do not add up; "
             f"a spike is 5 s at 1.5 times the kill's median{spikes}. Externals and overheal follow each kit.")
 
 

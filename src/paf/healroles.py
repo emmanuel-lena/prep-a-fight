@@ -27,7 +27,8 @@ from paf.corpus.db import TWIN
 from paf.gamedata import external_kind
 from paf.wcl import WCLClient, WCLError
 
-KILLS = 40  # kills read per boss (about 6 points each): enough healers of each spec to compare
+KILLS = 150  # kills whose healing tables are read per boss (about 6 points each): at 40, each other spec had 8 to 30
+# healers and no job stood out of the noise on any of 14 sheets (docs/research/healer-roles.md, the jobs audit)
 LONG_RATE = 1.1  # casts a minute: above, the median player of the spec uses the spell in its rotation
 LONG_CD = 60.0  # seconds: a healer's spell with at least this cooldown is a raid cooldown or an external (Time
 # Dilation and Ironbark are 60-90 s: at 90 the externals missed them)
@@ -66,6 +67,13 @@ TABLES = """query($c:String!,$f:[Int]!,$s:Float,$e:Float){ reportData { report(c
 HEAL_TWINS = f"""DELETE FROM heal_cast WHERE rowid IN (SELECT a.rowid FROM heal_cast a JOIN heal_cast b
   ON a.report=b.report AND a.fight_id=b.fight_id AND a.actor_id=b.actor_id AND a.ability_id=b.ability_id
   WHERE a.on_other=0 AND b.on_other=1 AND abs(a.t-b.t)<={TWIN})"""
+
+
+def heal_filter(encounter_id: int, difficulty: int) -> tuple[str, tuple]:
+    """The kills whose healing tables may be read: the corpus' ranked kills, collected or not yet (the healing
+    tables need no casts of the corpus' players: 100 collected kills could not give 150)."""
+    where, params = kills_filter(encounter_id, difficulty)
+    return where.replace("f.status='done'", "f.status IN ('done', 'pending')"), params
 
 
 def ensure_tables(con: sqlite3.Connection) -> None:
@@ -141,11 +149,11 @@ def long_cooldowns(spell_ids: set[int]) -> set[int]:
 def fetch_heal_roles(client: WCLClient, con: sqlite3.Connection, encounter_id: int, difficulty: int,
                      kills: int = KILLS, log: Callable[[str], None] = lambda s: print(s, flush=True)) -> int:
     ensure_tables(con)
-    where, params = kills_filter(encounter_id, difficulty)
+    where, params = heal_filter(encounter_id, difficulty)
     have = con.execute(f"SELECT COUNT(*) FROM heal_kill h JOIN fight f USING(report, fight_id) WHERE {where}",
                        params).fetchone()[0]
     todo = con.execute(f"SELECT f.report, f.fight_id FROM fight f LEFT JOIN heal_kill h USING(report, fight_id) "
-                       f"WHERE {where} AND h.report IS NULL ORDER BY f.report LIMIT ?",
+                       f"WHERE {where} AND h.report IS NULL ORDER BY f.status != 'done', f.report LIMIT ?",
                        (*params, max(0, kills - have))).fetchall()
     for rep, fid in todo:
         try:
@@ -172,7 +180,7 @@ def fetch_heal_roles(client: WCLClient, con: sqlite3.Connection, encounter_id: i
     return len(todo)
 
 
-DISPEL_KILLS = KILLS  # the same kills as the rest of the comparison (~1 page of events each)
+DISPEL_KILLS = 40  # the ranked healer's dispels, timed (~1 page of events each): 40 kills say it
 
 
 def fetch_dispels(client: WCLClient, con: sqlite3.Connection, encounter_id: int, difficulty: int,
@@ -272,7 +280,7 @@ def kills_of(con: sqlite3.Connection, encounter_id: int, difficulty: int,
     missing (the Restoration corpus showed 1 or 2 healers in raids of 27 to 30). The tanks always attack: the
     corpus' players."""
     ensure_tables(con)
-    where, params = kills_filter(encounter_id, difficulty)
+    where, params = (heal_filter if role is HEALERS else kills_filter)(encounter_id, difficulty)
     per: dict[tuple[str, int], list[str]] = defaultdict(list)
     dur: dict[tuple[str, int], float] = {}
     if role is HEALERS:
@@ -400,18 +408,21 @@ class Role:
     spike_cover: float = 0.0  # the share of the fight the raid's damage spikes take: the spike share's baseline
 
 
-TANK_HEALER = 1.4  # a spec puts this many times the other healers' tank share on the tanks: the tank healer
-TANK_FLOOR = 0.12  # ... and at least this share: a tank's sources are its top healers only (a lower bound), and
-# every healer measured on three bosses puts 4 to 10% on them
-SPIKE_HEALER = 1.25  # ... of the share in spikes: the burst healer
-DISPELLER = 2.0  # ... of the dispels: the dispeller
+# a job (the jobs audit, 2026-10-20: docs/research/healer-roles.md): paired within each kill, the ranked healer of the
+# corpus left out (its kills were picked for it: its spec read +6 to +16 points of healing in its own corpus),
+# Benjamini-Hochberg over the boss's specs x metrics, and an effect floor: about 1% of bosses get a false job by
+# chance (labels shuffled), where one sheet's 40 kills at three standard errors fired none or noise
+JOB_KILLS = 20  # kills with the spec and another healer, at least
+JOB_Q = 0.05  # the false discovery rate over the boss's tests
+JOB_RATIO = 1.2  # the spec's mean, at least this many times the other healers'
+JOB_GAP = {"tank": 0.015, "spike": 0.02, "dispels": 0.15}  # ... and at least this far above it
 
 
 def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: dict[int, str] | None = None,
-          min_players: int = 8) -> list[Role]:
+          min_players: int = 8, ranked: tuple[str, str] | None = None) -> list[Role]:
     """What each healer spec does on this boss, against the other healers of the same kills."""
     ensure_tables(con)
-    where, params = kills_filter(encounter_id, difficulty)
+    where, params = heal_filter(encounter_id, difficulty)
     rows = healers_only(con.execute(f"SELECT h.* FROM heal_stat h JOIN fight f USING(report, fight_id) WHERE {where}",
                                     params).fetchall(), total_at=5)
     durs = {(r[0], r[1]): r[2] for r in con.execute(f"SELECT report, fight_id, duration_s FROM fight f WHERE {where}",
@@ -487,8 +498,9 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
                         buff_spells=[(names or {}).get(ab, f"spell {ab}") for ab, _ in buff_casts[spec].most_common()]))
     cover = [x for (x,) in con.execute(f"SELECT k.spike_share FROM heal_kill k JOIN fight f USING(report, fight_id) "
                                        f"WHERE {where}", params) if x is not None]
+    found = paired_jobs(per_kill, durs, ranked)
     for r in out:
-        r.jobs = jobs(r, out)
+        r.jobs = found.get(r.spec) or ["nothing stands out against the other healers"]
         r.spike_cover = st.mean(cover) if cover else 0.0
     return sorted(out, key=lambda r: -r.players)
 
@@ -594,40 +606,65 @@ def press_moments(per_player: list[list[float]], keep: int, end: float | None = 
     return sorted(by_rank.values()), [t for t, _ in alt], [k for _, k in alt]
 
 
-def jobs(r: Role, everyone: list[Role]) -> list[str]:
-    """What this spec does on the boss, from its numbers against the other healer specs measured."""
-    others = [o for o in everyone if o is not r]
-    if not others:
-        return []
+def _key(cls: str | None, spec: str | None) -> tuple[str, str]:
+    """A class and spec however written ("Death Knight", "DeathKnight", "priest")."""
+    return ((cls or "").replace(" ", "").lower(), (spec or "").replace(" ", "").lower())
 
-    def ref(attr: str) -> float:
-        return st.median(getattr(o, attr) for o in others) or 0.0
 
-    def clear(attr: str, lower: bool = False) -> bool:
-        """The gap to the other healers is beyond the noise of the difference: two standard errors of it, this
-        spec's and the others' (a 4-point gap at "±4%" was called a job)."""
-        gap = (ref(attr) - getattr(r, attr)) if lower else (getattr(r, attr) - ref(attr))
-        theirs = st.median(o.se.get(attr, 0.0) for o in others)
-        # three standard errors: some 25 comparisons a sheet (five specs, five numbers) at two let one false job
-        # through on most sheets
-        return gap > 3 * (r.se.get(attr, 0.0) ** 2 + theirs ** 2) ** 0.5
-    out = []
-    if r.tank >= max(TANK_FLOOR, ref("tank") * TANK_HEALER) and clear("tank"):
-        out.append(f"heals the tanks: {r.tank:.0%} of its healing goes on them, ±{2 * r.se.get('tank', 0):.0%} "
-                   f"(the other healers of these kills: {ref('tank'):.0%})")
-    if r.spike >= max(0.05, ref("spike") * SPIKE_HEALER) and clear("spike"):
-        out.append(f"answers the raid's damage spikes: {r.spike:.0%} of its healing lands in them, "
-                   f"±{2 * r.se.get('spike', 0):.0%} (the other healers of these kills: {ref('spike'):.0%})")
-    if r.dispels >= max(0.2, ref("dispels") * DISPELLER) and clear("dispels"):
-        out.append(f"dispels {r.dispels:.1f} times a minute, ±{2 * r.se.get('dispels', 0):.1f} "
-                   f"(the other healers of these kills: {ref('dispels'):.1f})")
-    # externals given are the kit's (Mistweaver's Life Cocoon on every boss), as the overheal: on the card only
-    # not jobs: the count of long cooldowns compares kits, not what the boss asks; low overheal is the spec's trait
-    # on every boss (Restoration Shaman on 14 of 14 sheets). Both stay in the card's numbers.
-    # a damage dealer's buff (Power Infusion) is no healing job of the boss: the card's numbers say it
-    if not out:
-        out.append("nothing stands out against the other healers")
-    return out
+def paired_jobs(per_kill: dict, durs: dict, own: tuple[str, str] | None = None) -> dict[str, list[str]]:
+    """What a healer spec does on this boss beyond the other healers of the same kills: per kill, its healers' mean
+    minus the other healers' (tank share, share in the raid's damage spikes, dispels a minute), a one-sided test on
+    those gaps, Benjamini-Hochberg over every spec and number, and an effect floor (JOB_RATIO, JOB_GAP). own: the
+    corpus' spec, whose best healer of each kill (the ranked player) is left out."""
+    import math
+
+    gaps: dict[tuple[str, str], list[tuple[float, float, float]]] = defaultdict(list)  # (spec, metric) -> per kill
+    for k, hs in per_kill.items():
+        minutes = (durs.get(k) or 60) / 60
+        rows = list(hs)
+        if own:  # the ranked player: the corpus' spec's best healer of the kill
+            mine = [h for h in rows if _key(h[3], h[4]) == _key(*own)]
+            if mine:
+                rows.remove(max(mine, key=lambda h: h[5] or 0))
+        vals = [(pretty(h[3], h[4]), {"tank": (h[7] / h[5]) if h[5] else 0.0, "spike": h[8] or 0.0,
+                                     "dispels": (h[9] or 0) / minutes}) for h in rows]
+        for spec in {v[0] for v in vals}:
+            me = [v[1] for v in vals if v[0] == spec]
+            them = [v[1] for v in vals if v[0] != spec]
+            if not them:
+                continue
+            for m in JOB_GAP:
+                a, b = st.mean(x[m] for x in me), st.mean(x[m] for x in them)
+                gaps[(spec, m)].append((a - b, a, b))
+    tests = []
+    for (spec, m), ds in gaps.items():
+        if len(ds) < JOB_KILLS:
+            continue
+        d = [x[0] for x in ds]
+        sd = st.stdev(d)
+        z = st.mean(d) / (sd / len(d) ** 0.5) if sd else 0.0
+        tests.append((0.5 * math.erfc(z / 2 ** 0.5), spec, m, ds))  # one-sided: more than the others
+    tests.sort(key=lambda x: x[0])
+    passed = 0  # Benjamini-Hochberg: the largest rank whose p is under its share of JOB_Q
+    for i, (p, *_rest) in enumerate(tests, 1):
+        if p <= JOB_Q * i / len(tests):
+            passed = i
+    out: dict[str, list[str]] = defaultdict(list)
+    for _p, spec, m, ds in tests[:passed]:
+        a, b = st.mean(x[1] for x in ds), st.mean(x[2] for x in ds)
+        if a < JOB_RATIO * b or a - b < JOB_GAP[m]:
+            continue
+        n = len(ds)
+        if m == "tank":
+            out[spec].append(f"heals the tanks more: {a:.0%} of its healing goes on them, against {b:.0%} for the "
+                             f"other healers of the same kills ({n} kills)")
+        elif m == "spike":
+            out[spec].append(f"answers the raid's damage spikes more: {a:.0%} of its healing lands in them, against "
+                             f"{b:.0%} for the other healers of the same kills ({n} kills)")
+        else:
+            out[spec].append(f"dispels more: {a:.1f} times a minute, against {b:.1f} for the other healers of the "
+                             f"same kills ({n} kills)")
+    return dict(out)
 
 
 def sample(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> tuple[int, float, float]:
@@ -635,7 +672,7 @@ def sample(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> tuple
     sample changes them (Nek'zali heroic, the same specs: overheal 46-63% in kills ranked by an Elemental's damage,
     4:05 and no death; 19-35% in kills ranked by a Restoration Shaman's healing, 4:50 and 2 deaths)."""
     ensure_tables(con)
-    where, params = kills_filter(encounter_id, difficulty)
+    where, params = heal_filter(encounter_id, difficulty)
     rows = con.execute(f"SELECT f.duration_s, k.deaths, f.size FROM heal_kill k JOIN fight f USING(report, fight_id) "
                        f"WHERE {where}", params).fetchall()
     if not rows:

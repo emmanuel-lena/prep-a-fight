@@ -72,7 +72,7 @@ def test_compositions_and_jobs(monkeypatch):
     rs = {r.spec: r for r in healroles.roles(con, 3470, 4, {10060: "Power Infusion", 98008: "Spirit Link Totem"},
                                              min_players=5)}
     shaman, priest = rs["Restoration Shaman"], rs["Holy Priest"]
-    assert any("damage spikes: 50%" in j for j in shaman.jobs) and not any("wastes" in j for j in shaman.jobs)
+    assert shaman.jobs == ["nothing stands out against the other healers"]  # 10 kills: under JOB_KILLS
     # Power Infusion is a damage dealer's buff, said last; Guardian Spirit the protective external
     assert priest.externals == 0.5 and priest.buffs == 1.0 and priest.buff_spells == ["Power Infusion"]
     assert priest.jobs == ["nothing stands out against the other healers"]  # a buff is no healing job
@@ -161,7 +161,7 @@ def test_power_infusion_is_no_job_of_the_boss():
     shaman = healroles.Role("Restoration Shaman", 40, 0.2, 0.07, 0.2, 0.2, 0.6, 3, 0, jobs=[
         "answers the raid's damage spikes: 26% of its healing lands in them (the other healers 18%)"])
     assert jobs_lead([priest, shaman], "Holy Priest") == (
-        "<p class='lead'>Your spec here: nothing specific to this boss stands out against the other healers. "
+        "<p class='lead'>Your spec here: nothing stands out against the other healers of the same kills. "
         "The others: the Restoration Shaman answers the raid&#x27;s damage spikes: 26% of its healing lands in them "
         "(the other healers 18%).</p>")
 
@@ -214,3 +214,22 @@ def test_a_dropped_caster_is_no_third_spec(monkeypatch):
             con.execute("INSERT INTO heal_cast VALUES (?,1,?,10060,120,1)", (rep, actor))
     rs = {r.spec: r for r in healroles.roles(con, 3470, 4, {10060: "Power Infusion"}, min_players=5)}
     assert rs["Holy Priest"].buffs == 1.0 and rs["Holy Priest"].buff_spells == ["Power Infusion"]
+
+
+def test_a_job_is_paired_within_the_kill_and_leaves_the_ranked_healer_out():
+    """The jobs audit (2026-10-20), Vashnik heroic: Holy Priests dispel 1.4 times a minute against 0.8 for the other
+    healers of the same kills; the corpus' ranked healer is left out (its kills were picked for it)."""
+    per_kill, durs = {}, {}
+    for k in range(30):
+        key = (f"r{k}", 1)
+        durs[key] = 240.0
+        per_kill[key] = [
+            (key[0], 1, 0, "Priest", "Holy", 100, 30, 8, 0.2, 5 + k % 3),      # 1.25-1.75 a minute
+            (key[0], 1, 1, "Shaman", "Restoration", 100, 30, 8, 0.2, 3 + k % 2),  # 0.75-1.0
+            (key[0], 1, 2, "Paladin", "Holy", 300, 30, 30, 0.2, 9),            # the ranked healer: left out
+            (key[0], 1, 3, "Paladin", "Holy", 100, 30, 8, 0.2, 3)]
+    found = healroles.paired_jobs(per_kill, durs, ("Paladin", "Holy"))
+    assert list(found) == ["Holy Priest"]
+    assert found["Holy Priest"] == ["dispels more: 1.5 times a minute, against 0.8 for the other healers of the same "
+                                    "kills (30 kills)"]
+    assert healroles.paired_jobs(dict(list(per_kill.items())[:15]), durs, ("Paladin", "Holy")) == {}  # too few
