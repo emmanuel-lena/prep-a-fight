@@ -813,6 +813,7 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
         character=getattr(profile, "name", "") or "")
     p.split, p.split_players = healer.contested(con, enc.id, diff, spec)
     p.short_defs = short_defs
+    p.hero = healer.hero_split(con, enc.id, diff, spec)
     p.no_taunt = tank.taunt_immunity(bossguide.load(enc.id, diff_name), diff_name)
     step("The stacks the top tanks swap at, and the deaths of each composition")
     tank.fetch_stacks(client, con, enc.id, diff)  # their stacking debuffs, a few kills
@@ -937,6 +938,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         [(n, t) for n, t, _ in tl.phases], class_name=cls, character=getattr(profile, "name", "") or "")
     h.abilities = _role_journal(enc.id, diff_name, "healer", tl)
     h.named_by_damage = bool(by)
+    h.hero = healer.hero_split(con, enc.id, diff, spec)
     h.casts = {n: len(ts) for n, ts in tl.boss_casts}
     h.split, h.split_players = healer.contested(con, enc.id, diff, spec)
     from paf.gamedata import dispel_type

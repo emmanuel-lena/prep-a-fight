@@ -107,7 +107,8 @@ class HealerPrep:
     split: list = field(default_factory=list)  # (talent, share picked) the top players split on (contested)
     split_players: int = 0
     dispel_delay: tuple | None = None  # (median s after the boss casts it, dispels measured), paf.healroles
-    named_by_damage: bool = False  # the moments are named by the raid's damage taken by ability (measured)
+    named_by_damage: bool = False
+    hero: list = field(default_factory=list)  # (hero tree, share of the top players), paf.healer.hero_split  # the moments are named by the raid's damage taken by ability (measured)
 
 
 def ensure_table(con) -> None:
@@ -418,6 +419,20 @@ def build_rows(builds: list) -> list[tuple[int, str, str, str]]:
     return out
 
 
+BUILD_SHARE = 0.05  # a build fewer of the players read play is noise; the first one stays, a complete build to copy
+
+
+def talents_html(builds: list, players: int, who: str, hero: list | None = None) -> str:
+    """The hero tree the top players pick (the first choice), then their builds played by enough of them."""
+    line = ""
+    if hero:
+        line = ("<p><b>Hero tree:</b> " + (f"{e(hero[0][0])}, all of them" if len(hero) == 1 else
+                " &middot; ".join(f"{e(t)} {s:.0%}" for t, s in hero)) + f" of the {players} players read.</p>")
+    kept = [b for i, b in enumerate(builds) if i == 0 or not players or b[0] >= BUILD_SHARE * players]
+    return (f"<h2>Talents the top {e(who)} play</h2>{line}<ul class='hl2'>"
+            f"{builds_html(kept) or '<li>No build yet.</li>'}</ul>")
+
+
 def builds_html(builds: list) -> str:
     copy = "<button class='btn ghost copy' data-copy='{}'>Copy the talents</button>"
     return "".join(f"<li><b>{e(b[1][:1].upper() + b[1][1:])}</b><small>{b[0]} of the top players"
@@ -502,6 +517,29 @@ def contested(con, encounter_id: int, difficulty: int, spec: str, lo: float = 0.
                 picks[n] = picks.get(n, 0) + 1
     split = [(n, c / players) for n, c in picks.items() if players and lo <= c / players <= hi]
     return sorted(split, key=lambda x: abs(x[1] - 0.5))[:shown], players
+
+
+def hero_split(con, encounter_id: int, difficulty: int, spec: str) -> list[tuple[str, float]]:
+    """(hero tree, share of the top players) on this boss: the first talent choice, before the builds."""
+    import json
+
+    from paf.corpus.analyze import kills_filter
+
+    try:
+        from paf.gamedata import hero_trees
+
+        heroes = hero_trees()
+    except Exception:  # noqa: BLE001 - offline: no line
+        return []
+    where, params = kills_filter(encounter_id, difficulty)
+    trees: Counter = Counter()
+    for (tj,) in con.execute(f"SELECT r.talents_json FROM ranked r JOIN fight f USING(report, fight_id) WHERE {where} "
+                             f"AND r.spec=? AND r.actor_id IS NOT NULL", (*params, spec)):
+        mine = [heroes[t["talentID"]] for t in json.loads(tj or "[]") if t.get("talentID") in heroes]
+        if mine:
+            trees[max(set(mine), key=mine.count)] += 1
+    total = sum(trees.values())
+    return [(t, n / total) for t, n in trees.most_common()] if total else []
 
 
 def _and(items: list[str]) -> str:
@@ -684,8 +722,7 @@ def render_sheet(h: HealerPrep) -> str:
         fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{cooldowns_html(items)}</ul>")
     n_kills = h.role_kills or h.kills
     change = [build_lead(h.builds, h.spec, h.kills, h.split)]
-    change.append(f"<h2>Talents the top {e(h.spec)}s play</h2><ul class='hl2'>"
-                  f"{builds_html(h.builds) or '<li>No build yet.</li>'}</ul>")
+    change.append(talents_html(h.builds, h.split_players or h.kills, f"{h.spec}s", h.hero))
     if h.split:
         change.append(split_html(h.split, h.split_players, h.spec))
     trk = trinkets_html(h.trinkets) or "<li>No gear yet.</li>"

@@ -71,9 +71,9 @@ def test_the_journal_says_when_taunts_stop_working(monkeypatch):
 
     from paf import bossguide, tank
 
+    text = ("Upon reaching full energy, Nek'zali gains her full potential. "
+            "Additionally, grants immunity to Taunt effects.")
     rage = SimpleNamespace(title="Uncoiled Rage", text="", spell_id=1, kind="ability", children=[], flags=[])
-    monkeypatch.setattr(bossguide, "describe", lambda sid: (
-        "Upon reaching full energy, Nek'zali gains her full potential. Additionally, grants immunity to Taunt effects."))
+    monkeypatch.setattr(bossguide, "describe", lambda sid: text)
     monkeypatch.setattr("paf.mechanics.walk", lambda sections: [(0, s) for s in sections])
-    assert tank.taunt_immunity([rage], "heroic") == [("Uncoiled Rage", (
-        "Upon reaching full energy, Nek'zali gains her full potential. Additionally, grants immunity to Taunt effects."))]
+    assert tank.taunt_immunity([rage], "heroic") == [("Uncoiled Rage", text)]

@@ -58,6 +58,7 @@ class TankPrep:
     stacks: dict = field(default_factory=dict)  # debuff on the top tanks -> (peak stacks, seconds each cycle)
     swap_debuff: str = ""  # the tank ability whose debuff the tanks swap on (measured on them)
     no_taunt: list = field(default_factory=list)  # (ability, its journal sentence): when taunts stop working
+    hero: list = field(default_factory=list)  # (hero tree, share of the top players), paf.healer.hero_split
     short_defs: list = field(default_factory=list)  # (spell, share of the top tanks, casts a kill): too frequent
     # for a cooldown, too short for an uptime (Spell Reflection, Demoralizing Shout)
     split: list = field(default_factory=list)  # (talent, share picked) the top players split on
@@ -351,7 +352,6 @@ def render_sheet(p: TankPrep) -> str:
     )
     from paf.healer import (
         build_lead,
-        builds_html,
         comps_table,
         cooldowns_html,
         curve_svg,
@@ -359,6 +359,7 @@ def render_sheet(p: TankPrep) -> str:
         moments_html,
         presence_table,
         split_html,
+        talents_html,
         trinkets_html,
     )
     from paf.prep_report import sheet_page
@@ -413,8 +414,7 @@ def render_sheet(p: TankPrep) -> str:
                                                           f"</li></ul>" if swap else "")
         + "".join(f"<p><b>No swap then: {e(n)}.</b> {e(t)}</p>" for n, t in p.no_taunt)]
     change = [build_lead(p.builds, p.spec, p.kills, p.split),
-              f"<h2>Talents the top tanks play</h2><ul class='hl2'>{builds_html(p.builds) or '<li>No build yet.</li>'}"
-              f"</ul>",
+              talents_html(p.builds, p.split_players or p.kills, "tanks", p.hero),
               split_html(p.split, p.split_players, p.spec) if p.split else "",
               f"<h2>Trinkets the top tanks play</h2><ul class='hl2'>"
               f"{trinkets_html(p.trinkets) or '<li>No gear yet.</li>'}</ul>",
