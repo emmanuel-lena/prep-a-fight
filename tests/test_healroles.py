@@ -162,3 +162,14 @@ def test_power_infusion_is_no_job_of_the_boss():
     assert jobs_lead([priest, shaman], "Holy Priest") == (
         "<p class='lead'>Your spec here: nothing stands out against the other healers. The others: the Restoration "
         "Shaman answers the raid&#x27;s damage spikes: 26% of its healing lands in them (the other healers 18%).</p>")
+
+
+def test_a_cooldown_pressed_as_soon_as_it_is_back_answers_no_hit():
+    """Power Infusion "2:07 · the 2:10 hit" (Vashnik): pressed every 2 minutes, 3 times in 4:45, it lands near a hit
+    by its cadence. Divine Hymn, twice in 4:45 on a 2-minute gap, is kept for moments."""
+    from paf.healroles import on_cadence
+
+    pi = [[3.0, 127.0, 252.0] for _ in range(8)]
+    assert 120 <= on_cadence(pi, 3.0, 285.0) <= 130
+    hymn = [[4.0, 71.0 + 30 * (i % 3)] for i in range(8)]
+    assert on_cadence(hymn, 2.0, 285.0) == 0.0

@@ -447,7 +447,7 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
         mid = st.median(durs.values()) if durs else None
         cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n,
                 press_moments(ps, max(1, round(sum(map(len, ps)) / len(ps))), mid)[0])
-               for ab, ps in cd_times[spec].items() if sum(map(len, ps)) / n >= 0.5]
+               for ab, ps in cd_times[spec].items() if sum(map(len, ps)) / n >= 0.5 and not _personal(ab, names)]
         se = {k: (st.stdev(v) / len(v) ** 0.5 if len(v) > 1 else 0.0) for k, v in s.items()}
         out.append(Role(spec, n, st.median(s["healing"]), st.median(s["tank"]), st.median(s["spike"]),
                         st.median(s["overheal"]), st.median(s["dispels"]), st.mean(s["raid"]), st.mean(s["ext"]),
@@ -459,6 +459,36 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
     for r in out:
         r.jobs = jobs(r, out)
     return sorted(out, key=lambda r: -r.players)
+
+
+def _personal(ab: int, names: dict[int, str] | None) -> bool:
+    """A cooldown no other healer's player plans with: a personal defensive (Barkskin, Astral Shift) or a spell on
+    enemies only (Holy Word: Chastise). The cards show what each healer brings the raid."""
+    from paf.defensives import is_defensive
+
+    try:
+        from paf.gamedata import enemy_only
+
+        enemy = enemy_only(ab)
+    except Exception:  # noqa: BLE001 - offline
+        enemy = False
+    return enemy or is_defensive(ab, (names or {}).get(ab))
+
+
+CADENCE = 0.75  # pressed this share of the most casts its usual gap allows: on cooldown, no moment kept for a hit
+
+
+def on_cadence(per_player: list[list[float]], per_kill: float, duration: float) -> float:
+    """The players' median gap between two casts when they press it again as soon as it is back (Power Infusion every
+    2 min, Demoralizing Shout every 30 s): its presses answer no hit. 0: kept for moments."""
+    import statistics
+    from itertools import pairwise
+
+    gaps = [y - x for ts in per_player if ts for x, y in pairwise(sorted(ts))]
+    if len(gaps) < 5 or not duration:
+        return 0.0
+    gap = statistics.median(gaps)
+    return gap if gap and per_kill >= CADENCE * (1 + duration / gap) else 0.0
 
 
 def press_moments(per_player: list[list[float]], keep: int, end: float | None = None

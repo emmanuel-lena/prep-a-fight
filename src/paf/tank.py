@@ -380,9 +380,10 @@ def render_sheet(p: TankPrep) -> str:
 
     mit = "".join(f"<li><b>{e(n)}</b><small>up {u:.0%} of the kill for the top tanks</small></li>"
                   for n, u in p.mitigation) + "".join(
-        f"<li><b>{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top tanks</small>"
+        f"<li><b>{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top tanks"
+        + (f" &middot; on cooldown, about every {ev:.0f} s" if ev else "") + "</small>"
         + (f"<span class='when'>{''.join(f'<span class=chip>{_mmss(t)}</span>' for t in ts)}</span>" if ts else "")
-        + "</li>" for n, u, k, ts in p.short_defs)
+        + "</li>" for n, u, k, ts, ev in p.short_defs)
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]
     others = [replace(c, near=["" for _ in c.near]) for c in p.cooldowns  # no buster to answer; taunts: the swaps
               if c not in defs and not _taunt(c.spell_id)]
@@ -404,7 +405,7 @@ def render_sheet(p: TankPrep) -> str:
     if p.moments:
         m = max(p.moments, key=lambda x: x.ratio)
         own = m.boss_spell in {n for n, _s in p.hitters[:3]}
-        answers = [(c.name, c.times) for c in defs] + [(n, ts) for n, _u, _k, ts in p.short_defs]
+        answers = [(c.name, c.times) for c in defs if not c.every] + [(n, ts) for n, _u, _k, ts, _ev in p.short_defs]
         press = next(((n, t) for n, ts in answers for t in ts if -ANSWER[0] <= t - m.t <= ANSWER[1]), None)
         lead.append(f"Their biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({m.ratio:.1f}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
@@ -433,11 +434,12 @@ def render_sheet(p: TankPrep) -> str:
         f"{_cause(common, p.stacks) if swap and one else ''}"
         f"{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
                                                           f"</li></ul>" if swap else "")
-        + "".join(f"<p><b>Taunts stop working with {e(n)}:</b> {e(t)}</p>" for n, t in p.no_taunt)]
+        + "".join(f"<p><b>Taunts stop working with {e(n)}:</b> {e(t)} <span class='muted'>(The Encounter Journal; "
+                  f"whether the top kills reach it is not measured.)</span></p>" for n, t in p.no_taunt)]
     change = [build_lead(p.builds, p.spec, p.split_players or p.kills, p.split),
-              talents_html(p.builds, p.split_players or p.kills, "tanks", p.hero),
+              talents_html(p.builds, p.split_players or p.kills, f"{p.spec}s", p.hero),
               split_html(p.split, p.split_players, p.spec) if p.split else "",
-              f"<h2>Trinkets the top tanks play</h2><ul class='hl2'>"
+              f"<h2>Trinkets the top {e(p.spec)}s play</h2><ul class='hl2'>"
               f"{trinkets_html(p.trinkets) or '<li>No gear yet.</li>'}</ul>",
               "<p class='small muted'>No tank sim: these are the top players' choices, not a recommendation.</p>"]
     hit = "".join(f"<li><b>{e(n)}</b><small>{s:.0%} of the damage the top tanks take</small></li>"

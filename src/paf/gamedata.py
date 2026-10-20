@@ -216,6 +216,16 @@ def external_kind(spell_id: int) -> str:
     return ""
 
 
+ENEMY_TARGETS = {"6", "15", "16"}  # an enemy, the enemies around the caster or a spot
+
+
+def enemy_only(spell_id: int) -> bool:
+    """A spell whose every effect lands on enemies (Holy Word: Chastise): no healing cooldown. A dummy effect without
+    a target does not count."""
+    rows = [r for r in _filtered_rows("SpellEffect", "SpellID", spell_id) if r.get("ImplicitTarget_0") not in ("", "0")]
+    return bool(rows) and all(r.get("ImplicitTarget_0") in ENEMY_TARGETS for r in rows)
+
+
 def is_taunt(spell_id: int) -> bool:
     """A taunt (the game data's "attack me" effect, 114): the swaps section says them, not a cooldown list."""
     return any(r.get("Effect") == "114" for r in _filtered_rows("SpellEffect", "SpellID", spell_id))

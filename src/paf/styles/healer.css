@@ -24,7 +24,7 @@
 .panel>h2:first-child,.panel>.lead+h2{margin-top:20px}
 .panel>.lead{font:400 22px/1.5 var(--font-reading);color:var(--fg);max-width:68ch;margin:8px 0 6px}
 .panel>.card{background:none;border:0;box-shadow:none;padding:0}
-.panel>p.small{max-width:80ch}
+.panel>p.small{max-width:80ch} .panel>ul+p.small{margin-top:14px}
 .hl2{gap:0;max-width:1000px} .hl2 li{border:0;border-top:1px solid var(--line);border-radius:0;background:none;padding:12px 0}
 .hl2 li:last-child{border-bottom:1px solid var(--line)}
 .hrole{border:0;border-top:1px solid var(--line);border-radius:0;background:none;padding:14px 0;margin:0}

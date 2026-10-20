@@ -788,12 +788,13 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     # the short defensives most of them press: too frequent for a cooldown, too short for an uptime (Spell
     # Reflection's 5 s, Demoralizing Shout on the boss)
     kept = {n for n, _u in mitigation}
-    from paf.healroles import press_moments
+    from paf.healroles import on_cadence, press_moments
 
-    def moments_of(a) -> list[float]:  # a short defensive is a timed answer too (Spell Reflection at 0:35)
-        casts = [p["casts"].get(a.name) or p["casts"].get(a.id) or [] for p in tl.players]
-        return press_moments(casts, max(1, round(a.per_kill)), tl.duration)[0]
-    short_defs = sorted(((a.name, a.users, a.per_kill, moments_of(a)) for a in tl.abilities
+    def moments_of(a) -> list[float]:  # a short defensive is a timed answer too (Spell Reflection at 0:35); one
+        casts = [p["casts"].get(a.name) or p["casts"].get(a.id) or [] for p in tl.players]  # on cooldown is not
+        every = on_cadence(casts, a.per_kill, tl.duration)  # (Demoralizing Shout every 30 s): no moments
+        return ([], every) if every else (press_moments(casts, max(1, round(a.per_kill)), tl.duration)[0], 0.0)
+    short_defs = sorted(((a.name, a.users, a.per_kill, *moments_of(a)) for a in tl.abilities
                          if a.users >= 0.5 and a.name not in kept
                          and (cds.get(a.id, (0.0, 1))[0] < healer.COOLDOWN_GAP
                               or a.per_kill > tl.duration / healer.COOLDOWN_GAP)
@@ -967,8 +968,9 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
 
     worn = {n for n, _i, _s in h.trinkets}
     # every long cooldown fewer than half of them press (Pain Suppression, 34%): 25-50% fell between the two lists
+    # no potion (they crowded out Healing Tide Totem) nor spell on enemies; worn trinkets go to their own section
     h.rare = sorted((c for c in healer.cooldowns(tl, found, min_users=0.02, max_users=0.5)
-                     if c.name in worn or not healer._item(c.spell_id)),  # potions crowded out Healing Tide
+                     if c.name in worn or not (healer._item(c.spell_id) or healer._enemy(c.spell_id))),
                     key=lambda c: -c.users)[:5]
     step("The top raids' healers: their compositions and what each spec does here")
     healroles.fetch_heal_roles(client, con, enc.id, diff)

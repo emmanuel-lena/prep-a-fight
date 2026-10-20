@@ -83,3 +83,11 @@ def test_no_moment_after_the_kill():
     ab = SimpleNamespace(id=1, name="Rallying Cry", users=1.0, per_kill=1.0)
     tl = SimpleNamespace(abilities=[ab], duration=261.0, players=[{"casts": {1: [272.0]}} for _ in range(6)])
     assert healer.cooldowns(tl, [], {1: (180.0, 1)})[0].times == []
+
+
+def test_a_stretch_without_a_break_is_said():
+    """A stretch the raid takes 1.15x its median damage or more for 30 s or more has no peak and is still a healing
+    check. Nek'zali's Stage Two (about 1.05x, measured) is not one."""
+    curve = [100.0] * 40 + [125.0] * 8 + [100.0] * 10
+    assert healer.sustained(curve) == [(200.0, 240.0, 1.25)]
+    assert healer.sustained([100.0] * 40 + [105.0] * 18) == []
