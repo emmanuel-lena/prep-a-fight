@@ -473,7 +473,7 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
         if n < min_players:
             continue
         mid = st.median(durs.values()) if durs else None
-        cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n, _shared(ps, n, mid))
+        cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n, _shared(ps, n, mid), len(ps) / n)
                for ab, ps in cd_times[spec].items()  # pressed by half of them at least (Healing Tide Totem: 3%)
                if len(ps) / n >= 0.5 and not _personal(ab, names) and not _untied(ab, ps, mid)
                and sum(map(len, ps)) / len(ps) < 3.5]  # a 1-minute button (Nature's Swiftness, 3.9) is no raid cooldown
@@ -505,10 +505,20 @@ def _shared(ps: list[list[float]], n: int, end: float | None) -> list[tuple[floa
 def _untied(ab: int, ps: list[list[float]], end: float | None) -> bool:
     """A button the fight tab never ties to a hit, left off the cards too (they said so and showed Power Infusion):
     any external, a cast-while-moving button, an item, one on cooldown or about every minute."""
+    from itertools import pairwise
+
     from paf.healer import _item, _moving
 
+    try:
+        from paf.gamedata import spell_cooldowns
+
+        cd = spell_cooldowns().get(ab, (0.0, 1))[0]
+    except Exception:  # noqa: BLE001 - offline
+        cd = 0.0
     per = sum(map(len, ps)) / len(ps) if ps else 0
-    return bool(external_kind(ab) or _moving(ab) or _item(ab) or per >= 3.5
+    gaps = [y - x for ts in ps for x, y in pairwise(sorted(ts))]
+    rhythm = bool(gaps and cd and st.median(gaps) <= 1.15 * cd)  # pressed again as soon as it is back
+    return bool(external_kind(ab) or _moving(ab) or _item(ab) or per >= 3.5 or rhythm
                 or on_cadence(ps, per, end or 0))
 
 
