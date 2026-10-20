@@ -24,6 +24,7 @@ MIN_MOVE = 3.0  # seconds; shorter movement windows are ignored
 MERGE_GAP = 3  # seconds; movement windows closer than this are merged
 BOSS_UNIT_MIN_SHARE = 0.02  # secondary boss units taking less raid damage than this are mechanics, not targets
 ATTACK_GAP = 10.0  # seconds without a cast on a unit that end an attack window
+EARLY_HIT = 20.0  # seconds: a unit's first hit this much before its window opens it (no more)
 FOCUS_STEP = 10  # seconds; a council's focus is read per slice of this length
 FOCUS_DOMINANT = 0.6  # a player hits one council member in a slice when it gets this share of their casts
 FOCUS_MIN = 20.0  # seconds; shorter focus segments are merged into their neighbours
@@ -120,6 +121,13 @@ def attack_windows(con: sqlite3.Connection, where: str, params: tuple, spec: str
                     prev = tt
     waves = canonical_waves([[(s, 1, d, [nm]) for s, d, nm in segments.get(k, [])] for k in keys])
     return [AddWave(w.t, 1, w.lifetime, ", ".join(w.types), scalable=False) for w in waves if w.lifetime >= 5]
+
+
+def opened_by_hit(start: float, end: float, hit: float | None) -> tuple[float, float]:
+    """A unit's window, opened earlier when the ranked players hit it a little before (EARLY_HIT at most)."""
+    if hit is not None and start - EARLY_HIT <= hit < start - 2:
+        return hit, max(end, hit + 1)
+    return start, end
 
 
 def first_hit(con: sqlite3.Connection, where: str, params: tuple, spec: str, unit: str) -> float | None:
@@ -385,8 +393,10 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
                 start = trig[1]
                 label += f" (after {trig[0]})"
             hit = first_hit(con, where, params, spec, w.types[0])
-            if hit is not None and hit < start - 2:  # the ranked players hit it earlier: it is up from then
-                end, start = max(end, hit + 1), hit  # (Nek'zali's Echo: hit from 1:32, the cast ends at 1:42)
+            # the ranked players hit it a little earlier: it is up from then (Nek'zali's Echo: hit from 1:32, the cast
+            # ends at 1:42). Only near this window: the first hit is the fight's first, and a unit that comes back
+            # (Ula'tek's Venomous Heart at 2:04, 4:32, 9:21) would else open every later window at 2:16
+            start, end = opened_by_hit(start, end, hit)
             amp, source = game_amp(encounter_id, w.types[0], diff_name or "heroic")
             busy = sum(max(0.0, min(end, i.start + i.duration) - max(start, i.start)) for i in invulnerable)
             if amp is None and apart and busy < (end - start) / 2:  # a second boss up beside an attackable first

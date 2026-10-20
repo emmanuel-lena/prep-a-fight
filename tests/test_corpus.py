@@ -205,3 +205,14 @@ def test_your_raid_sees_the_adds_that_never_die():
                             [(rep, actor, "Nymrissa", dmg_boss), (rep, actor, "Bubblefin Shorerunner", dmg_add)])
     types = add_types(con, 3379, 4)
     assert [t.name for t in types] == ["Bubblefin Shorerunner"]
+
+
+def test_a_returning_unit_keeps_its_own_windows():
+    """Ula'tek heroic (2026-10-20): the Venomous Heart is up at 2:04, 4:32 and 9:21, its first hit at 2:16; the
+    first hit used to open the later windows at 2:16 too (the heart up from 2:16 to the end, every sim off). Only
+    a hit just before a window opens it (Nek'zali's Echo: hit at 1:32, the cast ends at 1:42)."""
+    from paf.corpus.template import opened_by_hit
+
+    assert opened_by_hit(102.0, 160.0, 92.0) == (92.0, 160.0)
+    assert opened_by_hit(272.0, 316.0, 136.5) == (272.0, 316.0)
+    assert opened_by_hit(124.0, 168.0, 136.5) == (124.0, 168.0)
