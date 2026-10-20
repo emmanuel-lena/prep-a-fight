@@ -64,6 +64,7 @@ class Log:
     casts: list[Cast]
     debuffs: list[tuple[float, str, int, int]]  # (t, type, ability, target)
     names: dict[int, str]
+    begins: list[tuple[float, int]] = field(default_factory=list)  # (t, ability) of the casts with a cast time
 
 
 @dataclass
@@ -142,8 +143,10 @@ def _events(client, code: str, fight: dict, kind: str, **ids) -> list[dict]:
 
 def fetch(client, code: str, fight: dict, actor_id: int, actor_name: str) -> Log:
     t0 = fight["startTime"]
-    casts = []
+    casts, begins = [], []
     for e in _events(client, code, fight, "Casts", s=actor_id):
+        if e.get("type") == "begincast" and e.get("sourceID") == actor_id:
+            begins.append(((e["timestamp"] - t0) / 1000, e["abilityGameID"]))
         if e.get("type") != "cast" or e.get("sourceID") != actor_id:
             continue
         res = next((r for r in e.get("classResources") or [] if r.get("type") != 0), None) or \
@@ -158,7 +161,7 @@ def fetch(client, code: str, fight: dict, actor_id: int, actor_name: str) -> Log
                if e.get("sourceID") == actor_id]
     names = {a["gameID"]: a["name"] for a in client.query(ABILITIES, {"c": code}, cache_ttl=86400)[
         "reportData"]["report"]["masterData"]["abilities"] or []}
-    return Log((fight["endTime"] - t0) / 1000, casts, debuffs, names)
+    return Log((fight["endTime"] - t0) / 1000, casts, debuffs, names, begins)
 
 
 def _norm(name: str) -> str:
@@ -463,3 +466,148 @@ def to_dict(r: Review) -> dict:
             "contexts": [{"key": c.key, "label": c.label, "seconds": c.seconds, "rows": [vars(x) for x in c.rows]}
                          for c in r.contexts],
             "buffs": [vars(b) for b in r.buffs]}
+
+
+# --- what each point costs (issue #24) ----------------------------------------------------------------------------
+
+@dataclass
+class Finding:
+    """One thing to clean in a pull, with what it costs when the sim or the top players can say it."""
+    cost: float | None  # % of the player's DPS, None when nothing prices it
+    text: str  # what happened
+    tops: str = ""  # what the top players of the spec do instead
+    at: float | None = None  # seconds into the pull: where to look in the log
+    weight: float = 0.0  # the order of the points nothing prices
+    approx: bool = False  # an estimate (time not casting as damage lost), not a sim
+    noise: float | None = None  # +- % of a sim's cost
+    kind: str = ""  # activity | cooldown | "" (the review's other points)
+    name: str = ""  # the spell, for a cooldown
+
+
+def activity(log: Log) -> tuple[float, list[tuple[float, float]]]:
+    """The share of the pull the player was casting, and their longest stretches without casting (paf.review)."""
+    from paf import review
+
+    events = sorted([("begincast", a, t) for t, a in log.begins] + [("cast", c.ability, c.t) for c in log.casts],
+                    key=lambda x: x[2])
+    spans = review.busy(events)
+    return review.share(spans, 0.0, log.duration), review.idle_gaps(spans, log.duration)
+
+
+def idle_windows(f: CooldownFinding, duration: float) -> list[tuple[float, float]]:
+    """(start, length) of the stretches a cooldown sat ready without being pressed, longest first."""
+    out, ready = [], 0.0
+    for t in [*f.times, duration]:
+        if t - ready >= 5:
+            out.append((round(ready, 1), round(t - ready, 1)))
+        ready = t + f.cooldown
+    return sorted(out, key=lambda w: -w[1])
+
+
+def cooldown_values(profile: str, names: list[str], duration: float, run_dir) -> dict[str, tuple[float, float]]:
+    """% of the character's DPS one cast of each cooldown is worth, with its noise: the default list on a single
+    target for the pull's length, against the same with that cooldown never pressed, divided by its casts."""
+    from paf import simc
+    from paf.cdplan import apl_lines, dump_apl, parse_apl
+    from paf.optimize import Rule, apply_rules, cd_key
+
+    apl = parse_apl(dump_apl(profile, run_dir / "apl"))
+    keys = {k for acts in apl.values() for a in acts if (k := cd_key(a))}
+    wanted = {_norm(n): n for n in names}
+    match = {k: wanted[_norm(k.replace("_", " "))] for k in keys if _norm(k.replace("_", " ")) in wanted}
+    if not match:
+        return {}
+    never = Rule("never", "never pressed", lambda _old: "0")
+    sets = {f"no_{k}": apply_rules(apl, {k: never}) for k in match}
+    base = "\n".join([profile.rstrip(), *apl_lines(apl)])
+    res = simc.run(simc.build_input(base, ["fight_style=Patchwerk", "desired_targets=1",
+                                           f"max_time={simc.fmt(round(duration))}"], sets),
+                   run_dir / "values", target_error=0.3)
+    player = (res.raw.get("sim", {}).get("players") or [{}])[0]
+    casts = {_norm(st_.get("name") or ""): (st_.get("num_executes") or {}).get("mean") or 0
+             for st_ in player.get("stats") or []}
+    out = {}
+    for ps in res.profilesets:
+        k = ps.name.removeprefix("no_")
+        n = casts.get(_norm(k.replace("_", " "))) or casts.get(_norm(k)) or 0
+        if k in match and n >= 1:  # (value of a cast, its noise): both runs' errors, as a share of the DPS
+            base = res.baseline["dps"]
+            err = ((base.error ** 2 + ps.dps.error ** 2) ** 0.5) / base.mean * 100 if base.mean else 0.0
+            out[match[k]] = (max(0.0, -res.delta_pct(ps)) / n, err / n)
+    return out
+
+
+ACTIVITY_GAP = 0.02  # casting this much less of the pull than the top players is worth a point
+
+
+def findings(r: Review, log: Log, tops_busy: float | None, tops_casts: dict[str, float],
+             values: dict[str, float]) -> list[Finding]:
+    """The points of a pull, the priced ones first by what they cost, then the others by weight. tops_busy: the
+    share of the fight the top players of the spec cast (paf.review.tops_activity); tops_casts: their casts a kill
+    of each spell (normalized name); values: % DPS of one cast of each cooldown (cooldown_values)."""
+    out: list[Finding] = []
+    mine, gaps = activity(log)
+    if tops_busy and mine < tops_busy - ACTIVITY_GAP:
+        gap = gaps[0] if gaps else None
+        out.append(Finding(round((tops_busy - mine) / tops_busy * 100, 1),
+                           f"You were casting {mine:.0%} of the pull"
+                           + (f"; your longest stretch without casting: {gap[1]:.0f} s at {_mmss(gap[0])}"
+                              if gap else "") + ".",
+                           f"the top players of your spec, {tops_busy:.0%} of theirs; an upper bound: some of this "
+                           f"time is movement the fight forces",
+                           gap[0] if gap else None, approx=True, kind="activity"))
+    for c in r.cooldowns:
+        missed = c.possible - c.casts
+        if missed < 1:
+            continue
+        idle = idle_windows(c, log.duration)
+        rate = tops_casts.get(_norm(c.name))
+        value, noise = values.get(c.name, (None, None))
+        tops_n = rate * log.duration / 60 if rate else None
+        held = f"held {idle[0][1]:.0f} s from {_mmss(idle[0][0])}" if idle else ""
+        text = (f"{c.name}: you pressed it {c.casts} {'time' if c.casts == 1 else 'times'}; {c.possible} fit in this "
+                f"pull" + (f" ({held})" if held else "") + ".")
+        out.append(Finding(round(missed * value, 1) if value is not None else None, text,
+                           f"the top players of your spec press it {tops_n:.1f} times in a pull this long"
+                           if tops_n is not None else "", idle[0][0] if idle else None, missed / c.possible * 0.5,
+                           noise=round(missed * noise, 1) if noise is not None else None, kind="cooldown",
+                           name=c.name))
+    for w, text in highlights(r, limit=10):
+        if any(f.text.split(":")[0] == text.split(":")[0] for f in out):
+            continue  # a cooldown already priced above
+        out.append(Finding(None, text, weight=w))
+    priced = sorted((f for f in out if f.cost is not None), key=lambda f: -f.cost)
+    return priced + sorted((f for f in out if f.cost is None), key=lambda f: -f.weight)
+
+
+def _mmss(t: float) -> str:
+    return f"{int(t // 60)}:{int(t % 60):02d}"
+
+
+def log_link(code: str, fight: dict, actor_id: int, at: float | None) -> str:
+    """The pull's casts on Warcraft Logs, from a few seconds before `at`."""
+    url = f"https://www.warcraftlogs.com/reports/{code}#fight={fight['id']}&type=casts&source={actor_id}"
+    if at is None:
+        return url
+    start = fight["startTime"] + max(0.0, at - 5) * 1000
+    return url + f"&start={int(start)}&end={int(min(fight['endTime'], start + 30_000))}"
+
+
+def tops_casts(con, encounter_id: int, difficulty: int, spec: str) -> dict[str, float]:
+    """Normalized spell name -> the median casts a minute of the corpus' ranked players of the spec (0 when absent):
+    their kills are shorter or longer than the player's pull, a rate compares."""
+    import statistics as stats
+
+    from paf.corpus.analyze import kills_filter
+
+    where, params = kills_filter(encounter_id, difficulty)
+    per: dict[str, dict[tuple[str, int], int]] = defaultdict(lambda: defaultdict(int))
+    minutes: dict[tuple[str, int], float] = {}
+    for rep, fid, name, dur in con.execute(
+            f"SELECT c.report, c.fight_id, a.name, f.duration_s FROM player_cast c "
+            f"JOIN ranked r USING(report, fight_id) "
+            f"JOIN fight f USING(report, fight_id) JOIN ability a ON a.id=c.ability_id WHERE {where} "
+            f"AND c.actor_id=r.actor_id AND r.spec=? AND c.type='cast'", (*params, spec)):
+        minutes[(rep, fid)] = max(1.0, (dur or 60) / 60)
+        per[_norm(name or "")][(rep, fid)] += 1
+    return {k: stats.median([v.get(x, 0) / m for x, m in minutes.items()]) for k, v in per.items()} if minutes else {}

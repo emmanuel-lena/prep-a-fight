@@ -236,8 +236,20 @@ def sentences(b: dict, player: str) -> list[str]:
     """Two or three things to clean on a boss, from the results of its tools."""
     out: list[str] = []
     if b["kill"]:
-        rot = _result(b["jobs"].get("rotation"))
-        out += (rot or {}).get("highlights", [])
+        rot = _result(b["jobs"].get("rotation")) or {}
+        if rot.get("findings"):  # priced first (issue #24): what it costs, what the top players do, where in the log
+            for f in rot["findings"][:3]:
+                noise = f.get("noise")
+                cost = ((f"up to &minus;{f['cost']:.1f}%" if f.get("approx") else f"&minus;{f['cost']:.1f}%")
+                        + ("" if f.get("approx") or noise is None else
+                           f" <small>&plusmn;{noise:.1f}</small>" if noise >= 0.1 else " <small>&plusmn;&lt;0.1</small>")
+                        if f.get("cost") is not None else "")
+                out.append({"text": f["text"], "cost": cost, "tops": f.get("tops", ""), "link": f.get("link", ""),
+                            "at": f.get("at"), "value": f.get("cost"), "kind": f.get("kind", ""),
+                            "approx": bool(f.get("approx")),
+                            "name": f.get("name", "")})
+            return out
+        out += rot.get("highlights", [])
         return out
     w = _result(b["jobs"].get("wipe"))
     if w:
@@ -266,9 +278,27 @@ def _ab(text: str) -> str:
     return text
 
 
-def _key(sentence: str) -> str:
+def _key(sentence) -> str:
     """What a sentence is about ("Halazzi's Rite", "Cleave (2-3 targets)"): the same point on several bosses."""
-    return sentence.split(":", 1)[0].strip().lower()
+    text = sentence["text"] if isinstance(sentence, dict) else sentence
+    return text.split(":", 1)[0].strip().lower()
+
+
+def _mmss_(t: float) -> str:
+    return f"{int(t // 60)}:{int(t % 60):02d}"
+
+
+def _li(s) -> str:
+    """One point of a boss: a sentence, or a priced finding with what the top players do and the log's moment."""
+    if not isinstance(s, dict):
+        return f"<li>{e(s)}</li>"
+    cost = (f"<b class='lr-cost'>{s['cost']}</b>" if s.get("cost") else
+            "<span class='lr-cost np'>&mdash; not priced</span>")  # built here: no user text
+    tops = f"<small class='lr-tops'>{e(s['tops'][:1].upper() + s['tops'][1:])}.</small>" if s.get("tops") else ""
+    at = f"Open {_mmss_(s['at'])}" if s.get("at") is not None else "Open the pull"
+    link = (f" <a class='lr-log' href='{e(s['link'])}' target='_blank' rel='noopener'>{at} on Warcraft Logs &#8599;"
+            f"</a>" if s.get("link") else "")
+    return f"<li class='lr-pt'>{cost}<span>{e(s['text'])}{link}{tops}</span></li>"
 
 
 def common(per_boss: list[list[str]]) -> list[str]:
@@ -282,6 +312,7 @@ def common(per_boss: list[list[str]]) -> list[str]:
     out = []
     for k in keys[:3]:
         first = next(x for says in per_boss for x in says if _key(x) == k)
+        first = first["text"] if isinstance(first, dict) else first
         out.append(first.replace(" on this boss", "").rstrip(".") + f" (on {count[k]} bosses).")
     return out
 
@@ -311,18 +342,20 @@ def card(slug: str) -> str:
     raid_wide = common(said)
     skip = {_key(x) for x in raid_wide}
     for b, boss_says in zip(cur["bosses"], said, strict=True):
-        state_txt = (f"killed in {b['pulls']} {'pull' if b['pulls'] == 1 else 'pulls'}" if b["kill"] else
-                     f"not killed: best pull at {b['best']:.0f}%, {_pulls(b['pulls'])}")
+        rot = _result(b["jobs"].get("rotation")) if b["kill"] else None
+        reviewed = f" &middot; reviewed: the kill, {_mmss(rot['duration'])}" if rot and rot.get("duration") else ""
+        state_txt = (f"killed in {b['pulls']} {'pull' if b['pulls'] == 1 else 'pulls'}{reviewed}" if b["kill"] else
+                     f"not killed: best pull with the boss at {b['best']:.0f}% health, {_pulls(b['pulls'])}")
         says = [x for x in boss_says if _key(x) not in skip][:3]
         links = "".join(f"<a href='/job/{e(jid)}'>{label}</a>" for kind, label in
                         (("rotation", "Your rotation"), ("wipe", "Why it did not die"), ("diff", "Your best pull vs your worst"))
                         if (jid := b["jobs"].get(kind)) and not _failed(jid))
-        if not b["kill"] and _failed(b["jobs"].get("wipe")):  # it needs the boss prepared (the top kills)
-            says = [*says, f"Prepare {b['name']} {b['difficulty']} to see why it did not die."][:3]
+        if not b["kill"] and (_failed(b["jobs"].get("wipe")) or not b["jobs"].get("wipe")):  # needs the boss prepared
+            says = [*says, f"Prepare {b['name']} to see why it did not die, then read the log again."][:3]
         if not says and not cur["finished"]:
             body = "<p class='lr-wait'><span class='pl-spin'></span> Reading&hellip;</p>"
         else:
-            body = ("<ul>" + "".join(f"<li>{e(s)}</li>" for s in says) + "</ul>") if says else \
+            body = ("<ul>" + "".join(_li(s) for s in says) + "</ul>") if says else \
                 "<p class='muted small'>Nothing stands out.</p>"
         card_html = (f"<article class='lr-boss{' kill' if b['kill'] else ''}'><header><b>{e(b['name'])}</b>"
                  f"<span class='pill'>{e(b['difficulty'])}</span><span class='lr-state'>{state_txt}</span></header>"
@@ -333,18 +366,39 @@ def card(slug: str) -> str:
         else:
             rows += card_html
     killed = sum(b["kill"] for b in cur["bosses"])
-    if folded:  # the bosses killed: one click away, the ones still to kill in view
-        folded = (f"<details class='lr-more'><summary>The {killed} "
-                  f"{'boss' if killed == 1 else 'bosses'} you killed</summary><div class='lr-grid'>{folded}</div></details>")
+    if folded:  # the bosses killed, after the ones still to kill: in view too (no fold, the user's rule)
+        folded = f"<div><h3 class='lr-killed'>Killed ({killed})</h3><div class='lr-grid'>{folded}</div></div>"
+    if rows:
+        rows = (f"<div><h3 class='lr-killed'>Not killed ({len(cur['bosses']) - killed})</h3>"
+                f"<div class='lr-grid'>{rows}</div></div>")
     progress = (f"<p class='lr-wait'><span class='pl-spin'></span> Reading your raid: {done} of {total} analyses"
                 f"&hellip;</p>" if not cur["finished"] else "")
     again_btn = ("" if not cur["finished"] or reading else
                  "<form method='post' action='/lastraid/again' class='lr-again'><button class='btn ghost'>Read the "
                  "last log again</button></form>")
+    priced = sorted(((x, b["name"]) for b, says in zip(cur["bosses"], said, strict=True) for x in says
+                     if isinstance(x, dict) and x.get("value")),  # the simmed costs first, then the upper bounds
+                    key=lambda xb: (xb[0].get("approx", False), -xb[0]["value"]))
+    def todo(x: dict) -> str:  # the point as an order
+        if x.get("kind") == "activity":
+            return "keep casting"
+        if x.get("kind") == "cooldown":
+            return f"press {e(x['name'])} as soon as it is ready"
+        return e(x["text"].split(":")[0])
+    top = priced[:2]
+    if top and all(n == top[0][1] for _x, n in top):  # one boss: said once
+        first = (f"<p class='lr-first'>Clean first, on {e(top[0][1])}: "
+                 + ", then ".join(f"{todo(x)} ({x['cost']})" for x, _n in top) + ".</p>")
+    else:
+        first = ("<p class='lr-first'>Clean first: " + "; then ".join(
+            f"{todo(x)} on {e(n)} ({x['cost']})" for x, n in top) + ".</p>") if top else ""
+    if top:
+        first += ("<p class='small muted lr-key'>% of your damage on the pull reviewed, simulated on your character; "
+                  "&ldquo;up to&rdquo;: an estimate from the time not casting, part of it movement the fight forces.</p>")
     wide = ("<div class='lr-wide'><b>On the whole raid</b><ul>" + "".join(f"<li>{e(x)}</li>" for x in raid_wide)
             + "</ul></div>") if raid_wide else ""
     return (f"<section class='lr' id='lastraid'{' data-reading=1' if not cur['finished'] else ''}>{head}{progress}"
-            f"{wide}{f'<div class=lr-grid>{rows}</div>' if rows else ''}{folded}{again_btn}</section>")
+            f"{first}{wide}<div class='lr-cols'>{folded}{rows}</div>{again_btn}</section>")
 
 
 CARD_JS = """<script>(function(){var s=document.getElementById('lastraid');if(!s||!s.dataset.reading)return;

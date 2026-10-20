@@ -1777,10 +1777,31 @@ def cmd_rotation(args: argparse.Namespace) -> int:
             r.buffs = rotation.buff_rows(mine, tops)
     except Exception as ex:  # noqa: BLE001 - a part of the review: never fails it
         print(f"  buffs next to the top players: skipped ({str(ex)[:100]})")
-    for _, text in rotation.highlights(r):
-        print("  " + text)
     root = simc.new_run_dir(label="rotation")
-    results.write(root, "rotation", dict(rotation.to_dict(r), boss=enc.name, kill=bool(fight["kill"])))
+    tops_busy, tops = None, {}
+    try:  # what the top players of the spec do: their casting share and their casts a kill (its corpus)
+        from paf import review as review_mod
+        from paf.corpus import db
+
+        con = db.connect(db.db_path(cls, spec))
+        tops_busy = review_mod.tops_activity(con, enc.id, diff, spec)[0]
+        tops = rotation.tops_casts(con, enc.id, diff, spec)
+    except Exception as ex:  # noqa: BLE001 - a part of the review: never fails it
+        print(f"  the top players' activity: skipped ({str(ex)[:100]})")
+    values = {}
+    missed = [c.name for c in r.cooldowns if c.possible > c.casts]
+    if profile and missed:
+        print("Pricing the cooldowns not pressed (SimulationCraft, the same character)...", flush=True)
+        try:
+            values = rotation.cooldown_values(profile, missed, log.duration, root)
+        except Exception as ex:  # noqa: BLE001 - unpriced, the points stay
+            print(f"  cooldown values: skipped ({str(ex)[:100]})")
+    found = rotation.findings(r, log, tops_busy, tops, values)
+    for f in found[:6]:
+        cost = "" if f.cost is None else f"{'about ' if f.approx else ''}-{f.cost:.1f}% DPS: "
+        print(f"  {cost}{f.text}" + (f" ({f.tops})" if f.tops else ""))
+    results.write(root, "rotation", dict(rotation.to_dict(r), boss=enc.name, kill=bool(fight["kill"]), findings=[
+        dict(vars(f), link=rotation.log_link(code, fight, actor["id"], f.at)) for f in found]))
     print(f"Runs: {root}")
     return 0
 
