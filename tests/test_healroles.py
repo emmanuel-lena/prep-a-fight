@@ -38,7 +38,11 @@ def _db():
     return con
 
 
-def test_compositions_and_jobs():
+KINDS = {10060: "damage", 47788: "protective", 322109: ""}  # paf.gamedata.external_kind on the 12.1 game data
+
+
+def test_compositions_and_jobs(monkeypatch):
+    monkeypatch.setattr(healroles, "external_kind", lambda ab: KINDS.get(ab, ""))
     con = _db()
     for k in range(10):
         rep = f"r{k}"
@@ -53,6 +57,9 @@ def test_compositions_and_jobs():
             (rep, 0, "Shaman", "Restoration", 100, 30, 10, 0.5, 0), (rep, 1, "Priest", "Holy", 100, 60, 10, 0.25, 0)]
             + ([(rep, 2, "Druid", "Restoration", 100, 60, 10, 0.25, 0)] if k < 6 else []))
         con.execute("INSERT INTO heal_cast VALUES (?,1,1,10060,?,1)", (rep, 120 + k))
+        if k % 2:  # Guardian Spirit on a player every other kill; Touch of Death on the boss is no external
+            con.execute("INSERT INTO heal_cast VALUES (?,1,1,47788,?,1)", (rep, 200 + k))
+        con.execute("INSERT INTO heal_cast VALUES (?,1,0,322109,?,1)", (rep, 220 + k))
         con.execute("INSERT INTO heal_cast VALUES (?,1,0,98008,?,0)", (rep, 30 + k))  # Spirit Link
     cs = healroles.comps(con, 3470, 4, min_kills=1)
     assert [(c.label, c.kills) for c in cs] == [("Holy Priest + Restoration Druid + Restoration Shaman", 6),
@@ -65,8 +72,11 @@ def test_compositions_and_jobs():
                                              min_players=5)}
     shaman, priest = rs["Restoration Shaman"], rs["Holy Priest"]
     assert any("spikes: 50%" in j for j in shaman.jobs) and any("wastes little" in j for j in shaman.jobs)
-    assert any("externals: 1.0" in j for j in priest.jobs)
-    assert priest.cd_names == [("Power Infusion", 1.0, [124.5])]
+    # Power Infusion is a damage dealer's buff, said last; Guardian Spirit the protective external
+    assert priest.externals == 0.5 and priest.buffs == 1.0 and priest.buff_spells == ["Power Infusion"]
+    assert priest.jobs[-1] == "buffs a damage dealer: Power Infusion 1.0 a kill"
+    assert priest.cd_names[0] == ("Power Infusion", 1.0, [124.5])
+    assert shaman.externals == 0 and shaman.raid_cds == 2.0  # Spirit Link, and Touch of Death on the boss
     assert rs["Restoration Druid"].jobs == ["close to the other healers on every number below"]
 
 

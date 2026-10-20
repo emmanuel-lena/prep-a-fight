@@ -494,8 +494,9 @@ def _nums(r) -> list[str]:
         out.append(f"{_pct(r.overheal)} overheal")
     out.append(f"{r.dispels:.1f} dispels a minute")
     if "external" not in said:
-        out.append(f"{r.externals:.1f} externals a kill (long cooldowns cast on another player, damage buffs "
-                   f"like Power Infusion included)")
+        out.append(f"{r.externals:.1f} externals a kill (protective cooldowns cast on another player)")
+    if r.buffs and "buffs" not in said:
+        out.append(f"{r.buffs:.1f} damage buffs given a kill ({', '.join(r.buff_spells)})")
     return out
 
 

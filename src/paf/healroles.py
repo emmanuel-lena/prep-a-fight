@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from itertools import zip_longest
 
 from paf.corpus.analyze import kills_filter
+from paf.gamedata import external_kind
 from paf.wcl import WCLClient, WCLError
 
 KILLS = 40  # kills read per boss (about 6 points each): enough healers of each spec to compare
@@ -321,11 +322,13 @@ class Role:
     spike: float  # median share of their own healing done during the raid's damage spikes
     overheal: float  # median overheal / (healing + overheal)
     dispels: float  # median dispels per minute
-    raid_cds: float  # long cooldowns cast on themselves or the raid, per kill
-    externals: float  # long cooldowns cast on another player, per kill
+    raid_cds: float  # long cooldowns cast on themselves, the raid or an enemy, per kill
+    externals: float  # protective long cooldowns cast on another player (paf.gamedata.external_kind), per kill
     cd_names: list[tuple[str, float, list[float]]] = field(default_factory=list)  # (spell, per kill, median times)
     jobs: list[str] = field(default_factory=list)  # what the numbers say this spec does on this boss
     se: dict[str, float] = field(default_factory=dict)  # standard error of each number (its healers' spread)
+    buffs: float = 0.0  # damage buffs cast on another player (Power Infusion), per kill
+    buff_spells: list[str] = field(default_factory=list)  # their names, the most cast first
 
 
 TANK_HEALER = 1.4  # a spec puts this many times the other healers' tank share on the tanks: the tank healer
@@ -359,6 +362,9 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
         for ab, _t, _o in cs:
             users[ab].add(spec_of.get(key, ""))
     common = {ab for ab, specs in users.items() if len(specs) >= 3}  # three specs or more: a trinket, a potion
+    # cast on another unit is not an external yet: the boss (Touch of Death), a dead player (a battle res)...
+    kind = {ab: external_kind(ab) for ab in users}
+    buff_casts: dict[str, Counter] = defaultdict(Counter)
     stats: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
     cd_times: dict[str, dict[int, list[float]]] = defaultdict(lambda: defaultdict(list))
     for k, hs in per_kill.items():
@@ -373,8 +379,10 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
             s["overheal"].append(over / (tot + over) if tot + over else 0)
             s["dispels"].append(disp / minutes)
             mine = [c for c in casts.get((k[0], k[1], h[2]), []) if c[0] not in common]
-            s["raid"].append(sum(1 for _a, _t, o in mine if not o))
-            s["ext"].append(sum(1 for _a, _t, o in mine if o))
+            s["raid"].append(sum(1 for a, _t, o in mine if not (o and kind[a])))
+            s["ext"].append(sum(1 for a, _t, o in mine if o and kind[a] == "protective"))
+            s["buff"].append(sum(1 for a, _t, o in mine if o and kind[a] == "damage"))
+            buff_casts[spec].update(a for a, _t, o in mine if o and kind[a] == "damage")
             for ab, t, _o in mine:
                 cd_times[spec][ab].append(t)
     out = []
@@ -389,7 +397,9 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
                         st.median(s["overheal"]), st.median(s["dispels"]), st.mean(s["raid"]), st.mean(s["ext"]),
                         sorted(cds, key=lambda c: -c[1]),
                         se={"tank": se["tank"], "spike": se["spike"], "overheal": se["overheal"],
-                            "dispels": se["dispels"], "raid_cds": se["raid"], "externals": se["ext"]}))
+                            "dispels": se["dispels"], "raid_cds": se["raid"], "externals": se["ext"]},
+                        buffs=st.mean(s["buff"]),
+                        buff_spells=[(names or {}).get(ab, f"spell {ab}") for ab, _ in buff_casts[spec].most_common()]))
     for r in out:
         r.jobs = jobs(r, out)
     return sorted(out, key=lambda r: -r.players)
@@ -405,6 +415,10 @@ def _peaks(times: list[float], gap: float = 20.0) -> list[float]:
             groups.append([t])
     keep = [g for g in groups if len(g) >= max(2, len(times) / 5)]
     return [round(st.median(g), 1) for g in keep]
+
+
+def _and(names: list[str]) -> str:
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
 def jobs(r: Role, everyone: list[Role]) -> list[str]:
@@ -434,6 +448,8 @@ def jobs(r: Role, everyone: list[Role]) -> list[str]:
         out.append(f"presses the most long cooldowns: {r.raid_cds:.1f} a kill")
     if r.overheal <= ref("overheal") * LOW_OVERHEAL and clear("overheal", lower=True):
         out.append(f"wastes little: {r.overheal:.0%} overhealing (the other healers {ref('overheal'):.0%})")
+    if r.buffs >= 1 and r.buffs >= ref("buffs") * 1.5:  # last: a damage dealer's buff, not a healing job
+        out.append(f"buffs a damage dealer: {_and(r.buff_spells)} {r.buffs:.1f} a kill")
     if not out:
         out.append("close to the other healers on every number below")
     return out

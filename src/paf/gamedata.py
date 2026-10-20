@@ -184,6 +184,24 @@ def is_mitigation(spell_id: int) -> bool:
     return any(r.get("EffectAura") in MITIGATION_AURAS for r in _filtered_rows("SpellEffect", "SpellID", spell_id))
 
 
+ALLY_TARGETS = {"21", "57"}  # implicit targets: the ally (or raid member) the spell is cast on
+PROTECTIVE_AURAS = MITIGATION_AURAS | {"39", "81", "118"}  # + immunity, damage shared away, healing received
+PROTECTIVE_EFFECTS = {"10", "67", "136"}  # heal, heal to full, heal a share of the health
+DAMAGE_AURAS = {"79", "138", "193"}  # damage done, haste, haste (Power Infusion)
+
+
+def external_kind(spell_id: int) -> str:
+    """What a spell cast on another player gives them, from the game data: "protective" (Life Cocoon, Ironbark,
+    Guardian Spirit, Blessing of Sacrifice, Lay on Hands), "damage" (Power Infusion), or "" when the spell is no
+    buff on an ally (Touch of Death or Ultimate Penitence on the boss, a battle res, Leap of Faith)."""
+    ally = [r for r in _filtered_rows("SpellEffect", "SpellID", spell_id) if r.get("ImplicitTarget_0") in ALLY_TARGETS]
+    if any(r.get("EffectAura") in PROTECTIVE_AURAS or r.get("Effect") in PROTECTIVE_EFFECTS for r in ally):
+        return "protective"
+    if any(r.get("EffectAura") in DAMAGE_AURAS for r in ally):
+        return "damage"
+    return ""
+
+
 def known_not_amp(spell_id: int, depth: int = 2) -> bool:
     """True when the game data has the spell and neither it nor the spells it triggers changes damage taken:
     a boss aura measured in the logs is then not an amp (Vexhul's Uncoiled Wrath raises the survivor's damage done)."""
