@@ -86,24 +86,30 @@ phases, waves, boss casts and notes), and every plan is also simmed on it as a s
 heroic: 4:16 → 5:14 with the intermission at 2:06 instead of 1:42 and a wave of 18 Restless Amani logged 0.8 s
 before Stage Two (which surfaced the boundary rule now in `Fight.__post_init__`).
 
-## Every boss, two specs (paf 0.8.16)
+## Every boss, two specs (paf 0.8.17)
 
-Every fight rebuilt with the current code, then calibrated as a prep does (the add counts scaled until the simulated
-boss share matches the spec's real one), then 4 top players of the spec simmed on it with their own gear, talents and
-real secondary stats. Simulated / real DPS, median (range):
+Every fight rebuilt with the current code, then calibrated as a prep does: the add counts scaled until the simulated
+boss share matches the spec's real one, then 4 top players of the spec simmed with their own gear, talents and real
+secondary stats, then the inferred movement scaled on them (`calibrate_movement`). Simulated / real DPS, median,
+before the movement scale → after it (the scale in brackets):
 
 | Boss | Heroic, Elemental | Heroic, Subtlety | Mythic, Elemental | Mythic, Subtlety |
 |---|---|---|---|---|
-| Nymrissa Wavecaller | 1.04 (1.00-1.08) | 0.85 (0.81-0.85) | 1.11 (1.07-1.20) | no corpus |
-| Nek'zali the Soulcoiler | 0.95 (0.91-0.96) | 0.89 (0.81-1.00) | 0.96 (0.93-1.00) | no corpus |
-| Entombed Sentinels | **0.89** (0.89-0.93), was 1.13 | **1.00** (0.97-1.04), was 1.31 | **0.87** (0.85-0.90), was 1.09 | no corpus |
-| The Lost Explorers | 0.91 (0.87-0.93) | 1.06 (0.99-1.09) | 0.93 (0.90-0.97) | no corpus |
-| Vashnik the Malignant | 0.90 (0.79-0.94) | 0.94 (0.87-0.97) | 1.01 (0.95-1.03) | 1.10 (1.06-1.16) |
-| Sszorak | 1.01 (0.95-1.03) | 1.03 (1.00-1.04) | 1.07 (0.97-1.09) | no corpus |
-| The Coiled Altar | 1.02 (0.99-1.08), was 1.05 | no kills in the corpus | 0.88 (0.87-0.90) | no corpus |
-| Ula'tek | 0.90 (0.82-0.93) | no kills in the corpus | 1.03 (1.00-1.06) | no corpus |
+| Nymrissa Wavecaller | 1.04 → 1.05 (×1) | 0.85 → 1.02 (×0.11) | 1.11 → 1.11 (×1) | 0.49 → 0.99 (×0) |
+| Nek'zali the Soulcoiler | 0.95 → 0.95 (×0) | 0.89 → 0.89 (×0.5) | 0.96 → 0.99 (×0.22) | 0.80 → 0.82 (×0) |
+| Entombed Sentinels | 0.89 → 0.93 (×0) | 1.00 → 1.00 (×0.1) | 0.87 → 0.95 (×0) | 0.87 → 0.89 (×0) |
+| The Lost Explorers | 0.91 → 0.92 (×0) | 1.06 → 1.01 (×0.55) | 0.93 → 0.93 (×0) | 0.81 → 0.81 (×0) |
+| Vashnik the Malignant | 0.90 → 0.90 (×0) | 0.94 → 0.94 (×0) | 1.01 → 1.01 (×0.34) | 1.10 → 1.06 (×1) |
+| Sszorak | 1.01 → 0.97 (×0.43) | 1.03 → 1.01 (×0.52) | 1.07 → 0.98 (×0.44) | 0.86 → 0.92 (×0) |
+| The Coiled Altar | 1.02 → 1.02 (×1) | 0.82 → 0.82 (×0) | 0.88 → 1.01 (×0.52) | 0.77 → 0.86 (×0.25) |
+| Ula'tek | 1.01 → 1.02 (×1), was 0.90 | 0.85 → 0.92 (×0), was 0.68 | 1.12 → 0.98 (×0.97) | 1.02 → 1.03 (×0.8) |
 
-Every median between 0.85 and 1.11. What the run found and fixed:
+After both calibrations: Elemental 0.92 to 1.11 on every boss and difficulty; Subtlety 0.81 to 1.06. The three
+Subtlety cells near 0.81 (Nek'zali and The Lost Explorers mythic, The Coiled Altar heroic) sit where the
+Elementals of the same fights are right (0.92 to 1.02): the fight is not the cause. It is the known gap of SimC on
+the top Rogues (their build or the APL, the open "specgear" question), left with the user.
+
+What these runs found and fixed:
 
 - **A run without the add calibration is not what a prep sims.** Nymrissa simmed at 1.41 for the Subtlety Rogues
   before calibration: their real boss share is 94% (the murlocs are the ranged players' job; 6% of a Rogue's
@@ -120,7 +126,15 @@ Every median between 0.85 and 1.11. What the run found and fixed:
   before), The Twin Fangs 2 (Vexhul and Ithraz stacked: unchanged), The Coiled Altar 1 (Hex Lord Malacrass no longer
   a cleave target: 1.05 → 1.02), Ula'tek and her heart 1 (the heart is a damage amp, unchanged).
 - **A ranked log made private stopped the whole validation** (The Coiled Altar and Ula'tek mythic): the player is
-  now skipped.
+  now skipped. **An item SimC's offline data lacks** (a ring, 268249) stopped it too: the slot goes, the player's
+  real stats being imposed anyway.
+- **A unit that comes back kept the first window's start.** A boss unit's window opens at the top players' first
+  hit when they hit it a little earlier (Nek'zali's Echo); that first hit is the fight's first, so for Ula'tek's
+  Venomous Heart (up at 2:04, 4:32 and 9:21) every later window opened at 2:16: a x2 window from 2:16 to the end.
+  Only a hit up to 20 s before a window opens it now. Ula'tek heroic: 0.90 → 1.02 (Elemental), 0.68 → 0.92
+  (Subtlety).
+- **Movement is calibrated per spec**: the movement inferred from the trajectories costs a melee player everything
+  while it lasts. Nymrissa mythic, Subtlety: 0.49 before the scale, 0.99 after (×0); a prep does this scale.
 
-Open: the Subtlety corpus has no mythic kills and no heroic kills of two bosses; Nymrissa heroic's Rogues sim at the
-low end (0.85, the add scale at its floor ×0.2: SimC's target priority keeps some damage on the murlocs).
+The Subtlety corpus was completed for this run (heroic The Coiled Altar and Ula'tek, every mythic boss, 60 kills
+each): every cell is filled.
