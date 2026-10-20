@@ -14,6 +14,7 @@ healers of the spec on this boss (a corpus ranked by healing per second, paf.cor
 from __future__ import annotations
 
 import json
+import re
 import statistics as st
 from collections import Counter
 from dataclasses import dataclass, field
@@ -61,8 +62,9 @@ class Cooldown:
     spell_id: int
     users: float  # share of the top players who cast it
     per_kill: float
-    times: list[float]  # when most of them press it
+    times: list[float]  # when most of them press it: as many moments as their casts a kill, the best followed
     near: list[str] = field(default_factory=list)  # the big moment each one answers, if any
+    alt: list[float] = field(default_factory=list)  # other moments some of them press it at instead
 
 
 @dataclass
@@ -79,6 +81,13 @@ class HealerPrep:
     trinkets: list[tuple[str, int, float]]  # name, item id, share of the top players
     journal: list[str]
     phases: list[tuple[str, float]] = field(default_factory=list)
+    comps: list = field(default_factory=list)  # paf.healroles.Comp, most played first
+    presence: list = field(default_factory=list)  # paf.healroles.Presence of every healer spec
+    roles: list = field(default_factory=list)  # paf.healroles.Role, every healer spec measured
+    role_kills: int = 0  # kills the roles were measured on
+    role_sample: str = ""  # which kills: "the top Restoration Shamans' kills (ranked by healing), median 4:50, 2 deaths"
+    class_name: str = ""
+    character: str = ""
 
 
 def ensure_table(con) -> None:
@@ -157,10 +166,11 @@ def moments(curve: list[float], boss_casts: list[tuple[str, list[float]]], top: 
     return sorted(sorted(found, key=lambda m: -m.ratio)[:top], key=lambda m: m.t)
 
 
-def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None = None) -> list[Cooldown]:
+def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None = None,
+              min_users: float = 0.5, max_users: float = 1.01) -> list[Cooldown]:
     """The cooldowns of the top players (spells with a cooldown of COOLDOWN_GAP s or more in the game data, that most
     of them cast; dispels, rotation spells and moves left out) and when most of them press each."""
-    from paf.defensives import peaks
+    from paf.defensives import ranked_peaks
 
     if base is None:
         try:
@@ -171,19 +181,23 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
             base = {}
     out, seen = [], set()
     for a in sorted(tl.abilities, key=lambda a: -a.users):
-        if a.users < 0.5 or not tl.duration or a.per_kill > max(1.0, tl.duration / COOLDOWN_GAP) or a.name in seen:
+        if not min_users <= a.users < max_users or not tl.duration or a.per_kill > max(1.0, tl.duration / COOLDOWN_GAP) \
+                or a.name in seen:
             continue
         if base and base.get(a.id, (0.0, 1))[0] < COOLDOWN_GAP:
             continue
         seen.add(a.name)
         per_player = [p["casts"].get(a.name) or p["casts"].get(a.id) or [] for p in tl.players]
         per_player = [ts for ts in per_player if ts]
-        times = peaks(per_player) if per_player else []
+        ranked = ranked_peaks(per_player) if per_player else []
+        keep = max(1, round(a.per_kill))
+        times = sorted(t for t, _n in ranked[:keep])
+        alt = sorted(t for t, _n in ranked[keep:])
         near = []
         for t in times:
             m = min(found, key=lambda m: abs(m.t - t), default=None)
             near.append(f"{_mmss(m.t)} {m.boss_spell}".strip() if m and abs(m.t - t) <= 20 else "")
-        out.append(Cooldown(a.name, a.id, a.users, a.per_kill, times, near))
+        out.append(Cooldown(a.name, a.id, a.users, a.per_kill, times, near, alt))
     return sorted(out, key=lambda c: -c.users)
 
 
@@ -228,9 +242,11 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
         return f"{10 + (1 - v / peak) * (H - B - 20):.1f}"
     pts = " ".join(f"{x(i * STEP)},{y(v)}" for i, v in enumerate(curve))
     marks = "".join(f"<circle cx='{x(m.t)}' cy='{y(m.dtps)}' r='4' class='mk'/>"
-                    f"<text x='{x(m.t)}' y='{max(12.0, float(y(m.dtps)) - 6):.1f}' class='ml'>{_mmss(m.t)}</text>"
+                    f"<text x='{float(x(m.t)) + 6:.1f}' y='{max(30.0, float(y(m.dtps)) - 8):.1f}' class='ml'>{_mmss(m.t)}</text>"
                     for m in found)
-    lines = "".join(f"<line class='ph' x1='{x(t)}' x2='{x(t)}' y1='10' y2='{H - B}'/>" for _, t in phases if t > 0)
+    lines = "".join(f"<line class='ph' x1='{x(t)}' x2='{x(t)}' y1='22' y2='{H - B}'/>"
+                    f"<text x='{float(x(t)) + 4:.1f}' y='18' class='pn'>{e(n.split(':')[0])}</text>"
+                    for n, t in phases if t > 0)  # the phase changes, named
     ticks = "".join(f"<text x='{x(t)}' y='{H - 6}' class='tk'>{int(t // 60)}:00</text>"
                     for t in range(0, int(span) + 1, 60))
     return (f"<svg viewBox='0 0 {W} {H}' class='rd' role='img' aria-label='{e(label)}'>"
@@ -246,15 +262,54 @@ def moments_html(found: list[Moment], what: str) -> str:
 def cooldowns_html(cds: list[Cooldown]) -> str:
     return "".join(
         f"<li><b>{e(c.name)}</b><small>{c.users:.0%} of the top players &middot; {c.per_kill:.1f} a kill</small>"
-        f"<span class='when'>" + "".join(f"<span class='chip'>{_mmss(t)}{(' &rarr; ' + e(n)) if n else ''}</span>"
-                                       for t, n in zip(c.times, c.near, strict=False)) + "</span></li>"
+        "<span class='when'>" + "".join(f"<span class='chip'>{_mmss(t)}{_near(n)}</span>"
+                                       for t, n in zip(c.times, c.near, strict=False))
+        + (f"<small class='alt'>some press it at {', '.join(_mmss(t) for t in c.alt)} instead</small>"
+           if c.alt else "") + "</span></li>"
         for c in cds)
 
 
-def builds_html(builds: list[tuple[int, str, str]]) -> str:
+def _near(n: str) -> str:
+    """ "0:35 Possession Barrage" -> " · Possession Barrage": the moment a press answers."""
+    if not n:
+        return ""
+    _t, _, name = n.partition(" ")
+    return f" &middot; {e(name)}" if name else ""
+
+
+SHOWN_TALENTS = 5
+
+
+def build_rows(builds: list) -> list[tuple[int, str, str, str]]:
+    """(players, label, import string, what sets it apart from the most played build) of the top builds."""
+    try:
+        from paf.gamedata import talent_entry_names
+
+        names = talent_entry_names()
+    except Exception:  # noqa: BLE001 - offline: the builds without their difference
+        names = {}
+    out = []
+    for i, b in enumerate(builds):
+        if i == 0 or not names:
+            out.append((b.count, b.label, b.code or "", "the most played" if i == 0 else ""))
+            continue
+        plus = sorted({names[t] for t in b.key - builds[0].key if names.get(t)})
+        minus = sorted({names[t] for t in builds[0].key - b.key if names.get(t)})
+
+        def few(xs: list[str]) -> str:  # another hero tree changes twenty talents: the first ones say enough
+            return ", ".join(xs[:SHOWN_TALENTS]) + (f" (+{len(xs) - SHOWN_TALENTS} more)" if len(xs) > SHOWN_TALENTS
+                                                    else "")
+        diff = "; ".join(x for x in (f"takes {few(plus)}" if plus else "", f"drops {few(minus)}" if minus else "")
+                         if x)
+        out.append((b.count, b.label, b.code or "", diff))
+    return out
+
+
+def builds_html(builds: list) -> str:
     copy = "<button class='btn ghost copy' data-copy='{}'>Copy the talents</button>"
-    return "".join(f"<li><b>{e(lbl)}</b><small>{n} of the top players</small>"
-                   + (copy.format(e(code)) if code else "") + "</li>" for n, lbl, code in builds)
+    return "".join(f"<li><b>{e(b[1][:1].upper() + b[1][1:])}</b><small>{b[0]} of the top players"
+                   + (f" &middot; {e(b[3])}" if len(b) > 3 and b[3] else "") + "</small>"
+                   + (copy.format(e(b[2])) if b[2] else "") + "</li>" for b in builds)
 
 
 def trinkets_html(trinkets: list[tuple[str, int, float]]) -> str:
@@ -289,3 +344,145 @@ fight.</p>
 <section class="hp-sec"><h2>The numbers</h2><p>SimulationCraft does not sim healing well: for the value of a talent or an
 item for your healing, use <a href="{QE_LIVE}" target="_blank" rel="noopener">QE Live</a>.</p></section>"""
     return page(f"{h.boss} prep", body)
+
+
+# --- the sheet in the four sections of every role's sheet (issue #27) ----------------------------------------------
+
+def _pct(v: float) -> str:
+    return f"{v:.0%}"
+
+
+def role_card(r, everyone: list, mine: bool, chips: bool = True) -> str:
+    """One healer spec's job on the boss, with its numbers and how many healers they come from. chips: its long
+    cooldowns' usual times (left out on your own card: the fight tab gives yours, from the top players of your spec)."""
+    cds = "".join(f"<span class='chip'>{e(n)} {', '.join(_mmss(t) for t in ts) or ''}</span>"
+                  for n, _k, ts in r.cd_names[:5]) if chips else ""
+    return (f"<article class='hrole'><h3>{e(r.spec)}{' <small>(you)</small>' if mine else ''}</h3>"
+            f"<ul class='jobs'>{''.join(f'<li>{e(j)}</li>' for j in r.jobs)}</ul>"
+            f"<p class='nums'>{_pct(r.healing)} of the healers' healing · {_pct(r.tank)} of its healing on the tanks · "
+            f"{_pct(r.spike)} of it in the raid's damage spikes · {_pct(r.overheal)} overheal · {r.dispels:.1f} dispels "
+            f"a minute (which debuffs: not measured yet) · {r.externals:.1f} externals a kill</p>" + (f"<p class='when'>{cds}</p>" if cds else "")
+            + f"<p class='small muted'>{r.players} {e(r.spec)}s in the kills read.</p></article>")
+
+
+def _plain(text: str) -> str:
+    """A journal line without its spell brackets: "[Soulcoil Well]" -> "Soulcoil Well"."""
+    return re.sub(r"[\[\]]", "", text)
+
+
+FEW_KILLS = 8  # a spec in fewer of the kills read: its numbers say little
+
+
+def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
+    """Each spec of a role in the top kills: how often it is brought, and the kills with it against without it."""
+    if not pres:
+        return "<p class='small muted'>Not enough kills read yet.</p>"
+    deaths = any(p.deaths_with is not None for p in pres)
+
+    def dd(a, b) -> str:
+        return "" if a is None else f"{a:g}" + ("" if b is None else f" <small>({b:g} without)</small>")
+    rows = ""
+    for p in pres:
+        if p.spec == mine and p.share >= 0.99:  # the corpus is this spec's kills: its row says nothing
+            continue
+        few = p.kills < FEW_KILLS
+        cells = ("<td class='n' colspan='3'><small>too few kills</small></td>" if few else
+                 f"<td class='n'>{p.per_kill:.1f}</td><td class='n'>{_mmss(p.duration_with)}"
+                 + ("" if p.duration_without is None else f" <small>({_mmss(p.duration_without)} without)</small>")
+                 + "</td>" + (f"<td class='n'>{dd(p.deaths_with, p.deaths_without)}</td>" if deaths else ""))
+        if few and not deaths:
+            cells = "<td class='n' colspan='2'><small>too few kills</small></td>"
+        rows += (f"<tr class='{'mine ' if p.spec == mine else ''}{'few' if few else ''}'><td>{e(p.spec)}</td>"
+                 f"<td class='n'>{_pct(p.share)} <small>({p.kills} kill{'s' if p.kills != 1 else ''})</small></td>"
+                 f"{cells}</tr>")
+    head = (f"<th>{what}</th><th>Top kills with one</th><th>Per kill</th><th>Median kill</th>"
+            + ("<th>Median deaths</th>" if deaths else ""))
+    return f"<table class='hcomp'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"
+
+
+def comps_table(comps: list, n_kills: int) -> str:
+    if not comps:
+        return ""
+    deaths = any(c.deaths is not None for c in comps)
+    rows = "".join(
+        f"<tr><td>{e(c.label)}</td><td class='n'>{c.kills} ({_pct(c.share)})</td><td class='n'>{_mmss(c.duration)}</td>"
+        + (f"<td class='n'>{'' if c.deaths is None else f'{c.deaths:g}'}</td>" if deaths else "") + "</tr>"
+        for c in comps)
+    return ("<table class='hcomp'><thead><tr><th>Healers</th><th>Top kills</th><th>Median kill</th>"
+            + ("<th>Median deaths</th>" if deaths else "") + f"</tr></thead><tbody>{rows}</tbody></table>"
+            f"<p class='small muted'>Of {n_kills} top kills read. Exact compositions played at least 5 times.</p>")
+
+
+def render_sheet(h: HealerPrep) -> str:
+    """The healer's sheet: The fight (the raid damage, your cooldowns where the top healers press them), What to
+    change (your spec's job here, the healers of the top kills, talents, trinkets), The boss, Dig deeper (every
+    healer spec's job, the compositions, how it is measured)."""
+    from paf.defensives import is_defensive
+    from paf.prep_report import sheet_page
+
+    mine = next((r for r in h.roles if r.spec == h.spec), None)
+    svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight")
+    worn = {n for n, _i, _s in h.trinkets}  # an on-use trinket is no class cooldown
+    items = [c for c in h.cooldowns if c.name in worn]
+    heals = [c for c in h.cooldowns if not is_defensive(c.spell_id, c.name) and c not in items]
+    defs = [c for c in h.cooldowns if c not in heals and c not in items]
+    lead = ""
+    if h.moments:
+        hits = " and ".join(f"{_mmss(m.t)} ({e(m.boss_spell or 'raid damage')})" for m in h.moments[:3])
+        used = [c.name for c in heals if any(n and n.split(" ", 1)[0] in {_mmss(m.t) for m in h.moments} for n in c.near)]
+        lead = (f"<p class='lead'>The raid's big hits come at {hits}"
+                + (f"; the top {e(h.spec)}s spend {e(', '.join(used[:3]))} on them." if used else ".") + "</p>")
+    you = []
+    own = "ranked by their healing" in (h.role_sample or "")
+    if mine is not None:
+        you = [f"<h2>How you heal, against the other healers</h2>{role_card(mine, h.roles, True, chips=False)}"
+               f"<p class='small muted'>From {h.role_kills} {e(h.role_sample or 'top kills')}."
+               + (" Kills ranked by your spec's healing: your share of the healing is inflated." if own else "")
+               + "</p>"]
+    fight = ([lead] if lead else []) + you + [
+        f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Damage the "
+        f"raid takes per second, median of the top kills; a dot marks a big moment.</p><ul class='hl2'>"
+        f"{moments_html(h.moments, 'raid damage') or '<li>No big moment: steady raid damage.</li>'}</ul></div>",
+        f"<h2>Your healing cooldowns, where the top {e(h.spec)}s press them</h2><ul class='hl2'>"
+        f"{cooldowns_html(heals) or '<li>Not enough top players in the corpus yet.</li>'}</ul>"]
+    if defs:
+        fight.append(f"<h2>Your defensives</h2><ul class='hl2'>{cooldowns_html(defs)}</ul>")
+    if items:
+        fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{cooldowns_html(items)}</ul>")
+    n_kills = h.role_kills or h.kills
+    change = []
+    change.append(f"<h2>Talents the top {e(h.spec)}s play</h2><ul class='hl2'>"
+                  f"{builds_html(h.builds) or '<li>No build yet.</li>'}</ul>")
+    trk = trinkets_html(h.trinkets) or "<li>No gear yet.</li>"
+    change.append(f"<h2>Trinkets the top {e(h.spec)}s play</h2><ul class='hl2'>{trk}</ul>"
+                  f"<p class='small muted'>No healing sim: these are the top players' choices, not a recommendation. "
+                  f"To weigh a talent or an item for your character, use <a href=\"{QE_LIVE}\" target=\"_blank\" "
+                  f"rel=\"noopener\">QE Live</a>.</p>")
+    jr = "".join(f"<li>{e(_plain(x))}</li>" for x in h.journal)
+    boss = [f"<h2>What the Encounter Journal asks healers</h2><ul class='hl2'>{jr}</ul>"] if jr else []
+    others = "".join(role_card(r, h.roles, r.spec == h.spec, chips=r.spec != h.spec) for r in h.roles)
+    few = [p.spec for p in h.presence if p.spec not in {r.spec for r in h.roles}]
+    deeper_first: list[str] = []
+    if h.presence:
+        have = next((x for x in h.presence if x.spec == h.spec), None)
+        if have and have.share >= 0.99:  # the corpus is your spec's top players' kills: they all have one
+            line = (f"These are the top {e(h.spec)}s' kills, so every one has a {e(h.spec)} ({have.per_kill:.1f} a "
+                    f"kill); the table tells what the other healers bring.")
+        elif have:
+            line = f"{_pct(have.share)} of the top kills bring a {e(h.spec)} ({have.per_kill:.1f} a kill when they do)."
+        else:
+            line = f"Few top raids bring a {e(h.spec)} on this boss."
+        deeper_first.append(f"<h2>Healers in the top {e(h.spec)}s' kills</h2><p>{line} Each healer spec in the {n_kills} "
+                      f"kills read, with it and without it (a reading, not a verdict on the spec):</p>"
+                      f"{presence_table(h.presence, h.spec)}")
+    deeper = deeper_first + [f"<h2>Every healer spec's job on this boss</h2><p class='small muted'>Measured on {h.role_kills} "
+              f"{e(h.role_sample or 'top kills')}: each healer against the other healers of the same kill; a job "
+              f"shows only when a number stands out beyond the sample's noise. The sample matters: kills ranked by a "
+              f"healer's healing are slower, with more to heal, than the fastest kills. No healing engine: these are "
+              f"the logs, not sims.</p><div class='hroles'>{others or '<p>Not measured yet.</p>'}</div>"
+              + (f"<p class='small muted'>Too few healers measured: {e(', '.join(few))}.</p>" if few else ""),
+              (f"<h2>The healer compositions played most</h2>{comps_table(h.comps, n_kills)}" if h.comps else "")]
+    byline = (f"{e(h.character or h.spec)} &middot; {e(h.spec)} &middot; {h.kills} top {e(h.spec)} kills, "
+              f"{h.role_kills} read for the healers' jobs &middot; a {_mmss(h.duration)} fight")
+    return sheet_page(h.boss, h.difficulty, byline, h.class_name,
+                      {"fight": fight, "change": change, "boss": boss, "deeper": deeper}, theme.style("healer"))

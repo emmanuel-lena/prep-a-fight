@@ -141,8 +141,14 @@ def ability_roles(sections: list[Section]) -> dict[str, list[str]]:
 def role_bullets(sections: list[Section], role: str = "damage") -> list[str]:
     """What the journal tells your role to do, as short points."""
     over = next((s for s in sections if s.kind == "overview"), None)
-    mine = next((c for c in over.children if c.title == ROLE_TITLES.get(role)), None) if over else None
+    mine = next((c for c in over.children if _same_role(c.title, role)), None) if over else None
     return bullets(mine.text) if mine and mine.text else []
+
+
+def _same_role(title: str, role: str) -> bool:
+    """A journal's role heading: "Tank" or "Tanks", "Healer" or "Healers" (Nek'zali writes Tanks, Nymrissa Healer)."""
+    want = ROLE_TITLES.get(role, "")
+    return bool(want) and title.lower().rstrip("s") == want.lower().rstrip("s")
 
 
 def summary_html(sections: list[Section], role: str = "damage", full_link: str = "") -> str:
@@ -150,7 +156,7 @@ def summary_html(sections: list[Section], role: str = "damage", full_link: str =
     over = next((s for s in sections if s.kind == "overview"), None)
     if over is None:
         return ""
-    mine = next((c for c in over.children if c.title == ROLE_TITLES.get(role)), None)
+    mine = next((c for c in over.children if _same_role(c.title, role)), None)
     others = [c for c in over.children if c is not mine and c.text]
     out = [f"<p>{e(readable(over.text))}</p>" if over.text else ""]
     if mine and mine.text:

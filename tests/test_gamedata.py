@@ -29,3 +29,20 @@ def test_known_not_amp_follows_the_triggered_spells(monkeypatch):
     assert not gamedata.known_not_amp(2)
     assert not gamedata.known_not_amp(3)
     assert not gamedata.known_not_amp(9)  # unknown to the game data: the logs may still be right
+
+
+def test_a_charge_longer_than_the_spells_own_cooldown_wins(monkeypatch):
+    """Shield Wall: one charge of 180 s and an 8 s lockout; read as 8 s it fell out of the tank sheet's defensives."""
+    tables = {"SpellCategory": [{"ID": "1929", "ChargeRecoveryTime": "180000", "MaxCharges": "1"}],
+              "SpellCategories": [{"SpellID": "871", "ChargeCategory": "1929"}],
+              "SpellCooldowns": [{"SpellID": "871", "RecoveryTime": "8000", "CategoryRecoveryTime": "0",
+                                  "DifficultyID": "0"},
+                                 {"SpellID": "12975", "RecoveryTime": "180000", "CategoryRecoveryTime": "20000",
+                                  "DifficultyID": "0"}]}
+    monkeypatch.setattr(gamedata, "table_rows", lambda table, *a, **k: tables.get(table, []))
+    if hasattr(gamedata.spell_cooldowns, "cache_clear"):
+        gamedata.spell_cooldowns.cache_clear()
+    cds = gamedata.spell_cooldowns()
+    assert cds[871] == (180.0, 1) and cds[12975] == (180.0, 1)
+    if hasattr(gamedata.spell_cooldowns, "cache_clear"):
+        gamedata.spell_cooldowns.cache_clear()

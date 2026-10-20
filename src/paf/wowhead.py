@@ -8,7 +8,7 @@ from __future__ import annotations
 import html
 import re
 
-SCRIPT = ('<script>const whTooltips={colorLinks:true,iconizeLinks:false,renameLinks:false};</script>'
+SCRIPT = ('<script>const whTooltips={colorLinks:false,iconizeLinks:false,renameLinks:false};</script>'
           '<script src="https://wow.zamimg.com/js/tooltips.js" async></script>')
 
 

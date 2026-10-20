@@ -71,6 +71,12 @@ class DefensiveMoment:
 def peaks(per_kill: list[list[float]], window: float = WINDOW, support: float = SUPPORT) -> list[float]:
     """Typical moments: the time when the most kills have a cast within +-window, then the next one once those
     casts are set aside, while at least `support` of the kills have one."""
+    return sorted(t for t, _n in ranked_peaks(per_kill, window, support))
+
+
+def ranked_peaks(per_kill: list[list[float]], window: float = WINDOW,
+                 support: float = SUPPORT) -> list[tuple[float, int]]:
+    """peaks() with how many kills have a cast there, the best supported first."""
     left = [sorted(ts) for ts in per_kill]
     out = []
     while True:
@@ -80,9 +86,9 @@ def peaks(per_kill: list[list[float]], window: float = WINDOW, support: float = 
             if n > best_n:
                 best, best_n = t, n
         if best is None or best_n < support * len(per_kill):
-            return sorted(out)
+            return out
         near = sorted(x for ts in left for x in ts if abs(x - best) <= window)
-        out.append(near[len(near) // 2])
+        out.append((near[len(near) // 2], best_n))
         left = [[x for x in ts if abs(x - best) > window] for ts in left]
 
 

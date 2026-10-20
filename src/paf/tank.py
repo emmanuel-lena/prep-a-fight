@@ -17,9 +17,10 @@ from __future__ import annotations
 import json
 import statistics as st
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from html import escape as e
 
+from paf import theme
 from paf.healer import RAID_KILLS, SPIKE, SPIKE_GAP, STEP, Cooldown, Moment, _mmss
 from paf.theme import diff_pill
 
@@ -40,13 +41,19 @@ class TankPrep:
     moments: list[Moment]
     hitters: list[tuple[str, float]]  # ability, median share of the tank's damage taken
     cooldowns: list[Cooldown]
-    swaps: list[float]  # when most top tanks taunt
+    swaps: list[float]  # when most top tanks taunt (the pull's taunt left out)
     taunts_per_kill: float
     mitigation: list[tuple[str, float]]  # buff, median uptime
     builds: list[tuple[int, str, str]]
     trinkets: list[tuple[str, int, float]]
     journal: list[str]
     phases: list[tuple[str, float]] = field(default_factory=list)
+    comps: list = field(default_factory=list)  # paf.healroles.Comp of the tanks
+    presence: list = field(default_factory=list)  # paf.healroles.Presence of every tank spec
+    swap_after: list[str] = field(default_factory=list)  # the boss cast just before each swap
+    rare: list = field(default_factory=list)  # defensives a quarter to a half of the top tanks press
+    class_name: str = ""
+    character: str = ""
 
 
 def ensure_table(con) -> None:
@@ -155,8 +162,20 @@ def swaps(con, encounter_id: int, difficulty: int) -> tuple[list[float], float]:
         per_kill[(rep, fid)].append(t)
     if not kills:
         return [], 0.0
-    lists = [per_kill.get(k, []) for k in kills]
+    lists = [[t for t in per_kill.get(k, []) if t >= PULL_TAUNT] for k in kills]  # the pull's taunt is no swap
     return peaks(lists), st.median(len(x) for x in lists)
+
+
+PULL_TAUNT = 5.0  # seconds: a taunt this early picks the boss up, it is no swap
+
+
+def swap_causes(swaps: list[float], boss_casts: list[tuple[str, list[float]]], before: float = 8.0) -> list[str]:
+    """The boss cast just before each swap (a stacking debuff's hit, a tank buster), or "" when none is close."""
+    out = []
+    for t in swaps:
+        near = [(t - c, n) for n, ts in boss_casts for c in ts if -1.0 <= t - c <= before]
+        out.append(min(near)[1] if near else "")
+    return out
 
 
 def render(p: TankPrep) -> str:
@@ -170,6 +189,8 @@ def render(p: TankPrep) -> str:
         trinkets_html,
     )
 
+    mit = "".join(f"<li><b>{e(n)}</b><small>up {u:.0%} of the kill for the top tanks</small></li>"
+                  for n, u in p.mitigation)
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]
     others = [c for c in p.cooldowns if c not in defs]
     svg = curve_svg(p.curve, p.moments, p.phases, "Damage the tank takes over the fight")
@@ -197,3 +218,82 @@ fight.</p>
 <section class="hp-sec"><h2>Trinkets the top tanks play</h2><ul class="hl2">{trinkets_html(p.trinkets) or '<li>No gear yet.</li>'}</ul></section>
 {f'<section class="hp-sec"><h2>What the Encounter Journal asks tanks</h2><ul class="hl2">{jr}</ul></section>' if jr else ''}"""
     return page(f"{p.boss} prep", body)
+
+
+def render_sheet(p: TankPrep) -> str:
+    """The tank's sheet in the four sections of every role's sheet (issue #27): The fight (what hits you and when,
+    your defensives where the top tanks press them, the swaps), What to change (mitigation, talents, trinkets), The
+    boss (the abilities that hit you, the journal), Dig deeper (your other cooldowns, the top raids' tanks)."""
+    from paf.defensives import is_defensive
+    from paf.healer import (
+        _plain as plain,
+    )
+    from paf.healer import (
+        builds_html,
+        comps_table,
+        cooldowns_html,
+        curve_svg,
+        moments_html,
+        presence_table,
+        trinkets_html,
+    )
+    from paf.prep_report import sheet_page
+
+    mit = "".join(f"<li><b>{e(n)}</b><small>up {u:.0%} of the kill for the top tanks</small></li>"
+                  for n, u in p.mitigation)
+    defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]
+    others = [replace(c, near=["" for _ in c.near]) for c in p.cooldowns if c not in defs]  # no buster to answer
+    svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight")
+    causes = p.swap_after or ["" for _ in p.swaps]
+    swap = "".join(f"<span class='chip'>{_mmss(t)}{f' after {e(c)}' if c else ''}</span>"
+                   for t, c in zip(p.swaps, causes, strict=False))
+    lead = []
+    if p.moments:
+        m = max(p.moments, key=lambda x: x.ratio)
+        press = next(((c.name, t) for c in defs for t in c.times if abs(t - m.t) <= 20), None)
+        lead.append(f"The hardest hit: {e(m.boss_spell or 'tank damage')} at {_mmss(m.t)} (&times;{m.ratio:.1f} the usual)"
+                    + (f"; the top {e(p.spec)}s press {e(press[0])} at {_mmss(press[1])}." if press else "."))
+    if p.swaps:
+        lead.append(f"They taunt about {p.taunts_per_kill:.0f} times a kill after the pull, first at "
+                    f"{_mmss(p.swaps[0])}" + (f" after {e(causes[0])}." if causes and causes[0] else "."))
+    fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + [
+        f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the top tanks "
+        f"take per second, median of the kills; a dot marks a tank buster.</p><ul class='hl2'>"
+        f"{moments_html(p.moments, 'tank damage') or '<li>No big moment: steady damage.</li>'}</ul></div>",
+        f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
+        f"{cooldowns_html(defs) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
+        + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
+           f"</p>" if p.rare else ""),
+        f"<h2>Active mitigation the top tanks keep up</h2><ul class='hl2'>{mit or '<li>Not measured yet.</li>'}</ul>",
+        f"<h2>Tank swaps</h2><p>The top tanks taunt about <b>{p.taunts_per_kill:.0f}</b> times a kill after the pull"
+        f"{'; the moments most of them taunt at:' if swap else '.'}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
+                                                          f"</li></ul>" if swap else "")]
+    change = [
+              f"<h2>Talents the top tanks play</h2><ul class='hl2'>{builds_html(p.builds) or '<li>No build yet.</li>'}"
+              f"</ul>",
+              f"<h2>Trinkets the top tanks play</h2><ul class='hl2'>"
+              f"{trinkets_html(p.trinkets) or '<li>No gear yet.</li>'}</ul>",
+              "<p class='small muted'>No tank sim: these are the top players' choices, not a recommendation.</p>"]
+    hit = "".join(f"<li><b>{e(n)}</b><small>{s:.0%} of the damage the top tanks take</small></li>"
+                  for n, s in p.hitters)
+    jr = "".join(f"<li>{e(plain(x))}</li>" for x in p.journal)
+    boss = [f"<h2>The abilities that hit the top tanks the most</h2><ul class='hl2'>{hit or '<li>Not measured yet.</li>'}</ul>"]
+    if jr:
+        boss.append(f"<h2>What the Encounter Journal asks tanks</h2><ul class='hl2'>{jr}</ul>")
+    have = next((x for x in p.presence if x.spec == p.spec), None)
+    deeper = []
+    if others:
+        deeper.append(f"<h2>Your other cooldowns</h2><ul class='hl2'>{cooldowns_html(others)}</ul>")
+    if p.presence:
+        if have and have.share >= 0.99:  # the corpus is this spec's kills
+            line = f"These are the top {e(p.spec)}s' kills; the table tells which tanks play beside them."
+        elif have:
+            line = f"{have.share:.0%} of the top kills bring a {e(p.spec)} ({have.per_kill:.1f} a kill when they do)."
+        else:
+            line = f"Few top raids bring a {e(p.spec)} on this boss."
+        deeper.append(f"<h2>The top raids' tanks</h2><p>{line}</p>{presence_table(p.presence, p.spec, 'Tank')}"
+                      + comps_table(p.comps, p.kills).replace("Healers", "Tanks"))
+    byline = (f"{e(p.character or p.spec)} &middot; {e(p.spec)} &middot; {p.kills} top tank kills &middot; "
+              f"a {_mmss(p.duration)} fight")
+    return sheet_page(p.boss, p.difficulty, byline, p.class_name,
+                      {"fight": fight, "change": change, "boss": boss, "deeper": deeper}, theme.style("healer"))

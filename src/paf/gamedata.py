@@ -160,6 +160,15 @@ def damage_taken_multiplier(spell_id: int, difficulty: str = "heroic") -> float 
     return round(1 + pct / 100, 2) if pct else None
 
 
+MITIGATION_AURAS = {"69", "87", "51", "47", "49", "268"}  # absorb, damage taken, block, parry, dodge, armor by stat
+
+
+def is_mitigation(spell_id: int) -> bool:
+    """A buff the game data gives a defensive effect: Shield Block, Ignore Pain, Ironfur, Shield of the Righteous,
+    Demon Spikes, Bone Shield, Shuffle, Blood Shield. Not an offensive buff a tank keeps up (Seeing Red)."""
+    return any(r.get("EffectAura") in MITIGATION_AURAS for r in _filtered_rows("SpellEffect", "SpellID", spell_id))
+
+
 def known_not_amp(spell_id: int, depth: int = 2) -> bool:
     """True when the game data has the spell and neither it nor the spells it triggers changes damage taken:
     a boss aura measured in the logs is then not an amp (Vexhul's Uncoiled Wrath raises the survivor's damage done)."""
@@ -235,8 +244,11 @@ def spell_cooldowns() -> dict[int, tuple[float, int]]:
         if not cat or not sid.isdigit() or not int(cat.get("ChargeRecoveryTime") or 0):
             continue
         charges = int(cat.get("MaxCharges") or 0)
-        if charges > 1 or int(sid) not in out:  # several charges, or the spell's only cooldown (Spirit Link Totem)
-            out[int(sid)] = (int(cat["ChargeRecoveryTime"]) / 1000, max(1, charges))
+        recharge = int(cat["ChargeRecoveryTime"]) / 1000
+        # several charges, the spell's only cooldown (Spirit Link Totem), or a charge longer than its own short
+        # cooldown (Shield Wall: one charge of 180 s, an 8 s lockout; it read 8 s and fell out of every cooldown list)
+        if charges > 1 or int(sid) not in out or recharge > out[int(sid)][0]:
+            out[int(sid)] = (recharge, max(1, charges))
     return out
 
 

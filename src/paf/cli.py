@@ -738,7 +738,7 @@ def tops_alignment_safe(timeline, fight) -> list:
         return []
 
 
-def _prep_tank(args: argparse.Namespace) -> int:
+def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     """A tank's prep from the logs of the top tanks of the spec (paf.tank): what hits you and when, the defensives
     and taunts of the top tanks, their mitigation, talents and trinkets, the Encounter Journal."""
     from paf import bossguide, healer, rotation, settings, tank
@@ -772,21 +772,40 @@ def _prep_tank(args: argparse.Namespace) -> int:
     curve, by, hitters = tank.tank_curves(con, enc.id, diff, tl.duration)
     found = tank.tank_busters(curve, by)
     swap_times, taunts = tank.swaps(con, enc.id, diff)
-    mitigation = sorted(((n, u) for n, u in rotation.tops_buffs(con, enc.id, diff).values() if u >= 0.3),
-                        key=lambda x: -x[1])[:6]
+    from paf.defensives import is_defensive
+    from paf.gamedata import is_mitigation, spell_cooldowns
+
+    cds = spell_cooldowns()
+    pressed = {n for (n, i) in con.execute(  # the spells the top tanks press themselves, short cooldowns only
+        "SELECT DISTINCT a.name, a.id FROM player_cast c JOIN ranked r USING(report, fight_id) "
+        "JOIN fight f USING(report, fight_id) JOIN ability a ON a.id=c.ability_id WHERE f.encounter_id=? "
+        "AND f.difficulty=? AND c.actor_id=r.actor_id AND c.type='cast'", (enc.id, diff))
+        if cds.get(i, (0.0, 1))[0] < 60}
+    # active mitigation: a defensive buff (game data) from a spell they press, not a big cooldown (Avatar) nor a
+    # talent's passive buff
+    mitigation = sorted(((n, u) for sid, (n, u) in rotation.tops_buffs(con, enc.id, diff).items()
+                         if u >= 0.3 and is_mitigation(sid) and n in pressed), key=lambda x: -x[1])[:6]
     builds = top_builds(con, enc.id, diff, spec, n=3)
     try:
         fetch_codes(client, con, builds)
     except Exception as ex:  # noqa: BLE001 - the import strings are a convenience
         print(f"  talent strings: skipped ({str(ex)[:80]})")
+    from paf import healroles
+
     p = tank.TankPrep(
-        enc.name, diff_name, f"{spec} {cls}", tl.kills, tl.duration, curve, found, hitters,
+        enc.name, diff_name, healroles.pretty(cls, spec), tl.kills, tl.duration, curve, found, hitters,
         healer.cooldowns(tl, found), swap_times, taunts, mitigation,
-        [(b.count, b.label, b.code or "") for b in builds], healer.trinkets(con, enc.id, diff),
-        bossguide.role_bullets(bossguide.load(enc.id, diff_name), "tank"), [(n, t) for n, t, _ in tl.phases])
+        healer.build_rows(builds), healer.trinkets(con, enc.id, diff),
+        bossguide.role_bullets(bossguide.load(enc.id, diff_name), "tank"), [(n, t) for n, t, _ in tl.phases],
+        healroles.comps(con, enc.id, diff, role=healroles.TANKS),
+        healroles.presence(con, enc.id, diff, role=healroles.TANKS),
+        swap_after=tank.swap_causes(swap_times, tl.boss_casts), class_name=cls,
+        rare=[c for c in healer.cooldowns(tl, found, min_users=0.25, max_users=0.5)
+              if is_defensive(c.spell_id, c.name)],
+        character=getattr(profile, "name", "") or "")
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(tank.render(p), encoding="utf-8")
+    out.write_text(tank.render_sheet(p), encoding="utf-8")
     for m in found:
         print(f"  tank buster at {healer._mmss(m.t)} ({m.ratio:.1f}x): {m.boss_spell}")
     print(f"  taunts: {taunts:.0f} a kill, at {', '.join(healer._mmss(t) for t in swap_times)}")
@@ -796,10 +815,10 @@ def _prep_tank(args: argparse.Namespace) -> int:
     return 0
 
 
-def _prep_healer(args: argparse.Namespace) -> int:
+def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     """A healer's prep from the logs of the top healers of the spec (paf.healer): the raid damage and its big
     moments, when they press their healing cooldowns, their talents and trinkets, the Encounter Journal."""
-    from paf import bossguide, healer, settings
+    from paf import bossguide, healer, healroles, settings
     from paf.config import data_dir
     from paf.corpus import db
     from paf.corpus.analyze import main_boss
@@ -835,12 +854,26 @@ def _prep_healer(args: argparse.Namespace) -> int:
     except Exception as ex:  # noqa: BLE001 - the import strings are a convenience
         print(f"  talent strings: skipped ({str(ex)[:80]})")
     h = healer.HealerPrep(
-        enc.name, diff_name, f"{spec} {cls}", tl.kills, tl.duration, curve, found, healer.cooldowns(tl, found),
-        [(b.count, b.label, b.code or "") for b in builds], healer.trinkets(con, enc.id, diff),
-        bossguide.role_bullets(bossguide.load(enc.id, diff_name), "healer"), [(n, t) for n, t, _ in tl.phases])
+        enc.name, diff_name, healroles.pretty(cls, spec), tl.kills, tl.duration, curve, found,
+        healer.cooldowns(tl, found), healer.build_rows(builds),
+        healer.trinkets(con, enc.id, diff), bossguide.role_bullets(bossguide.load(enc.id, diff_name), "healer"),
+        [(n, t) for n, t, _ in tl.phases], class_name=cls, character=getattr(profile, "name", "") or "")
+    step("The top raids' healers: their compositions and what each spec does here")
+    healroles.fetch_heal_roles(client, con, enc.id, diff)
+    from paf.gamedata import spell_names
+
+    names = {**spell_names(), **dict(con.execute("SELECT id, name FROM ability").fetchall())}
+    h.comps, h.presence = healroles.comps(con, enc.id, diff), healroles.presence(con, enc.id, diff)
+    h.roles = healroles.roles(con, enc.id, diff, names)
+    n, dur, dead = healroles.sample(con, enc.id, diff)
+    h.role_kills = n
+    h.role_sample = (f"kills of the top {healroles.pretty(cls, spec)}s (ranked by their healing), median "
+                     f"{healer._mmss(dur)} and {dead:g} deaths")
+    for r in h.roles:
+        print(f"  {r.spec} ({r.players} healers): {'; '.join(r.jobs)}")
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(healer.render(h), encoding="utf-8")
+    out.write_text(healer.render_sheet(h), encoding="utf-8")
     for m in found:
         print(f"  big raid damage at {healer._mmss(m.t)} ({m.ratio:.1f}x): {m.boss_spell}")
     for c in h.cooldowns:
@@ -910,9 +943,9 @@ def cmd_prep(args: argparse.Namespace) -> int:
 
     use_profile_spec(profile)  # the corpus, timelines and talents are the loaded character's spec's
     if role(profile) == "healer":  # no SimulationCraft for healing: a prep from the logs only (issue #16)
-        return _prep_healer(args)
+        return _prep_healer(args, profile)
     if role(profile) == "tank":  # from the logs of the top tanks too (issue #15)
-        return _prep_tank(args)
+        return _prep_tank(args, profile)
     client, enc, diff_name, diff = _encounter_and_difficulty(args)
     spec = settings.get("spec")
     con = db.connect()
