@@ -770,7 +770,7 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
         print(f"No kill of {enc.name} {diff_name} for {spec} {cls} yet.")
         return 1
     curve, by, hitters = tank.tank_curves(con, enc.id, diff, tl.duration)
-    found = tank.tank_busters(curve, by)
+    found = tank.tank_busters(curve, by, top=3)  # its three biggest: five "biggest moments" lost the point
     healer.name_by_damage(found, by)  # by the window's share, as the raid's moments (a lone point named Slithering
     # Flame in Stage Two)
     swap_times, taunts = tank.swaps(con, enc.id, diff)

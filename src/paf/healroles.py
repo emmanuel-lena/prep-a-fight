@@ -496,7 +496,7 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
 def _shared(ps: list[list[float]], n: int, end: float | None) -> list[tuple[float, float]]:
     """(moment, share of the spec's players pressing it within 8 s) for a card: the moments a quarter of those who
     press it share at least, as the fight tab's (a card showed Ascendance 0:51 for 23% as "most of them")."""
-    times = press_moments(ps, max(1, round(sum(map(len, ps)) / len(ps))), end)[0]
+    times = press_moments(ps, max(1, round(sum(map(len, ps)) / len(ps))), end)[0]  # the main moments
     users = len(ps) / n if n else 0
     out = [(t, sum(1 for ts in ps if any(abs(x - t) <= 8 for x in ts)) / n) for t in times]
     return [(t, sp) for t, sp in out if sp >= 0.25 * users]
@@ -537,30 +537,41 @@ def on_cadence(per_player: list[list[float]], per_kill: float, duration: float) 
 
 
 def press_moments(per_player: list[list[float]], keep: int, end: float | None = None
-                  ) -> tuple[list[float], list[float]]:
-    """(the moments most top players press a cooldown at, other moments some press it at): the shared clusters of
-    their casts (paf.defensives.ranked_peaks, the best followed first), as many as their casts a kill. Two moments
-    closer than one player ever presses it twice (the 10th percentile of their own gaps) are two habits, not one
-    plan (Avenging Wrath "0:21, 0:41"): the second goes with the other habits; nothing after the kill's median end."""
+                  ) -> tuple[list[float], list[float], list[float]]:
+    """(the moments most top players press a cooldown at, other moments some press it at, the moment each of those
+    is the alternative of): the shared clusters of their casts (paf.defensives.ranked_peaks, the best followed
+    first), one per press of a kill: each cluster's rank is the median rank of the cast within each player's
+    sequence (1st, 2nd...), and an alternative is one of the same press (Avenging Wrath's 2:23 is its 2nd press, no
+    other habit of its 1st at 0:42). Two moments closer than one player ever presses it twice (the 10th percentile
+    of their own gaps) are not one plan; nothing after the kill's median end."""
     from itertools import pairwise
 
-    from paf.defensives import ranked_peaks
+    from paf.defensives import WINDOW, ranked_peaks
 
     lists = [sorted(ts) for ts in per_player if ts]
     if not lists:
-        return [], []
+        return [], [], []
     gaps = sorted(y - x for ts in lists for x, y in pairwise(ts))
     gap = gaps[len(gaps) // 10] * 0.9 if gaps else 0.0
-    times: list[float] = []
-    alt: list[float] = []
+
+    def rank(t: float) -> int:
+        ranks = [min(range(len(ts)), key=lambda i: abs(ts[i] - t)) for ts in lists
+                 if any(abs(x - t) <= WINDOW for x in ts)]
+        return round(st.median(ranks)) if ranks else 0
+    by_rank: dict[int, float] = {}
+    others: list[tuple[float, int]] = []
     for t, _n in ranked_peaks(lists):
         if end is not None and t > end:
             continue
-        if len(times) < keep and all(abs(t - x) >= gap for x in times):
-            times.append(t)
+        r = rank(t)
+        # one moment a press, in order (a later press after an earlier one): two habits of one press share a rank
+        if (r not in by_rank and len(by_rank) < keep
+                and all((t - x) * (r - q) > 0 and abs(t - x) >= gap / 2 for q, x in by_rank.items())):
+            by_rank[r] = t
         else:
-            alt.append(t)
-    return sorted(times), sorted(alt)
+            others.append((t, r))
+    alt = [(t, by_rank[r]) for t, r in sorted(others) if r in by_rank]  # a habit of a press kept, else no moment
+    return sorted(by_rank.values()), [t for t, _ in alt], [k for _, k in alt]
 
 
 def jobs(r: Role, everyone: list[Role]) -> list[str]:

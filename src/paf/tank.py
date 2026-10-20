@@ -504,7 +504,12 @@ def render_sheet(p: TankPrep) -> str:
         deeper.append(f"<p class='lead'>Beside a {e(p.spec)}, the top raids play "
                       + (", ".join(f"{e(x.spec)} (in {x.share:.0%} of the kills)"
                                    for x in sorted(mates, key=lambda x: -x.share)[:3])
-                         if mates else "no other tank spec often") + ".</p>")
+                         if mates else "no other tank spec often") + "."
+                      + "".join(f" Kills with a {e(x.spec)} beside you are {abs(x.duration_with - x.duration_without):.0f} s "
+                                f"{'shorter' if x.duration_with < x.duration_without else 'longer'}, beyond the noise (a "
+                                f"reading, not a verdict: the raids that bring one differ in other ways too)."
+                                for x in mates if x.kills >= 15 and x.duration_without and not x.duration_close)
+                      + "</p>")
     worn = {n for n, _i, _s in p.trinkets}  # on-use trinkets on the fight tab, as the healers' sheets
     items = [c for c in others if c.name in worn]
     rest = [c for c in others if c not in items]

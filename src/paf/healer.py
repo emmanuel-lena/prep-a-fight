@@ -51,7 +51,7 @@ STEP = 5.0
 SPIKE = 1.5  # a moment with this many times the median raid damage is a big hit
 RELATIVE = 0.85  # ... and every hit this close to the highest is one too (Nek'zali: 0:35 x1.62, 1:20 x1.57)
 SPIKE_GAP = 15.0
-ANSWER = (10.0, 8.0)  # seconds before and after a moment (a 5 s step) a press answers it
+ANSWER = (5.0, 8.0)  # seconds before and after a moment's start a press answers it: 5 s ahead, its 5 s window and 3
 WAVE = 1.2  # without any SPIKE, the waves of raid damage at this many times the median are the moments to plan for
 COOLDOWN_GAP = 45.0  # a spell cast at most once in this many seconds (median) is a cooldown
 QE_LIVE = "https://questionablyepic.com/live/"
@@ -78,6 +78,7 @@ class Cooldown:
     support: list[float] = field(default_factory=list)  # each moment's share of the players pressing it then
     alt_support: list[float] = field(default_factory=list)  # the same for the other habits
     alt_near: list[str] = field(default_factory=list)  # the hit another habit answers, if any
+    alt_of: list[float] = field(default_factory=list)  # the moment (same press of the kill) each habit replaces
 
 
 @dataclass
@@ -390,7 +391,7 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         if base and max(base.get(i, (0.0, 1))[0] for i in ids) < COOLDOWN_GAP:
             continue
         sid = max(abs_, key=lambda a: a.users).id
-        times, alt = press_moments(per_player, max(1, round(per_kill)), tl.duration)
+        times, alt, alt_of = press_moments(per_player, max(1, round(per_kill)), tl.duration)
         every = on_cadence(per_player, per_kill, tl.duration)
         cd = max((base or {}).get(i, (0.0, 1))[0] for i in ids)
         if every and (any(abs((y - x) - every) > 0.15 * every for x, y in pairwise(times))
@@ -398,7 +399,7 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
             every = 0.0  # its moments are not a cooldown apart: the top players hold it (the Vessel at 0:03, 2:02)
         if every and len(times) > 1:  # said from the moments shown, so the number matches them
             every = st.median(y - x for x, y in pairwise(times))
-        tied = not (every or per_kill >= 4 or _external(sid) or _moving(sid))  # on cooldown, a 1-minute button, a
+        tied = not (every or per_kill >= 4 or _external(sid) or _moving(sid) or _item(sid))  # a trinket: its rhythm  # on cooldown, a 1-minute button, a
         near = []  # buff on one player, a cast-while-moving: near a hit by chance, not kept for it
         for t in times:
             m = min(found, key=lambda m: abs(m.t - t), default=None)
@@ -410,16 +411,18 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         # of the top players read as a moment next to "no moment most of them share")
         kept = [i for i, sp in enumerate(support) if sp >= 0.25 * users]
         times, near, support = [times[i] for i in kept], [near[i] for i in kept], [support[i] for i in kept]
-        alt = [] if every else alt
+        alt, alt_of = ([], []) if every else (alt, alt_of)
         alt_support = [sum(1 for ts in per_player if any(abs(x - t) <= 8 for x in ts)) / n_all for t in alt]
-        kept = [i for i, sp in enumerate(alt_support) if sp >= 0.25 * users]  # the same quarter as the moments
-        alt, alt_support = [alt[i] for i in kept], [alt_support[i] for i in kept]
+        kept = [i for i, sp in enumerate(alt_support) if sp >= 0.25 * users  # the same quarter as the moments,
+                and alt_of[i] in times]  # of a moment still shown
+        alt, alt_support, alt_of = [alt[i] for i in kept], [alt_support[i] for i in kept], [alt_of[i] for i in kept]
         alt_near = []  # another habit answers a hit too (Aura Mastery at 0:36 for 28%: the 0:35 hit)
         for t in alt:
             m = min(found, key=lambda m: abs(m.t - t), default=None)
             ok = tied and m is not None and -ANSWER[0] <= t - m.t <= ANSWER[1]
             alt_near.append(f"{_mmss(m.t)} {m.boss_spell}".strip() if ok else "")
-        out.append(Cooldown(name, sid, users, per_kill, times, near, alt, every, support, alt_support, alt_near))
+        out.append(Cooldown(name, sid, users, per_kill, times, near, alt, every, support, alt_support, alt_near,
+                            alt_of))
     return sorted(out, key=lambda c: -c.users)
 
 
@@ -495,7 +498,8 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
     cds = "".join(
         f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(_shown(c.name).split(',')[0][:22])}</text>"
         + "".join(f"<rect x='{float(x(t)) - 3:.1f}' y='{H - B + 7 + 18 * i}' width='6' height='11' rx='1.5' "
-                  f"class='cp'><title>{e(c.name)} {_mmss(t)}</title></rect>" for t in [*c.times, *c.alt] if t <= span)
+                  f"class='cp{' alt' if t in c.alt else ''}'><title>{e(c.name)} {_mmss(t)}"
+                  f"{' (another habit)' if t in c.alt else ''}</title></rect>" for t in [*c.times, *c.alt] if t <= span)
         for i, c in enumerate(rows))
     return (f"<svg viewBox='0 0 {W} {H}' class='rd' role='img' aria-label='{e(label)}'>"
             f"<line class='ax' x1='{L}' x2='{W - 10}' y1='{H - B}' y2='{H - B}'/>{median}{lines}{ticks}"
@@ -518,6 +522,18 @@ def _shown(name: str) -> str:
     return re.sub(r"\s*\([^)]*\)$", "", name) or name
 
 
+def _most(c: Cooldown, t: float, sp: float) -> str:
+    """When the moment tied to a hit is not the press's most common one: "while 38% press it at 1:51"."""
+    same = [(a, x) for a, x, k in zip(c.alt, c.alt_support or [], c.alt_of or [], strict=False) if k == t]
+    if t not in c.times:  # an alternative itself: the main moment of its press
+        i = next((i for i, a in enumerate(c.alt) if a == t), None)
+        k = c.alt_of[i] if i is not None and c.alt_of else None
+        if k in c.times:
+            same = [(k, c.support[c.times.index(k)])]
+    best = max(same, key=lambda x: x[1], default=None)
+    return f"; {_pct(best[1])} press it at {_mmss(best[0])}" if best and best[1] > sp else ""
+
+
 def _share(sp: float) -> str:
     """How many of the top players press it then: a chip is no consensus ("1:16 · 28% of them")."""
     return f" &middot; {_pct(sp)} of the top players" if sp else ""
@@ -532,8 +548,9 @@ def _more(c: Cooldown) -> str:
 def _or(c: Cooldown, t: float) -> str:
     """The other habits nearest this moment, said on its chip ("1:18, or 0:36 for some"): another player's choice
     for the same press, never an extra one."""
-    near = [(a, sp) for a, sp in zip(c.alt, c.alt_support or [0.0] * len(c.alt), strict=False)
-            if min(c.times, key=lambda x: abs(x - a)) == t]
+    near = [(a, sp) for a, sp, k in zip(c.alt, c.alt_support or [0.0] * len(c.alt), c.alt_of or [None] * len(c.alt),
+                                       strict=False)
+            if (k if k is not None else min(c.times, key=lambda x: abs(x - a))) == t]  # the same press only
     if not near:
         return ""
     # every other habit, each said (the chart draws them all: 2:23 drawn and never written)
@@ -636,7 +653,7 @@ def builds_html(builds: list) -> str:
     one = len(builds) == 1  # a single build is no "Top build A"
     return "".join(f"<li><b>{'The most played build' if one else e(b[1][:1].upper() + b[1][1:])}</b> "
                    f"<small>{b[0]} of the top players"
-                   + (f" &middot; {e(b[3])}" if len(b) > 3 and b[3] else "") + "</small>"
+                   + (f" &middot; {e(b[3])}" if len(b) > 3 and b[3] and not one else "") + "</small>"
                    + (copy.format(e(b[2])) if b[2] else "<small class='muted'>no import string in their logs</small>")
                    + "</li>" for b in builds)
 
@@ -781,7 +798,8 @@ def build_lead(builds: list, spec: str, players: int, split: list | None = None)
         return (f"<p class='lead'>The top {e(spec)}s split on "
                 + e(_and([n for n, _s in split[:4]])) + f"; no build is played by more than {top[0]} of the "
                 f"{players} players read.{NOT_ADVICE}</p>")
-    return (f"<p class='lead'>The most played build of the top {e(spec)}s: {e(top[1])}, by {top[0]} of the "
+    return (f"<p class='lead'>The most played build of the top {e(spec)}s"
+            + ("" if len(builds) == 1 else f", {e(top[1])},") + f" is played by {top[0]} of the "
             f"{players} players read" + (f"; the {len(builds)} builds below cover {total} of them, the other "
                                         f"{players - total} play builds of their own" if len(builds) > 1 else "")
             + f".{NOT_ADVICE}</p>")
@@ -839,18 +857,22 @@ def jobs_lead(roles: list, mine: str = "") -> str:
     return f"<p class='lead'>{e(head)}The others: " + "; ".join(e(x) for x in lines) + ".</p>"
 
 
-NUMS_NOTE = ("On each card, the median player of the spec (externals and Power Infusion: a mean): the share of the kill's healing (medians over different "
-             "kills, they do not add up); of its own healing, the share on the tanks and in the raid's damage spikes (every 5 s at 1.5 times the kill's median: a wider net than the chart's big moments); "
-             "overheal; dispels a minute, all of them (the boss tab counts the top healer of each kill); externals a "
-             "kill (protective cooldowns cast on another player, not on themselves). Externals and overheal follow "
-             "each spec's kit on every boss: shown, never called a job of this boss. The times on a card are the "
-             "moments most of its players share.")
+def nums_note(roles: list) -> str:
+    """What the cards' numbers are, said once above them (the spikes' share of the fight too)."""
+    cover = next((r.spike_cover for r in roles if getattr(r, "spike_cover", 0)), 0.0)
+    spikes = f", {_pct(cover)} of the fight" if cover else ""
+    return ("Each card is the median player of that spec in these kills (externals and Power Infusion: a mean): "
+            "its share of the kill's healing (from different kills: they do not add up); of its own healing, the "
+            f"share on the tanks and in damage spikes (every 5 s at 1.5 times the kill's median{spikes}); overheal; "
+            "dispels a minute (the boss tab counts the top healer of each kill); externals a kill. Externals and "
+            "overheal follow each spec's kit, so they are never a job of this boss. Times: moments a quarter or more "
+            "of its players share.")
 
 
 def _nums(r) -> list[str]:
-    """A healer spec's numbers, all of them, the same on every card (NUMS_NOTE says what each is)."""
+    """A healer spec's numbers, all of them, the same on every card (nums_note says what each is)."""
     out = [f"{_pct(r.healing)} of the kill's healing", f"{_pct(r.tank)} on the tanks",
-           f"{_pct(r.spike)} in damage spikes" + (f" (spikes are {_pct(r.spike_cover)} of the fight)" if r.spike_cover else ""),
+           f"{_pct(r.spike)} in damage spikes",
            f"{_pct(r.overheal)} overheal", f"{r.dispels:.1f} dispels a minute",
            f"{r.externals:.1f} externals a kill on average" if r.externals >= 0.05 else "no externals"]
     if r.buffs:
@@ -955,6 +977,7 @@ def render_sheet(h: HealerPrep) -> str:
         # a cooldown said for a hit only when the top players' usual press answers it (paf.healer.ANSWER), at the
         # press's own time
         answers, bare = [], []
+        c_of = {c.name: c for c in heals}
         for m in shown:
             mine_here = [(c.name, t, sp) for c in heals if not _external(c.spell_id)  # a buff on one player: no answer
                          for t, n, sp in [*zip(c.times, c.near, c.support or [0.0] * len(c.times), strict=False),
@@ -963,7 +986,7 @@ def render_sheet(h: HealerPrep) -> str:
                          if n and n.split(" ", 1)[0] == _mmss(m.t)]  # the main moment or another habit
             if mine_here:  # with its share: a third of the top players is a habit, not the consensus
                 answers.append(f"for the {_mmss(m.t)} hit, "
-                               + _and([f"{e(_shown(n))} ({_pct(sp)} of them, about {_mmss(t)})"
+                               + _and([f"{e(_shown(n))} ({_pct(sp)} of them, about {_mmss(t)}{_most(c_of[n], t, sp)})"
                                        for n, t, sp in mine_here[:3]]))
             else:
                 bare.append(_mmss(m.t))
@@ -984,7 +1007,7 @@ def render_sheet(h: HealerPrep) -> str:
            "before, matched by timing)") + f".</p><ul class='hl2'>"
         f"{moments_html(h.moments, 'raid damage') or '<li>No big moment: steady raid damage.</li>'}</ul></div>",
         f"<h2>Your long cooldowns, where the top {e(h.spec)}s press them</h2><ul class='hl2'>"
-        f"{cooldowns_html(heals) or '<li>Not enough top players in the corpus yet.</li>'}</ul>"
+        f"{cooldowns_html([c for c in heals if _external(c.spell_id) != 'protective']) or '<li>Not enough top players in the corpus yet.</li>'}</ul>"
         "<p class='small muted'>A button pressed on cooldown, about every minute or on another player is never tied "
         "to a hit: it lands near one by its rhythm, not for it.</p>"]
     rare = [c for c in h.rare if c not in items]
@@ -992,6 +1015,10 @@ def render_sheet(h: HealerPrep) -> str:
         fight.append(f"<p class='small muted'>Fewer than half of the top {e(h.spec)}s press "
                      + ", ".join(f"{e(c.name)} ({c.users:.0%}, {_and([_mmss(t) for t in c.times]) or 'no shared moment'})"
                                  for c in rare) + " on this boss.</p>")
+    exts = [c for c in heals if _external(c.spell_id) == "protective"]
+    if exts:  # cast on another player: their own group, apart from the raid cooldowns
+        fight.append(f"<h2>Your externals, where the top {e(h.spec)}s cast them</h2><ul class='hl2'>"
+                     f"{cooldowns_html(exts)}</ul>")
     if defs:
         fight.append(f"<h2>Your defensives</h2><ul class='hl2'>{cooldowns_html(defs)}</ul>")
     if items:
@@ -1063,7 +1090,7 @@ def render_sheet(h: HealerPrep) -> str:
                       f"{presence_table(h.presence, h.spec)}")
     deeper = deeper_first + [f"<h2>What each healer spec brings here</h2><p class='small muted'>Measured on {h.role_kills} "
               f"{e(h.role_sample or 'top kills')}: each spec's median player against the other healers of the same "
-              f"kill; a job shows when a number stands out beyond the noise.{_pace(h)} {NUMS_NOTE}</p><div class='hroles'>{others or '<p>Not measured yet.</p>'}</div>"
+              f"kill; a job shows when a number stands out beyond the noise.{_pace(h)} {nums_note(h.roles)}</p><div class='hroles'>{others or '<p>Not measured yet.</p>'}</div>"
               + (f"<p class='small muted'>Too few healers measured: {e(', '.join(few))}.</p>" if few else ""),
               (f"<h2>The healer compositions played most</h2>{comps_table(h.comps, n_kills)}"
                if comps_table(h.comps, n_kills) else "")]

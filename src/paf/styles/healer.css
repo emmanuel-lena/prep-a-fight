@@ -36,3 +36,4 @@
 .hl2.split li{padding:8px 0;break-inside:avoid}
 .rd .cl{fill:var(--muted);font-size:11px} .rd .cp{fill:var(--fg);opacity:.7}
 .rd .gd{stroke:var(--warn);stroke-dasharray:2 3;opacity:.45}
+.rd .cp.alt{opacity:.35}
