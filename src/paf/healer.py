@@ -611,11 +611,15 @@ def render_sheet(h: HealerPrep) -> str:
                   f"To weigh a talent or an item for your character, use <a href=\"{QE_LIVE}\" target=\"_blank\" "
                   f"rel=\"noopener\">QE Live</a>.</p>")
     jr = "".join(f"<li>{e(_plain(x))}</li>" for x in h.journal)
-    boss = [journal_lead(h.journal, "healers")] + (
+    first = ([f"<p class='lead'>Your measured job here: dispel {e(h.dispelled[0][0])} ({h.dispelled[0][1]:.1f} a kill "
+              f"in the top kills).</p>"] if h.dispelled and h.dispelled[0][1] >= 1 else [journal_lead(h.journal, "healers")])
+    boss = first + (
         [f"<h2>What the Encounter Journal asks healers</h2><ul class='hl2'>{jr}</ul>"] if jr else [])
     if h.dispelled:  # measured: what the top healers of the spec removed
+        inside = set(re.findall(r'<b>([^<]+)</b>', h.abilities))  # the abilities the journal lists below
         boss.append(f"<h2>What the top {e(h.spec)}s dispel here</h2><p>"
-                    + _and([f"{e(n)} ({k:.1f} a kill)" for n, k in h.dispelled])
+                    + _and([f"{e(n)} ({k:.1f} a kill" + ("" if n in inside else ", not in the Encounter Journal")
+                            + ")" for n, k in h.dispelled])
                     + f", on {h.dispel_kills} of their kills read.</p>")
     elif h.dispellable:  # where the dispels most likely go: the Journal's flags and the game data, not a measure
         boss.append("<h2>What you can dispel here</h2><p>Dispellable on this boss at this difficulty: "

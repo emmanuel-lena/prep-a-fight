@@ -216,7 +216,9 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
         facts.append(e(ctx["also"][s.title]))
     if s.title.lower() in ctx["burst"]:
         facts.append(f"<b>burst window: the boss takes x{ctx['burst'][s.title.lower()]:g} damage</b>")
-    text = readable(s.text or ctx["describe"](s.spell_id), ctx["difficulty"])
+    text = readable(s.text, ctx["difficulty"]).strip() if s.text else ""
+    if not text:  # no journal text, or only another difficulty's sentence: the spell's own description
+        text = readable(ctx["describe"](s.spell_id), ctx["difficulty"])
     body = f"<div class='small ab-d'>{e(text)}</div>" if text else ""
     pic = icons.img(ctx["icons"].get(s.title, ""), "small")
     fact = f"<div class='small muted'>{' &middot; '.join(facts)}</div>" if facts else ""
