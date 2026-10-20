@@ -180,7 +180,7 @@ SUSTAINED = 1.15  # the raid damage this many times the median, for SUSTAINED_S 
 SUSTAINED_S = 30.0
 
 
-def sustained(curve: list[float]) -> list[tuple[float, float, float]]:
+def sustained(curve: list[float], found: list[Moment] | None = None) -> list[tuple[float, float, float]]:
     """(start, end, mean ratio) of the stretches the raid takes SUSTAINED x its median damage or more for SUSTAINED_S
     or more (Nek'zali's Uncoiling: the last 1:30 at about 1.2x): no peak, yet the fight's longest healing check."""
     pos = [v for v in curve if v > 0]
@@ -192,15 +192,16 @@ def sustained(curve: list[float]) -> list[tuple[float, float, float]]:
         if v >= SUSTAINED * base and start is None:
             start = i
         elif v < SUSTAINED * base and start is not None:
-            if (i - start) * STEP >= SUSTAINED_S:
-                out.append((start * STEP, i * STEP, st.mean(curve[start:i]) / base))
+            a, b = start * STEP, i * STEP  # a stretch holding a big moment is that moment (Evoker: 1:10-1:40)
+            if b - a >= SUSTAINED_S and not any(a <= m.t < b for m in found or []):
+                out.append((a, b, st.mean(curve[start:i]) / base))
             start = None
     return out
 
 
 def moment_names(m: Moment) -> list[str]:
     """The abilities a moment is named after: "mixed damage, most from A and B" -> [A, B]."""
-    return [x for x in m.boss_spell.removeprefix("mixed damage, most from ").removeprefix("after ").split(" and ") if x]
+    return [x for x in m.boss_spell.removeprefix("mostly ").removeprefix("after ").split(" and ") if x]
 
 
 def moment_notes(found: list[Moment]) -> dict[str, str]:
@@ -226,7 +227,7 @@ def name_by_damage(found: list[Moment], by: dict[str, list[float]], width: int =
         if a / total >= NAMED:
             m.boss_spell = f"{first} and {second}" if s / total >= ALSO else first
         else:
-            m.boss_spell = f"mixed damage, most from {first} and {second}"
+            m.boss_spell = f"mostly {first} and {second}"
 
 
 def raid_curve(con, encounter_id: int, difficulty: int, duration: float) -> list[float]:
@@ -504,9 +505,10 @@ def _chip(t: float, n: str) -> str:
     hit = n.partition(" ")[0]
     m, _, sec = hit.partition(":")
     gap = t - (int(m) * 60 + int(sec))
-    # a moment is a STEP-long window from its time: a press within it, 3 s either side, is at the hit
-    return _mmss(t) + (" &middot; at the hit" if -3 <= gap <= STEP + 3 else
-                       f" &middot; just before the {e(hit)} hit" if gap < 0 else f" &middot; after the {e(hit)} hit")
+    # said with its offset from the hit's start: "4 s into" a reactive press, "3 s before" a planned one
+    return _mmss(t) + (f" &middot; as the {e(hit)} hit starts" if abs(gap) < 1 else
+                       f" &middot; {-gap:.0f} s before the {e(hit)} hit" if gap < 0 else
+                       f" &middot; {gap:.0f} s into the {e(hit)} hit")
 
 
 SHOWN_TALENTS = 60  # every class and spec difference shown (a hero tree is named, not listed): no "+N more"
@@ -554,8 +556,7 @@ def talents_html(builds: list, players: int, who: str, hero: list | None = None)
         line = ("<p><b>Hero tree:</b> " + (f"{e(hero[0][0])} (all {players} players read)" if len(hero) == 1 else
                 " &middot; ".join(f"{e(t)} {s:.0%}" for t, s in hero) + f" of the {players} players read") + ".</p>")
     if builds and builds[0][0] < BUILD_SHARE * players:  # 3 of 100 is no build to show, empty row and all
-        return (f"<h2>Talents the top {e(who)} play</h2>{line}<p>No shared build: none is played by more than "
-                f"{builds[0][0]} of the {players} players read. The talents they split on follow.</p>")
+        return f"<h2>Talents the top {e(who)} play</h2>{line}" if line else ""  # the lead said there is no build
     return (f"<h2>Talents the top {e(who)} play</h2>{line}<ul class='hl2'>"
             f"{builds_html(shown_builds(builds, players)) or '<li>No build yet.</li>'}</ul>")
 
@@ -627,7 +628,7 @@ def role_card(r, everyone: list, mine: bool, chips: bool = True) -> str:
             + f"<p class='small muted'>{r.players} {e(r.spec)}s in the kills read.</p></article>")
 
 
-def contested(con, encounter_id: int, difficulty: int, spec: str, lo: float = 0.3, hi: float = 0.7,
+def contested(con, encounter_id: int, difficulty: int, spec: str, lo: float = 0.35, hi: float = 0.65,
               shown: int = 10) -> tuple[list[tuple[str, float]], int]:
     """The talents the top players of the spec split on (picked by lo to hi of them), the closest to half first,
     and how many players were read: when most play a build of their own, these explain the builds. A hero tree's
@@ -700,9 +701,13 @@ def _and(items: list[str]) -> str:
 def build_lead(builds: list, spec: str, players: int, split: list | None = None) -> str:
     """The change tab's answer: the most played build when the top players agree on one; when their builds are
     scattered, the talents they split on (the rest they agree on)."""
-    builds = shown_builds(builds, players)  # the sentence counts the builds the list shows
-    if not builds:
-        return ""
+    shown = shown_builds(builds, players)  # the sentence counts the builds the list shows
+    if not shown:  # no shared build: still an answer, the talents they split on
+        most = builds[0][0] if builds else 0
+        return (f"<p class='lead'>No shared build among the top {e(spec)}s: none is played by more than {most} of the "
+                f"{players} players read"
+                + (f"; they split on {e(_and([n for n, _s in split[:4]]))}" if split else "") + f".{NOT_ADVICE}</p>")
+    builds = shown
     top = builds[0]
     total = sum(b[0] for b in builds)
     if split and top[0] < players / 5:  # no build a fifth of them play: the answer is in the split talents
@@ -731,11 +736,11 @@ def journal_lead(lines: list[str], who: str) -> str:
     names = list(dict.fromkeys(re.findall(r"\[([^\]]+)\]", " ".join(lines))))
     if not names and lines:  # the journal's notes without spell links: said as they are, just below
         return (f"<p class='lead'>The Encounter Journal has {len(lines)} notes for {who} on this boss, just below; "
-                f"every ability follows, phase by phase; another role's own abilities are only named.</p>")
+                f"every ability follows; another role's own abilities are only named.</p>")
     if not names:
         return f"<p class='lead'>The Encounter Journal asks {who} nothing in particular on this boss.</p>"
     return (f"<p class='lead'>What the Encounter Journal asks {who} to handle here: {e(', '.join(names[:5]))}. Every "
-            f"ability follows, phase by phase; another role's own abilities are only named.</p>")
+            f"ability follows; another role's own abilities are only named.</p>")
 
 
 def _job(r) -> str:
@@ -758,23 +763,25 @@ def jobs_lead(roles: list, mine: str = "") -> str:
     head = ""
     if you:
         head = (f"Your spec here: the {you.spec} {_job(you)}. " if _job(you) else
-                "Your spec here: nothing stands out against the other healers. ")
+                "Your spec here: nothing specific to this boss stands out against the other healers. ")
     lines = [f"the {r.spec} {_job(r)}" for r in roles if r.spec != mine and _job(r)]
     if not lines:
-        return f"<p class='lead'>{e(head)}No other healer spec stands out on this boss.</p>"
+        return f"<p class='lead'>{e(head)}No other healer spec does a job specific to this boss.</p>"
     return f"<p class='lead'>{e(head)}The others: " + "; ".join(e(x) for x in lines) + ".</p>"
 
 
 NUMS_NOTE = ("On each card, the median player of the spec: the share of the kill's healing (medians over different "
              "kills, they do not add up); of its own healing, the share on the tanks and in the raid's spikes; "
              "overheal; dispels a minute, all of them; externals a kill (protective cooldowns cast on another player, "
-             "not on themselves).")
+             "not on themselves). Externals and overheal follow each spec's kit on every boss: shown, never called "
+             "a job of this boss.")
 
 
 def _nums(r) -> list[str]:
     """A healer spec's numbers, all of them, the same on every card (NUMS_NOTE says what each is)."""
     out = [f"{_pct(r.healing)} of the kill's healing", f"{_pct(r.tank)} on the tanks", f"{_pct(r.spike)} in spikes",
-           f"{_pct(r.overheal)} overheal", f"{r.dispels:.1f} dispels a minute", f"{r.externals:.1f} externals a kill"]
+           f"{_pct(r.overheal)} overheal", f"{r.dispels:.1f} dispels a minute",
+           f"{r.externals:.1f} externals a kill" if r.externals >= 0.05 else "no externals"]
     if r.buffs:
         out.append(f"{r.buffs:.1f} {_and(r.buff_spells)} a kill on another player")
     return out
@@ -802,10 +809,16 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
         if p.spec == mine and p.share >= 0.99:  # the corpus is this spec's kills: its row says nothing
             continue
         few = p.kills < FEW_KILLS
+        # the kills without it are held to the same threshold as the kills with it (10 kills read "too few" in one
+        # row and gave a median in the next)
+        without = round(p.kills / p.share) - p.kills if p.share else 0
+        few_without = without < FEW_KILLS
         cells = ("<td class='n' colspan='3'><small>too few kills</small></td>" if few else
                  f"<td class='n'>{p.per_kill:.1f}</td><td class='n'>{_mmss(p.duration_with)}"
-                 + ("" if p.duration_without is None else f" <small>({_mmss(p.duration_without)} without)</small>")
-                 + "</td>" + (f"<td class='n'>{dd(p.deaths_with, p.deaths_without)}</td>" if deaths else ""))
+                 + (" <small>(too few without)</small>" if few_without or p.duration_without is None
+                    else f" <small>({_mmss(p.duration_without)} without)</small>")
+                 + "</td>" + (f"<td class='n'>{dd(p.deaths_with, None if few_without else p.deaths_without)}</td>"
+                              if deaths else ""))
         if few and not deaths:
             cells = "<td class='n' colspan='2'><small>too few kills</small></td>"
         rows += (f"<tr class='{'mine ' if p.spec == mine else ''}{'few' if few else ''}'><td>{e(p.spec)}</td>"
@@ -870,7 +883,7 @@ def render_sheet(h: HealerPrep) -> str:
         end = len(h.curve) * STEP
         long = "".join(f" {'From ' + _mmss(a) + ' to the end' if b >= end - STEP else _mmss(a) + ' to ' + _mmss(b)}, "
                        f"the raid takes about {r:.1f}&times; the usual damage without a break."
-                       for a, b, r in sustained(h.curve))
+                       for a, b, r in sustained(h.curve, h.moments))
         lead = (f"<p class='lead'>Big raid damage at {hits}.{long}"
                 + (f" The top {e(h.spec)}s press: {'; '.join(answers)}." if answers else
                    f" No healing cooldown of the top {e(h.spec)}s is kept for them.") + "</p>")
@@ -939,8 +952,8 @@ def render_sheet(h: HealerPrep) -> str:
         stages = h.abilities
         if h.dispelled and h.dispelled[0][1] >= 1:
             name, k = h.dispelled[0]
-            stages = stages.replace(f"<b>{e(name)}</b>", f"<b>{e(name)}</b> <span class=\"pill gold\">you dispel "
-                                    f"it: {k:.1f} a kill</span>", 1)
+            stages = stages.replace(f"<b>{e(name)}</b>", f"<b>{e(name)}</b> <span class=\"pill gold\">the top "
+                                    f"{e(h.spec)}s dispel it: {k:.1f} a kill</span>", 1)
         boss.append(f"<h2>Every ability{', phase by phase' if '<h3>' in stages else ''}</h2>"  # Vashnik: one phase
                     f"<div class='stages'>{stages}</div>")
     enough = {p.spec for p in h.presence if p.kills >= FEW_KILLS} if h.presence else {r.spec for r in h.roles}

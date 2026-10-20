@@ -161,8 +161,9 @@ def test_power_infusion_is_no_job_of_the_boss():
     shaman = healroles.Role("Restoration Shaman", 40, 0.2, 0.07, 0.2, 0.2, 0.6, 3, 0, jobs=[
         "answers the raid's damage spikes: 26% of its healing lands in them (the other healers 18%)"])
     assert jobs_lead([priest, shaman], "Holy Priest") == (
-        "<p class='lead'>Your spec here: nothing stands out against the other healers. The others: the Restoration "
-        "Shaman answers the raid&#x27;s damage spikes: 26% of its healing lands in them (the other healers 18%).</p>")
+        "<p class='lead'>Your spec here: nothing specific to this boss stands out against the other healers. "
+        "The others: the Restoration Shaman answers the raid&#x27;s damage spikes: 26% of its healing lands in them "
+        "(the other healers 18%).</p>")
 
 
 def test_a_cooldown_pressed_as_soon_as_it_is_back_answers_no_hit():

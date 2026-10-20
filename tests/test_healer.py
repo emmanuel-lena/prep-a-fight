@@ -58,7 +58,7 @@ def test_a_moment_is_named_by_what_hits_the_raid():
     healer.name_by_damage(found, by)
     assert [m.boss_spell for m in found] == [
         "Soulcoil Rite and Possession Barrage", "Soulcoil Rite",
-        "mixed damage, most from Corpse Blight and Soulcoil Rite"]
+        "mostly Corpse Blight and Soulcoil Rite"]
 
 
 def test_two_hits_near_the_same_height_are_both_kept():
