@@ -202,6 +202,18 @@ def external_kind(spell_id: int) -> str:
     return ""
 
 
+def weakens_enemy(spell_id: int) -> bool:
+    """A debuff lowering the damage its enemy targets deal (Demoralizing Shout): a defensive cast on the boss."""
+    for r in _filtered_rows("SpellEffect", "SpellID", spell_id):
+        try:
+            low = float(r.get("EffectBasePointsF") or 0) < 0
+        except ValueError:
+            low = False
+        if r.get("EffectAura") == "79" and low and r.get("ImplicitTarget_0") not in ("1", "21", "57"):
+            return True
+    return False
+
+
 def known_not_amp(spell_id: int, depth: int = 2) -> bool:
     """True when the game data has the spell and neither it nor the spells it triggers changes damage taken:
     a boss aura measured in the logs is then not an amp (Vexhul's Uncoiled Wrath raises the survivor's damage done)."""

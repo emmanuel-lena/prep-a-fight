@@ -21,7 +21,7 @@ from dataclasses import dataclass, field, replace
 from html import escape as e
 
 from paf import theme
-from paf.healer import RAID_KILLS, SPIKE, SPIKE_GAP, STEP, Cooldown, Moment, _mmss
+from paf.healer import RAID_KILLS, RELATIVE, SPIKE, SPIKE_GAP, STEP, Cooldown, Moment, _mmss
 from paf.theme import diff_pill
 
 GRAPH = """query($c:String!,$f:[Int]!,$s:Int!,$a:Float,$b:Float){ reportData { report(code:$c) {
@@ -57,6 +57,9 @@ class TankPrep:
     abilities: str = ""  # the Encounter Journal's stages, the tanks' abilities in full (paf.bossguide), html
     stacks: dict = field(default_factory=dict)  # debuff on the top tanks -> (peak stacks, seconds each cycle)
     swap_debuff: str = ""  # the tank ability whose debuff the tanks swap on (measured on them)
+    no_taunt: list = field(default_factory=list)  # (ability, its journal sentence): when taunts stop working
+    short_defs: list = field(default_factory=list)  # (spell, share of the top tanks, casts a kill): too frequent
+    # for a cooldown, too short for an uptime (Spell Reflection, Demoralizing Shout)
     split: list = field(default_factory=list)  # (talent, share picked) the top players split on
     split_players: int = 0
 
@@ -137,7 +140,7 @@ def tank_busters(curve: list[float], by: dict[str, list[float]], top: int = 8) -
         return []
     found: list[Moment] = []
     for i, v in enumerate(curve):
-        if v < SPIKE * base or (i and curve[i - 1] > v) or (i + 1 < len(curve) and curve[i + 1] > v):
+        if v < SPIKE * 0.9 * base or (i and curve[i - 1] > v) or (i + 1 < len(curve) and curve[i + 1] > v):
             continue
         t = i * STEP
         name = max(by, key=lambda a: by[a][i] if i < len(by[a]) else 0.0, default="")
@@ -146,6 +149,9 @@ def tank_busters(curve: list[float], by: dict[str, list[float]], top: int = 8) -
                 found[-1] = Moment(t, v, v / base, name)
             continue
         found.append(Moment(t, v, v / base, name))
+    # every hit near the highest, as paf.healer.moments: a line at x1.5 kept one of Vashnik's four
+    highest = max((m.ratio for m in found), default=0.0)
+    found = [m for m in found if highest >= SPIKE and m.ratio >= max(SPIKE * 0.9, RELATIVE * highest)]
     return sorted(sorted(found, key=lambda m: -m.ratio)[:top], key=lambda m: m.t)
 
 
@@ -309,13 +315,29 @@ def swap_debuff(stacks: dict, tank_abilities: set[str]) -> str:
     return max(mine, key=lambda n: (mine[n][0] >= 2, mine[n][0], mine[n][1]))
 
 
+def taunt_immunity(sections, difficulty: str) -> list[tuple[str, str]]:
+    """The journal's sentences that stop the swaps (Nek'zali's Uncoiled Rage: "grants immunity to Taunt effects")."""
+    import re
+
+    from paf import bossguide
+    from paf.mechanics import walk
+
+    out = []
+    for _, s in walk(sections):
+        text = bossguide.readable(s.text or bossguide.describe(s.spell_id), difficulty)  # as the boss tab
+        if re.search(r"immun\w* to taunt", text, re.I) and s.title not in {n for n, _ in out}:
+            out.append((s.title, text.strip()))  # the whole text: "Additionally, ..." needs what comes before
+    return out
+
+
 def _cause(common: str, stacks: dict) -> str:
-    """What most swaps follow, measured on the top tanks: the stacks of a stacking debuff, or a debuff without
-    stacks and how long it stays; else a timing."""
+    """What most swaps follow, measured on the top tanks: the stacks of a stacking debuff, or a debuff they never
+    let stack and how long it stays; else a timing."""
     if common in stacks:
         peak, secs = stacks[common]
         return (f" (most of them at about {peak} stacks of {e(common)}, measured on the top tanks)" if peak >= 2 else
-                f" (most of them right after {e(common)}: a debuff on the tank, no stacks, about {secs:.0f} s each)")
+                f" (most of them right after {e(common)}: the top tanks never take a second stack, they swap each "
+                f"time, about {secs:.0f} s apart)")
     return f" (most of them right after {e(common)}: a timing in the logs)"
 
 
@@ -342,7 +364,9 @@ def render_sheet(p: TankPrep) -> str:
     from paf.prep_report import sheet_page
 
     mit = "".join(f"<li><b>{e(n)}</b><small>up {u:.0%} of the kill for the top tanks</small></li>"
-                  for n, u in p.mitigation)
+                  for n, u in p.mitigation) + "".join(
+        f"<li><b>{e(n)}</b><small>pressed {k:.1f} times a kill by {u:.0%} of the top tanks</small></li>"
+        for n, u, k in p.short_defs)
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]
     others = [replace(c, near=["" for _ in c.near]) for c in p.cooldowns if c not in defs]  # no buster to answer
     svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight")
@@ -368,7 +392,7 @@ def render_sheet(p: TankPrep) -> str:
         lead.append(f"Each of them taunts about {p.taunts_per_kill:.0f} times a kill after the pull"
                     + ((f", most often at about {p.stacks[common][0]} stacks of {e(common)}." if common in p.stacks
                         and p.stacks[common][0] >= 2 else f", swapping after each {e(common)} (a debuff on the tank, "
-                        f"about {p.stacks[common][1]:.0f} s)." if common in p.stacks
+                        f"about {p.stacks[common][1]:.0f} s; they never take a second stack)." if common in p.stacks
                         else f", most often right after {e(common)} (a timing, not a measured cause).")
                        if one else
                        f", the first time at {_mmss(p.swaps[0])}" + (f" after {e(causes[0])}." if causes[0] else ".")))
@@ -380,12 +404,14 @@ def render_sheet(p: TankPrep) -> str:
         f"{cooldowns_html(defs) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
            f"</p>" if p.rare else ""),
-        f"<h2>Active mitigation the top tanks keep up</h2><ul class='hl2'>{mit or '<li>Not measured yet.</li>'}</ul>",
+        f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"
+        f"{mit or '<li>Not measured yet.</li>'}</ul>",
         f"<h2>Tank swaps</h2><p>Each top tank taunts about <b>{p.taunts_per_kill:.0f}</b> times a kill after the pull"
         f"{'; with the other tank, the swaps come at these moments' if swap else '.'}"
         f"{_cause(common, p.stacks) if swap and one else ''}"
         f"{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
-                                                          f"</li></ul>" if swap else "")]
+                                                          f"</li></ul>" if swap else "")
+        + "".join(f"<p><b>No swap then: {e(n)}.</b> {e(t)}</p>" for n, t in p.no_taunt)]
     change = [build_lead(p.builds, p.spec, p.kills, p.split),
               f"<h2>Talents the top tanks play</h2><ul class='hl2'>{builds_html(p.builds) or '<li>No build yet.</li>'}"
               f"</ul>",

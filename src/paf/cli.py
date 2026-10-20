@@ -773,7 +773,7 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     found = tank.tank_busters(curve, by)
     swap_times, taunts = tank.swaps(con, enc.id, diff)
     from paf.defensives import is_defensive
-    from paf.gamedata import is_mitigation, spell_cooldowns
+    from paf.gamedata import is_mitigation, spell_cooldowns, weakens_enemy
 
     cds = spell_cooldowns()
     pressed = {n for (n, i) in con.execute(  # the spells the top tanks press themselves, short cooldowns only
@@ -785,6 +785,14 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     # talent's passive buff
     mitigation = sorted(((n, u) for sid, (n, u) in rotation.tops_buffs(con, enc.id, diff).items()
                          if u >= 0.3 and is_mitigation(sid) and n in pressed), key=lambda x: -x[1])[:6]
+    # the short defensives most of them press: too frequent for a cooldown, too short for an uptime (Spell
+    # Reflection's 5 s, Demoralizing Shout on the boss)
+    kept = {n for n, _u in mitigation}
+    short_defs = sorted(((a.name, a.users, a.per_kill) for a in tl.abilities
+                         if a.users >= 0.5 and a.name not in kept
+                         and (cds.get(a.id, (0.0, 1))[0] < healer.COOLDOWN_GAP
+                              or a.per_kill > tl.duration / healer.COOLDOWN_GAP)
+                         and (is_mitigation(a.id) or weakens_enemy(a.id))), key=lambda x: -x[1])[:4]
     builds = top_builds(con, enc.id, diff, spec, n=3)
     try:
         fetch_codes(client, con, builds)
@@ -804,6 +812,8 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
               if is_defensive(c.spell_id, c.name)],
         character=getattr(profile, "name", "") or "")
     p.split, p.split_players = healer.contested(con, enc.id, diff, spec)
+    p.short_defs = short_defs
+    p.no_taunt = tank.taunt_immunity(bossguide.load(enc.id, diff_name), diff_name)
     step("The stacks the top tanks swap at, and the deaths of each composition")
     tank.fetch_stacks(client, con, enc.id, diff)  # their stacking debuffs, a few kills
     from paf.gamedata import spell_names

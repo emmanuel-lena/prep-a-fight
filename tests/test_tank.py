@@ -63,3 +63,17 @@ def test_the_debuff_the_tanks_swap_on():
     vash = {"Virulent Fumes": (1, 0.7), "Dripping Fangs": (1, 32.0)}
     assert swap_debuff(vash, {"Dripping Fangs"}) == "Dripping Fangs"
     assert swap_debuff(vash, set()) == ""
+
+
+def test_the_journal_says_when_taunts_stop_working(monkeypatch):
+    """Nek'zali heroic: Uncoiled Rage "grants immunity to Taunt effects"; the swaps section said nothing of it."""
+    from types import SimpleNamespace
+
+    from paf import bossguide, tank
+
+    rage = SimpleNamespace(title="Uncoiled Rage", text="", spell_id=1, kind="ability", children=[], flags=[])
+    monkeypatch.setattr(bossguide, "describe", lambda sid: (
+        "Upon reaching full energy, Nek'zali gains her full potential. Additionally, grants immunity to Taunt effects."))
+    monkeypatch.setattr("paf.mechanics.walk", lambda sections: [(0, s) for s in sections])
+    assert tank.taunt_immunity([rage], "heroic") == [("Uncoiled Rage", (
+        "Upon reaching full energy, Nek'zali gains her full potential. Additionally, grants immunity to Taunt effects."))]

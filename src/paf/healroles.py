@@ -251,7 +251,7 @@ class Comp:
     @property
     def label(self) -> str:
         c = Counter(self.specs)
-        return " + ".join(f"{n} {s}" if n > 1 else s for s, n in sorted(c.items(), key=lambda x: (-x[1], x[0])))
+        return " + ".join(f"{n} {s}s" if n > 1 else s for s, n in sorted(c.items(), key=lambda x: (-x[1], x[0])))
 
 
 def pretty(cls: str, spec: str) -> str:

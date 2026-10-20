@@ -583,7 +583,7 @@ def _plain(text: str) -> str:
     return re.sub(r"[\[\]]", "", text)
 
 
-FEW_KILLS = 8  # a spec in fewer of the kills read: its numbers say little
+FEW_KILLS = 10  # a spec in fewer of the kills read: its numbers say little (Vengeance, 8 kills: "0.0 deaths")
 
 
 def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
