@@ -370,7 +370,8 @@ def render_sheet(p: TankPrep) -> str:
         for n, u, k in p.short_defs)
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]
     others = [replace(c, near=["" for _ in c.near]) for c in p.cooldowns if c not in defs]  # no buster to answer
-    svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight")
+    svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight, and their defensives",
+                    defs)
     causes = p.swap_after or ["" for _ in p.swaps]
     named = [c for c in causes if c]
     common = max(set(named), key=named.count) if named else ""

@@ -323,9 +323,15 @@ JS = ("<script>document.addEventListener('click',function(e){var b=e.target.clos
       "</script>")
 
 
-def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, float]], label: str) -> str:
-    """A damage-taken curve (per STEP), its big moments as dots, the phases as dashed lines."""
-    W, H, L, B = 760, 200, 46, 24
+PRESS_ROWS = 4  # cooldown rows drawn under a damage curve
+
+
+def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, float]], label: str,
+              presses: list | None = None) -> str:
+    """A damage-taken curve (per STEP), its big moments as dots, the phases as dashed lines; under it, one row per
+    cooldown (Cooldown) with a mark where the top players usually press it: the hit and the button on one time axis."""
+    rows = [c for c in presses or [] if c.times][:PRESS_ROWS]
+    W, H, L, B = 760, 200 + 18 * len(rows), 128 if rows else 46, 24 + 18 * len(rows)
     peak = max(curve, default=0) or 1
     span = max(len(curve) * STEP, 1)
 
@@ -349,9 +355,14 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
               f"<text x='{L - 4}' y='{float(y(med)) - 3:.1f}' class='mdl' text-anchor='end'>median</text>"
               f"<text x='{L - 4}' y='{float(y(med)) + 9:.1f}' class='mdl' text-anchor='end'>{_per_s(med)}</text>"
               ) if med else ""
+    cds = "".join(
+        f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(c.name[:20])}</text>"
+        + "".join(f"<rect x='{float(x(t)) - 3:.1f}' y='{H - B + 7 + 18 * i}' width='6' height='11' rx='1.5' "
+                  f"class='cp'><title>{e(c.name)} {_mmss(t)}</title></rect>" for t in c.times)
+        for i, c in enumerate(rows))
     return (f"<svg viewBox='0 0 {W} {H}' class='rd' role='img' aria-label='{e(label)}'>"
             f"<line class='ax' x1='{L}' x2='{W - 10}' y1='{H - B}' y2='{H - B}'/>{median}{lines}{ticks}"
-            f"<polyline points='{pts}'/>{marks}</svg>")
+            f"<polyline points='{pts}'/>{marks}{cds}</svg>")
 
 
 def _per_s(v: float) -> str:
@@ -673,10 +684,11 @@ def render_sheet(h: HealerPrep) -> str:
     from paf.prep_report import sheet_page
 
     mine = next((r for r in h.roles if r.spec == h.spec), None)
-    svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight")
     worn = {n for n, _i, _s in h.trinkets}  # an on-use trinket is no class cooldown
     items = [c for c in h.cooldowns if c.name in worn]
     heals = [c for c in h.cooldowns if not is_defensive(c.spell_id, c.name) and c not in items]
+    svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight, and the top players' healing "
+                    "cooldowns", heals)
     defs = [c for c in h.cooldowns if c not in heals and c not in items]
     lead = ""
     if h.moments:
