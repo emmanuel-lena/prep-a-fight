@@ -475,7 +475,8 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
         mid = st.median(durs.values()) if durs else None
         cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n, _shared(ps, n, mid))
                for ab, ps in cd_times[spec].items()  # pressed by half of them at least (Healing Tide Totem: 3%)
-               if len(ps) / n >= 0.5 and not _personal(ab, names)
+               if len(ps) / n >= 0.5 and not _personal(ab, names) and external_kind(ab) != "protective"
+               and not on_cadence(ps, sum(map(len, ps)) / len(ps), mid or 0)  # as the fight tab: no tie to a hit
                and sum(map(len, ps)) / len(ps) < 3.5]  # a 1-minute button (Nature's Swiftness, 3.9) is no raid cooldown
         se = {k: (st.stdev(v) / len(v) ** 0.5 if len(v) > 1 else 0.0) for k, v in s.items()}
         out.append(Role(spec, n, st.median(s["healing"]), st.median(s["tank"]), st.median(s["spike"]),

@@ -414,7 +414,7 @@ def render_sheet(p: TankPrep) -> str:
 
     mit = "".join(f"<li><b>{e(n)}</b><small>up {u:.0%} of the kill for the top tanks</small></li>"
                   for n, u in p.mitigation) + "".join(
-        f"<li><b>{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top tanks"
+        f"<li><b>{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top players"
         + (f" &middot; on cooldown, about every {ev:.0f} s" if ev else "") + "</small>"
         + (f"<span class='when'>{''.join(f'<span class=chip>{_mmss(t)}{_share(sp)}</span>' for t, sp in zip(ts, sps, strict=False))}</span>"
            if ts else "")
@@ -422,8 +422,6 @@ def render_sheet(p: TankPrep) -> str:
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]
     others = [replace(c, near=["" for _ in c.near]) for c in p.cooldowns  # no buster to answer; taunts: the swaps
               if c not in defs and not _taunt(c.spell_id)]
-    svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight, and their defensives",
-                    defs)
     causes = p.swap_after or ["" for _ in p.swaps]
     named = [c for c in causes if c]
     common = max(set(named), key=named.count) if named else ""
@@ -456,6 +454,10 @@ def render_sheet(p: TankPrep) -> str:
                         else f", most often right after {e(common)} (a timing, not a measured cause).")
                        if one else
                        f", the first time at {_mmss(p.swaps[0])}" + (f" after {e(causes[0])}." if causes[0] else ".")))
+    # the chart's lanes: the defensives and short ones, the lead's answer first (Spell Reflection had none)
+    shorts = [Cooldown(n, 0, u, k, ts, ["" for _ in ts], support=sps) for n, u, k, ts, _ev, sps in p.short_defs if ts]
+    svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight, and their defensives",
+                    [*defs, *shorts], {press[0]} if p.moments and press else set())
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + [
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the top tanks "
         f"take per second, median of {p.damage_kills or 'the'} kills read; a dot marks the tanks' biggest damage, "
@@ -490,7 +492,7 @@ def render_sheet(p: TankPrep) -> str:
     # the boss tab's answer: the mechanic the swaps follow (the fight tab says the swaps), else the journal's ask
     # the boss tab says what hits them (the fight tab, when): measured, then the journal below
     top_hit = (f"<p class='lead'>What hits the top tanks the most: "
-               f"{_and([f'{e(n)} ({s:.0%} of their damage taken)' for n, s in p.hitters[:3]])}.</p>"
+               f"{_and([f'{e(n)} ({s:.0%})' for n, s in p.hitters[:3]])} of their damage taken.</p>"
                if p.hitters else journal_lead(p.journal, "tanks"))
     boss = [top_hit, f"<h2>The abilities that hit the top tanks the most</h2><ul class='hl2'>{hit or '<li>Not measured yet.</li>'}</ul>"]
     if jr:
