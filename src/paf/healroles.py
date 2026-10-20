@@ -475,8 +475,7 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
         mid = st.median(durs.values()) if durs else None
         cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n, _shared(ps, n, mid))
                for ab, ps in cd_times[spec].items()  # pressed by half of them at least (Healing Tide Totem: 3%)
-               if len(ps) / n >= 0.5 and not _personal(ab, names) and external_kind(ab) != "protective"
-               and not on_cadence(ps, sum(map(len, ps)) / len(ps), mid or 0)  # as the fight tab: no tie to a hit
+               if len(ps) / n >= 0.5 and not _personal(ab, names) and not _untied(ab, ps, mid)
                and sum(map(len, ps)) / len(ps) < 3.5]  # a 1-minute button (Nature's Swiftness, 3.9) is no raid cooldown
         se = {k: (st.stdev(v) / len(v) ** 0.5 if len(v) > 1 else 0.0) for k, v in s.items()}
         out.append(Role(spec, n, st.median(s["healing"]), st.median(s["tank"]), st.median(s["spike"]),
@@ -501,6 +500,16 @@ def _shared(ps: list[list[float]], n: int, end: float | None) -> list[tuple[floa
     users = len(ps) / n if n else 0
     out = [(t, sum(1 for ts in ps if any(abs(x - t) <= 8 for x in ts)) / n) for t in times]
     return [(t, sp) for t, sp in out if sp >= 0.25 * users]
+
+
+def _untied(ab: int, ps: list[list[float]], end: float | None) -> bool:
+    """A button the fight tab never ties to a hit, left off the cards too (they said so and showed Power Infusion):
+    any external, a cast-while-moving button, an item, one on cooldown or about every minute."""
+    from paf.healer import _item, _moving
+
+    per = sum(map(len, ps)) / len(ps) if ps else 0
+    return bool(external_kind(ab) or _moving(ab) or _item(ab) or per >= 3.5
+                or on_cadence(ps, per, end or 0))
 
 
 def _personal(ab: int, names: dict[int, str] | None) -> bool:

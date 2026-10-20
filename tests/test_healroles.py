@@ -76,7 +76,7 @@ def test_compositions_and_jobs(monkeypatch):
     # Power Infusion is a damage dealer's buff, said last; Guardian Spirit the protective external
     assert priest.externals == 0.5 and priest.buffs == 1.0 and priest.buff_spells == ["Power Infusion"]
     assert priest.jobs == ["nothing stands out against the other healers"]  # a buff is no healing job
-    assert priest.cd_names[0] == ("Power Infusion", 1.0, [(125.0, 1.0)])
+    assert not [c for c in priest.cd_names if c[0] == "Power Infusion"]  # cast on another player: off the cards
     assert shaman.externals == 0 and shaman.raid_cds == 2.0  # Spirit Link, and Touch of Death on the boss
     assert rs["Restoration Druid"].jobs == ["nothing stands out against the other healers"]
 

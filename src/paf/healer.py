@@ -347,11 +347,13 @@ def _item_why(name: str, spell_id: int) -> str:
 
 
 def _moving(spell_id: int) -> bool:
-    """A cast-while-moving button (Spiritwalker's Grace; game data aura 330): no answer to a raid hit."""
+    """A cast-while-moving button (Spiritwalker's Grace; game data aura 330): no answer to a raid hit. One that also
+    changes spells (aura 108: Tip the Scales makes an empowered heal instant) is a throughput cooldown."""
     try:
         from paf.gamedata import _filtered_rows
 
-        return any(r.get("EffectAura") == "330" for r in _filtered_rows("SpellEffect", "SpellID", spell_id))
+        auras = {r.get("EffectAura") for r in _filtered_rows("SpellEffect", "SpellID", spell_id)}
+        return "330" in auras and "108" not in auras
     except Exception:  # noqa: BLE001 - offline
         return False
 
@@ -405,8 +407,8 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         if every and (any(abs((y - x) - every) > 0.15 * every for x, y in pairwise(times))
                       or (cd and every > 1.15 * cd)):  # held past its cooldown (the Vessel every 118 s, cooldown 90)
             every = 0.0  # its moments are not a cooldown apart: the top players hold it (the Vessel at 0:03, 2:02)
-        if every and len(times) > 1:  # said from the moments shown, so the number matches them
-            every = st.median(y - x for x, y in pairwise(times))
+        if every and len(times) > 1:  # said from the moments shown, so the number matches them, never under the
+            every = max(st.median(y - x for x, y in pairwise(times)), cd)  # cooldown (the Vessel "every 111 s")
         why = ("" if every else "about every minute" if per_kill >= 4 else "cast on another player" if _external(sid)
                else "a cast-while-moving button" if _moving(sid) else _item_why(name, sid) if _item(sid) else "")
         tied = not (every or why)  # on cooldown, a 1-minute button, a
@@ -562,9 +564,9 @@ def cooldowns_html(cds: list[Cooldown]) -> str:
                                         for t, n, sp in zip(c.times, c.near, c.support or [0.0] * len(c.times),
                                                             strict=False))
                                 or "<small>timing varies: no shared moment</small>")
-        + (f"<small class='alt'>{e(c.why)}: not tied to a hit</small>" if c.why and c.times else "")
         + (f"<small class='alt'>on cooldown, about every {c.every:.0f} s</small>" if c.every else
            f"<small class='alt'>{_more(c)} more, timing varies</small>" if c.times and _more(c) else "")
+        + (f"<small class='alt'>{e(c.why)}: not tied to a hit</small>" if c.why and c.times else "")
         + "</span></li>"
         for c in cds)
 
@@ -610,7 +612,7 @@ def build_rows(builds: list) -> list[tuple[int, str, str, str]]:
     out = []
     for i, b in enumerate(builds):
         if i == 0 or not names:
-            out.append((b.count, b.label, b.code or "", "the most played" if i == 0 else ""))
+            out.append((b.count, b.label, b.code or "", ""))  # its count says it; "the most played" pulled to copy
             continue
         mine, base = hero(b.key), hero(builds[0].key)
         other = mine and base and mine != base  # another hero tree: named, its own talents not listed one by one
@@ -991,20 +993,26 @@ def render_sheet(h: HealerPrep) -> str:
             for c, t, sp, press in mine_here[:3]:
                 by_name.setdefault(c.name, []).append((m.t, t, sp, press, c))
 
-        def habit(hit: float, t: float, sp: float, press: float, c) -> str:
-            """One habit for a hit, and the press's more common habit when it is another ("more often at 0:16")."""
+        def habit(hit: float, t: float, sp: float, press: float, c, said: set) -> str:
+            """One habit for a hit, and the press's more common (or as common) habit when it is another and not
+            said in the same clause ("more often at 0:16, 49%"; "as many at 1:42": a tie is no winner)."""
             same = [(x, y) for x, y in zip(c.times, c.support or [], strict=False) if x == press] + \
                    [(x, y) for x, y, k in zip(c.alt, c.alt_support or [], c.alt_of or [], strict=False) if k == press]
-            top = max(same, key=lambda z: z[1], default=None)
-            more = f" (more often at {_mmss(top[0])}, {_pct(top[1])})" if top and top[1] > sp and top[0] != t else ""
+            top = max(((x, y) for x, y in same if x != t and x not in said), key=lambda z: z[1], default=None)
+            more = ("" if not top or top[1] < sp else f" (as many at {_mmss(top[0])})" if top[1] == sp
+                    else f" (more often at {_mmss(top[0])}, {_pct(top[1])})")
             return f"{_pct(sp)} at {_mmss(t)} for the {_mmss(hit)} hit{more}"
         answers, lead_names = [], list(by_name)
         for n, hs in by_name.items():  # "or" between habits of one press, "and" between presses
             presses: dict[float, list] = {}
             for x in hs:
                 presses.setdefault(x[3], []).append(x)
-            answers.append(f"{e(_shown(n))}, " + " and ".join(" or ".join(habit(*x) for x in xs)
-                                                            for xs in presses.values()))
+            parts = []
+            for xs in presses.values():
+                xs = sorted(xs, key=lambda x: -x[2])  # the press's most common habit first
+                said = {x[1] for x in xs}
+                parts.append(" or ".join(habit(*x, said) for x in xs))
+            answers.append(f"{e(_shown(n))}, " + " and ".join(parts))
         end = len(h.curve) * STEP
         long = "".join(f" {'From ' + _mmss(a) + ' to the end' if b >= end - STEP else _mmss(a) + ' to ' + _mmss(b)}, "
                        f"the raid takes about {r:.1f}&times; the usual damage without a break."
@@ -1019,7 +1027,7 @@ def render_sheet(h: HealerPrep) -> str:
     fight = ([lead] if lead else []) + [
         f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Damage the "
         f"raid takes per second, median of {h.raid_kills or 'the top'} kills read (under it, the top players' "
-        f"cooldowns; a light mark is another habit of the same press); a dot marks a big moment, "
+        f"cooldowns; a faint mark is another habit of the same press); a dot marks a big moment, "
         + ("named after the ability doing the most of the raid's damage there, measured on the same kills"
            if h.named_by_damage else "named after the boss cast just before it (&quot;after X&quot;: 8 to 30 s "
            "before, matched by timing)") + f".</p><ul class='hl2'>"

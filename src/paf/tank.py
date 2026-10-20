@@ -447,7 +447,7 @@ def render_sheet(p: TankPrep) -> str:
                        f"; the top {e(p.spec)}s' {e(press[0])} lands then (about {_mmss(press[1])})." if press
                        else f"; most top {e(p.spec)}s press no defensive for it."))
     if p.swaps:
-        lead.append(f"Each of them taunts about {p.taunts_per_kill:.0f} times a kill after the pull (adds included)"
+        lead.append(f"Each top tank taunts about {p.taunts_per_kill:.0f} times a kill after the pull (adds included)"
                     + ((f", most often at about {p.stacks[common][0]} stacks of {e(common)}." if common in p.stacks
                         and p.stacks[common][0] >= 2 else f", swapping after each {e(common)} (the debuff lasts "
                         f"about {p.stacks[common][1]:.0f} s; they never take a second stack)." if common in p.stacks
@@ -463,7 +463,9 @@ def render_sheet(p: TankPrep) -> str:
         f"take per second, median of {p.damage_kills or 'the'} kills read; a dot marks the tanks' biggest damage, "
         f"whatever casts it.</p><ul class='hl2'>"
         f"{moments_html(p.moments, 'tank damage') or '<li>No big moment: steady damage.</li>'}</ul></div>",
-        f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
+        f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><p class='small muted'>A button pressed on "
+        f"cooldown or about every minute, a potion or a trinket is never tied to a hit: it lands near one by its "
+        f"rhythm. A time is shown when a quarter or more of those who press it share it.</p><ul class='hl2'>"
         f"{cooldowns_html(defs) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
            f"</p>" if p.rare else ""),
