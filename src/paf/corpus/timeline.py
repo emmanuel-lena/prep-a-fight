@@ -82,7 +82,7 @@ def target_segments(casts: list[tuple[float, str]]) -> list[tuple[float, float, 
 
 
 def build_timeline(con: sqlite3.Connection, encounter_id: int, difficulty: int, boss_name: str,
-                   diff_name: str, spec: str, top: int = 25) -> Timeline:
+                   diff_name: str, spec: str, top: int = 25, min_users: float = MIN_USERS) -> Timeline:
     where, params = kills_filter(encounter_id, difficulty)
     fights = con.execute(f"SELECT report, fight_id, duration_s FROM fight f WHERE {where}", params).fetchall()
     keys = sorted((r["report"], r["fight_id"]) for r in fights)
@@ -114,7 +114,7 @@ def build_timeline(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
     abilities = []
     for a, v in counts.items():
         med = st.median(v)
-        if len(v) / n >= MIN_USERS and med / max(duration / 60, 1) <= MAX_CASTS_PER_MIN:
+        if len(v) / n >= min_users and med / max(duration / 60, 1) <= MAX_CASTS_PER_MIN:
             abilities.append(Ability(a, names.get(a) or f"spell {a}", len(v) / n, med))
     for ab in abilities:
         ab.utility = any(h in ab.name.lower() for h in UTILITY_HINTS)

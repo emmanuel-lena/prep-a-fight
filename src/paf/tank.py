@@ -437,15 +437,28 @@ def render_sheet(p: TankPrep) -> str:
         own = bool(set(moment_names(m)) & {n for n, _s in p.hitters[:3]})  # any of its abilities a tank hitter
         answers = ([(c.name, c.times, c.support or [0.0] * len(c.times)) for c in defs if not c.every]
                    + [(n, ts, sps) for n, _u, _k, ts, _ev, sps in p.short_defs])
-        press = max(((n, t, sp) for n, ts, sps in answers for t, sp in zip(ts, sps, strict=False)
-                     if -ANSWER[0] <= t - m.t <= ANSWER[1]), key=lambda x: x[2], default=None)  # the most shared
-        # (Spell Reflection, 41% at 0:33, before Shield Wall's 24%)
+        def answer(m: Moment) -> tuple | None:  # the most shared press for a hit (Spell Reflection, 41% at 0:33,
+            return max(((n, t, sp) for n, ts, sps in answers for t, sp in zip(ts, sps, strict=False)  # before
+                        if -ANSWER[0] <= t - m.t <= ANSWER[1] and sp), key=lambda x: x[2], default=None)  # Shield Wall)
+        press = answer(m)
         lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({m.ratio:.1f}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
                     + (f"; {press[2]:.0%} of the top {e(p.spec)}s press {e(press[0])} then (about {_mmss(press[1])})."
-                       if press and press[2] else
-                       f"; the top {e(p.spec)}s' {e(press[0])} lands then (about {_mmss(press[1])})." if press
-                       else f"; most top {e(p.spec)}s press no defensive for it."))
+                       if press else f"; most top {e(p.spec)}s press no defensive for it."))
+        # every other dot: its most shared press, or none (Vashnik's 2:55, Spell Reflection 24%)
+        rest = [(x, answer(x)) for x in p.moments if x is not m]
+        said = [f"for the {_mmss(x.t)} hit, {a[2]:.0%} press {e(a[0])} (about {_mmss(a[1])})" for x, a in rest if a]
+        bare = [_mmss(x.t) for x, a in rest if not a]
+        if said:
+            lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 3:55 hit, 24% press Shield Wall"
+        if bare:
+            lead.append(f"No defensive most of them share for the {_and(bare)} hit{'s' if len(bare) > 1 else ''}.")
+        # a hit that comes with a swap (Vashnik's 1:35 and 2:55, after Dripping Fangs): the time is the link
+        with_swap = [(x, w) for x in p.moments for w in p.swaps if abs(w - x.t) <= ANSWER[0]]
+        if with_swap:
+            lead.append(f"The {_and([_mmss(x.t) for x, _w in with_swap])} hit{'s' if len(with_swap) > 1 else ''} "
+                        f"{'come' if len(with_swap) > 1 else 'comes'} with a tank swap (at "
+                        f"{_and([_mmss(w) for _x, w in with_swap])}).")
     if p.swaps:
         lead.append(f"Each top tank taunts about {p.taunts_per_kill:.0f} times a kill after the pull (adds included)"
                     + ((f", most often at about {p.stacks[common][0]} stacks of {e(common)}." if common in p.stacks
@@ -456,8 +469,10 @@ def render_sheet(p: TankPrep) -> str:
                        f", the first time at {_mmss(p.swaps[0])}" + (f" after {e(causes[0])}." if causes[0] else ".")))
     # the chart's lanes: the defensives and short ones, the lead's answer first (Spell Reflection had none)
     shorts = [Cooldown(n, 0, u, k, ts, ["" for _ in ts], support=sps) for n, u, k, ts, _ev, sps in p.short_defs if ts]
-    svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight, and their defensives",
-                    [*defs, *shorts], {press[0]} if p.moments and press else set())
+    lane = [Cooldown("Tank swaps", 0, 1.0, len(p.swaps), p.swaps, ["swap"] * len(p.swaps))] if p.swaps else []
+    svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight, their defensives and "
+                    "the swaps", [*lane, *defs, *shorts],
+                    {"Tank swaps", *([press[0]] if p.moments and press else [])})
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + [
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the top tanks "
         f"take per second, median of {p.damage_kills or 'the'} kills read; a dot marks the tanks' biggest damage, "

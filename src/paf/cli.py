@@ -765,7 +765,8 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     step("Analyzing the corpus: what hits the top tanks, their defensives and swaps")
     tank.fetch_tank_damage(client, con, enc.id, diff)
     boss = main_boss(con, enc.id, diff, enc.name)
-    tl = build_timeline(con, enc.id, diff, boss, diff_name, spec, top=10_000)  # all the players read
+    # all the players read, every button a quarter of them press (Blessing of Sacrifice, 26%: "fewer than half")
+    tl = build_timeline(con, enc.id, diff, boss, diff_name, spec, top=10_000, min_users=0.25)
     if not tl.kills:
         print(f"No kill of {enc.name} {diff_name} for {spec} {cls} yet.")
         return 1
@@ -824,6 +825,7 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
               if is_defensive(c.spell_id, c.name)],
         character=getattr(profile, "name", "") or "")
     p.split, p.split_players = healer.contested(con, enc.id, diff, spec)
+    p.builds = healer.build_rows(builds, p.split)  # the most played build's side of each split
     p.short_defs = short_defs
     p.hero = healer.hero_split(con, enc.id, diff, spec)
     p.no_taunt = [(n, t, *tank.reached(con, enc.id, diff, n))
@@ -919,7 +921,8 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     step("Analyzing the corpus: the raid damage and the top healers' cooldowns")
     healer.fetch_raid_damage(client, con, enc.id, diff)
     boss = main_boss(con, enc.id, diff, enc.name)
-    tl = build_timeline(con, enc.id, diff, boss, diff_name, spec, top=10_000)  # all the players read
+    # all the players read, every button a quarter of them press (Blessing of Sacrifice, 26%: "fewer than half")
+    tl = build_timeline(con, enc.id, diff, boss, diff_name, spec, top=10_000, min_users=0.25)
     if not tl.kills:
         print(f"No kill of {enc.name} {diff_name} for {spec} {cls} yet.")
         return 1
@@ -959,6 +962,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     h.hero = healer.hero_split(con, enc.id, diff, spec)
     h.casts = {n: len(ts) for n, ts in tl.boss_casts}
     h.split, h.split_players = healer.contested(con, enc.id, diff, spec)
+    h.builds = healer.build_rows(builds, h.split)  # the most played build's side of each split
     from paf.gamedata import dispel_type
     from paf.mechanics import walk
 

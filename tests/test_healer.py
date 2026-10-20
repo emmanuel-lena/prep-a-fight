@@ -150,5 +150,40 @@ def test_one_press_for_either_hit_is_said_once():
     cds = healer.cooldowns(tl, found, {1: (180.0, 1)})
     h = healer.HealerPrep("Boss", "heroic", "Holy Paladin", 9, 240.0, [100.0] * 48, found, cds, [], [], [], [])
     sheet = healer.render_sheet(h)
-    assert "Aura Mastery is pressed once, for the 0:35 hit by 44% (about 0:36) or for the 1:15 hit by 56%" in sheet
+    assert "their Aura Mastery goes on the 0:35 hit (44%, about 0:36) or the 1:15 hit (56%, about 1:19)" in sheet
     assert "for the 1:15 hit, 56% press" not in sheet
+
+
+def test_two_cooldowns_as_common_for_a_hit_are_both_named():
+    # Vashnik heroic, Holy Paladin: Avenging Wrath 36% at 0:42, Aura Mastery 35% at 0:44 for the 0:40 hit
+    aw = SimpleNamespace(id=1, name="Avenging Wrath", users=1.0, per_kill=1.0)
+    am = SimpleNamespace(id=2, name="Aura Mastery", users=1.0, per_kill=1.0)
+    players = [{"casts": {1: [42.0 if i < 36 else 150.0], 2: [44.0 if i < 35 else 170.0]}} for i in range(100)]
+    tl = SimpleNamespace(abilities=[aw, am], duration=240.0, players=players)
+    found = [healer.Moment(40.0, 1000.0, 5.0, "Caustic Surge")]
+    cds = healer.cooldowns(tl, found, {1: (120.0, 1), 2: (180.0, 1)})
+    h = healer.HealerPrep("Boss", "heroic", "Holy Paladin", 100, 240.0, [100.0] * 48, found, cds, [], [], [], [])
+    sheet = healer.render_sheet(h)
+    assert "for the 0:40 hit, 36% press Avenging Wrath (about 0:42) and 35% press Aura Mastery (about 0:44)" in sheet
+
+
+def test_the_most_played_build_says_its_side_of_each_split():
+    # Disc, Vashnik heroic: the builds scatter on Lightburst, Weal and Woe, Searing Light and a choice node
+    names = {1: "Lightburst", 2: "Weal and Woe", 3: "Searing Light", 4: "Protector of the Frail", 5: "Voidwraith"}
+    split = [("Lightburst", 0.52), ("Searing Light", 0.47), ("Protector of the Frail 48% / Voidwraith 41%", -1.0)]
+    assert (healer._sides({1, 2, 5}, names, split)
+            == "of the talents they split on, takes Lightburst and Voidwraith; skips Searing Light")
+
+
+def test_every_healer_spec_in_one_table():
+    # Nek'zali heroic: a Disc's Power Infusion gets its column, a spec without externals a dash
+    disc = SimpleNamespace(spec="Discipline Priest", healing=0.22, tank=0.18, spike=0.31, overheal=0.12, dispels=0.9,
+                           externals=0.5, buffs=1.4, buff_spells=["Power Infusion"], players=40, jobs=[], cd_names=[])
+    shaman = SimpleNamespace(spec="Restoration Shaman", healing=0.27, tank=0.12, spike=0.29, overheal=0.2,
+                             dispels=1.1, externals=0.0, buffs=0.0, buff_spells=[], players=38,
+                             jobs=["removes Essence Rend"], cd_names=[("Ascendance", 1, [(35.0, 0.38)], 0.9)])
+    table = healer.roles_table([shaman, disc], "Restoration Shaman")
+    assert "<th>On another player, a kill</th>" in table and "1.4 <small>Power Infusion</small>" in table
+    assert "Restoration Shaman <small>(you)</small>" in table and "&ndash;" in table
+    more = healer.roles_more([shaman, disc], "Restoration Shaman")
+    assert "removes Essence Rend" in more and "Ascendance" not in more  # your own times are on the fight tab
