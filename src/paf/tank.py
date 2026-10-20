@@ -21,7 +21,20 @@ from dataclasses import dataclass, field, replace
 from html import escape as e
 
 from paf import theme
-from paf.healer import ANSWER, RAID_KILLS, RELATIVE, SPIKE, SPIKE_GAP, STEP, UNSIMMED, Cooldown, Moment, _and, _mmss
+from paf.healer import (
+    ANSWER,
+    RAID_KILLS,
+    RELATIVE,
+    SPIKE,
+    SPIKE_GAP,
+    STEP,
+    UNSIMMED,
+    Cooldown,
+    Moment,
+    _and,
+    _mmss,
+    moment_names,
+)
 from paf.theme import diff_pill
 
 GRAPH = """query($c:String!,$f:[Int]!,$s:Int!,$a:Float,$b:Float){ reportData { report(code:$c) {
