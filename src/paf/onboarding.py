@@ -169,7 +169,8 @@ def page_body() -> str:
 {"</details>" if wcllogin.available() else ""}
 """
     via = "your Warcraft Logs account" if wcllogin.logged_in() else "your own API key"
-    done_html = (f"<p>The app reads the logs with {via}. Nothing to do here.</p>"  # no connect button then
+    done_html = (f"<p>Connected: the app reads the top players' logs with {via}. Nothing more to do here"
+                 f"{'; an API key of your own is not needed' if wcllogin.logged_in() else ''}.</p>"  # no connect button then
                  "<div class='ob-actions'><button type='button' class='btn go next'>Next &rarr;</button></div>")
     return f"""<div class="ob" data-key="{'1' if key_done else ''}">
 <p class="ob-brand">prep-a-<b>fight</b></p>
@@ -257,8 +258,9 @@ function summary(){
   el.textContent = s.length ? s.join(' \\u00b7 ') : el.dataset.text;
 }
 root.querySelectorAll('.next,.skip').forEach(function(b){ b.addEventListener('click', next); });
-root.querySelectorAll('.wcl-connect').forEach(function(c){ c.addEventListener('wcl-connected', function(ev){
-  ev.preventDefault(); done.key = true; next(); }); });
+// connected: the page reloads on this step (paf.web.CONNECT_JS), which then says so and waits for Next, and the
+// character step lists the account's characters; jumping ahead instead left the player, back from the browser,
+// on the next step without the account's characters (issue #31)
 root.querySelectorAll('.ob-tabs button').forEach(function(b){ b.addEventListener('click', function(){
   root.querySelectorAll('.ob-tabs button').forEach(function(x){ x.classList.toggle('on', x === b); });
   root.querySelectorAll('.ob-tab').forEach(function(f){ f.hidden = f.dataset.tab !== b.dataset.tab; }); }); });
