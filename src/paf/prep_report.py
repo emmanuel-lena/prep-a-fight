@@ -1507,7 +1507,7 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
 
 
 def sheet_page(boss: str, difficulty: str, byline: str, class_name: str, sections: dict[str, list[str]],
-               extra_css: str = "") -> str:
+               extra_css: str = "", labels: dict[str, str] | None = None) -> str:
     """A prep sheet's page: the hero with the section tabs (SECTIONS), one panel per section with content. Every
     role's sheet (damage, healer, tank) has this skeleton. byline: html."""
     from paf import briefing, fightview, simple
@@ -1517,7 +1517,7 @@ def sheet_page(boss: str, difficulty: str, byline: str, class_name: str, section
 <h1>{e(boss)} {diff_pill(difficulty)}</h1>
 <p>{byline} &middot; {datetime.now():%d %b %Y %H:%M}</p>
 </div><nav class="tabs" aria-label="Sections"><div class="tabs-in" role="tablist">{''.join(
-        f'<a role="tab" href="#{k}">{e(label)}</a>' for k, label in SECTIONS if sections.get(k))}</div></nav></div></header>"""
+        f'<a role="tab" href="#{k}">{e((labels or {}).get(k, label))}</a>' for k, label in SECTIONS if sections.get(k))}</div></nav></div></header>"""
     panels = "".join(f'<section class="panel" id="{k}">{"".join(v)}</section>' for k, v in sections.items() if v)
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             f"<title>{e(boss)} prep</title><script>document.documentElement.classList.add('js')</script>"

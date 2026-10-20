@@ -108,6 +108,7 @@ class HealerPrep:
     dispel_delay: tuple | None = None  # (median s after it lands, dispels measured), paf.healroles.dispel_delay
     named_by_damage: bool = False
     raid_kills: int = 0  # kills the raid damage curve is the median of
+    role_median: float = 0.0  # median duration of the healers' comparison's kills
     hero: list = field(default_factory=list)  # (hero tree, share of the top players), paf.healer.hero_split  # the moments are named by the raid's damage taken by ability (measured)
 
 
@@ -171,6 +172,21 @@ def raid_by_ability(con, encounter_id: int, difficulty: int, duration: float) ->
                 if b < n:
                     row[b] += v or 0
     return out
+
+
+def moment_names(m: Moment) -> list[str]:
+    """The abilities a moment is named after: "mixed damage, most from A and B" -> [A, B]."""
+    return [x for x in m.boss_spell.removeprefix("mixed damage, most from ").removeprefix("after ").split(" and ") if x]
+
+
+def moment_notes(found: list[Moment]) -> dict[str, str]:
+    """The boss tab's measured line under each ability the raid's big moments are named after (Soulcoil Rite: no
+    cast to time it, yet the fight tab names it twice)."""
+    at: dict[str, list[float]] = {}
+    for m in found:
+        for n in moment_names(m):
+            at.setdefault(n, []).append(m.t)
+    return {n: "big raid damage at " + _and([_mmss(t) for t in ts]) + " (measured)" for n, ts in at.items()}
 
 
 def name_by_damage(found: list[Moment], by: dict[str, list[float]], width: int = 2) -> None:
@@ -392,16 +408,21 @@ def _more(c: Cooldown) -> str:
     return f"+{n}" if n > 0 else ""
 
 
+def _or(c: Cooldown, t: float) -> str:
+    """The other habits nearest this moment, said on its chip ("1:18, or 0:36 for some"): another player's choice
+    for the same press, never an extra one."""
+    near = [a for a in c.alt if min(c.times, key=lambda x: abs(x - a)) == t]
+    return f", or {', '.join(_mmss(a) for a in near)} for some" if near else ""
+
+
 def cooldowns_html(cds: list[Cooldown]) -> str:
     return "".join(
         f"<li><b>{e(c.name)}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill</small>"
-        "<span class='when'>" + ("".join(f"<span class='chip'>{_mmss(t)}{_near(n)}</span>"
+        "<span class='when'>" + ("".join(f"<span class='chip'>{_mmss(t)}{_near(n)}{_or(c, t)}</span>"
                                         for t, n in zip(c.times, c.near, strict=False))
                                 or "<small>when they need it: no moment most of them share</small>")
-        + (f"<small class='alt'>{_more(c)} more when they need it"
-           + (f" (some at {', '.join(_mmss(t) for t in c.alt)})" if c.alt else "") + "</small>" if c.times and _more(c)
-           else f"<small class='alt'>some press it at {', '.join(_mmss(t) for t in c.alt)} instead</small>"
-           if c.alt else "") + "</span></li>"
+        + (f"<small class='alt'>{_more(c)} more when they need it</small>" if c.times and _more(c) else "")
+        + "</span></li>"
         for c in cds)
 
 
@@ -448,6 +469,8 @@ def build_rows(builds: list) -> list[tuple[int, str, str, str]]:
     return out
 
 
+UNSIMMED = {"change": "What the top players play"}  # no sim to say what to change: the tab says what it holds
+COPY_SHARE = 0.10  # a build fewer of the players read play gets no copy button: copying it is no choice of theirs
 BUILD_SHARE = 0.05  # a build fewer of the players read play is noise; the first one stays, a complete build to copy
 
 
@@ -458,7 +481,7 @@ def talents_html(builds: list, players: int, who: str, hero: list | None = None)
         line = ("<p><b>Hero tree:</b> " + (f"{e(hero[0][0])} (all {players} players read)" if len(hero) == 1 else
                 " &middot; ".join(f"{e(t)} {s:.0%}" for t, s in hero) + f" of the {players} players read") + ".</p>")
     return (f"<h2>Talents the top {e(who)} play</h2>{line}<ul class='hl2'>"
-            f"{builds_html(shown_builds(builds, players)) or '<li>No build yet.</li>'}</ul>")
+            f"{builds_html(shown_builds(builds, players), players) or '<li>No build yet.</li>'}</ul>")
 
 
 def shown_builds(builds: list, players: int) -> list:
@@ -466,11 +489,12 @@ def shown_builds(builds: list, players: int) -> list:
     return [b for i, b in enumerate(builds) if i == 0 or not players or b[0] >= BUILD_SHARE * players]
 
 
-def builds_html(builds: list) -> str:
+def builds_html(builds: list, players: int = 0) -> str:
     copy = "<button class='btn ghost copy' data-copy='{}'>Copy the talents</button>"
     return "".join(f"<li><b>{e(b[1][:1].upper() + b[1][1:])}</b><small>{b[0]} of the top players"
                    + (f" &middot; {e(b[3])}" if len(b) > 3 and b[3] else "") + "</small>"
-                   + (copy.format(e(b[2])) if b[2] else "") + "</li>" for b in builds)
+                   + (copy.format(e(b[2])) if b[2] and (not players or b[0] >= COPY_SHARE * players) else "")
+                   + "</li>" for b in builds)
 
 
 def trinkets_html(trinkets: list[tuple[str, int, float]]) -> str:
@@ -560,9 +584,10 @@ def contested(con, encounter_id: int, difficulty: int, spec: str, lo: float = 0.
     for sides in by_node.values():
         sides.sort(key=lambda x: -x[1])
         split.append((" / ".join(f"{n} {s:.0%}" for n, s in sides) if len(sides) > 1 else sides[0][0],
-                      sides[0][1] if len(sides) == 1 else -1.0))
-    # a pair says its own shares (-1); a single talent its share, the closest to half first
-    return sorted(split, key=lambda x: abs(x[1] - 0.5) if x[1] >= 0 else 0.0)[:shown], players
+                      sides[0][1] if len(sides) == 1 else -1.0, sides[0][1]))
+    # a pair says its own shares (-1 in the second place) and sorts by its first side, as a single talent by its
+    # share: the closest to half first
+    return [(n, s) for n, s, _k in sorted(split, key=lambda x: abs(x[2] - 0.5))][:shown], players
 
 
 def hero_split(con, encounter_id: int, difficulty: int, spec: str) -> list[tuple[str, float]]:
@@ -602,13 +627,16 @@ def build_lead(builds: list, spec: str, players: int, split: list | None = None)
     top = builds[0]
     total = sum(b[0] for b in builds)
     if split and top[0] < players / 5:  # no build a fifth of them play: the answer is in the split talents
-        return (f"<p class='lead'>The top {e(spec)}s agree on most talents and split on "
+        return (f"<p class='lead'>The top {e(spec)}s split on "
                 + e(_and([n for n, _s in split[:4]])) + f"; no build is played by more than {top[0]} of the "
-                f"{players} players read.</p>")
+                f"{players} players read.{NOT_ADVICE}</p>")
     return (f"<p class='lead'>The most played build of the top {e(spec)}s: {e(top[1])}, by {top[0]} of the "
             f"{players} players read" + (f"; the {len(builds)} builds below cover {total} of them, the other "
                                         f"{players - total} play builds of their own" if len(builds) > 1 else "")
-            + ".</p>")
+            + f".{NOT_ADVICE}</p>")
+
+
+NOT_ADVICE = " Their choices, not a recommendation: no sim weighs them."
 
 
 def split_html(split: list, players: int, spec: str) -> str:
@@ -634,6 +662,15 @@ def journal_lead(lines: list[str], who: str) -> str:
 def _job(r) -> str:
     """A spec's healing job of this boss, or "": not "nothing stands out", nor Power Infusion given on every boss."""
     return next((j for j in r.jobs if not j.startswith(("nothing stands out", "buffs a damage dealer"))), "")
+
+
+def _pace(h) -> str:
+    """The comparison's kills against the timings' ones, said from the numbers (kills ranked by a healer's healing
+    were said slower: on four sheets they were not)."""
+    if not h.role_median or not h.duration or abs(h.role_median - h.duration) < 5:
+        return ""
+    return (f" These kills are {'slower' if h.role_median > h.duration else 'faster'} than the {h.kills} top kills "
+            f"of the timings ({_mmss(h.role_median)} against {_mmss(h.duration)}).")
 
 
 def jobs_lead(roles: list, mine: str = "") -> str:
@@ -706,12 +743,14 @@ def comps_table(comps: list, n_kills: int) -> str:
     deaths = any(c.deaths is not None for c in comps)
     rows = "".join(
         f"<tr><td>{e(c.label)}</td><td class='n'>{c.kills} ({_pct(c.share)})</td><td class='n'>{_mmss(c.duration)}</td>"
-        + (f"<td class='n'>{'' if c.deaths is None else f'{c.deaths:.1f}'}</td>" if deaths else "") + "</tr>"
+        + (f"<td class='n'>{'' if c.deaths is None else f'{c.deaths:.1f}' if c.kills >= FEW_KILLS else '<small>too few kills</small>'}</td>"
+           if deaths else "") + "</tr>"
         for c in comps)
     return ("<table class='hcomp'><thead><tr><th>Healers</th><th>Top kills</th><th>Median kill</th>"
             + ("<th>Deaths a kill</th>" if deaths else "") + f"</tr></thead><tbody>{rows}</tbody></table>"
             f"<p class='small muted'>Of {n_kills} top kills read. Exact compositions played at least 5 times; the "
-            f"other {n_kills - sum(c.kills for c in comps)} kills play rarer ones.</p>")
+            f"other {n_kills - sum(c.kills for c in comps)} kills play rarer ones. Deaths from {FEW_KILLS} kills of a "
+            f"composition, as in the table above.</p>")
 
 
 def render_sheet(h: HealerPrep) -> str:
@@ -742,7 +781,7 @@ def render_sheet(h: HealerPrep) -> str:
         answers = []
         for m in shown:
             mine_here = [c.name for c in heals if any(n and n.split(" ", 1)[0] == _mmss(m.t) for n in c.near)
-                         and _external(c.spell_id) != "damage"]  # Power Infusion lines up, it heals nothing
+                         and not _external(c.spell_id)]  # one player's buff (Life Cocoon, Power Infusion): no raid answer
             if mine_here:
                 answers.append(f"{_mmss(m.t)}: {_and(mine_here[:3])}")
         lead = (f"<p class='lead'>Big raid damage at {hits}."
@@ -778,13 +817,18 @@ def render_sheet(h: HealerPrep) -> str:
                   f"rel=\"noopener\">QE Live</a>.</p>")
     jr = "".join(f"<li>{e(_plain(x))}</li>" for x in h.journal)
     when = (f", a median {h.dispel_delay[0]:.0f} s after it lands on the player" if h.dispel_delay else "")
+    # what the dispel sets off, when it is part of a big moment (Vashnik: Caustic Explosion at 2:10 and 3:35)
+    feeds = sorted({n for m in h.moments for n in moment_names(m) if n and n in (h.dispel_text or "")})
+    fed = "".join(f" {e(n)} is part of the raid's big damage at "
+                  + _and([_mmss(m.t) for m in h.moments if n in moment_names(m)]) + ": your dispels feed it."
+                  for n in feeds)
     first = ([f"<p class='lead'>Your measured job here: dispel {e(h.dispelled[0][0])}. The top {e(h.spec)} of each "
               f"kill removes it {h.dispelled[0][1]:.1f} times ({h.dispel_kills} kills read){when}."
-              + (f" {e(h.dispel_text)}" if h.dispel_text else "") + "</p>"]
+              + (f" {e(h.dispel_text)}" if h.dispel_text else "") + fed + "</p>"]
              if h.dispelled and h.dispelled[0][1] >= 1 else [journal_lead(h.journal, "healers")])
     boss = first + (
         [f"<h2>What the Encounter Journal asks healers</h2><ul class='hl2'>{jr}</ul>"] if jr else [])
-    if h.dispelled:  # measured: what the top healers of the spec removed
+    if h.dispelled and (len(h.dispelled) > 1 or h.dispelled[0][1] < 1):  # the others than the lead's job, measured
         inside = set(re.findall(r'<b>([^<]+)</b>', h.abilities))  # the abilities the journal lists below
         boss.append(f"<h2>What the top {e(h.spec)}s dispel here</h2><p>"
                     + _and([f"{e(n)} ({k:.1f} a kill" + ("" if n in inside else ", not in the Encounter Journal")
@@ -825,15 +869,16 @@ def render_sheet(h: HealerPrep) -> str:
                       f"{presence_table(h.presence, h.spec)}")
     deeper = deeper_first + [f"<h2>Every healer spec's job on this boss</h2><p class='small muted'>Measured on {h.role_kills} "
               f"{e(h.role_sample or 'top kills')}: each healer against the other healers of the same kill; a job "
-              f"shows only when a number stands out beyond the sample's noise. {NUMS_NOTE} The sample matters: kills "
-              f"ranked by a healer's healing are slower, with more to heal, than the fastest kills. No healing "
+              f"shows only when a number stands out beyond the sample's noise. {NUMS_NOTE}{_pace(h)} No healing "
               f"engine: these are the logs, not sims.</p><div class='hroles'>{others or '<p>Not measured yet.</p>'}</div>"
               + (f"<p class='small muted'>Too few healers measured: {e(', '.join(few))}.</p>" if few else ""),
               (f"<h2>The healer compositions played most</h2>{comps_table(h.comps, n_kills)}" if h.comps else "")]
     # every sample said once, at the top: the timings and talents, the healers' comparison; read, not simmed
     byline = (f"{e(h.character or h.spec)} &middot; {e(h.spec)} &middot; {h.kills} top kills for the timings and "
               f"talents, median {_mmss(h.duration)}"
-              + (f" &middot; {h.role_kills} for the healers' comparison" if h.role_kills else "")
+              + (f" &middot; {h.role_kills} for the healers' comparison"
+                 + (f", median {_mmss(h.role_median)}" if h.role_median else "") if h.role_kills else "")
               + " &middot; read from the logs, no healing sim")
     return sheet_page(h.boss, h.difficulty, byline, h.class_name,
-                      {"fight": fight, "change": change, "boss": boss, "deeper": deeper}, theme.style("healer"))
+                      {"fight": fight, "change": change, "boss": boss, "deeper": deeper}, theme.style("healer"),
+                      UNSIMMED)

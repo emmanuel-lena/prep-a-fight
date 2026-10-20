@@ -788,7 +788,12 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     # the short defensives most of them press: too frequent for a cooldown, too short for an uptime (Spell
     # Reflection's 5 s, Demoralizing Shout on the boss)
     kept = {n for n, _u in mitigation}
-    short_defs = sorted(((a.name, a.users, a.per_kill) for a in tl.abilities
+    from paf.healroles import press_moments
+
+    def moments_of(a) -> list[float]:  # a short defensive is a timed answer too (Spell Reflection at 0:35)
+        casts = [p["casts"].get(a.name) or p["casts"].get(a.id) or [] for p in tl.players]
+        return press_moments(casts, max(1, round(a.per_kill)), tl.duration)[0]
+    short_defs = sorted(((a.name, a.users, a.per_kill, moments_of(a)) for a in tl.abilities
                          if a.users >= 0.5 and a.name not in kept
                          and (cds.get(a.id, (0.0, 1))[0] < healer.COOLDOWN_GAP
                               or a.per_kill > tl.duration / healer.COOLDOWN_GAP)
@@ -831,8 +836,8 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
         peak, secs = p.stacks[p.swap_debuff]  # "stacks" where heroic does not)
         hit = f"; {also[p.swap_debuff]}" if p.swap_debuff in also else ""
         also[p.swap_debuff] = ("measured on the top tanks: " + (
-            f"they swap at about {peak} stacks, a cycle of about {secs:.0f} s" if peak >= 2 else
-            f"they never take a second stack, it stays about {secs:.0f} s") + hit)
+            f"they swap at about {peak} stacks, reached in about {secs:.0f} s" if peak >= 2 else
+            f"they never take a second stack; the debuff lasts about {secs:.0f} s") + hit)
     p.abilities = _role_journal(enc.id, diff_name, "tank", tl, also)
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -937,7 +942,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         healer.cooldowns(tl, found), healer.build_rows(builds),
         healer.trinkets(con, enc.id, diff), bossguide.role_bullets(bossguide.load(enc.id, diff_name), "healer"),
         [(n, t) for n, t, _ in tl.phases], class_name=cls, character=getattr(profile, "name", "") or "")
-    h.abilities = _role_journal(enc.id, diff_name, "healer", tl)
+    h.abilities = _role_journal(enc.id, diff_name, "healer", tl, healer.moment_notes(found))
     h.named_by_damage = bool(by)
     h.raid_kills = con.execute("SELECT COUNT(*) FROM raid_damage d JOIN fight f USING(report, fight_id) "
                                "WHERE f.encounter_id=? AND f.difficulty=?", (enc.id, diff)).fetchone()[0]
@@ -977,7 +982,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     h.dispel_delay = healroles.dispel_delay(con, enc.id, diff, h.dispelled[0][0], names) if h.dispelled else None
     h.roles = healroles.roles(con, enc.id, diff, names)
     n, dur, dead = healroles.sample(con, enc.id, diff)
-    h.role_kills = n
+    h.role_kills, h.role_median = n, dur
     h.role_sample = (f"kills of the top {healroles.pretty(cls, spec)}s (ranked by their healing), median "
                      f"{healer._mmss(dur)}, {dead:.1f} deaths a kill")
     for r in h.roles:

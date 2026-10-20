@@ -21,7 +21,7 @@ from dataclasses import dataclass, field, replace
 from html import escape as e
 
 from paf import theme
-from paf.healer import ANSWER, RAID_KILLS, RELATIVE, SPIKE, SPIKE_GAP, STEP, Cooldown, Moment, _and, _mmss
+from paf.healer import ANSWER, RAID_KILLS, RELATIVE, SPIKE, SPIKE_GAP, STEP, UNSIMMED, Cooldown, Moment, _and, _mmss
 from paf.theme import diff_pill
 
 GRAPH = """query($c:String!,$f:[Int]!,$s:Int!,$a:Float,$b:Float){ reportData { report(code:$c) {
@@ -116,6 +116,9 @@ def tank_curves(con, encounter_id: int, difficulty: int, duration: float
         for name, v in sums.items():
             shares[name].append(v / all_damage)
         buckets = [0.0] * n
+        # the buckets this kill lasts: a finished kill is no zero damage (the curve fell at the end, "the boss gets
+        # easy", as the shorter kills ended)
+        lasts = min(n, int((max((len(v) for v in data.values()), default=0) * step) // STEP))
         for name, values in data.items():
             mine = [0.0] * n
             for i, v in enumerate(values):
@@ -123,9 +126,9 @@ def tank_curves(con, encounter_id: int, difficulty: int, duration: float
                 if b < n:
                     mine[b] += v or 0
                     buckets[b] += v or 0
-            for b in range(n):
+            for b in range(lasts):
                 per_ability[name][b].append(mine[b])
-        for b in range(n):
+        for b in range(lasts):
             total[b].append(buckets[b])
     curve = [st.median(v) if v else 0.0 for v in total]
     by = {name: [st.median(v) if v else 0.0 for v in rows] for name, rows in per_ability.items()}
@@ -345,10 +348,10 @@ def _cause(common: str, stacks: dict) -> str:
     let stack and how long it stays; else a timing."""
     if common in stacks:
         peak, secs = stacks[common]
-        return (f" (most of them at about {peak} stacks of {e(common)}, a cycle of about {secs:.0f} s; measured on the "
-                f"top tanks)" if peak >= 2 else
-                f" (most of them right after {e(common)}: the top tanks never take a second stack, they swap each "
-                f"time, about {secs:.0f} s apart)")
+        return (f" (most of them at about {peak} stacks of {e(common)}, reached in about {secs:.0f} s; measured on "
+                f"the top tanks)" if peak >= 2 else
+                f" (most of them right after {e(common)}: the top tanks never take a second stack; the debuff "
+                f"lasts about {secs:.0f} s)")
     return f" (most of them right after {e(common)}: a timing in the logs)"
 
 
@@ -377,8 +380,9 @@ def render_sheet(p: TankPrep) -> str:
 
     mit = "".join(f"<li><b>{e(n)}</b><small>up {u:.0%} of the kill for the top tanks</small></li>"
                   for n, u in p.mitigation) + "".join(
-        f"<li><b>{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top tanks</small></li>"
-        for n, u, k in p.short_defs)
+        f"<li><b>{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top tanks</small>"
+        + (f"<span class='when'>{''.join(f'<span class=chip>{_mmss(t)}</span>' for t in ts)}</span>" if ts else "")
+        + "</li>" for n, u, k, ts in p.short_defs)
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]
     others = [replace(c, near=["" for _ in c.near]) for c in p.cooldowns  # no buster to answer; taunts: the swaps
               if c not in defs and not _taunt(c.spell_id)]
@@ -400,7 +404,8 @@ def render_sheet(p: TankPrep) -> str:
     if p.moments:
         m = max(p.moments, key=lambda x: x.ratio)
         own = m.boss_spell in {n for n, _s in p.hitters[:3]}
-        press = next(((c.name, t) for c in defs for t in c.times if -ANSWER[0] <= t - m.t <= ANSWER[1]), None)
+        answers = [(c.name, c.times) for c in defs] + [(n, ts) for n, _u, _k, ts in p.short_defs]
+        press = next(((n, t) for n, ts in answers for t in ts if -ANSWER[0] <= t - m.t <= ANSWER[1]), None)
         lead.append(f"Their biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({m.ratio:.1f}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
                     + (f"; the top {e(p.spec)}s press {e(press[0])} for it." if press
@@ -408,7 +413,7 @@ def render_sheet(p: TankPrep) -> str:
     if p.swaps:
         lead.append(f"Each of them taunts about {p.taunts_per_kill:.0f} times a kill after the pull"
                     + ((f", most often at about {p.stacks[common][0]} stacks of {e(common)}." if common in p.stacks
-                        and p.stacks[common][0] >= 2 else f", swapping after each {e(common)} (a debuff on the tank, "
+                        and p.stacks[common][0] >= 2 else f", swapping after each {e(common)} (the debuff lasts "
                         f"about {p.stacks[common][1]:.0f} s; they never take a second stack)." if common in p.stacks
                         else f", most often right after {e(common)} (a timing, not a measured cause).")
                        if one else
@@ -417,7 +422,7 @@ def render_sheet(p: TankPrep) -> str:
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the top tanks "
         f"take per second, median of the kills; a dot marks the tanks' biggest damage, whatever casts it.</p><ul class='hl2'>"
         f"{moments_html(p.moments, 'tank damage') or '<li>No big moment: steady damage.</li>'}</ul></div>",
-        f"<h2>Your defensives and raid cooldowns, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
+        f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
         f"{cooldowns_html(defs) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
            f"</p>" if p.rare else ""),
@@ -438,10 +443,7 @@ def render_sheet(p: TankPrep) -> str:
     hit = "".join(f"<li><b>{e(n)}</b><small>{s:.0%} of the damage the top tanks take</small></li>"
                   for n, s in p.hitters)
     jr = "".join(f"<li>{e(plain(x))}</li>" for x in p.journal)
-    top_hit = (f"<p class='lead'>What hits the top tanks the most: {e(p.hitters[0][0])} "
-               f"({p.hitters[0][1]:.0%} of their damage taken)" + (f", then {e(p.hitters[1][0])} ({p.hitters[1][1]:.0%})"
-                                                                    if len(p.hitters) > 1 else "") + ".</p>"
-               if p.hitters else journal_lead(p.journal, "tanks"))
+    top_hit = journal_lead(p.journal, "tanks")  # what hits them leads the fight tab already: the journal's ask here
     boss = [top_hit, f"<h2>The abilities that hit the top tanks the most</h2><ul class='hl2'>{hit or '<li>Not measured yet.</li>'}</ul>"]
     if jr:
         boss.append(f"<h2>What the Encounter Journal asks tanks</h2><ul class='hl2'>{jr}</ul>")
@@ -472,4 +474,5 @@ def render_sheet(p: TankPrep) -> str:
     byline = (f"{e(p.character or p.spec)} &middot; {e(p.spec)} &middot; {p.kills} top kills for the timings and "
               f"talents, median {_mmss(p.duration)} &middot; read from the logs, no tank sim")
     return sheet_page(p.boss, p.difficulty, byline, p.class_name,
-                      {"fight": fight, "change": change, "boss": boss, "deeper": deeper}, theme.style("healer"))
+                      {"fight": fight, "change": change, "boss": boss, "deeper": deeper}, theme.style("healer"),
+                      UNSIMMED)

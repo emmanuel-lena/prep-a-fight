@@ -509,8 +509,7 @@ def jobs(r: Role, everyone: list[Role]) -> list[str]:
                    f"(the other healers {ref('spike'):.0%})")
     if r.dispels >= max(0.2, ref("dispels") * DISPELLER) and clear("dispels"):
         out.append(f"dispels: {r.dispels:.1f} a minute (the other healers {ref('dispels'):.1f})")
-    if r.externals >= 1 and r.externals >= ref("externals") * 1.5 and clear("externals"):
-        out.append(f"gives externals: {r.externals:.1f} a kill on other players")
+    # externals given are the kit's (Mistweaver's Life Cocoon on every boss), as the overheal: on the card only
     # not jobs: the count of long cooldowns compares kits, not what the boss asks; low overheal is the spec's trait
     # on every boss (Restoration Shaman on 14 of 14 sheets). Both stay in the card's numbers.
     # a damage dealer's buff (Power Infusion) is no healing job of the boss: the card's numbers say it

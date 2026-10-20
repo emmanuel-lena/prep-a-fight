@@ -11,7 +11,7 @@
 .hrole.mine{border-color:var(--fg)} .hrole h3{margin:0 0 6px;font:600 17px var(--font-display)}
 .hrole .jobs{margin:0 0 6px;padding-left:18px} .hrole .nums{margin:0 0 6px;font-size:14px}
 .hrole .when{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px} .hrole .chip{padding:3px 9px;border-radius:999px;border:1px solid var(--line);font-size:13px}
-.hroles{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(420px,1fr))}
+.hroles{display:grid;gap:10px 40px;grid-template-columns:repeat(2,minmax(0,1fr));max-width:1000px} /* the page's column */
 .hcomp{border-collapse:collapse;width:100%;max-width:820px;margin:8px 0} .hcomp th,.hcomp td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left}
 .hcomp th{font:600 12px var(--font-display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)} .hcomp .n{font-family:var(--font-data);font-variant-numeric:tabular-nums}
 .hcomp tr.mine td{font-weight:600} .hcomp small{color:var(--muted);font-family:var(--font-body)}

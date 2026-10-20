@@ -190,7 +190,12 @@ MITIGATION_AURAS = {"69", "87", "51", "47", "49", "268"}  # absorb, damage taken
 def is_mitigation(spell_id: int) -> bool:
     """A buff the game data gives a defensive effect: Shield Block, Ignore Pain, Ironfur, Shield of the Righteous,
     Demon Spikes, Bone Shield, Shuffle, Blood Shield. Not an offensive buff a tank keeps up (Seeing Red)."""
-    return any(r.get("EffectAura") in MITIGATION_AURAS for r in _filtered_rows("SpellEffect", "SpellID", spell_id))
+    rows = _filtered_rows("SpellEffect", "SpellID", spell_id)
+    # a cast that only triggers its buff (Spell Reflection 23920 -> 385391): the buff says it
+    return any(r.get("EffectAura") in MITIGATION_AURAS for r in rows) or any(
+        r.get("Effect") == "64" and int(r.get("EffectTriggerSpell") or 0) and any(
+            x.get("EffectAura") in MITIGATION_AURAS
+            for x in _filtered_rows("SpellEffect", "SpellID", int(r["EffectTriggerSpell"]))) for r in rows)
 
 
 ALLY_TARGETS = {"21", "57"}  # implicit targets: the ally (or raid member) the spell is cast on
