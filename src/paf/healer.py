@@ -1034,14 +1034,12 @@ def render_sheet(h: HealerPrep) -> str:
         caused = sorted({n for m in shown for n in moment_names(m)
                          if h.dispelled and h.dispel_text and n in h.dispel_text})  # Vashnik's Caustic Explosion
         from_dispel = "".join(
-            f" {e(n)} comes from dispelling {e(h.dispelled[0][0])}: the top {e(h.spec)} of each kill removes it "
-            f"{h.dispelled[0][1]:.1f} times" + (f", a median {h.dispel_delay[0]:.0f} s after it lands" if h.dispel_delay
-                                                 else "") + "." for n in caused)
+            f" {e(n)} is set off when {e(h.dispelled[0][0])} is dispelled." for n in caused)
         lead = (f"<p class='lead'>Big raid damage at {hits}.{long}{from_dispel}"
                 + (f" Among the top {e(h.spec)}s, {'; '.join(answers)}." if answers else "")
                 + (f" No shared cooldown for the {_and(bare)} hit{'s' if len(bare) > 1 else ''}." if bare and answers else
                    "" if answers else
-                   f" No healing cooldown of the top {e(h.spec)}s is kept for them.") + "</p>")
+                   f" No healing cooldown of the top {e(h.spec)}s is kept for these hits.") + "</p>")
     svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight, and the top players' healing "
                     "cooldowns", heals, set(lead_names))
     fight = ([lead] if lead else []) + [
