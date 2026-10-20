@@ -173,3 +173,11 @@ def test_a_cooldown_pressed_as_soon_as_it_is_back_answers_no_hit():
     assert 120 <= on_cadence(pi, 3.0, 285.0) <= 130
     hymn = [[4.0, 71.0 + 30 * (i % 3)] for i in range(8)]
     assert on_cadence(hymn, 2.0, 285.0) == 0.0
+
+
+def test_a_cooldown_kept_past_the_pull_is_chosen():
+    """Restoration Druid, Nek'zali: Tranquility at 0:35 (the hit) and 3:55 read "on cooldown"; kept past the pull,
+    the first press is a choice."""
+    from paf.healroles import on_cadence
+
+    assert on_cadence([[35.0, 235.0] for _ in range(8)], 2.0, 278.0) == 0.0

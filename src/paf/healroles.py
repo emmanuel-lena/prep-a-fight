@@ -475,6 +475,7 @@ def _personal(ab: int, names: dict[int, str] | None) -> bool:
     return enemy or is_defensive(ab, (names or {}).get(ab))
 
 
+PULL = 15.0  # seconds: a cooldown pressed on cooldown goes out at the pull
 CADENCE = 0.75  # pressed this share of the most casts its usual gap allows: on cooldown, no moment kept for a hit
 
 
@@ -485,7 +486,9 @@ def on_cadence(per_player: list[list[float]], per_kill: float, duration: float) 
     from itertools import pairwise
 
     gaps = [y - x for ts in per_player if ts for x, y in pairwise(sorted(ts))]
-    if len(gaps) < 5 or not duration:
+    firsts = [min(ts) for ts in per_player if ts]
+    # kept past the pull, the first press is a choice (Tranquility at the 0:35 hit), not the cooldown's cadence
+    if len(gaps) < 5 or not duration or statistics.median(firsts) > PULL:
         return 0.0
     gap = statistics.median(gaps)
     return gap if gap and per_kill >= CADENCE * (1 + duration / gap) else 0.0
