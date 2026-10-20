@@ -394,9 +394,7 @@ def render_sheet(p: TankPrep) -> str:
     boss (the abilities that hit you, the journal), Dig deeper (your other cooldowns, the top raids' tanks)."""
     from paf.defensives import is_defensive
     from paf.healer import (
-        _plain as plain,
-    )
-    from paf.healer import (
+        SWAP_LANE,
         _share,
         build_lead,
         comps_table,
@@ -409,6 +407,9 @@ def render_sheet(p: TankPrep) -> str:
         split_html,
         talents_html,
         trinkets_html,
+    )
+    from paf.healer import (
+        _plain as plain,
     )
     from paf.prep_report import sheet_page
 
@@ -435,7 +436,9 @@ def render_sheet(p: TankPrep) -> str:
     if p.moments:
         m = max(p.moments, key=lambda x: x.ratio)
         own = bool(set(moment_names(m)) & {n for n, _s in p.hitters[:3]})  # any of its abilities a tank hitter
-        answers = ([(c.name, c.times, c.support or [0.0] * len(c.times)) for c in defs if not c.every]
+        answers = ([(c.name, [t for t, n in zip(c.times, c.near, strict=False) if n],  # a press back from
+                     [sp for sp, n in zip(c.support or [0.0] * len(c.times), c.near, strict=False) if n])  # cooldown
+                    for c in defs if not c.every]  # is no answer (Shield Wall's 3:51)
                    + [(n, ts, sps) for n, _u, _k, ts, _ev, sps in p.short_defs])
         def answer(m: Moment) -> tuple | None:  # the most shared press for a hit (Spell Reflection, 41% at 0:33,
             return max(((n, t, sp) for n, ts, sps in answers for t, sp in zip(ts, sps, strict=False)  # before
@@ -448,6 +451,7 @@ def render_sheet(p: TankPrep) -> str:
         # every other dot: its most shared press, or none (Vashnik's 2:55, Spell Reflection 24%)
         rest = [(x, answer(x)) for x in p.moments if x is not m]
         said = [f"for the {_mmss(x.t)} hit, {a[2]:.0%} press {e(a[0])} (about {_mmss(a[1])})" for x, a in rest if a]
+        answered = {(a[0], a[1]) for a in [press, *(a for _x, a in rest)] if a}  # the chart draws these full
         bare = [_mmss(x.t) for x, a in rest if not a]
         if said:
             lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 3:55 hit, 24% press Shield Wall"
@@ -469,14 +473,16 @@ def render_sheet(p: TankPrep) -> str:
                        f", the first time at {_mmss(p.swaps[0])}" + (f" after {e(causes[0])}." if causes[0] else ".")))
     # the chart's lanes: the defensives and short ones, the lead's answer first (Spell Reflection had none)
     shorts = [Cooldown(n, 0, u, k, ts, ["" for _ in ts], support=sps) for n, u, k, ts, _ev, sps in p.short_defs if ts]
-    lane = [Cooldown("Tank swaps", 0, 1.0, len(p.swaps), p.swaps, ["swap"] * len(p.swaps))] if p.swaps else []
+    lane = [Cooldown("Tank swaps", SWAP_LANE, 1.0, len(p.swaps), p.swaps, [""] * len(p.swaps))] if p.swaps else []
+    if not p.moments:
+        answered = set()
     svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight, their defensives and "
-                    "the swaps", [*lane, *defs, *shorts],
-                    {"Tank swaps", *([press[0]] if p.moments and press else [])})
+                    "the swaps", [*defs, *shorts, *lane], {"Tank swaps", *(n for n, _t in answered)}, answered)
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + [
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the top tanks "
-        f"take per second, median of {p.damage_kills or 'the'} kills read; a dot marks the tanks' biggest damage, "
-        f"whatever casts it.</p><ul class='hl2'>"
+        f"take per second, median of {p.damage_kills or 'the'} kills; under it, the defensives the lead names (an "
+        f"outline: another press of the same button) and the swaps. A dot is the tanks' biggest damage, whatever "
+        f"casts it.</p><ul class='hl2'>"
         f"{moments_html(p.moments, 'tank damage') or '<li>No big moment: steady damage.</li>'}</ul></div>",
         f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><p class='small muted'>A button pressed on "
         f"cooldown or about every minute, a potion or a trinket is never tied to a hit: it lands near one by its "

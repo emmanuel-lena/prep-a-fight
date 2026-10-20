@@ -39,6 +39,25 @@ def spell_names(locale: str = "") -> dict[int, str]:
 
 
 @cache
+def same_name_spells() -> dict[str, list[int]]:
+    """Spell name -> every spell id of that name: a cast whose effect is a script (Divine Steed, a dummy) and the
+    buff it applies share a name."""
+    out: dict[str, list[int]] = {}
+    for i, n in spell_names().items():
+        out.setdefault(n, []).append(i)
+    return out
+
+
+def is_speed(spell_id: int) -> bool:
+    """A movement button: it, or its buff of the same name, raises run speed (aura 31) and changes no spell nor
+    damage (Divine Steed; not Avenging Wrath)."""
+    name = spell_names().get(spell_id)
+    ids = {spell_id, *(same_name_spells().get(name, []) if name else [])}
+    auras = {r.get("EffectAura") for i in ids for r in _filtered_rows("SpellEffect", "SpellID", i)}
+    return "31" in auras and not auras & {"108", "107", "79", "129"}  # spell mods, damage done, haste: throughput
+
+
+@cache
 def talent_entry_names() -> dict[int, str]:
     """TraitNodeEntry id (what Warcraft Logs reports as talentID) -> talent name."""
     spells = spell_names()

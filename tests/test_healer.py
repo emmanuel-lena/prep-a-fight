@@ -187,3 +187,19 @@ def test_every_healer_spec_in_one_table():
     assert "Restoration Shaman <small>(you)</small>" in table and "&ndash;" in table
     more = healer.roles_more([shaman, disc], "Restoration Shaman")
     assert "removes Essence Rend" in more and "Ascendance" not in more  # your own times are on the fight tab
+
+
+def test_a_press_back_from_cooldown_in_a_hit_is_said_and_drawn_as_none():
+    # Vashnik heroic, Restoration Druid: Tranquility at 0:42 for the 0:40 hit, again at 2:45 as soon as it is back
+    ab = SimpleNamespace(id=1, name="Tranquility", users=1.0, per_kill=2.0)
+    players = [{"casts": {1: [42.0, 165.0]}} for _ in range(10)]
+    tl = SimpleNamespace(abilities=[ab], duration=240.0, players=players)
+    found = [healer.Moment(40.0, 1000.0, 5.0, "Caustic Surge"), healer.Moment(160.0, 1000.0, 5.0, "Caustic Surge")]
+    cds = healer.cooldowns(tl, found, {1: (120.0, 1)})
+    assert cds[0].rhythm and cds[0].near[1] == ""
+    h = healer.HealerPrep("Boss", "heroic", "Restoration Druid", 10, 240.0, [100.0] * 48, found, cds, [], [], [], [])
+    sheet = healer.render_sheet(h)
+    assert "for the 0:40 hit, 100% press Tranquility (about 0:42)" in sheet
+    assert "No cooldown is kept for the 2:40 hit (100% have Tranquility land at 2:45, back from cooldown)" in sheet
+    assert "2:45 &middot; 100% of the top players &middot; back from cooldown" in sheet
+    assert "class='cp off'><title>Tranquility 2:45" in sheet and "class='cp'><title>Tranquility 0:42" in sheet
