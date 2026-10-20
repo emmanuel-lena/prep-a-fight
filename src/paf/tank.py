@@ -70,7 +70,7 @@ class TankPrep:
     abilities: str = ""  # the Encounter Journal's stages, the tanks' abilities in full (paf.bossguide), html
     stacks: dict = field(default_factory=dict)  # debuff on the top tanks -> (peak stacks, seconds each cycle)
     swap_debuff: str = ""  # the tank ability whose debuff the tanks swap on (measured on them)
-    no_taunt: list = field(default_factory=list)  # (ability, its journal sentence): when taunts stop working
+    no_taunt: list = field(default_factory=list)  # (ability, its journal text, kills reaching it, kills read)
     hero: list = field(default_factory=list)  # (hero tree, share of the top players), paf.healer.hero_split
     damage_kills: int = 0  # kills the tanks' damage curve is the median of
     short_defs: list = field(default_factory=list)  # (spell, share of the top tanks, casts a kill): too frequent
@@ -342,6 +342,25 @@ def _taunt(spell_id: int) -> bool:
         return False
 
 
+def reached(con, encounter_id: int, difficulty: int, name: str) -> tuple[int, int]:
+    """(kills where the boss casts or gains `name`, kills read): a journal mechanic the top kills may never reach
+    (Nek'zali's Uncoiled Rage, a full-energy enrage: 0 of them)."""
+    from paf.corpus.analyze import kills_filter
+
+    where, params = kills_filter(encounter_id, difficulty)
+    ids = [r[0] for r in con.execute("SELECT id FROM ability WHERE name=?", (name,))]
+    n = con.execute(f"SELECT COUNT(*) FROM fight f WHERE {where}", params).fetchone()[0]
+    if not ids:
+        return 0, n
+    marks = ",".join("?" * len(ids))
+    hit = con.execute(
+        f"SELECT COUNT(DISTINCT f.report || f.fight_id) FROM fight f WHERE {where} AND ("
+        f"EXISTS (SELECT 1 FROM boss_aura b WHERE b.report=f.report AND b.fight_id=f.fight_id "
+        f"AND b.ability_id IN ({marks})) OR EXISTS (SELECT 1 FROM enemy_cast c WHERE c.report=f.report "
+        f"AND c.fight_id=f.fight_id AND c.ability_id IN ({marks})))", (*params, *ids, *ids)).fetchone()[0]
+    return hit, n
+
+
 def taunt_immunity(sections, difficulty: str) -> list[tuple[str, str]]:
     """The journal's sentences that stop the swaps (Nek'zali's Uncoiled Rage: "grants immunity to Taunt effects")."""
     import re
@@ -422,7 +441,7 @@ def render_sheet(p: TankPrep) -> str:
                    + [(n, ts, sps) for n, _u, _k, ts, _ev, sps in p.short_defs])
         press = next(((n, t, sp) for n, ts, sps in answers for t, sp in zip(ts, sps, strict=False)
                       if -ANSWER[0] <= t - m.t <= ANSWER[1]), None)
-        lead.append(f"Their biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({m.ratio:.1f}&times; the "
+        lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({m.ratio:.1f}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
                     + (f"; {press[2]:.0%} of the top {e(p.spec)}s press {e(press[0])} then (about {_mmss(press[1])})."
                        if press and press[2] else
@@ -453,9 +472,10 @@ def render_sheet(p: TankPrep) -> str:
                                                           f"</li></ul>" if swap else "")
         + (f"<p class='small muted'>About {extra} more swaps a kill come at varying times.</p>"
            if swap and (extra := round(2 * p.taunts_per_kill) - len(p.swaps)) > 0 else "")
-        + "".join(f"<p><b>Taunts stop working with {e(n)}:</b> {e(t)} <span class='muted'>(The Encounter Journal"
-                  + (f"; the top tanks still swap at {_mmss(p.swaps[-1])}" if p.swaps else "") + ".)</span></p>"
-                  for n, t in p.no_taunt)]
+        + "".join(f"<p><b>Taunts stop working with {e(n)}:</b> {e(t)} <span class='muted'>(The Encounter Journal; "
+                  + (f"never reached in the {k} top kills read" if not hit and k else
+                     f"reached in {hit} of the {k} top kills read" if k else "not measured") + ".)</span></p>"
+                  for n, t, hit, k in p.no_taunt)]
     change = [build_lead(p.builds, p.spec, p.split_players or p.kills, p.split),
               talents_html(p.builds, p.split_players or p.kills, f"{p.spec}s", p.hero),
               split_html(p.split, p.split_players, p.spec) if p.split else "",

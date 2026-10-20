@@ -41,7 +41,7 @@ def test_tank_busters_hitters_and_swaps():
     assert "What hits you, and when" in page and "Crush" in page and "Tank swaps" in page
     assert "Shield Wall" in page and "Shield Block" in page and "Taunt at 3 stacks." in page
     sheet = tank.render_sheet(p)  # the four-tab sheet the app shows: its lead names the tanks' own danger
-    assert "What hits the top tanks the most: Melee" in sheet and "Their biggest moment: 0:30, Crush" in sheet
+    assert "What hits the top tanks the most: Melee" in sheet and "The top tanks' biggest moment: 0:30, Crush" in sheet
 
 
 

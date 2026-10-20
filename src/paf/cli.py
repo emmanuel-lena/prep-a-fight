@@ -826,7 +826,8 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     p.split, p.split_players = healer.contested(con, enc.id, diff, spec)
     p.short_defs = short_defs
     p.hero = healer.hero_split(con, enc.id, diff, spec)
-    p.no_taunt = tank.taunt_immunity(bossguide.load(enc.id, diff_name), diff_name)
+    p.no_taunt = [(n, t, *tank.reached(con, enc.id, diff, n))
+                  for n, t in tank.taunt_immunity(bossguide.load(enc.id, diff_name), diff_name)]
     p.damage_kills = con.execute("SELECT COUNT(*) FROM tank_damage d JOIN fight f USING(report, fight_id) "
                                  "WHERE f.encounter_id=? AND f.difficulty=?", (enc.id, diff)).fetchone()[0]
     step("The stacks the top tanks swap at, and the deaths of each composition")

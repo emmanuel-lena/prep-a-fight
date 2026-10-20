@@ -397,6 +397,7 @@ class Role:
     se: dict[str, float] = field(default_factory=dict)  # standard error of each number (its healers' spread)
     buffs: float = 0.0  # damage buffs cast on another player (Power Infusion), per kill
     buff_spells: list[str] = field(default_factory=list)  # their names, the most cast first
+    spike_cover: float = 0.0  # the share of the fight the raid's damage spikes take: the spike share's baseline
 
 
 TANK_HEALER = 1.4  # a spec puts this many times the other healers' tank share on the tanks: the tank healer
@@ -485,8 +486,11 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
                             "dispels": se["dispels"], "raid_cds": se["raid"], "externals": se["ext"]},
                         buffs=st.mean(s["buff"]),
                         buff_spells=[(names or {}).get(ab, f"spell {ab}") for ab, _ in buff_casts[spec].most_common()]))
+    cover = [x for (x,) in con.execute(f"SELECT k.spike_share FROM heal_kill k JOIN fight f USING(report, fight_id) "
+                                       f"WHERE {where}", params) if x is not None]
     for r in out:
         r.jobs = jobs(r, out)
+        r.spike_cover = st.mean(cover) if cover else 0.0
     return sorted(out, key=lambda r: -r.players)
 
 
@@ -573,7 +577,7 @@ def jobs(r: Role, everyone: list[Role]) -> list[str]:
         out.append(f"heals the tanks: {r.tank:.0%} of its healing goes on them, ±{2 * r.se.get('tank', 0):.0%} "
                    f"(the other healers of these kills: {ref('tank'):.0%})")
     if r.spike >= max(0.05, ref("spike") * SPIKE_HEALER) and clear("spike"):
-        out.append(f"answers the raid's big moments: {r.spike:.0%} of its healing lands in them, "
+        out.append(f"answers the raid's damage spikes: {r.spike:.0%} of its healing lands in them, "
                    f"±{2 * r.se.get('spike', 0):.0%} (the other healers of these kills: {ref('spike'):.0%})")
     if r.dispels >= max(0.2, ref("dispels") * DISPELLER) and clear("dispels"):
         out.append(f"dispels {r.dispels:.1f} times a minute, ±{2 * r.se.get('dispels', 0):.1f} "

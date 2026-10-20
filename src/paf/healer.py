@@ -63,6 +63,7 @@ class Moment:
     dtps: float  # raid damage taken per second there
     ratio: float  # times the median
     boss_spell: str = ""
+    after: str = ""  # the raid-wide boss cast it follows, with its delay ("about 16 s after Imbibe")
 
 
 @dataclass
@@ -77,6 +78,7 @@ class Cooldown:
     every: float = 0.0  # pressed on cooldown, about every this many seconds (paf.healroles.on_cadence)
     support: list[float] = field(default_factory=list)  # each moment's share of the players pressing it then
     alt_support: list[float] = field(default_factory=list)  # the same for the other habits
+    alt_near: list[str] = field(default_factory=list)  # the hit another habit answers, if any
 
 
 @dataclass
@@ -287,6 +289,8 @@ def moments(curve: list[float], boss_casts: list[tuple[str, list[float]]], top: 
         elif later:  # the damage that follows a cast (Vashnik: the waves 16 to 28 s after Imbibe), matched by timing;
             hits = [c for c in later if c[1] in raid]  # an ability the journal says hits all players goes first
             m.boss_spell = f"after {min(hits or later)[1]}"
+            if hits:  # kept when the moment is renamed by what hits: the journal's raid-wide cast it follows
+                m.after = f"about {min(hits)[0]:.0f} s after {min(hits)[1]}"
     return sorted(sorted(found, key=lambda m: -m.ratio)[:top], key=lambda m: m.t)
 
 
@@ -411,7 +415,14 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         times, near, support = [times[i] for i in kept], [near[i] for i in kept], [support[i] for i in kept]
         alt = [] if every else alt
         alt_support = [sum(1 for ts in per_player if any(abs(x - t) <= 8 for x in ts)) / n_all for t in alt]
-        out.append(Cooldown(name, sid, users, per_kill, times, near, alt, every, support, alt_support))
+        kept = [i for i, sp in enumerate(alt_support) if sp >= 0.25 * users]  # the same quarter as the moments
+        alt, alt_support = [alt[i] for i in kept], [alt_support[i] for i in kept]
+        alt_near = []  # another habit answers a hit too (Aura Mastery at 0:36 for 28%: the 0:35 hit)
+        for t in alt:
+            m = min(found, key=lambda m: abs(m.t - t), default=None)
+            ok = tied and m is not None and -ANSWER[0] <= t - m.t <= ANSWER[1]
+            alt_near.append(f"{_mmss(m.t)} {m.boss_spell}".strip() if ok else "")
+        out.append(Cooldown(name, sid, users, per_kill, times, near, alt, every, support, alt_support, alt_near))
     return sorted(out, key=lambda c: -c.users)
 
 
@@ -485,7 +496,7 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
     cds = "".join(
         f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(_shown(c.name).split(',')[0][:22])}</text>"
         + "".join(f"<rect x='{float(x(t)) - 3:.1f}' y='{H - B + 7 + 18 * i}' width='6' height='11' rx='1.5' "
-                  f"class='cp'><title>{e(c.name)} {_mmss(t)}</title></rect>" for t in c.times if t <= span)
+                  f"class='cp'><title>{e(c.name)} {_mmss(t)}</title></rect>" for t in [*c.times, *c.alt] if t <= span)
         for i, c in enumerate(rows))
     return (f"<svg viewBox='0 0 {W} {H}' class='rd' role='img' aria-label='{e(label)}'>"
             f"<line class='ax' x1='{L}' x2='{W - 10}' y1='{H - B}' y2='{H - B}'/>{median}{lines}{ticks}"
@@ -500,7 +511,8 @@ def _per_s(v: float) -> str:
 def moments_html(found: list[Moment], what: str) -> str:
     """what: kept for the callers; a moment no boss cast explains shows its time only."""
     return "".join(f"<li><b>{_mmss(m.t)}</b><span>{e(m.boss_spell) if m.boss_spell else ''}</span>"
-                   f"<small>{m.ratio:.1f}&times; the usual damage</small></li>" for m in found)
+                   f"<small>{m.ratio:.1f}&times; the usual damage{' &middot; ' + e(m.after) if m.after else ''}</small></li>"
+                   for m in found)
 
 
 def _shown(name: str) -> str:
@@ -828,7 +840,7 @@ def jobs_lead(roles: list, mine: str = "") -> str:
 
 
 NUMS_NOTE = ("On each card, the median player of the spec (externals and Power Infusion: a mean): the share of the kill's healing (medians over different "
-             "kills, they do not add up); of its own healing, the share on the tanks and in the raid's big moments; "
+             "kills, they do not add up); of its own healing, the share on the tanks and in the raid's damage spikes (every 5 s at 1.5 times the kill's median: a wider net than the chart's big moments); "
              "overheal; dispels a minute, all of them (the boss tab counts the top healer of each kill); externals a "
              "kill (protective cooldowns cast on another player, not on themselves). Externals and overheal follow "
              "each spec's kit on every boss: shown, never called a job of this boss. The times on a card are the "
@@ -837,7 +849,8 @@ NUMS_NOTE = ("On each card, the median player of the spec (externals and Power I
 
 def _nums(r) -> list[str]:
     """A healer spec's numbers, all of them, the same on every card (NUMS_NOTE says what each is)."""
-    out = [f"{_pct(r.healing)} of the kill's healing", f"{_pct(r.tank)} on the tanks", f"{_pct(r.spike)} in big moments",
+    out = [f"{_pct(r.healing)} of the kill's healing", f"{_pct(r.tank)} on the tanks",
+           f"{_pct(r.spike)} in damage spikes" + (f" (spikes are {_pct(r.spike_cover)} of the fight)" if r.spike_cover else ""),
            f"{_pct(r.overheal)} overheal", f"{r.dispels:.1f} dispels a minute",
            f"{r.externals:.1f} externals a kill on average" if r.externals >= 0.05 else "no externals"]
     if r.buffs:
@@ -886,7 +899,10 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
                  f"{cells}</tr>")
     head = (f"<th>{what}</th><th>Top kills with one</th><th>Per kill</th><th>Median kill</th>"
             + ("<th>Deaths per 20 players</th>" if deaths else ""))
-    return (f"<table class='hcomp'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"
+    marked = "beyond the noise" in rows
+    return ((f"<p>With or without any {e(what.lower())} spec here, kill time and deaths stay within the noise.</p>"
+             if not marked else "")
+            + f"<table class='hcomp'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"
             "<p class='small muted'>A difference with and without a spec is marked when it is beyond the noise "
             "(three standard errors); unmarked, it is within it.</p>")
 
@@ -941,8 +957,10 @@ def render_sheet(h: HealerPrep) -> str:
         answers = []
         for m in shown:
             mine_here = [(c.name, t, sp) for c in heals if not _external(c.spell_id)  # a buff on one player: no answer
-                         for t, n, sp in zip(c.times, c.near, c.support or [0.0] * len(c.times), strict=False)
-                         if n and n.split(" ", 1)[0] == _mmss(m.t)]
+                         for t, n, sp in [*zip(c.times, c.near, c.support or [0.0] * len(c.times), strict=False),
+                                          *zip(c.alt, c.alt_near or [""] * len(c.alt),
+                                               c.alt_support or [0.0] * len(c.alt), strict=False)]
+                         if n and n.split(" ", 1)[0] == _mmss(m.t)]  # the main moment or another habit
             if mine_here:  # with its share: a third of the top players is a habit, not the consensus
                 answers.append(f"for the {_mmss(m.t)} hit, "
                                + _and([f"{e(_shown(n))} ({_pct(sp)} of them, about {_mmss(t)})"
@@ -985,7 +1003,7 @@ def render_sheet(h: HealerPrep) -> str:
                   f"To weigh a talent or an item for your character, use <a href=\"{QE_LIVE}\" target=\"_blank\" "
                   f"rel=\"noopener\">QE Live</a>.</p>")
     jr = "".join(f"<li>{e(_plain(x))}</li>" for x in h.journal)
-    when = (f", a median {h.dispel_delay[0]:.0f} s after it lands on the player" if h.dispel_delay else "")
+    when = (f", a median {h.dispel_delay[0]:.0f} s after it lands" if h.dispel_delay else "")
     # what the dispel sets off, when it is part of a big moment (Vashnik: Caustic Explosion at 2:10 and 3:35)
     feeds = sorted({n for m in h.moments for n in moment_names(m) if n and n in (h.dispel_text or "")})
     fed = "".join(f" {e(n)} is part of the raid's big damage at "
@@ -993,12 +1011,9 @@ def render_sheet(h: HealerPrep) -> str:
                   for n in feeds)
     # a dispel every healer does: said as what the top players do, not as this spec's job (Dig deeper says those)
     aura = h.dispelled[0][0] if h.dispelled else ""
-    both = (" The Encounter Journal also says it appears when the debuff expires."  # Essence Rend: both texts
-            if "removal" in (h.dispel_text or "").lower()
-            and any(aura in x and "expir" in x.lower() for x in h.journal) else "")
     first = ([f"<p class='lead'>The top {e(h.spec)} of each kill removes {e(aura)} {h.dispelled[0][1]:.1f} times "
               f"({h.dispel_kills} kills read){when}."
-              + (f" {e(h.dispel_text)}" if h.dispel_text else "") + both + fed + "</p>"]
+              + (f" {e(h.dispel_text)}" if h.dispel_text else "") + fed + "</p>"]  # the journal's other text: below
              if h.dispelled and h.dispelled[0][1] >= 1 else [journal_lead(h.journal, "healers")])
     boss = first + (
         [f"<h2>What the Encounter Journal asks healers</h2><ul class='hl2'>{jr}</ul>"] if jr else [])
@@ -1034,7 +1049,7 @@ def render_sheet(h: HealerPrep) -> str:
         have = next((x for x in h.presence if x.spec == h.spec), None)
         if have and have.share >= 0.99:  # the corpus is your spec's top players' kills: they all have one
             line = (f"These are the top {e(h.spec)}s' kills, so every one has a {e(h.spec)} ({have.per_kill:.1f} a "
-                    f"kill); the table tells what the other healers bring.")
+                    f"kill); the table shows how often each other healer is there, and the kills with and without it.")
         elif have:
             line = f"{_pct(have.share)} of the top kills bring a {e(h.spec)} ({have.per_kill:.1f} a kill when they do)."
         else:
