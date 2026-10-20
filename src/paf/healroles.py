@@ -440,7 +440,7 @@ def jobs(r: Role, everyone: list[Role]) -> list[str]:
 
 
 def sample(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> tuple[int, float, float]:
-    """The kills the roles were measured on: (kills, median kill time, median deaths). Shown with the roles: the
+    """The kills the roles were measured on: (kills, median kill time, mean deaths). Shown with the roles: the
     sample changes them (Nek'zali heroic, the same specs: overheal 46-63% in kills ranked by an Elemental's damage,
     4:05 and no death; 19-35% in kills ranked by a Restoration Shaman's healing, 4:50 and 2 deaths)."""
     ensure_tables(con)
@@ -449,4 +449,4 @@ def sample(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> tuple
                        f"WHERE {where}", params).fetchall()
     if not rows:
         return 0, 0.0, 0.0
-    return len(rows), st.median(r[0] for r in rows), st.median(r[1] for r in rows)
+    return len(rows), st.median(r[0] for r in rows), round(st.mean(r[1] for r in rows), 1)

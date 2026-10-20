@@ -844,9 +844,10 @@ def _dispel_text(sections, name: str, diff_name: str) -> str:
         t = bossguide.readable(s.text, diff_name).strip() if s.text else ""
         return t or bossguide.readable(bossguide.describe(s.spell_id), diff_name).strip()
     for _, s in walk(sections):
-        if s.kind == "ability" and s.title == name:
-            parts = [said(s)] + [f"{c.title}: {said(c)}" for c in s.children if c.kind == "ability" and said(c)]
-            return " ".join(p for p in parts if p)
+        if s.kind == "ability" and s.title == name:  # the sentence on its removal, else its first one
+            text = " ".join([said(s)] + [said(c) for c in s.children if c.kind == "ability"])
+            sentences = re.split(r"(?<=[.!?])\s+", text)
+            return next((x for x in sentences if re.search(r"\b(removal|removed|dispel)", x, re.I)), sentences[0])
     return ""
 
 
@@ -957,7 +958,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     n, dur, dead = healroles.sample(con, enc.id, diff)
     h.role_kills = n
     h.role_sample = (f"kills of the top {healroles.pretty(cls, spec)}s (ranked by their healing), median "
-                     f"{healer._mmss(dur)} and {dead:g} deaths")
+                     f"{healer._mmss(dur)}, {dead:.1f} deaths a kill")
     for r in h.roles:
         print(f"  {r.spec} ({r.players} healers): {'; '.join(r.jobs)}")
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"

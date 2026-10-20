@@ -613,8 +613,7 @@ def render_sheet(h: HealerPrep) -> str:
                   f"rel=\"noopener\">QE Live</a>.</p>")
     jr = "".join(f"<li>{e(_plain(x))}</li>" for x in h.journal)
     first = ([f"<p class='lead'>Your measured job here: dispel {e(h.dispelled[0][0])} ({h.dispelled[0][1]:.1f} a kill "
-              f"in the top kills).</p>" + (f"<p class='aside'>What it does, from the game: {e(h.dispel_text)}</p>"
-                                           if h.dispel_text else "")]
+              f"in the top kills)." + (f" {e(h.dispel_text)}" if h.dispel_text else "") + "</p>"]
              if h.dispelled and h.dispelled[0][1] >= 1 else [journal_lead(h.journal, "healers")])
     boss = first + (
         [f"<h2>What the Encounter Journal asks healers</h2><ul class='hl2'>{jr}</ul>"] if jr else [])
