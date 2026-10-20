@@ -286,6 +286,10 @@ def presence(con: sqlite3.Connection, encounter_id: int, difficulty: int,
     ks = list(kills_of(con, encounter_id, difficulty, role).values())
     out = []
 
+    def mean(vals: list) -> float | None:
+        vals = [v for v in vals if v is not None]
+        return round(st.mean(vals), 1) if vals else None
+
     def med(vals: list) -> float | None:
         vals = [v for v in vals if v is not None]
         return st.median(vals) if vals else None
@@ -293,8 +297,9 @@ def presence(con: sqlite3.Connection, encounter_id: int, difficulty: int,
         with_ = [k for k in ks if s in k[0]]
         without = [k for k in ks if s not in k[0]]
         out.append(Presence(s, len(with_) / len(ks), st.mean(k[0].count(s) for k in with_), len(with_),
-                            med([k[1] for k in with_]), med([k[1] for k in without]), med([k[2] for k in with_]),
-                            med([k[2] for k in without])))
+                            med([k[1] for k in with_]), med([k[1] for k in without]), mean([k[2] for k in with_]),
+                            mean([k[2] for k in without])))  # deaths: a mean (one decimal), a median of 0s and 1s
+                                                              # reads as a verdict
     return sorted(out, key=lambda p: -p.share)
 
 

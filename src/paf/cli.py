@@ -815,8 +815,13 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     healroles.fetch_heal_roles(client, con, enc.id, diff)  # each kill's deaths (and its healers), as for a healer
     p.presence = healroles.presence(con, enc.id, diff, role=healroles.TANKS)
     p.comps = healroles.comps(con, enc.id, diff, role=healroles.TANKS)
-    p.abilities = _role_journal(enc.id, diff_name, "tank", tl, {  # another role's ability that hits the tanks too
-        n: f"{s:.0%} of the damage the top tanks take" for n, s in hitters if s >= 0.05})
+    also = {n: f"{s:.0%} of the damage the top tanks take" for n, s in hitters if s >= 0.05}  # another role's
+    if p.swap_debuff in p.stacks:  # ability hitting the tanks too; the swap debuff as measured (the journal may say
+        peak, secs = p.stacks[p.swap_debuff]  # "stacks" where heroic does not)
+        hit = f"; {also[p.swap_debuff]}" if p.swap_debuff in also else ""
+        also[p.swap_debuff] = ("measured on the top tanks: " + (f"about {peak} stacks" if peak >= 2 else "no stacks")
+                               + f", about {secs:.0f} s each{hit}")
+    p.abilities = _role_journal(enc.id, diff_name, "tank", tl, also)
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(tank.render_sheet(p), encoding="utf-8")

@@ -530,7 +530,7 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
                  f"<td class='n'>{_pct(p.share)} <small>({p.kills} kill{'s' if p.kills != 1 else ''})</small></td>"
                  f"{cells}</tr>")
     head = (f"<th>{what}</th><th>Top kills with one</th><th>Per kill</th><th>Median kill</th>"
-            + ("<th>Median deaths</th>" if deaths else ""))
+            + ("<th>Deaths a kill</th>" if deaths else ""))
     return f"<table class='hcomp'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"
 
 

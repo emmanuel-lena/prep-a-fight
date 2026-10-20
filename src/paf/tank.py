@@ -350,8 +350,9 @@ def render_sheet(p: TankPrep) -> str:
     named = [c for c in causes if c]
     common = max(set(named), key=named.count) if named else ""
     one = bool(common) and named.count(common) >= len(causes) / 2  # one ability behind most swaps: said once
-    if p.swap_debuff:  # measured on the top tanks: what they swap on, whatever cast comes just before
+    if p.swap_debuff:  # measured on the top tanks: what they swap on; a cast just before is no cause then
         common, one = p.swap_debuff, True
+        causes = ["" for _ in p.swaps]
     swap = "".join(f"<span class='chip'>{_mmss(t)}{f' after {e(c)}' if c and not (one and c == common) else ''}</span>"
                    for t, c in zip(p.swaps, causes, strict=False))
     lead = []
@@ -424,8 +425,8 @@ def render_sheet(p: TankPrep) -> str:
                       + comps_table(p.comps, p.kills).replace("Healers", "Tanks"))
         deaths = any(x.deaths_with is not None for x in p.presence)
         deeper.append("<p class='small muted'>" + ("" if deaths else "The deaths of each composition are not read yet. ")
-                      + "A spec's longer kills are a reading, not a verdict: the raids that bring it differ in other "
-                      "ways too.</p>")
+                      + "A spec's longer kills or extra deaths are a reading, not a verdict: the raids that bring it "
+                      "differ in other ways too, and a few kills move a mean of deaths.</p>")
     byline = (f"{e(p.character or p.spec)} &middot; {e(p.spec)} &middot; {p.kills} top tank kills &middot; "
               f"a {_mmss(p.duration)} fight")
     return sheet_page(p.boss, p.difficulty, byline, p.class_name,

@@ -60,7 +60,7 @@ def test_compositions_and_jobs():
     assert cs[0].deaths == 1.0 and cs[0].duration == 240
     pres = {p.spec: p for p in healroles.presence(con, 3470, 4)}
     assert pres["Restoration Druid"].share == 0.6 and pres["Restoration Shaman"].share == 1.0
-    assert pres["Restoration Druid"].deaths_with == 1 and pres["Restoration Druid"].deaths_without == 0.5
+    assert pres["Restoration Druid"].deaths_with == 1 and pres["Restoration Druid"].deaths_without == 0.8  # a mean now
     rs = {r.spec: r for r in healroles.roles(con, 3470, 4, {10060: "Power Infusion", 98008: "Spirit Link Totem"},
                                              min_players=5)}
     shaman, priest = rs["Restoration Shaman"], rs["Holy Priest"]
