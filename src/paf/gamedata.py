@@ -61,6 +61,16 @@ def is_speed(spell_id: int) -> bool:
             and not effects & {"2", "10", "136"})
 
 
+def is_ramp_kind(spell_id: int) -> bool:
+    """A button that heals nothing itself and changes other spells (aura 108): Evangelism, Rapture, Spirit Shell, a
+    ramp's finisher. Not a channel or a heal (Celestial Conduit), nor haste (Avenging Wrath, aura 129)."""
+    name = spell_names().get(spell_id)
+    rows = [r for i in {spell_id, *(same_name_spells().get(name, []) if name else [])}
+            for r in _filtered_rows("SpellEffect", "SpellID", i)]
+    auras, effects = {r.get("EffectAura") for r in rows}, {r.get("Effect") for r in rows}
+    return "108" in auras and not auras & {"23", "8", "3", "226", "129"} and not effects & {"2", "10", "136", "28"}
+
+
 def is_utility(spell_id: int) -> bool:
     """A utility button, no healing cooldown: a pure dispel (effect 38, Mass Dispel), a knockback (effects 98, 144 in
     the spells of its name, Ring of Peace) with no heal nor damage, or a movement button (is_speed)."""

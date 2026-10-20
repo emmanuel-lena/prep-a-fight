@@ -203,3 +203,40 @@ def test_a_press_back_from_cooldown_in_a_hit_is_said_and_drawn_as_none():
     assert "No cooldown is kept for the 2:40 hit (100% have Tranquility land at 2:45, back from cooldown)" in sheet
     assert "2:45 &middot; 100% of the top players &middot; back from cooldown" in sheet
     assert "class='cp off'><title>Tranquility 2:45" in sheet and "class='cp'><title>Tranquility 0:42" in sheet
+
+
+def test_an_external_says_how_many_go_on_another_player():
+    # Mistweaver, Nek'zali heroic: about one Life Cocoon in five goes on the Monk himself
+    import sqlite3
+
+    con = sqlite3.connect(":memory:")
+    con.executescript(
+        "CREATE TABLE fight(report TEXT, fight_id INT, encounter_id INT, difficulty INT, status TEXT, cohort TEXT,"
+        " duration_s REAL);"
+        "CREATE TABLE ranked(report TEXT, fight_id INT, actor_id INT, spec TEXT);"
+        "CREATE TABLE player_cast(report TEXT, fight_id INT, actor_id INT, ability_id INT, type TEXT, t REAL,"
+        " target_id INT);"
+        "INSERT INTO fight VALUES ('a', 1, 3470, 4, 'done', '', 300);"
+        "INSERT INTO ranked VALUES ('a', 1, 7, 'Mistweaver');")
+    con.executemany("INSERT INTO player_cast VALUES ('a', 1, 7, 116849, 'cast', ?, ?)",
+                    [(10.0 * i, 7 if i == 0 else 20 + i) for i in range(5)])
+    assert healer.on_others(con, 3470, 4, "Mistweaver", [116849]) == {116849: 0.8}
+    cd = healer.Cooldown("Life Cocoon", 116849, 1.0, 4.0, [30.0], [""], why="cast on another player", on_others=0.8)
+    row = healer.cooldowns_html([cd])
+    assert "80% of them on another player" in row and "mostly cast on another player" in row
+
+
+def test_a_ramp_answers_the_hit_after_it(monkeypatch):
+    # Vashnik heroic, Discipline Priest: Evangelism at 0:24, 1:42 and 3:15 for the 0:40, 2:10 and 3:35 hits
+    monkeypatch.setattr(healer, "_ramp_kind", lambda sid: True)  # a ramp's button by the game data
+    ab = SimpleNamespace(id=1, name="Evangelism", users=1.0, per_kill=3.0)
+    players = [{"casts": {1: [24.0, 102.0, 195.0]}} for _ in range(10)]
+    tl = SimpleNamespace(abilities=[ab], duration=270.0, players=players)
+    found = [healer.Moment(t, 1000.0, 5.0, "Caustic Surge") for t in (40.0, 130.0, 215.0)]
+    cd = healer.cooldowns(tl, found, {1: (90.0, 1)})[0]
+    assert cd.ramp and cd.near == ["0:40 Caustic Surge", "2:10 Caustic Surge", "3:35 Caustic Surge"]
+    h = healer.HealerPrep("Boss", "heroic", "Discipline Priest", 10, 270.0, [100.0] * 54, found, [cd], [], [], [],
+                          [])
+    sheet = healer.render_sheet(h)
+    assert "for the 0:40 hit, 100% press Evangelism (about 0:24, a ramp ahead of it)" in sheet
+    assert "0:24 &middot; 16 s before the 0:40 hit" in sheet and "1:42 &middot; 28 s before the 2:10 hit" in sheet

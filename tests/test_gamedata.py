@@ -93,3 +93,18 @@ def test_a_utility_button_is_a_pure_dispel_a_knockback_or_a_move(monkeypatch):
         assert gamedata.is_utility(32375) and gamedata.is_utility(116844) and not gamedata.is_utility(115310)
     finally:
         gamedata.same_name_spells.cache_clear()
+
+
+def test_a_ramp_button_changes_spells_and_heals_nothing(monkeypatch):
+    # Evangelism (dummy, spell mods) is a ramp's button; Celestial Conduit changes spells too but heals as a channel
+    effects = {472433: [{"Effect": "3", "EffectAura": "0"}, {"Effect": "6", "EffectAura": "108"}],
+               443028: [{"Effect": "6", "EffectAura": "23"}, {"Effect": "6", "EffectAura": "108"}],
+               443039: [{"Effect": "10", "EffectAura": "0"}]}
+    names = {472433: "Evangelism", 443028: "Celestial Conduit", 443039: "Celestial Conduit"}
+    monkeypatch.setattr(gamedata, "_filtered_rows", lambda table, col, value: effects.get(value, []))
+    monkeypatch.setattr(gamedata, "spell_names", lambda locale="": names)
+    gamedata.same_name_spells.cache_clear()
+    try:
+        assert gamedata.is_ramp_kind(472433) and not gamedata.is_ramp_kind(443028)
+    finally:
+        gamedata.same_name_spells.cache_clear()

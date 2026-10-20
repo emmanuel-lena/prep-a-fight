@@ -51,6 +51,7 @@ STEP = 5.0
 SPIKE = 1.5  # a moment with this many times the median raid damage is a big hit
 RELATIVE = 0.85  # ... and every hit this close to the highest is one too (Nek'zali: 0:35 x1.62, 1:20 x1.57)
 SPIKE_GAP = 15.0
+RAMP = (8.0, 30.0)  # seconds before a hit a ramp button is pressed for it (Evangelism 1:42 for 2:10)
 ANSWER = (5.0, 8.0)  # seconds before and after a moment's start a press answers it: 5 s ahead, its 5 s window and 3
 WAVE = 1.2  # without any SPIKE, the waves of raid damage at this many times the median are the moments to plan for
 COOLDOWN_GAP = 45.0  # a spell cast at most once in this many seconds (median) is a cooldown
@@ -81,6 +82,8 @@ class Cooldown:
     alt_of: list[float] = field(default_factory=list)  # the moment (same press of the kill) each habit replaces
     why: str = ""  # why it is never tied to a hit, said on its row
     rhythm: float = 0.0  # after its first press, pressed again as soon as it is back, about every this many seconds
+    ramp: bool = False  # pressed 8 to 30 s before the hits it answers (paf.healer.RAMP): a ramp, said so
+    on_others: float = -1.0  # an external: the share of its casts on another player (Life Cocoon 0.81); -1 unread
 
 
 @dataclass
@@ -359,6 +362,16 @@ def _moving(spell_id: int) -> bool:
         return False
 
 
+def _ramp_kind(spell_id: int) -> bool:
+    """A ramp's button by the game data (paf.gamedata.is_ramp_kind): Evangelism, Rapture, Spirit Shell."""
+    try:
+        from paf.gamedata import is_ramp_kind
+
+        return is_ramp_kind(spell_id)
+    except Exception:  # noqa: BLE001 - offline
+        return False
+
+
 def _utility(spell_id: int) -> bool:
     """A utility button (paf.gamedata.is_utility): a pure dispel, a knockback, a movement button."""
     try:
@@ -467,8 +480,23 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
             ok = (tied and m is not None and -ANSWER[0] <= t - m.t <= ANSWER[1]
                   and not (rhythm and times and k != times[0]))
             alt_near.append(f"{_mmss(m.t)} {m.boss_spell}".strip() if ok else "")
+        # a ramp: pressed 8 to 30 s before the hits, on two of them at least and on most presses (Disc's
+        # Evangelism at 0:24, 1:42, 3:15 for Vashnik's 0:40, 2:10, 3:35): its job is the hit after it (the owner)
+        ramp = False
+        if tied and found and _ramp_kind(sid):
+            def ahead(t: float):
+                m = min((m for m in found if m.t > t), key=lambda m: m.t - t, default=None)
+                return m if m is not None and RAMP[0] <= m.t - t <= RAMP[1] else None
+            # its moments or another habit of each press (Evangelism: 0:04 on cooldown for some, 0:24 for others)
+            hit = {m.t for t in [*times, *alt] if (m := ahead(t))}
+            if len(hit) >= 2:
+                ramp = True
+                near = [n or (f"{_mmss(m.t)} {m.boss_spell}".strip() if (m := ahead(t)) else "")
+                        for t, n in zip(times, near, strict=False)]
+                alt_near = [n or (f"{_mmss(m.t)} {m.boss_spell}".strip() if (m := ahead(t)) else "")
+                            for t, n in zip(alt, alt_near, strict=False)]
         out.append(Cooldown(name, sid, users, per_kill, times, near, alt, every, support, alt_support, alt_near,
-                            alt_of, why, rhythm if len(times) > 1 else 0.0))
+                            alt_of, why, rhythm if len(times) > 1 else 0.0, ramp=ramp))
     return sorted(out, key=lambda c: -c.users)
 
 
@@ -630,6 +658,26 @@ def landed_in(m: Moment, cds: list[Cooldown]) -> str:
     return f" ({_pct(sp)} have {e(_shown(c.name))} land at {_mmss(t)}, {e(why)})"
 
 
+def on_others(con, encounter_id: int, difficulty: int, spec: str, spell_ids: list[int]) -> dict[int, float]:
+    """The share of each spell's casts by the ranked players that land on another player (Life Cocoon on Nek'zali:
+    124 of 153; the rest on the Monk himself): the card's "a kill" and the deeper table's "on others" then agree."""
+    from paf.corpus.analyze import kills_filter
+
+    if not spell_ids:
+        return {}
+    where, params = kills_filter(encounter_id, difficulty)
+    ids = ",".join(str(int(i)) for i in spell_ids)
+    out = {}
+    for sid, n, others in con.execute(
+            f"SELECT c.ability_id, COUNT(*), SUM(c.target_id IS NOT NULL AND c.target_id != c.actor_id) "
+            f"FROM player_cast c JOIN fight f USING(report, fight_id) JOIN ranked r ON r.report=c.report "
+            f"AND r.fight_id=c.fight_id AND r.actor_id=c.actor_id WHERE {where} AND r.spec=? AND c.type='cast' "
+            f"AND c.ability_id IN ({ids}) GROUP BY c.ability_id", (*params, spec)):
+        if n:
+            out[sid] = (others or 0) / n
+    return out
+
+
 def _rank(named: list[str]):
     """The order of the cooldown rows: the lead's answers, the other buttons tied to a hit, those on cooldown, then
     those never tied to one (a movement button, a trinket); by press share within each (Nature's Swiftness, 5 a
@@ -646,7 +694,8 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None) -> str:
     def tie(c: Cooldown, t: float, n: str) -> str:
         return n if answered is None or (c.name, t) in answered else ""
     return "".join(
-        f"<li><b>{e(_shown(c.name))}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill</small>"
+        f"<li><b>{e(_shown(c.name))}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill"
+        + (f", {_pct(c.on_others)} of them on another player" if 0 <= c.on_others < 0.95 else "") + "</small>"
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, tie(c, t, n))}{_share(sp)}{_or(c, t, answered)}"
                                         + (" &middot; back from cooldown" if c.rhythm and k and not c.why else "")
                                         + "</span>"
@@ -657,7 +706,8 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None) -> str:
         + (f"<small class='alt'>on cooldown, about every {c.every:.0f} s</small>" if c.every else
            "" if c.why and c.times else  # one reason a button; a press back from cooldown says it on its chip
            f"<small class='alt'>{_more(c)} more at varying times</small>" if c.times and _more(c) else "")
-        + (f"<small class='alt'>{e(c.why)}: not tied to a hit</small>" if c.why and c.times else "")
+        + (f"<small class='alt'>{'mostly ' if c.why.startswith('cast on another') and 0 <= c.on_others < 0.95 else ''}"
+           f"{e(c.why)}: not tied to a hit</small>" if c.why and c.times else "")
         + "</span></li>"
         for c in cds)
 
@@ -1162,14 +1212,17 @@ def render_sheet(h: HealerPrep) -> str:
             nth = ("first", "second", "third", "fourth")[k] if round(c.per_kill) > 1 and k < 4 else ""
             return f"their {nth + ' ' if nth else ''}{e(_shown(n))}"
 
+        def ramp_of(c) -> str:  # Evangelism 16 s ahead: the ramp is the answer
+            return ", a ramp ahead of it" if c.ramp else ""
+
         def clause(key: tuple, ps: list) -> tuple[float, str]:
             if len(key) == 1:  # two cooldowns as common for one hit
                 return key[0], (f"for the {_mmss(key[0])} hit, " + _and(
-                    [f"{_pct(sp)} press {e(_shown(n))} (about {_mmss(t)})" for n, t, sp, _p, _c in ps]))
+                    [f"{_pct(sp)} press {e(_shown(n))} (about {_mmss(t)}{ramp_of(c)})" for n, t, sp, _p, c in ps]))
             n, press = key
             if len(ps) == 1:
-                hit, t, sp, _c = ps[0]
-                return hit, f"for the {_mmss(hit)} hit, {_pct(sp)} press {e(_shown(n))} (about {_mmss(t)})"
+                hit, t, sp, c = ps[0]
+                return hit, f"for the {_mmss(hit)} hit, {_pct(sp)} press {e(_shown(n))} (about {_mmss(t)}{ramp_of(c)})"
             return ps[0][0], (f"{which(n, press, ps[0][3])} goes on " + _and(
                 [f"the {_mmss(hit)} hit ({_pct(sp)}, about {_mmss(t)})" for hit, t, sp, _c in ps], "or"))
         answers = [x for _t, x in sorted(clause(k, ps) for k, ps in by_press.items())]

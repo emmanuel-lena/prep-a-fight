@@ -960,6 +960,10 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     h.raid_kills = con.execute("SELECT COUNT(*) FROM raid_damage d JOIN fight f USING(report, fight_id) "
                                "WHERE f.encounter_id=? AND f.difficulty=?", (enc.id, diff)).fetchone()[0]
     h.hero = healer.hero_split(con, enc.id, diff, spec)
+    ext = [x for x in [*h.cooldowns, *h.rare] if healer._external(x.spell_id)]  # Life Cocoon: some on the Monk
+    shares = healer.on_others(con, enc.id, diff, spec, [x.spell_id for x in ext])
+    for x in ext:
+        x.on_others = shares.get(x.spell_id, -1.0)
     h.casts = {n: len(ts) for n, ts in tl.boss_casts}
     h.split, h.split_players = healer.contested(con, enc.id, diff, spec)
     h.builds = healer.build_rows(builds, h.split)  # the most played build's side of each split
