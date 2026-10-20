@@ -63,7 +63,6 @@ class Moment:
     dtps: float  # raid damage taken per second there
     ratio: float  # times the median
     boss_spell: str = ""
-    after: str = ""  # the raid-wide boss cast it follows, with its delay ("about 16 s after Imbibe")
 
 
 @dataclass
@@ -289,8 +288,6 @@ def moments(curve: list[float], boss_casts: list[tuple[str, list[float]]], top: 
         elif later:  # the damage that follows a cast (Vashnik: the waves 16 to 28 s after Imbibe), matched by timing;
             hits = [c for c in later if c[1] in raid]  # an ability the journal says hits all players goes first
             m.boss_spell = f"after {min(hits or later)[1]}"
-            if hits:  # kept when the moment is renamed by what hits: the journal's raid-wide cast it follows
-                m.after = f"about {min(hits)[0]:.0f} s after {min(hits)[1]}"
     return sorted(sorted(found, key=lambda m: -m.ratio)[:top], key=lambda m: m.t)
 
 
@@ -511,8 +508,7 @@ def _per_s(v: float) -> str:
 def moments_html(found: list[Moment], what: str) -> str:
     """what: kept for the callers; a moment no boss cast explains shows its time only."""
     return "".join(f"<li><b>{_mmss(m.t)}</b><span>{e(m.boss_spell) if m.boss_spell else ''}</span>"
-                   f"<small>{m.ratio:.1f}&times; the usual damage{' &middot; ' + e(m.after) if m.after else ''}</small></li>"
-                   for m in found)
+                   f"<small>{m.ratio:.1f}&times; the usual damage</small></li>" for m in found)
 
 
 def _shown(name: str) -> str:
