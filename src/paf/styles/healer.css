@@ -34,4 +34,4 @@
 .panel>.card,.panel>.card:has(svg.rd){max-width:1000px}
 .hl2.split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:40px}
 .hl2.split li{padding:8px 0} .hl2.split li:nth-last-child(2){border-bottom:1px solid var(--line)}
-.rd .cl{fill:var(--muted);font-size:11px} .rd .cp{fill:var(--accent,var(--fg));opacity:.85}
+.rd .cl{fill:var(--muted);font-size:11px} .rd .cp{fill:var(--fg);opacity:.7}

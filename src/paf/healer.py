@@ -348,7 +348,7 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
               f"<text x='{L - 4}' y='{float(y(med)) + 9:.1f}' class='mdl' text-anchor='end'>{_per_s(med)}</text>"
               ) if med else ""
     cds = "".join(
-        f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(c.name[:20])}</text>"
+        f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(c.name.split(',')[0][:18])}</text>"
         + "".join(f"<rect x='{float(x(t)) - 3:.1f}' y='{H - B + 7 + 18 * i}' width='6' height='11' rx='1.5' "
                   f"class='cp'><title>{e(c.name)} {_mmss(t)}</title></rect>" for t in c.times)
         for i, c in enumerate(rows))
@@ -438,11 +438,15 @@ def talents_html(builds: list, players: int, who: str, hero: list | None = None)
     """The hero tree the top players pick (the first choice), then their builds played by enough of them."""
     line = ""
     if hero:
-        line = ("<p><b>Hero tree:</b> " + (f"{e(hero[0][0])}, all of them" if len(hero) == 1 else
-                " &middot; ".join(f"{e(t)} {s:.0%}" for t, s in hero)) + f" of the {players} players read.</p>")
-    kept = [b for i, b in enumerate(builds) if i == 0 or not players or b[0] >= BUILD_SHARE * players]
+        line = ("<p><b>Hero tree:</b> " + (f"{e(hero[0][0])} (all {players} players read)" if len(hero) == 1 else
+                " &middot; ".join(f"{e(t)} {s:.0%}" for t, s in hero) + f" of the {players} players read") + ".</p>")
     return (f"<h2>Talents the top {e(who)} play</h2>{line}<ul class='hl2'>"
-            f"{builds_html(kept) or '<li>No build yet.</li>'}</ul>")
+            f"{builds_html(shown_builds(builds, players)) or '<li>No build yet.</li>'}</ul>")
+
+
+def shown_builds(builds: list, players: int) -> list:
+    """The builds enough of the players read play (BUILD_SHARE); the most played always, a complete build to copy."""
+    return [b for i, b in enumerate(builds) if i == 0 or not players or b[0] >= BUILD_SHARE * players]
 
 
 def builds_html(builds: list) -> str:
@@ -562,6 +566,7 @@ def _and(items: list[str]) -> str:
 def build_lead(builds: list, spec: str, players: int, split: list | None = None) -> str:
     """The change tab's answer: the most played build when the top players agree on one; when their builds are
     scattered, the talents they split on (the rest they agree on)."""
+    builds = shown_builds(builds, players)  # the sentence counts the builds the list shows
     if not builds:
         return ""
     top = builds[0]
@@ -633,7 +638,7 @@ def _plain(text: str) -> str:
     return re.sub(r"[\[\]]", "", text)
 
 
-FEW_KILLS = 10  # a spec in fewer of the kills read: its numbers say little (Vengeance, 8 kills: "0.0 deaths")
+FEW_KILLS = 15  # a spec in fewer of the kills read: its numbers say little (Vengeance, 10 kills: "0.0 deaths")
 
 
 def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
@@ -716,8 +721,7 @@ def render_sheet(h: HealerPrep) -> str:
         you = [f"<h2>How you heal, against the other healers</h2>{role_card(mine, h.roles, True, chips=False)}"
                f"<p class='small muted'>From {h.role_kills} {e(h.role_sample or 'top kills')}."
                + (" These are the kills where your spec healed the most: its share looks higher than in a usual kill."
-                  if own else "")
-               + "</p>"]
+                  if own else "") + " How each number is measured: Dig deeper.</p>"]
     fight = ([lead] if lead else []) + you + [
         f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Damage the "
         f"raid takes per second, median of the top kills; a dot marks a big moment, "
@@ -735,7 +739,7 @@ def render_sheet(h: HealerPrep) -> str:
     if items:
         fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{cooldowns_html(items)}</ul>")
     n_kills = h.role_kills or h.kills
-    change = [build_lead(h.builds, h.spec, h.kills, h.split)]
+    change = [build_lead(h.builds, h.spec, h.split_players or h.kills, h.split)]
     change.append(talents_html(h.builds, h.split_players or h.kills, f"{h.spec}s", h.hero))
     if h.split:
         change.append(split_html(h.split, h.split_players, h.spec))

@@ -830,8 +830,9 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     if p.swap_debuff in p.stacks:  # ability hitting the tanks too; the swap debuff as measured (the journal may say
         peak, secs = p.stacks[p.swap_debuff]  # "stacks" where heroic does not)
         hit = f"; {also[p.swap_debuff]}" if p.swap_debuff in also else ""
-        also[p.swap_debuff] = ("measured on the top tanks: " + (f"about {peak} stacks" if peak >= 2 else "no stacks")
-                               + f", about {secs:.0f} s each{hit}")
+        also[p.swap_debuff] = ("measured on the top tanks: " + (
+            f"they swap at about {peak} stacks, a cycle of about {secs:.0f} s" if peak >= 2 else
+            f"they never take a second stack, it stays about {secs:.0f} s") + hit)
     p.abilities = _role_journal(enc.id, diff_name, "tank", tl, also)
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"
     out.parent.mkdir(parents=True, exist_ok=True)

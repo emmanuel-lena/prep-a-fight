@@ -204,6 +204,11 @@ def external_kind(spell_id: int) -> str:
     return ""
 
 
+def is_taunt(spell_id: int) -> bool:
+    """A taunt (the game data's "attack me" effect, 114): the swaps section says them, not a cooldown list."""
+    return any(r.get("Effect") == "114" for r in _filtered_rows("SpellEffect", "SpellID", spell_id))
+
+
 def weakens_enemy(spell_id: int) -> bool:
     """A debuff lowering the damage its enemy targets deal (Demoralizing Shout): a defensive cast on the boss."""
     for r in _filtered_rows("SpellEffect", "SpellID", spell_id):

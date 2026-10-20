@@ -316,6 +316,15 @@ def swap_debuff(stacks: dict, tank_abilities: set[str]) -> str:
     return max(mine, key=lambda n: (mine[n][0] >= 2, mine[n][0], mine[n][1]))
 
 
+def _taunt(spell_id: int) -> bool:
+    try:
+        from paf.gamedata import is_taunt
+
+        return is_taunt(spell_id)
+    except Exception:  # noqa: BLE001 - offline: listed
+        return False
+
+
 def taunt_immunity(sections, difficulty: str) -> list[tuple[str, str]]:
     """The journal's sentences that stop the swaps (Nek'zali's Uncoiled Rage: "grants immunity to Taunt effects")."""
     import re
@@ -336,7 +345,8 @@ def _cause(common: str, stacks: dict) -> str:
     let stack and how long it stays; else a timing."""
     if common in stacks:
         peak, secs = stacks[common]
-        return (f" (most of them at about {peak} stacks of {e(common)}, measured on the top tanks)" if peak >= 2 else
+        return (f" (most of them at about {peak} stacks of {e(common)}, a cycle of about {secs:.0f} s; measured on the "
+                f"top tanks)" if peak >= 2 else
                 f" (most of them right after {e(common)}: the top tanks never take a second stack, they swap each "
                 f"time, about {secs:.0f} s apart)")
     return f" (most of them right after {e(common)}: a timing in the logs)"
@@ -369,7 +379,8 @@ def render_sheet(p: TankPrep) -> str:
         f"<li><b>{e(n)}</b><small>pressed {k:.1f} times a kill by {u:.0%} of the top tanks</small></li>"
         for n, u, k in p.short_defs)
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]
-    others = [replace(c, near=["" for _ in c.near]) for c in p.cooldowns if c not in defs]  # no buster to answer
+    others = [replace(c, near=["" for _ in c.near]) for c in p.cooldowns  # no buster to answer; taunts: the swaps
+              if c not in defs and not _taunt(c.spell_id)]
     svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight, and their defensives",
                     defs)
     causes = p.swap_after or ["" for _ in p.swaps]
@@ -414,7 +425,7 @@ def render_sheet(p: TankPrep) -> str:
         f"{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
                                                           f"</li></ul>" if swap else "")
         + "".join(f"<p><b>No swap then: {e(n)}.</b> {e(t)}</p>" for n, t in p.no_taunt)]
-    change = [build_lead(p.builds, p.spec, p.kills, p.split),
+    change = [build_lead(p.builds, p.spec, p.split_players or p.kills, p.split),
               talents_html(p.builds, p.split_players or p.kills, "tanks", p.hero),
               split_html(p.split, p.split_players, p.spec) if p.split else "",
               f"<h2>Trinkets the top tanks play</h2><ul class='hl2'>"
@@ -454,7 +465,7 @@ def render_sheet(p: TankPrep) -> str:
         deeper.append("<p class='small muted'>" + ("" if deaths else "The deaths of each composition are not read yet. ")
                       + "A spec's longer kills or extra deaths are a reading, not a verdict: the raids that bring it "
                       "differ in other ways too, and a few kills move a mean of deaths.</p>")
-    byline = (f"{e(p.character or p.spec)} &middot; {e(p.spec)} &middot; {p.kills} top tank kills &middot; "
-              f"a {_mmss(p.duration)} fight")
+    byline = (f"{e(p.character or p.spec)} &middot; {e(p.spec)} &middot; {p.kills} top kills for the timings and "
+              f"talents, median {_mmss(p.duration)} &middot; read from the logs, no tank sim")
     return sheet_page(p.boss, p.difficulty, byline, p.class_name,
                       {"fight": fight, "change": change, "boss": boss, "deeper": deeper}, theme.style("healer"))
