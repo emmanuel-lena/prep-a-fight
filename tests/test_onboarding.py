@@ -15,9 +15,9 @@ def test_the_accounts_characters_one_click_each(monkeypatch):
             return data
     monkeypatch.setattr(wcllogin, "logged_in", lambda: True)
     assert onboarding.account_characters(Client())[0] == ("Alpha", "archimonde", "eu")
-    monkeypatch.setattr(onboarding, "account_characters", lambda client=None: [("Alpha", "archimonde", "eu")])
-    html = onboarding.page_body()
-    assert "data-tab='acc'>From your account</button>" in html and "data-stay='1'" in html
-    assert "Add Alpha <small>archimonde-EU</small>" in html
     monkeypatch.setattr(wcllogin, "logged_in", lambda: False)
     assert onboarding.account_characters(Client()) == []  # the search by name stays
+    monkeypatch.setattr(onboarding, "account_characters", lambda client=None: [("Alpha", "archimonde", "eu")])
+    html = onboarding.page_body()
+    assert "data-tab='acc'>Your account</button>" in html and "data-stay='1'" in html
+    assert "Add Alpha <small>archimonde-EU</small>" in html

@@ -145,7 +145,7 @@ def page_body() -> str:
         f"guild {guild}" if guild else "") if x)  # what is set already, said on the last step
     skip = "<button type='button' class='btn ghost skip'>Skip</button>"
     mine = account_characters()  # logged in with Warcraft Logs: the account's characters, one click each
-    acc_tab = "<button type='button' role='tab' class='on' data-tab='acc'>From your account</button>" if mine else ""
+    acc_tab = "<button type='button' role='tab' class='on' data-tab='acc'>Your account</button>" if mine else ""
     acc_forms = ("<div class='ob-tab' data-tab='acc'><p class='small muted'>Your Warcraft Logs account's characters: "
                  "add one or several (their latest logged boss fight gives their gear and talents; no bags).</p>"
                  "<div class='ob-acc'>" + "".join(
@@ -190,8 +190,8 @@ def page_body() -> str:
 
 <section class="ob-step" data-step="character">
 <h1>Your character</h1>{have_char}
-<div class="ob-tabs" role="tablist">{acc_tab}<button type="button" role="tab"{'' if mine else ' class="on"'} data-tab="simc">Paste /simc (recommended)</button>
-<button type="button" role="tab" data-tab="wcl">Quick: from Warcraft Logs</button></div>{acc_forms}
+<div class="ob-tabs" role="tablist">{acc_tab}<button type="button" role="tab"{'' if mine else ' class="on"'} data-tab="simc" title="Recommended: it includes your bags">Paste /simc</button>
+<button type="button" role="tab" data-tab="wcl">Find by name</button></div>{acc_forms}
 <form class="ob-form ob-tab" data-tab="wcl" data-to="/onboard/character" hidden>
 <p class="small muted">Its latest logged boss fight gives its gear and talents. No bags: for Top Gear, paste /simc.</p>
 <div class="row"><input name="name" placeholder="Character name" required><input name="server" placeholder="Server" required>
