@@ -76,6 +76,7 @@ class Cooldown:
     alt: list[float] = field(default_factory=list)  # other moments some of them press it at instead
     every: float = 0.0  # pressed on cooldown, about every this many seconds (paf.healroles.on_cadence)
     support: list[float] = field(default_factory=list)  # each moment's share of the players pressing it then
+    alt_support: list[float] = field(default_factory=list)  # the same for the other habits
 
 
 @dataclass
@@ -408,7 +409,9 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         # of the top players read as a moment next to "no moment most of them share")
         kept = [i for i, sp in enumerate(support) if sp >= 0.25 * users]
         times, near, support = [times[i] for i in kept], [near[i] for i in kept], [support[i] for i in kept]
-        out.append(Cooldown(name, sid, users, per_kill, times, near, [] if every else alt, every, support))
+        alt = [] if every else alt
+        alt_support = [sum(1 for ts in per_player if any(abs(x - t) <= 8 for x in ts)) / n_all for t in alt]
+        out.append(Cooldown(name, sid, users, per_kill, times, near, alt, every, support, alt_support))
     return sorted(out, key=lambda c: -c.users)
 
 
@@ -449,7 +452,8 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
     """A damage-taken curve (per STEP), its big moments as dots, the phases as dashed lines; under it, one row per
     cooldown (Cooldown) with a mark where the top players usually press it: the hit and the button on one time axis."""
     # a lane for a cooldown with a moment 40% of the top players share: a spread one (Divine Steed) has none
-    rows = [c for c in presses or [] if c.times and max(c.support or [1.0]) >= 0.4][:PRESS_ROWS]
+    rows = [c for c in presses or [] if c.times and (max(c.support or [1.0]) >= 0.4 or any(c.near))][:PRESS_ROWS]
+    # (a cooldown the lead names for a hit has its lane, whatever its share)
     W, H, L, B = 760, 200 + 18 * len(rows), 150 if rows else 46, 24 + 18 * len(rows)
     peak = max(curve, default=0) or 1
     span = max(len(curve) * STEP, 1)
@@ -518,8 +522,12 @@ def _more(c: Cooldown) -> str:
 def _or(c: Cooldown, t: float) -> str:
     """The other habits nearest this moment, said on its chip ("1:18, or 0:36 for some"): another player's choice
     for the same press, never an extra one."""
-    near = [a for a in c.alt if min(c.times, key=lambda x: abs(x - a)) == t]
-    return f", or {_mmss(min(near, key=lambda a: abs(a - t)))} for some" if near else ""  # one, the nearest
+    near = [(a, sp) for a, sp in zip(c.alt, c.alt_support or [0.0] * len(c.alt), strict=False)
+            if min(c.times, key=lambda x: abs(x - a)) == t]
+    if not near:
+        return ""
+    a, sp = min(near, key=lambda x: abs(x[0] - t))  # one, the nearest, with its share
+    return f", or {_mmss(a)} for {_pct(sp)}" if sp else f", or {_mmss(a)} for some"
 
 
 def cooldowns_html(cds: list[Cooldown]) -> str:
@@ -555,7 +563,7 @@ def _chip(t: float, n: str) -> str:
     return _mmss(t) + (f" &middot; as the {e(hit)} hit starts" if gap == 0 else
                        f" &middot; {-gap} s before the {e(hit)} hit" if gap < 0 else
                        f" &middot; {gap} s into the {e(hit)} hit" if gap <= STEP else
-                       f" &middot; {gap - int(STEP)} s after the {e(hit)} hit")
+                       f" &middot; {gap} s after the {e(hit)} hit starts")
 
 
 SHOWN_TALENTS = 60  # every class and spec difference shown (a hero tree is named, not listed): no "+N more"
@@ -819,7 +827,7 @@ def jobs_lead(roles: list, mine: str = "") -> str:
     return f"<p class='lead'>{e(head)}The others: " + "; ".join(e(x) for x in lines) + ".</p>"
 
 
-NUMS_NOTE = ("On each card, the median player of the spec: the share of the kill's healing (medians over different "
+NUMS_NOTE = ("On each card, the median player of the spec (externals and Power Infusion: a mean): the share of the kill's healing (medians over different "
              "kills, they do not add up); of its own healing, the share on the tanks and in the raid's big moments; "
              "overheal; dispels a minute, all of them (the boss tab counts the top healer of each kill); externals a "
              "kill (protective cooldowns cast on another player, not on themselves). Externals and overheal follow "
@@ -867,9 +875,9 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
                  f"<td class='n'>{p.per_kill:.1f}</td><td class='n'>{_mmss(p.duration_with)}"
                  + (" <small>(too few without)</small>" if few_without or p.duration_without is None
                     else f" <small>({_mmss(p.duration_without)} without"
-                    + (", within the noise" if p.duration_close else "") + ")</small>")
+                    + ("" if p.duration_close else ", beyond the noise") + ")</small>")
                  + "</td>" + (f"<td class='n'>{dd(p.deaths_with, None if few_without else p.deaths_without)}"
-                              + (" <small>within the noise</small>" if p.deaths_close and p.deaths_with is not None
+                              + (" <small>beyond the noise</small>" if not p.deaths_close and p.deaths_with is not None
                                  and not few_without else "") + "</td>" if deaths else ""))
         if few and not deaths:
             cells = "<td class='n' colspan='2'><small>too few kills</small></td>"
@@ -878,7 +886,9 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
                  f"{cells}</tr>")
     head = (f"<th>{what}</th><th>Top kills with one</th><th>Per kill</th><th>Median kill</th>"
             + ("<th>Deaths per 20 players</th>" if deaths else ""))
-    return f"<table class='hcomp'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"
+    return (f"<table class='hcomp'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"
+            "<p class='small muted'>A difference with and without a spec is marked when it is beyond the noise "
+            "(three standard errors); unmarked, it is within it.</p>")
 
 
 def comps_table(comps: list, n_kills: int) -> str:
@@ -916,11 +926,14 @@ def render_sheet(h: HealerPrep) -> str:
     lead = ""
     if h.moments:
         shown = h.moments[:3]
-        ratios = _and([f"{m.ratio:.1f}&times;" for m in shown])
+        ratios = (f"{'both' if len(shown) == 2 else 'each'} {shown[0].ratio:.1f}&times;"
+                  if len({round(m.ratio, 1) for m in shown}) == 1 and len(shown) > 1
+                  else _and([f"{m.ratio:.1f}&times;" for m in shown]))
         groups: dict[str, list[Moment]] = {}  # moments of the same ability said together (Vashnik's "mixed
         for m in shown:                       # damage, most from..." three times in one sentence)
             groups.setdefault(m.boss_spell, []).append(m)
-        hits = _and([f"{_and([_mmss(m.t) for m in ms])}"
+        inner = _and if len(groups) == 1 else (lambda xs: ", ".join(xs))  # no "and ... and"
+        hits = _and([f"{inner([_mmss(m.t) for m in ms])}"
                      + (f" ({'each time ' if len(ms) > 1 else ''}{e(name)})" if name else "") for name, ms in groups.items()])
         hits += f": {ratios} the usual damage"
         # a cooldown said for a hit only when the top players' usual press answers it (paf.healer.ANSWER), at the

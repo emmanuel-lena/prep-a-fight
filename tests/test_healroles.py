@@ -194,3 +194,23 @@ def test_deaths_need_enough_kills_with_their_deaths(monkeypatch):
         for i in range(60)})
     pal = next(p for p in healroles.presence(None, 1, 4) if p.spec == "Protection Paladin")
     assert pal.kills == 18 and pal.deaths_with is None and pal.deaths_without == 2.0
+
+
+def test_a_dropped_caster_is_no_third_spec(monkeypatch):
+    """Mistweaver corpus, Nek'zali: a priest under 3% of the healing was dropped from the healers, its casts kept with
+    no spec; Power Infusion then had three "specs" (Holy, Discipline and none), read as a trinket, and left the
+    Holy Priest card."""
+    monkeypatch.setattr(healroles, "external_kind", lambda ab: "damage" if ab == 10060 else "")
+    con = _db()
+    for k in range(10):
+        rep = f"r{k}"
+        con.execute("INSERT INTO fight(report, fight_id, encounter_id, difficulty, status, duration_s) "
+                    "VALUES (?,1,3470,4,'done',240)", (rep,))
+        con.execute("INSERT INTO heal_kill VALUES (?,1,0,0.2)", (rep,))
+        con.executemany("INSERT INTO heal_stat VALUES (?,1,?,?,?,?,?,?,?,?)", [
+            (rep, 0, "Priest", "Holy", 100, 30, 10, 0.3, 0), (rep, 1, "Priest", "Discipline", 100, 30, 10, 0.3, 0),
+            (rep, 2, "Priest", "Holy", 1, 0, 0, 0.0, 0)])  # under 3%: no healer of the kill
+        for actor in (0, 1, 2):
+            con.execute("INSERT INTO heal_cast VALUES (?,1,?,10060,120,1)", (rep, actor))
+    rs = {r.spec: r for r in healroles.roles(con, 3470, 4, {10060: "Power Infusion"}, min_players=5)}
+    assert rs["Holy Priest"].buffs == 1.0 and rs["Holy Priest"].buff_spells == ["Power Infusion"]

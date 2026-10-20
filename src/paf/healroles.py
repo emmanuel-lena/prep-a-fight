@@ -426,8 +426,10 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
     spec_of = {(r[0], r[1], r[2]): pretty(r[3], r[4]) for r in rows}
     users: dict[int, set[str]] = defaultdict(set)
     for key, cs in casts.items():
+        if key not in spec_of:  # a caster left out of the healers (under 3% of the kill): no spec to count
+            continue
         for ab, _t, _o in cs:
-            users[ab].add(spec_of.get(key, ""))
+            users[ab].add(spec_of[key])
     common = {ab for ab, specs in users.items() if len(specs) >= 3}  # three specs or more: a trinket, a potion
     # a long cooldown as the players press it, not its base cooldown: Holy Word: Serenity is 60 s on paper and cast
     # 7.8 times a minute (Holy Words cut it); a spell the median player of a spec casts more than LONG_RATE a minute
