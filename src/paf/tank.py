@@ -447,8 +447,9 @@ def render_sheet(p: TankPrep) -> str:
         f"{_cause(common, p.stacks) if swap and one else ''}"
         f"{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
                                                           f"</li></ul>" if swap else "")
-        + "".join(f"<p><b>Taunts stop working with {e(n)}:</b> {e(t)} <span class='muted'>(The Encounter Journal; "
-                  f"whether the top kills reach it is not measured.)</span></p>" for n, t in p.no_taunt)]
+        + "".join(f"<p><b>Taunts stop working with {e(n)}:</b> {e(t)} <span class='muted'>(The Encounter Journal"
+                  + (f"; the top tanks still swap at {_mmss(p.swaps[-1])}" if p.swaps else "") + ".)</span></p>"
+                  for n, t in p.no_taunt)]
     change = [build_lead(p.builds, p.spec, p.split_players or p.kills, p.split),
               talents_html(p.builds, p.split_players or p.kills, f"{p.spec}s", p.hero),
               split_html(p.split, p.split_players, p.spec) if p.split else "",

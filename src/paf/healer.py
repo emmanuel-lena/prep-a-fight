@@ -497,6 +497,11 @@ def _shown(name: str) -> str:
     return re.sub(r"\s*\([^)]*\)$", "", name) or name
 
 
+def _share(sp: float) -> str:
+    """How many of the top players press it then: a chip is no consensus ("1:16 · 28% of them")."""
+    return f" &middot; {_pct(sp)} of them" if sp else ""
+
+
 def _more(c: Cooldown) -> str:
     """The casts a kill no shared moment shows ("+1"): the count always matches the "a kill" number."""
     n = round(c.per_kill) - len(c.times)
@@ -513,8 +518,9 @@ def _or(c: Cooldown, t: float) -> str:
 def cooldowns_html(cds: list[Cooldown]) -> str:
     return "".join(
         f"<li><b>{e(_shown(c.name))}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill</small>"
-        "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, n)}{_or(c, t)}</span>"
-                                        for t, n in zip(c.times, c.near, strict=False))
+        "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, n)}{_share(sp)}{_or(c, t)}</span>"
+                                        for t, n, sp in zip(c.times, c.near, c.support or [0.0] * len(c.times),
+                                                            strict=False))
                                 or "<small>timing varies: no moment most of them share</small>")
         + (f"<small class='alt'>on cooldown, about every {c.every:.0f} s</small>" if c.every else
            f"<small class='alt'>{_more(c)} more, timing varies</small>" if c.times and _more(c) else "")
@@ -645,7 +651,7 @@ item for your healing, use <a href="{QE_LIVE}" target="_blank" rel="noopener">QE
 # --- the sheet in the four sections of every role's sheet (issue #27) ----------------------------------------------
 
 def _pct(v: float) -> str:
-    return f"{v:.0%}"
+    return f"{int(v * 100 + 0.5)}%"  # half up: 21/40 and 15/40 read 53% and 38%, not 52% and 38%
 
 
 def role_card(r, everyone: list, mine: bool, chips: bool = True) -> str:
@@ -817,9 +823,9 @@ def _nums(r) -> list[str]:
     """A healer spec's numbers, all of them, the same on every card (NUMS_NOTE says what each is)."""
     out = [f"{_pct(r.healing)} of the kill's healing", f"{_pct(r.tank)} on the tanks", f"{_pct(r.spike)} in spikes",
            f"{_pct(r.overheal)} overheal", f"{r.dispels:.1f} dispels a minute",
-           f"{r.externals:.1f} externals a kill" if r.externals >= 0.05 else "no externals"]
+           f"{r.externals:.1f} externals a kill on average" if r.externals >= 0.05 else "no externals"]
     if r.buffs:
-        out.append(f"{r.buffs:.1f} {_and(r.buff_spells)} a kill on another player")
+        out.append(f"{r.buffs:.1f} {_and(r.buff_spells)} a kill on another player, on average")
     return out
 
 
@@ -862,7 +868,7 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
                  f"<td class='n'>{_pct(p.share)} <small>({p.kills} kill{'s' if p.kills != 1 else ''})</small></td>"
                  f"{cells}</tr>")
     head = (f"<th>{what}</th><th>Top kills with one</th><th>Per kill</th><th>Median kill</th>"
-            + ("<th>Deaths a kill</th>" if deaths else ""))
+            + ("<th>Deaths per 20 players</th>" if deaths else ""))
     return f"<table class='hcomp'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"
 
 
@@ -877,9 +883,9 @@ def comps_table(comps: list, n_kills: int) -> str:
            if deaths else "") + "</tr>"
         for c in comps)
     return ("<table class='hcomp'><thead><tr><th>Healers</th><th>Top kills</th><th>Median kill</th>"
-            + ("<th>Deaths a kill</th>" if deaths else "") + f"</tr></thead><tbody>{rows}</tbody></table>"
+            + ("<th>Deaths per 20 players</th>" if deaths else "") + f"</tr></thead><tbody>{rows}</tbody></table>"
             f"<p class='small muted'>Of {n_kills} top kills read. Exact compositions played at least {FEW_KILLS} times; the "
-            f"other {n_kills - sum(c.kills for c in comps)} kills play rarer ones. Deaths are a mean over the kills "
+            f"other {n_kills - sum(c.kills for c in comps)} kills play rarer ones. Deaths, per 20 players (heroic raids are 10 to 30), are a mean over the kills "
             f"whose deaths were read, shown from {FEW_KILLS} of them.</p>")
 
 
@@ -950,7 +956,7 @@ def render_sheet(h: HealerPrep) -> str:
         change.append(split_html(h.split, h.split_players, h.spec))
     trk = trinkets_html(h.trinkets) or "<li>No gear yet.</li>"
     change.append(f"<h2>Trinkets the top {e(h.spec)}s play</h2><ul class='hl2'>{trk}</ul>"
-                  f"<p class='small muted'>No healing sim: these are the top players' choices, not a recommendation. "
+                  f"<p class='small muted'>"
                   f"To weigh a talent or an item for your character, use <a href=\"{QE_LIVE}\" target=\"_blank\" "
                   f"rel=\"noopener\">QE Live</a>.</p>")
     jr = "".join(f"<li>{e(_plain(x))}</li>" for x in h.journal)

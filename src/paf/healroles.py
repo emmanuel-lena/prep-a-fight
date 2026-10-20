@@ -279,9 +279,9 @@ def kills_of(con: sqlite3.Connection, encounter_id: int, difficulty: int,
         dur = {(r, f): d for r, f, d in con.execute(
             f"SELECT k.report, k.fight_id, f.duration_s FROM heal_kill k JOIN fight f USING(report, fight_id) "
             f"WHERE {where}", params)}
-        for rep, fid, cls, spec in con.execute(
-                f"SELECT h.report, h.fight_id, h.class, h.spec FROM heal_stat h JOIN fight f USING(report, fight_id) "
-                f"WHERE {where}", params):
+        rows = con.execute(f"SELECT h.report, h.fight_id, h.class, h.spec, h.total FROM heal_stat h "
+                           f"JOIN fight f USING(report, fight_id) WHERE {where}", params).fetchall()
+        for rep, fid, cls, spec, _t in healers_only(rows, total_at=4):
             per[(rep, fid)].append(pretty(cls, spec))
     else:
         for rep, fid, cls, spec, d in con.execute(
@@ -290,8 +290,24 @@ def kills_of(con: sqlite3.Connection, encounter_id: int, difficulty: int,
             dur[(rep, fid)] = d
             if (cls, spec) in role:
                 per[(rep, fid)].append(pretty(cls, spec))
-    deaths = {(r, f): n for r, f, n in con.execute("SELECT report, fight_id, deaths FROM heal_kill")}
+    # deaths per 20 players: a flexible heroic raid of 30 dies more than one of 12 (and brings more healers: every
+    # healer spec read "deadly" against raids too small to need it)
+    size = {(r, f): z for r, f, z in con.execute(f"SELECT report, fight_id, size FROM fight f WHERE {where}", params)}
+    deaths = {(r, f): (round(n * 20 / size[(r, f)], 2) if size.get((r, f)) else n)
+              for r, f, n in con.execute("SELECT report, fight_id, deaths FROM heal_kill") if n is not None}
     return {k: (sorted(per[k]), d, deaths.get(k)) for k, d in dur.items() if per.get(k)}
+
+
+MIN_SHARE = 0.03  # a player with a healer's icon who does less of the kill's healing is no healer of that kill
+
+
+def healers_only(rows: list, total_at: int) -> list:
+    """The rows of players who healed (MIN_SHARE of their kill's healing or more): the corpus keeps every healer
+    icon, and a 30-player kill had 11 "healers", five of them under 3%."""
+    totals: dict[tuple, float] = defaultdict(float)
+    for r in rows:
+        totals[(r[0], r[1])] += r[total_at] or 0
+    return [r for r in rows if (r[total_at] or 0) >= MIN_SHARE * (totals[(r[0], r[1])] or 1)]
 
 
 def comps(con: sqlite3.Connection, encounter_id: int, difficulty: int, min_kills: int = 5,
@@ -390,8 +406,8 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
     """What each healer spec does on this boss, against the other healers of the same kills."""
     ensure_tables(con)
     where, params = kills_filter(encounter_id, difficulty)
-    rows = con.execute(f"SELECT h.* FROM heal_stat h JOIN fight f USING(report, fight_id) WHERE {where}",
-                       params).fetchall()
+    rows = healers_only(con.execute(f"SELECT h.* FROM heal_stat h JOIN fight f USING(report, fight_id) WHERE {where}",
+                                    params).fetchall(), total_at=5)
     durs = {(r[0], r[1]): r[2] for r in con.execute(f"SELECT report, fight_id, duration_s FROM fight f WHERE {where}",
                                                     params)}
     per_kill: dict[tuple[str, int], list] = defaultdict(list)
