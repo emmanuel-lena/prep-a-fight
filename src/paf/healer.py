@@ -322,7 +322,10 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
               presses: list | None = None) -> str:
     """A damage-taken curve (per STEP), its big moments as dots, the phases as dashed lines; under it, one row per
     cooldown (Cooldown) with a mark where the top players usually press it: the hit and the button on one time axis."""
-    rows = [c for c in presses or [] if c.times][:PRESS_ROWS]
+    def moments_of(c) -> list[float]:  # the casts with a moment (LOOSE): a spread one has no mark
+        spans = c.spans or [(t, t) for t in c.times]
+        return [t for t, (lo, hi) in zip(c.times, spans, strict=False) if hi - lo <= LOOSE]
+    rows = [c for c in presses or [] if moments_of(c)][:PRESS_ROWS]
     W, H, L, B = 760, 200 + 18 * len(rows), 128 if rows else 46, 24 + 18 * len(rows)
     peak = max(curve, default=0) or 1
     span = max(len(curve) * STEP, 1)
@@ -350,11 +353,14 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
     cds = "".join(
         f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(c.name.split(',')[0][:18])}</text>"
         + "".join(f"<rect x='{float(x(t)) - 3:.1f}' y='{H - B + 7 + 18 * i}' width='6' height='11' rx='1.5' "
-                  f"class='cp'><title>{e(c.name)} {_mmss(t)}</title></rect>" for t in c.times)
+                  f"class='cp'><title>{e(c.name)} {_mmss(t)}</title></rect>" for t in moments_of(c))
         for i, c in enumerate(rows))
     return (f"<svg viewBox='0 0 {W} {H}' class='rd' role='img' aria-label='{e(label)}'>"
             f"<line class='ax' x1='{L}' x2='{W - 10}' y1='{H - B}' y2='{H - B}'/>{median}{lines}{ticks}"
             f"<polyline points='{pts}'/>{marks}{cds}</svg>")
+
+
+LOOSE = 45.0  # seconds between the 25th and 75th percentile of a cast: wider, no moment is said for it
 
 
 def _span(cast: tuple[float, float, float]) -> str:
@@ -362,6 +368,8 @@ def _span(cast: tuple[float, float, float]) -> str:
     from paf.healroles import SPREAD
 
     med, lo, hi = cast
+    if hi - lo > LOOSE:  # the players press it anywhere in a minute or more: no moment to give
+        return ""
     return f"{_mmss(lo)}&ndash;{_mmss(hi)}" if hi - lo > SPREAD else _mmss(med)
 
 
@@ -379,9 +387,9 @@ def moments_html(found: list[Moment], what: str) -> str:
 def cooldowns_html(cds: list[Cooldown]) -> str:
     return "".join(
         f"<li><b>{e(c.name)}</b><small>pressed by {c.users:.0%} of the top players &middot; {c.per_kill:.1f} a kill</small>"
-        "<span class='when'>" + ("".join(f"<span class='chip'>{_span((t, *sp)) if sp else _mmss(t)}{_near(n)}</span>"
+        "<span class='when'>" + ("".join(f"<span class='chip'>{w}{_near(n)}</span>"
                                         for t, n, sp in zip_longest(c.times, c.near, c.spans or [], fillvalue=None)
-                                        if t is not None)
+                                        if t is not None and (w := _span((t, *sp)) if sp else _mmss(t)))
                                 or "<small>when they need it: no moment most of them share</small>")
         + (f"<small class='alt'>some press it at {', '.join(_mmss(t) for t in c.alt)} instead</small>"
            if c.alt else "") + "</span></li>"
@@ -499,8 +507,8 @@ def _pct(v: float) -> str:
 def role_card(r, everyone: list, mine: bool, chips: bool = True) -> str:
     """One healer spec's job on the boss, with its numbers and how many healers they come from. chips: its long
     cooldowns' usual times (left out on your own card: the fight tab gives yours, from the top players of your spec)."""
-    cds = "".join([f"<span class='chip'>{e(n)} {', '.join(_span(x) for x in ts)}</span>"
-                   for n, _k, ts in r.cd_names if ts][:5]) if chips else ""
+    cds = "".join([f"<span class='chip'>{e(n)} {', '.join(x for x in map(_span, ts) if x)}</span>"
+                   for n, _k, ts in r.cd_names if any(map(_span, ts))][:5]) if chips else ""
     return (f"<article class='hrole'><h3>{e(r.spec)}{' <small>(you)</small>' if mine else ''}</h3>"
             f"<ul class='jobs'>{''.join(f'<li>{e(j)}</li>' for j in r.jobs)}</ul>"
             f"<p class='nums'>{' · '.join(_nums(r))}</p>" + (f"<p class='when'>{cds}</p>" if cds else "")
@@ -733,7 +741,8 @@ def render_sheet(h: HealerPrep) -> str:
         f"{cooldowns_html(heals) or '<li>Not enough top players in the corpus yet.</li>'}</ul>"]
     if h.rare:  # a big cooldown the top players skip is information too (Healing Tide Totem: 3 kills in 100)
         fight.append(f"<p class='small muted'>Fewer than half of the top {e(h.spec)}s press "
-                     + ", ".join(f"{e(c.name)} ({c.users:.0%}, {_and([_span((t, *sp)) for t, sp in zip(c.times, c.spans, strict=False)]) or 'no shared moment'})"
+                     + ", ".join(f"{e(c.name)} ({c.users:.0%}, "
+                                 f"{_and([w for t, sp in zip(c.times, c.spans, strict=False) if (w := _span((t, *sp)))]) or 'no shared moment'})"
                                  for c in h.rare) + " on this boss.</p>")
     if defs:
         fight.append(f"<h2>Your defensives</h2><ul class='hl2'>{cooldowns_html(defs)}</ul>")

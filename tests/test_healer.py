@@ -68,3 +68,10 @@ def test_two_hits_near_the_same_height_are_both_kept():
     curve = [100.0] * 60
     curve[7], curve[16] = 162.0, 157.0
     assert [m.t for m in healer.moments(curve, [])] == [35.0, 80.0]
+
+
+def test_a_cast_spread_over_a_minute_has_no_moment():
+    """Restoration Shaman card, Nek'zali: "Nature's Swiftness 1:12-2:00", "Divine Protection 1:10-2:38": a range
+    that wide names no moment."""
+    assert healer._span((95.0, 72.0, 120.0)) == "" and healer._span((40.0, 30.0, 50.0)) == "0:30&ndash;0:50"
+    assert healer._span((40.0, 38.0, 44.0)) == "0:40"
