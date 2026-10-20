@@ -95,6 +95,7 @@ class HealerPrep:
     dispels_checked: bool = False  # the journal and the game data were read for them (none found is information)
     dispelled: list = field(default_factory=list)  # (debuff, a kill) the ranked healers removed, measured
     dispel_kills: int = 0
+    dispel_text: str = ""  # what the dispelled ability does and sets off (journal, game data): the dispel's cost
     rare: list = field(default_factory=list)  # long cooldowns few top players press (Cooldown): said, not hidden
     casts: dict = field(default_factory=dict)  # boss ability -> its casts in the typical kill (timing evidence)
     split: list = field(default_factory=list)  # (talent, share picked) the top players split on (contested)
@@ -612,7 +613,9 @@ def render_sheet(h: HealerPrep) -> str:
                   f"rel=\"noopener\">QE Live</a>.</p>")
     jr = "".join(f"<li>{e(_plain(x))}</li>" for x in h.journal)
     first = ([f"<p class='lead'>Your measured job here: dispel {e(h.dispelled[0][0])} ({h.dispelled[0][1]:.1f} a kill "
-              f"in the top kills).</p>"] if h.dispelled and h.dispelled[0][1] >= 1 else [journal_lead(h.journal, "healers")])
+              f"in the top kills).</p>" + (f"<p class='aside'>What it does, from the game: {e(h.dispel_text)}</p>"
+                                           if h.dispel_text else "")]
+             if h.dispelled and h.dispelled[0][1] >= 1 else [journal_lead(h.journal, "healers")])
     boss = first + (
         [f"<h2>What the Encounter Journal asks healers</h2><ul class='hl2'>{jr}</ul>"] if jr else [])
     if h.dispelled:  # measured: what the top healers of the spec removed

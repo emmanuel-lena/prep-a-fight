@@ -818,6 +818,22 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     return 0
 
 
+def _dispel_text(sections, name: str, diff_name: str) -> str:
+    """What the dispelled ability does, from the journal or the spell's game data, with what it sets off (its
+    children: Exploding Infection -> Caustic Explosion): the cost of the dispel, said next to it."""
+    from paf import bossguide
+    from paf.mechanics import walk
+
+    def said(s) -> str:
+        t = bossguide.readable(s.text, diff_name).strip() if s.text else ""
+        return t or bossguide.readable(bossguide.describe(s.spell_id), diff_name).strip()
+    for _, s in walk(sections):
+        if s.kind == "ability" and s.title == name:
+            parts = [said(s)] + [f"{c.title}: {said(c)}" for c in s.children if c.kind == "ability" and said(c)]
+            return " ".join(p for p in parts if p)
+    return ""
+
+
 def _role_journal(encounter_id: int, diff_name: str, role: str, tl, also: dict[str, str] | None = None) -> str:
     """The Encounter Journal's stages for a healer's or a tank's sheet: that role's abilities in full, the others'
     named (paf.bossguide), with the boss's cast times from the top kills."""
@@ -920,6 +936,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     h.comps, h.presence = healroles.comps(con, enc.id, diff), healroles.presence(con, enc.id, diff)
     healroles.fetch_dispels(client, con, enc.id, diff)  # what the top healers really remove, a few kills
     h.dispelled, h.dispel_kills = healroles.dispelled(con, enc.id, diff, names)
+    h.dispel_text = _dispel_text(sections, h.dispelled[0][0], diff_name) if h.dispelled else ""
     h.roles = healroles.roles(con, enc.id, diff, names)
     n, dur, dead = healroles.sample(con, enc.id, diff)
     h.role_kills = n
