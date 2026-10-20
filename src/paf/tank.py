@@ -412,17 +412,18 @@ def render_sheet(p: TankPrep) -> str:
     swap = "".join(f"<span class='chip'>{_mmss(t)}{f' after {e(c)}' if c and not (one and c == common) else ''}</span>"
                    for t, c in zip(p.swaps, causes, strict=False))
     lead = []
-    if p.hitters:  # what hits the tanks over the fight first: their own danger, not the raid's
-        lead.append(f"What hits the top tanks the most: {_and([f'{e(n)} ({s:.0%})' for n, s in p.hitters[:2]])} "
-                    f"of their damage taken.")
     if p.moments:
         m = max(p.moments, key=lambda x: x.ratio)
         own = bool(set(moment_names(m)) & {n for n, _s in p.hitters[:3]})  # any of its abilities a tank hitter
-        answers = [(c.name, c.times) for c in defs if not c.every] + [(n, ts) for n, _u, _k, ts, _ev in p.short_defs]
-        press = next(((n, t) for n, ts in answers for t in ts if -ANSWER[0] <= t - m.t <= ANSWER[1]), None)
+        answers = ([(c.name, c.times, c.support or [0.0] * len(c.times)) for c in defs if not c.every]
+                   + [(n, ts, [0.0] * len(ts)) for n, _u, _k, ts, _ev in p.short_defs])
+        press = next(((n, t, sp) for n, ts, sps in answers for t, sp in zip(ts, sps, strict=False)
+                      if -ANSWER[0] <= t - m.t <= ANSWER[1]), None)
         lead.append(f"Their biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({m.ratio:.1f}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
-                    + (f"; the top {e(p.spec)}s who press {e(press[0])} press it then ({_mmss(press[1])})." if press
+                    + (f"; {press[2]:.0%} of the top {e(p.spec)}s press {e(press[0])} then (about {_mmss(press[1])})."
+                       if press and press[2] else
+                       f"; the top {e(p.spec)}s' {e(press[0])} lands then (about {_mmss(press[1])})." if press
                        else f"; most top {e(p.spec)}s press no defensive for it."))
     if p.swaps:
         lead.append(f"Each of them taunts about {p.taunts_per_kill:.0f} times a kill after the pull (adds included)"
@@ -459,7 +460,10 @@ def render_sheet(p: TankPrep) -> str:
     jr = "".join(f"<li>{e(plain(x))}</li>" for x in p.journal)
     # the tank's answer here: the swap (the fight tab's lead, its last sentence), else the journal's ask
     # the boss tab's answer: the mechanic the swaps follow (the fight tab says the swaps), else the journal's ask
-    top_hit = journal_lead(p.journal, "tanks")  # the swaps are the fight tab's; here what the journal asks tanks
+    # the boss tab says what hits them (the fight tab, when): measured, then the journal below
+    top_hit = (f"<p class='lead'>What hits the top tanks the most: "
+               f"{_and([f'{e(n)} ({s:.0%} of their damage taken)' for n, s in p.hitters[:3]])}.</p>"
+               if p.hitters else journal_lead(p.journal, "tanks"))
     boss = [top_hit, f"<h2>The abilities that hit the top tanks the most</h2><ul class='hl2'>{hit or '<li>Not measured yet.</li>'}</ul>"]
     if jr:
         boss.append(f"<h2>What the Encounter Journal asks tanks</h2><ul class='hl2'>{jr}</ul>")

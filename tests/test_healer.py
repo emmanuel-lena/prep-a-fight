@@ -127,3 +127,15 @@ def test_a_channel_s_ticks_do_not_bury_its_cast():
     tl = SimpleNamespace(abilities=[cast, ticks], duration=285.0, players=players)
     cds = healer.cooldowns(tl, [], {64843: (180.0, 1), 64844: (0.0, 1)})
     assert [(c.name, c.per_kill) for c in cds] == [("Divine Hymn", 2)]
+
+
+def test_the_two_sides_of_a_choice_node_are_one_cooldown(monkeypatch):
+    """Mistweaver, Nek'zali: "Revival pressed by 61%" and "fewer than half press Restoral (38%)": one talent node,
+    pressed by 99% of them."""
+    monkeypatch.setattr(healer, "_choice_nodes", lambda: {115310: 7, 388615: 7})
+    rev = SimpleNamespace(id=115310, name="Revival", users=0.6, per_kill=1.0)
+    res = SimpleNamespace(id=388615, name="Restoral", users=0.4, per_kill=1.0)
+    players = [{"casts": {115310: [36.0]}} for _ in range(6)] + [{"casts": {388615: [37.0]}} for _ in range(4)]
+    tl = SimpleNamespace(abilities=[rev, res], duration=280.0, players=players)
+    cds = healer.cooldowns(tl, [], {115310: (180.0, 1), 388615: (180.0, 1)})
+    assert [(c.name, round(c.users, 1)) for c in cds] == [("Revival / Restoral", 1.0)]

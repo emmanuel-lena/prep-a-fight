@@ -323,6 +323,7 @@ class Presence:
     duration_without: float | None
     deaths_with: float | None
     deaths_without: float | None
+    deaths_close: bool = False  # with and without within two standard errors of their difference: no reading
 
 
 def presence(con: sqlite3.Connection, encounter_id: int, difficulty: int,
@@ -341,10 +342,13 @@ def presence(con: sqlite3.Connection, encounter_id: int, difficulty: int,
     for s in {x for specs, _d, _k in ks for x in specs}:
         with_ = [k for k in ks if s in k[0]]
         without = [k for k in ks if s not in k[0]]
+        dw, dwo = [k[2] for k in with_ if k[2] is not None], [k[2] for k in without if k[2] is not None]
+        close = (len(dw) > 1 and len(dwo) > 1 and abs(st.mean(dw) - st.mean(dwo))
+                 < 2 * (st.variance(dw) / len(dw) + st.variance(dwo) / len(dwo)) ** 0.5)
         out.append(Presence(s, len(with_) / len(ks), st.mean(k[0].count(s) for k in with_), len(with_),
                             med([k[1] for k in with_]), med([k[1] for k in without]), mean([k[2] for k in with_]),
-                            mean([k[2] for k in without])))  # deaths: a mean (one decimal), a median of 0s and 1s
-                                                              # reads as a verdict
+                            mean([k[2] for k in without]), close))  # deaths: a mean (a median of 0s and 1s
+                                                                          # reads as a verdict)
     return sorted(out, key=lambda p: -p.share)
 
 
@@ -538,7 +542,9 @@ def jobs(r: Role, everyone: list[Role]) -> list[str]:
         spec's and the others' (a 4-point gap at "±4%" was called a job)."""
         gap = (ref(attr) - getattr(r, attr)) if lower else (getattr(r, attr) - ref(attr))
         theirs = st.median(o.se.get(attr, 0.0) for o in others)
-        return gap > 2 * (r.se.get(attr, 0.0) ** 2 + theirs ** 2) ** 0.5
+        # three standard errors: some 25 comparisons a sheet (five specs, five numbers) at two let one false job
+        # through on most sheets
+        return gap > 3 * (r.se.get(attr, 0.0) ** 2 + theirs ** 2) ** 0.5
     out = []
     if r.tank >= max(TANK_FLOOR, ref("tank") * TANK_HEALER) and clear("tank"):
         out.append(f"heals the tanks: {r.tank:.0%} of its healing goes on them, ±{2 * r.se.get('tank', 0):.0%} "

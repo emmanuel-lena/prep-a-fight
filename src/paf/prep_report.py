@@ -1515,7 +1515,7 @@ def sheet_page(boss: str, difficulty: str, byline: str, class_name: str, section
     cls_icon = icons.img(icons.CLASS_ICON.format(cls=class_name.lower()), "large", "hero-ic") if class_name else ""
     header = f"""<header class="sheet-hero"><div class="in">{cls_icon}<div class="txt">
 <h1>{e(boss)} {diff_pill(difficulty)}</h1>
-<p>{byline} &middot; {datetime.now():%d %b %Y %H:%M}</p>
+<p>{byline} &middot; <span class="nw">{datetime.now():%d %b %Y %H:%M}</span></p>
 </div><nav class="tabs" aria-label="Sections"><div class="tabs-in" role="tablist">{''.join(
         f'<a role="tab" href="#{k}">{e((labels or {}).get(k, label))}</a>' for k, label in SECTIONS if sections.get(k))}</div></nav></div></header>"""
     panels = "".join(f'<section class="panel" id="{k}">{"".join(v)}</section>' for k, v in sections.items() if v)
