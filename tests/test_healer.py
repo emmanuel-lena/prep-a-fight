@@ -172,7 +172,7 @@ def test_the_most_played_build_says_its_side_of_each_split():
     names = {1: "Lightburst", 2: "Weal and Woe", 3: "Searing Light", 4: "Protector of the Frail", 5: "Voidwraith"}
     split = [("Lightburst", 0.52), ("Searing Light", 0.47), ("Protector of the Frail 48% / Voidwraith 41%", -1.0)]
     assert (healer._sides({1, 2, 5}, names, split)
-            == "of the talents they split on, takes Lightburst and Voidwraith; skips Searing Light")
+            == "of the talents listed below, takes Lightburst and Voidwraith; skips Searing Light")
 
 
 def test_every_healer_spec_in_one_table():

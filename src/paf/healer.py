@@ -802,7 +802,7 @@ def _sides(key, names: dict, split: list) -> str:
             skips.append(n)
     if not takes and not skips:
         return ""
-    return "of the talents they split on, " + "; ".join(
+    return "of the talents listed below, " + "; ".join(
         x for x in (f"takes {_and(takes)}" if takes else "", f"skips {_and(skips)}" if skips else "") if x)
 
 
