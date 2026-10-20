@@ -890,14 +890,14 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         healer.trinkets(con, enc.id, diff), bossguide.role_bullets(bossguide.load(enc.id, diff_name), "healer"),
         [(n, t) for n, t, _ in tl.phases], class_name=cls, character=getattr(profile, "name", "") or "")
     h.abilities = _role_journal(enc.id, diff_name, "healer", tl)
+    h.casts = {n: len(ts) for n, ts in tl.boss_casts}
     h.split, h.split_players = healer.contested(con, enc.id, diff, spec)
     from paf.gamedata import dispel_type
     from paf.mechanics import walk
 
     h.dispellable = []  # the journal's flags, else the spell's dispel type in the game data, at this difficulty
     for _, s in walk(sections):
-        if s.kind != "ability" or not s.for_difficulty(diff_name) or (
-                s.text and not bossguide.readable(s.text, diff_name).strip()):  # another difficulty's ability
+        if s.kind != "ability" or not s.for_difficulty(diff_name):
             continue
         kind = next((f for f in s.flags if f in ("magic", "curse", "poison", "disease")), "")
         try:
@@ -918,6 +918,8 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
 
     names = {**spell_names(), **dict(con.execute("SELECT id, name FROM ability").fetchall())}
     h.comps, h.presence = healroles.comps(con, enc.id, diff), healroles.presence(con, enc.id, diff)
+    healroles.fetch_dispels(client, con, enc.id, diff)  # what the top healers really remove, a few kills
+    h.dispelled, h.dispel_kills = healroles.dispelled(con, enc.id, diff, names)
     h.roles = healroles.roles(con, enc.id, diff, names)
     n, dur, dead = healroles.sample(con, enc.id, diff)
     h.role_kills = n

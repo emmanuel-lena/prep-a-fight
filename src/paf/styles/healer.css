@@ -32,3 +32,5 @@
 .rd .ml{font-size:12px;fill:var(--fg)}
 .rd .md{stroke:var(--muted);stroke-dasharray:2 4;opacity:.7} .rd .mdl{fill:var(--muted);font-size:11px}
 .panel>.card,.panel>.card:has(svg.rd){max-width:1000px}
+.hl2.split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:40px}
+.hl2.split li{padding:8px 0} .hl2.split li:nth-last-child(2){border-bottom:1px solid var(--line)}

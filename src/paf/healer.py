@@ -93,7 +93,10 @@ class HealerPrep:
     abilities: str = ""  # the Encounter Journal's stages, your role's abilities in full (paf.bossguide), html
     dispellable: list = field(default_factory=list)  # (ability, debuff type): the Journal's flags or the game data
     dispels_checked: bool = False  # the journal and the game data were read for them (none found is information)
+    dispelled: list = field(default_factory=list)  # (debuff, a kill) the ranked healers removed, measured
+    dispel_kills: int = 0
     rare: list = field(default_factory=list)  # long cooldowns few top players press (Cooldown): said, not hidden
+    casts: dict = field(default_factory=dict)  # boss ability -> its casts in the typical kill (timing evidence)
     split: list = field(default_factory=list)  # (talent, share picked) the top players split on (contested)
     split_players: int = 0
 
@@ -436,12 +439,17 @@ def _and(items: list[str]) -> str:
     return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1] if items else ""
 
 
-def build_lead(builds: list, spec: str, players: int) -> str:
-    """The change tab's answer: the most played build, and whether the top players agree on one."""
+def build_lead(builds: list, spec: str, players: int, split: list | None = None) -> str:
+    """The change tab's answer: the most played build when the top players agree on one; when their builds are
+    scattered, the talents they split on (the rest they agree on)."""
     if not builds:
         return ""
     top = builds[0]
     total = sum(b[0] for b in builds)
+    if split and top[0] < players / 5:  # no build a fifth of them play: the answer is in the split talents
+        return (f"<p class='lead'>The top {e(spec)}s agree on most talents and split on "
+                + e(_and([n for n, _s in split[:4]])) + f"; no build is played by more than {top[0]} of the "
+                f"{players} players read.</p>")
     return (f"<p class='lead'>The most played build of the top {e(spec)}s: {e(top[1])}, by {top[0]} of the "
             f"{players} players read" + (f"; the {len(builds)} builds below cover {total} of them, the other "
                                         f"{players - total} play builds of their own" if len(builds) > 1 else "")
@@ -556,8 +564,11 @@ def render_sheet(h: HealerPrep) -> str:
     if h.moments:
         said = [m.boss_spell for m in h.moments[:3]]
         if len(set(said)) == 1 and said[0]:  # the same cast before each: said once (Vashnik's three waves)
+            cast = said[0].removeprefix("after ")
+            n = h.casts.get(cast, 0)
             hits = (_and([_mmss(m.t) for m in h.moments[:3]]) + f", each {e(said[0])}"
-                    + (" (matched by timing)" if said[0].startswith("after ") else ""))
+                    + (f" (matched by timing: {len(said)} of its {n} casts)" if said[0].startswith("after ") and n
+                       else " (matched by timing)" if said[0].startswith("after ") else ""))
         else:
             hits = _and([f"{_mmss(m.t)} ({e(m.boss_spell)})" if m.boss_spell else _mmss(m.t) for m in h.moments[:3]])
         at = {_mmss(m.t) for m in h.moments}  # a cooldown kept for the hits: most of its presses answer one
@@ -589,7 +600,7 @@ def render_sheet(h: HealerPrep) -> str:
     if items:
         fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{cooldowns_html(items)}</ul>")
     n_kills = h.role_kills or h.kills
-    change = [build_lead(h.builds, h.spec, h.kills)]
+    change = [build_lead(h.builds, h.spec, h.kills, h.split)]
     change.append(f"<h2>Talents the top {e(h.spec)}s play</h2><ul class='hl2'>"
                   f"{builds_html(h.builds) or '<li>No build yet.</li>'}</ul>")
     if h.split:
@@ -602,7 +613,11 @@ def render_sheet(h: HealerPrep) -> str:
     jr = "".join(f"<li>{e(_plain(x))}</li>" for x in h.journal)
     boss = [journal_lead(h.journal, "healers")] + (
         [f"<h2>What the Encounter Journal asks healers</h2><ul class='hl2'>{jr}</ul>"] if jr else [])
-    if h.dispellable:  # where the dispels most likely go: the Journal's flags and the game data, not a measure
+    if h.dispelled:  # measured: what the top healers of the spec removed
+        boss.append(f"<h2>What the top {e(h.spec)}s dispel here</h2><p>"
+                    + _and([f"{e(n)} ({k:.1f} a kill)" for n, k in h.dispelled])
+                    + f", on {h.dispel_kills} of their kills read.</p>")
+    elif h.dispellable:  # where the dispels most likely go: the Journal's flags and the game data, not a measure
         boss.append("<h2>What you can dispel here</h2><p>Dispellable on this boss at this difficulty: "
                     + _and([f"{e(n)} ({e(t)})" for n, t in h.dispellable])
                     + "; your spec's dispels in the top kills most likely go to them (not measured per debuff yet)."

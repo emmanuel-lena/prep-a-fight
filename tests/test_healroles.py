@@ -104,3 +104,31 @@ def test_a_wave_is_named_after_the_cast_before_it():
     found = healer.moments(curve, [("Imbibe", [24.0, 108.0, 192.0])])
     assert [m.boss_spell for m in found] == ["after Imbibe"] * 3
     assert healer.moments(curve, [("Soulcoil Ignition", [36.0])])[0].boss_spell == "Soulcoil Ignition"
+
+
+def test_what_the_top_healers_dispel_is_measured():
+    """Vashnik heroic (2026-10-20): no ability is dispellable in the game data, yet the top Restoration Shamans
+    dispel Exploding Infection about 4 times a kill: the sheet says what they remove, from their dispel events."""
+    import sqlite3
+
+    from paf import healroles
+    from paf.corpus.db import SCHEMA
+
+    con = sqlite3.connect(":memory:")
+    con.executescript(SCHEMA)
+    healroles.ensure_tables(con)
+    for k in range(2):
+        con.execute("INSERT INTO fight(report, fight_id, encounter_id, difficulty, duration_s, status) "
+                    "VALUES(?, 1, 9, 4, 250, 'done')", (f"r{k}",))
+        con.execute("INSERT INTO ranked(report, fight_id, spec, actor_id) VALUES(?, 1, 'Restoration', 7)", (f"r{k}",))
+
+    class Client:
+        def query(self, *a, **k):
+            return {"reportData": {"report": {"fights": [{"startTime": 0, "endTime": 250000}]}}}
+
+        def events(self, *a, **k):
+            return [{"type": "dispel", "extraAbilityGameID": 1}] * 4 + [{"type": "dispel", "extraAbilityGameID": 2}]
+
+    assert healroles.fetch_dispels(Client(), con, 9, 4) == 2
+    got, n = healroles.dispelled(con, 9, 4, {1: "Exploding Infection", 2: "Congealing Bolt"})
+    assert n == 2 and got == [("Exploding Infection", 4.0), ("Congealing Bolt", 1.0)]

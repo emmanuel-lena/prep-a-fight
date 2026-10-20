@@ -283,7 +283,7 @@ def render_sheet(p: TankPrep) -> str:
         f"{f' (most of them right after {e(common)}: a timing in the logs, the stacks are not counted)' if swap and one else ''}"
         f"{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
                                                           f"</li></ul>" if swap else "")]
-    change = [build_lead(p.builds, p.spec, p.kills),
+    change = [build_lead(p.builds, p.spec, p.kills, p.split),
               f"<h2>Talents the top tanks play</h2><ul class='hl2'>{builds_html(p.builds) or '<li>No build yet.</li>'}"
               f"</ul>",
               split_html(p.split, p.split_players, p.spec) if p.split else "",

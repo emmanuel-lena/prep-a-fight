@@ -95,9 +95,10 @@ def test_another_difficultys_sentences_are_left_out():
         sec(6, "Exploding Infection", "ability", "On Mythic difficulty, this gains a stack every 1.5 sec."),
         sec(7, "Imbibe", "ability", "Vashnik drinks. On Mythic difficulty, Imbibe conjures a totem.")])
     heroic = abilities_html([stage], difficulty="heroic")
-    assert "absorbs an amount of incoming healing" in heroic and "Exploding Infection" not in heroic
+    assert "absorbs an amount of incoming healing" in heroic and "gains a stack" not in heroic
+    assert "Exploding Infection" in heroic  # it exists at heroic too (dispelled 4 times a kill): its name stays
     assert "Vashnik drinks." in heroic and "conjures a totem" not in heroic
-    assert "Exploding Infection" in abilities_html([stage], difficulty="mythic")
+    assert "gains a stack" in abilities_html([stage], difficulty="mythic")
     assert readable("On Heroic difficulty, the rite burns.", "normal") == ""
 
 

@@ -253,9 +253,9 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
             if skip is not None and depth > skip:  # under an ability of another role: named with it
                 continue
             skip = None
-            if s.kind == "ability" and s.text and not readable(s.text, difficulty).strip():
-                skip = depth  # another difficulty's ability ("On Mythic difficulty, ..."), and what sits under it
-                continue
+            # an ability whose only text is another difficulty's sentence keeps its name: it exists here too
+            # (Vashnik heroic: Exploding Infection, "On Mythic difficulty, this gains a stack", is dispelled 4 times
+            # a kill in the top heroic kills); a mythic-only ability is left out by its flag (dedupe)
             mine = [f for f in s.flags if f in ROLE_OTHERS]
             if role and s.kind == "ability" and mine and role not in mine and s.title not in (also or {}):
                 # another role's job: named, not told (unless it hits you too: also)

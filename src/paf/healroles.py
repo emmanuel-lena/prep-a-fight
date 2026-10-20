@@ -36,6 +36,8 @@ TANKS = {("Warrior", "Protection"), ("Paladin", "Protection"), ("DeathKnight", "
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS heal_stat(report TEXT, fight_id INT, actor_id INT, class TEXT, spec TEXT, total REAL,
   overheal REAL, tank REAL, spike REAL, dispels INT, PRIMARY KEY(report, fight_id, actor_id));
+CREATE TABLE IF NOT EXISTS heal_dispel(report TEXT, fight_id INT, aura_id INT, n INT);  -- the ranked healer removed
+CREATE TABLE IF NOT EXISTS heal_dispel_status(report TEXT, fight_id INT, PRIMARY KEY(report, fight_id));
 CREATE TABLE IF NOT EXISTS heal_cast(report TEXT, fight_id INT, actor_id INT, ability_id INT, t REAL, on_other INT);
 CREATE TABLE IF NOT EXISTS heal_kill(report TEXT, fight_id INT, deaths INT, spike_share REAL,
   PRIMARY KEY(report, fight_id));
@@ -153,6 +155,50 @@ def fetch_heal_roles(client: WCLClient, con: sqlite3.Connection, encounter_id: i
         con.execute("INSERT OR REPLACE INTO heal_kill VALUES(?,?,?,?)", (rep, fid, deaths, round(share, 3)))
         con.commit()
     return len(todo)
+
+
+DISPEL_KILLS = 6  # kills read for what the top healers dispel: ~1 page of events each
+
+
+def fetch_dispels(client: WCLClient, con: sqlite3.Connection, encounter_id: int, difficulty: int,
+                  kills: int = DISPEL_KILLS, log: Callable[[str], None] = lambda s: print(s, flush=True)) -> int:
+    """What the ranked healer of a few kills dispels (the aura each dispel removes): where a spec's dispels go,
+    measured, not guessed from the Journal (Vashnik heroic: none of its abilities is dispellable in the game data,
+    yet the top healers dispel about once a minute)."""
+    ensure_tables(con)
+    where, params = kills_filter(encounter_id, difficulty)
+    have = con.execute(f"SELECT COUNT(*) FROM heal_dispel_status s JOIN fight f USING(report, fight_id) WHERE {where}",
+                       params).fetchone()[0]
+    todo = con.execute(
+        f"SELECT f.report, f.fight_id, r.actor_id FROM fight f JOIN ranked r USING(report, fight_id) "
+        f"LEFT JOIN heal_dispel_status s USING(report, fight_id) WHERE {where} AND s.report IS NULL "
+        f"AND r.actor_id IS NOT NULL ORDER BY f.report LIMIT ?", (*params, max(0, kills - have))).fetchall()
+    for rep, fid, actor in todo:
+        try:
+            fr = client.query(BOUNDS, {"c": rep, "f": [fid]}, cache_ttl=0)["reportData"]["report"]["fights"][0]
+            events = list(client.events(rep, fid, fr["startTime"], fr["endTime"], data_type="Dispels",
+                                        source_id=actor, cache=False))
+        except (WCLError, KeyError, TypeError, IndexError, OSError) as e:
+            log(f"  dispels skipped: {str(e)[:100]}")
+            continue
+        counts = Counter(ev.get("extraAbilityGameID") for ev in events
+                         if ev.get("type") in ("dispel", "removedebuff") and ev.get("extraAbilityGameID"))
+        con.executemany("INSERT INTO heal_dispel VALUES(?,?,?,?)", [(rep, fid, a, n) for a, n in counts.items()])
+        con.execute("INSERT OR REPLACE INTO heal_dispel_status VALUES(?,?)", (rep, fid))
+        con.commit()
+    return len(todo)
+
+
+def dispelled(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: dict[int, str],
+              top: int = 3) -> tuple[list[tuple[str, float]], int]:
+    """(debuff, dispels a kill) the ranked healers remove the most, and the kills read."""
+    ensure_tables(con)
+    where, params = kills_filter(encounter_id, difficulty)
+    n = con.execute(f"SELECT COUNT(*) FROM heal_dispel_status s JOIN fight f USING(report, fight_id) WHERE {where}",
+                    params).fetchone()[0]
+    rows = con.execute(f"SELECT d.aura_id, SUM(d.n) FROM heal_dispel d JOIN fight f USING(report, fight_id) "
+                       f"WHERE {where} GROUP BY d.aura_id ORDER BY 2 DESC LIMIT ?", (*params, top)).fetchall()
+    return [(names.get(a, f"spell {a}"), s / n) for a, s in rows if n], n
 
 
 # --- compositions -----------------------------------------------------------------------------------------------
