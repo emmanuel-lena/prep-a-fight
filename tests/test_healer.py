@@ -91,3 +91,27 @@ def test_a_stretch_without_a_break_is_said():
     curve = [100.0] * 40 + [125.0] * 8 + [100.0] * 10
     assert healer.sustained(curve) == [(200.0, 240.0, 1.25)]
     assert healer.sustained([100.0] * 40 + [105.0] * 18) == []
+
+
+def test_one_spell_under_two_ids_is_one_row():
+    """Holy Paladin, Nek'zali: Lay on Hands is 633 for some players and 471195 (talented) for others: 54% counting
+    one id, about 66% for both."""
+    a = SimpleNamespace(id=633, name="Lay on Hands", users=0.4, per_kill=1.0)
+    b = SimpleNamespace(id=471195, name="Lay on Hands", users=0.3, per_kill=1.0)
+    players = ([{"casts": {633: [80.0]}} for _ in range(4)] + [{"casts": {471195: [82.0]}} for _ in range(3)]
+               + [{"casts": {}} for _ in range(3)])
+    tl = SimpleNamespace(abilities=[a, b], duration=280.0, players=players)
+    cds = healer.cooldowns(tl, [], {633: (420.0, 1), 471195: (420.0, 1)})
+    assert [(c.name, round(c.users, 1)) for c in cds] == [("Lay on Hands", 0.7)]
+
+
+def test_a_held_press_is_not_on_cooldown():
+    """Resto Shaman, Nek'zali: the Vessel "3 a kill, 0:03 2:02, on cooldown, about every 97 s": the median gap came
+    from the players pressing it 5 times; the shared moments are 2 minutes apart, held."""
+    ab = SimpleNamespace(id=7, name="Soulcoiler Ritual Vessel", users=1.0, per_kill=3.0)
+    players = ([{"casts": {7: [3.0, 122.0, 214.0]}} for _ in range(8)]
+               + [{"casts": {7: [3.0, 95.0, 190.0, 285.0, 380.0]}} for _ in range(8)])
+    tl = SimpleNamespace(abilities=[ab], duration=400.0, players=players)
+    cd = healer.cooldowns(tl, [], {7: (90.0, 1)})[0]
+    gaps = [y - x for x, y in zip(cd.times, cd.times[1:], strict=False)]
+    assert cd.every == 0.0 or all(abs(g - cd.every) <= 0.25 * cd.every for g in gaps)

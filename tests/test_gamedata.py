@@ -54,8 +54,10 @@ def test_a_filtered_table_keeps_its_own_rows_only(tmp_path, monkeypatch):
     from paf import gamedata
 
     monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    gamedata._filtered_rows.cache_clear()  # read once a process: this test's file, not a real one read before
     f = tmp_path / "gamedata" / "filtered" / "SpellEffect-SpellID-100.csv"
     f.parent.mkdir(parents=True)
     f.write_text("ID,SpellID,EffectAura,ImplicitTarget_0\n1,100,0,6\n2,10001,87,1\n3,100002,79,18\n", encoding="utf-8")
     assert [r["ID"] for r in gamedata._filtered_rows("SpellEffect", "SpellID", 100)] == ["1"]
     assert not gamedata.is_mitigation(100) and not gamedata.weakens_enemy(100)
+    gamedata._filtered_rows.cache_clear()

@@ -442,8 +442,7 @@ def render_sheet(p: TankPrep) -> str:
            f"</p>" if p.rare else ""),
         f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"
         f"{mit or '<li>Not measured yet.</li>'}</ul>",
-        f"<h2>Tank swaps</h2><p>Each top tank taunts about <b>{p.taunts_per_kill:.0f}</b> times a kill after the pull"
-        f"{'; the swap moments most top raids share' if swap else '.'}"
+        f"<h2>Tank swaps</h2><p>{'The swap moments most top raids share' if swap else 'No swap moment most top raids share.'}"
         f"{_cause(common, p.stacks) if swap and one else ''}"
         f"{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
                                                           f"</li></ul>" if swap else "")
@@ -459,7 +458,9 @@ def render_sheet(p: TankPrep) -> str:
                   for n, s in p.hitters)
     jr = "".join(f"<li>{e(plain(x))}</li>" for x in p.journal)
     # the tank's answer here: the swap (the fight tab's lead, its last sentence), else the journal's ask
-    top_hit = f"<p class='lead'>{lead[-1]}</p>" if p.swaps and lead else journal_lead(p.journal, "tanks")
+    # the boss tab's answer: the mechanic the swaps follow (the fight tab says the swaps), else the journal's ask
+    top_hit = (f"<p class='lead'>The swaps follow {e(common)}{_cause(common, p.stacks)}.</p>"
+               if p.swaps and one and common in p.stacks else journal_lead(p.journal, "tanks"))
     boss = [top_hit, f"<h2>The abilities that hit the top tanks the most</h2><ul class='hl2'>{hit or '<li>Not measured yet.</li>'}</ul>"]
     if jr:
         boss.append(f"<h2>What the Encounter Journal asks tanks</h2><ul class='hl2'>{jr}</ul>")
@@ -471,15 +472,22 @@ def render_sheet(p: TankPrep) -> str:
     if have and p.presence:
         mates = [x for x in p.presence if x.spec != p.spec and x.kills >= 8]
         deeper.append(f"<p class='lead'>Beside a {e(p.spec)}, the top raids play "
-                      + (", ".join(f"{e(x.spec)} ({x.share:.0%})" for x in sorted(mates, key=lambda x: -x.share)[:3])
+                      + (", ".join(f"{e(x.spec)} (in {x.share:.0%} of the kills)"
+                                   for x in sorted(mates, key=lambda x: -x.share)[:3])
                          if mates else "no other tank spec often") + ".</p>")
     worn = {n for n, _i, _s in p.trinkets}  # on-use trinkets on the fight tab, as the healers' sheets
     items = [c for c in others if c.name in worn]
     rest = [c for c in others if c not in items]
+    from paf.healer import _item
+
+    used = [c for c in rest if _item(c.spell_id)]  # potions: the deeper tab
+    damage = [c for c in rest if c not in used]  # Avatar, Shield Charge: pressed by all of them, the fight tab
+    if damage:
+        fight.append(f"<h2>Your damage cooldowns</h2><ul class='hl2'>{cooldowns_html(damage)}</ul>")
     if items:
         fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{cooldowns_html(items)}</ul>")
-    if rest:
-        deeper.append(f"<h2>Your other cooldowns and consumables</h2><ul class='hl2'>{cooldowns_html(rest)}</ul>")
+    if used:
+        deeper.append(f"<h2>Consumables</h2><ul class='hl2'>{cooldowns_html(used)}</ul>")
     if p.presence:
         if have and have.share >= 0.99:  # the corpus is this spec's kills
             line = f"These are the top {e(p.spec)}s' kills; the table tells which tanks play beside them."

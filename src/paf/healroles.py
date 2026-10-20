@@ -538,12 +538,14 @@ def jobs(r: Role, everyone: list[Role]) -> list[str]:
         return gap > 2 * r.se.get(attr, 0.0)
     out = []
     if r.tank >= max(TANK_FLOOR, ref("tank") * TANK_HEALER) and clear("tank"):
-        out.append(f"heals the tanks: {r.tank:.0%} of its healing goes on them (the other healers {ref('tank'):.0%})")
+        out.append(f"heals the tanks: {r.tank:.0%} of its healing goes on them, ±{2 * r.se.get('tank', 0):.0%} "
+                   f"(the other healers {ref('tank'):.0%})")
     if r.spike >= max(0.05, ref("spike") * SPIKE_HEALER) and clear("spike"):
-        out.append(f"answers the raid's damage spikes: {r.spike:.0%} of its healing lands in them "
-                   f"(the other healers {ref('spike'):.0%})")
+        out.append(f"answers the raid's damage spikes: {r.spike:.0%} of its healing lands in them, "
+                   f"±{2 * r.se.get('spike', 0):.0%} (the other healers {ref('spike'):.0%})")
     if r.dispels >= max(0.2, ref("dispels") * DISPELLER) and clear("dispels"):
-        out.append(f"dispels: {r.dispels:.1f} a minute (the other healers {ref('dispels'):.1f})")
+        out.append(f"dispels {r.dispels:.1f} times a minute, ±{2 * r.se.get('dispels', 0):.1f} "
+                   f"(the other healers {ref('dispels'):.1f})")
     # externals given are the kit's (Mistweaver's Life Cocoon on every boss), as the overheal: on the card only
     # not jobs: the count of long cooldowns compares kits, not what the boss asks; low overheal is the spec's trait
     # on every boss (Restoration Shaman on 14 of 14 sheets). Both stay in the card's numbers.

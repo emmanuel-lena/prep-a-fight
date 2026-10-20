@@ -139,6 +139,7 @@ AURA_MOD_DAMAGE_PERCENT_TAKEN = 87
 GAME_DIFFICULTY = {"lfr": 17, "normal": 14, "heroic": 15, "mythic": 16}
 
 
+@cache  # read once a process: a short id's file holds every id it prefixes (1 -> 100002, 10001...), a second
 def _filtered_rows(table: str, column: str, value: int, locale: str = "") -> list[dict[str, str]]:
     """A few rows of a big DB2 table, fetched with the wago.tools filter (cached per value); locale: its texts in
     that language."""

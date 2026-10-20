@@ -19,6 +19,7 @@ import statistics as st
 from collections import Counter
 from dataclasses import dataclass, field
 from html import escape as e
+from itertools import pairwise
 
 from paf import theme
 from paf.theme import diff_pill
@@ -310,6 +311,16 @@ def _enemy(spell_id: int) -> bool:
         return False
 
 
+def _moving(spell_id: int) -> bool:
+    """A cast-while-moving button (Spiritwalker's Grace; game data aura 330): no answer to a raid hit."""
+    try:
+        from paf.gamedata import _filtered_rows
+
+        return any(r.get("EffectAura") == "330" for r in _filtered_rows("SpellEffect", "SpellID", spell_id))
+    except Exception:  # noqa: BLE001 - offline
+        return False
+
+
 def _external(spell_id: int) -> str:
     try:
         from paf.gamedata import external_kind
@@ -332,26 +343,35 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
             base = spell_cooldowns()
         except Exception:  # noqa: BLE001 - offline: no game data, the casts' rarity alone
             base = {}
-    out, seen = [], set()
-    for a in sorted(tl.abilities, key=lambda a: -a.users):
-        if not min_users <= a.users < max_users or not tl.duration or a.per_kill > max(1.0, tl.duration / COOLDOWN_GAP) \
-                or a.name in seen:
-            continue
-        if base and base.get(a.id, (0.0, 1))[0] < COOLDOWN_GAP:
-            continue
-        seen.add(a.name)
-        per_player = [p["casts"].get(a.name) or p["casts"].get(a.id) or [] for p in tl.players]
+    groups: dict[str, list] = {}  # one spell under several ids (Lay on Hands 633 and its talented 471195): one row
+    for a in tl.abilities:
+        groups.setdefault(a.name, []).append(a)
+    out = []
+    for name, abs_ in groups.items():
+        ids = [a.id for a in abs_]
+        per_player = [sorted(t for i in ids for t in (p["casts"].get(i) or [])) or list(p["casts"].get(name) or [])
+                      for p in tl.players]
+        users = sum(1 for ts in per_player if ts) / max(1, len(tl.players))
         per_player = [ts for ts in per_player if ts]
-        times, alt = press_moments(per_player, max(1, round(a.per_kill)), tl.duration)
-        every = on_cadence(per_player, a.per_kill, tl.duration)
-        near = []
+        if not per_player or not tl.duration:
+            continue
+        per_kill = st.median(len(ts) for ts in per_player)
+        if not min_users <= users < max_users or per_kill > max(1.0, tl.duration / COOLDOWN_GAP):
+            continue
+        if base and max(base.get(i, (0.0, 1))[0] for i in ids) < COOLDOWN_GAP:
+            continue
+        sid = max(abs_, key=lambda a: a.users).id
+        times, alt = press_moments(per_player, max(1, round(per_kill)), tl.duration)
+        every = on_cadence(per_player, per_kill, tl.duration)
+        if every and any(abs((y - x) - every) > 0.25 * every for x, y in pairwise(times)):
+            every = 0.0  # its moments are not a cooldown apart: the top players hold it (the Vessel at 0:03, 2:02)
+        tied = not (every or per_kill >= 4 or _external(sid) or _moving(sid))  # on cooldown, a 1-minute button, a
+        near = []  # buff on one player, a cast-while-moving: near a hit by chance, not kept for it
         for t in times:
             m = min(found, key=lambda m: abs(m.t - t), default=None)
-            ok = (not every and a.per_kill < 4 and m is not None  # on cooldown, or a 1-minute button pressed 4 times
-                  # or more: near a hit by its cadence, not kept for it
-                  and -ANSWER[0] <= t - m.t <= ANSWER[1])  # pressed for the hit: just before or in it
+            ok = tied and m is not None and -ANSWER[0] <= t - m.t <= ANSWER[1]  # pressed for the hit: before or in it
             near.append(f"{_mmss(m.t)} {m.boss_spell}".strip() if ok else "")
-        out.append(Cooldown(a.name, a.id, a.users, a.per_kill, times, near, [] if every else alt, every))
+        out.append(Cooldown(name, sid, users, per_kill, times, near, [] if every else alt, every))
     return sorted(out, key=lambda c: -c.users)
 
 
@@ -371,7 +391,7 @@ def trinkets(con, encounter_id: int, difficulty: int, top: int = 100) -> list[tu
                 count[gear[slot]["id"]] += 1
                 names[gear[slot]["id"]] = gear[slot].get("name") or str(gear[slot]["id"])
     n = len(rows) or 1
-    return [(names[i], i, c / n) for i, c in count.most_common(6)]
+    return [(names[i], i, c / n) for i, c in count.most_common(6) if c / n >= 0.10]  # under 10%: no habit
 
 
 def _mmss(t: float) -> str:
@@ -408,8 +428,9 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
     lines = "".join(f"<line class='ph' x1='{x(t)}' x2='{x(t)}' y1='22' y2='{H - B}'/>"
                     f"<text x='{float(x(t)) + 4:.1f}' y='18' class='pn'>{e(n.split(':')[0])}</text>"
                     for n, t in phases if t > 0)  # the phase changes, named
-    ticks = "".join(f"<text x='{x(t)}' y='{H - 6}' class='tk'>{int(t // 60)}:00</text>"
-                    for t in range(0, int(span) + 1, 60) if t <= span - 20)  # none cut at the right edge
+    end_anchor = " text-anchor='end'"  # the last tick inside the right edge (5:00 of a 5:02 fight was cut)
+    ticks = "".join(f"<text x='{x(t)}' y='{H - 6}' class='tk'{end_anchor if t > span - 20 else ''}>"
+                    f"{int(t // 60)}:00</text>" for t in range(0, int(span) + 1, 60))
     pos = [v for v in curve if v > 0]
     med = st.median(pos) if pos else 0.0  # the scale the moments are read against (x1.6 the fight's median)
     median = (f"<line class='md' x1='{L}' x2='{W - 10}' y1='{y(med)}' y2='{y(med)}'/>"
@@ -472,8 +493,14 @@ def _near(n: str) -> str:
 
 
 def _chip(t: float, n: str) -> str:
-    """A press's time and the hit it answers; "0:35 · the hit" when they are the same time."""
-    return _mmss(t) + (" &middot; the hit" if n and n.partition(" ")[0] == _mmss(t) else _near(n))
+    """A press's time and the hit it answers, said as before, at or after it ("1:11 · just before the 1:15 hit")."""
+    if not n:
+        return _mmss(t)
+    hit = n.partition(" ")[0]
+    m, _, sec = hit.partition(":")
+    gap = t - (int(m) * 60 + int(sec))
+    return _mmss(t) + (" &middot; at the hit" if abs(gap) <= 2 else
+                       f" &middot; just before the {e(hit)} hit" if gap < 0 else f" &middot; after the {e(hit)} hit")
 
 
 SHOWN_TALENTS = 60  # every class and spec difference shown (a hero tree is named, not listed): no "+N more"
@@ -511,9 +538,7 @@ def build_rows(builds: list) -> list[tuple[int, str, str, str]]:
 
 
 UNSIMMED = {"change": "What the top players play"}  # no sim to say what to change: the tab says what it holds
-SHARED_BUILD = 8  # players: fewer on the most played build, the top players build their own
-COPY_SHARE = 0.10  # a build fewer of the players read play gets no copy button: copying it is no choice of theirs
-BUILD_SHARE = 0.05  # a build fewer of the players read play is noise; the first one stays, a complete build to copy
+BUILD_SHARE = 0.10  # a build fewer of the players read play is no shared build: not listed, nothing to copy
 
 
 def talents_html(builds: list, players: int, who: str, hero: list | None = None) -> str:
@@ -522,24 +547,23 @@ def talents_html(builds: list, players: int, who: str, hero: list | None = None)
     if hero:
         line = ("<p><b>Hero tree:</b> " + (f"{e(hero[0][0])} (all {players} players read)" if len(hero) == 1 else
                 " &middot; ".join(f"{e(t)} {s:.0%}" for t, s in hero) + f" of the {players} players read") + ".</p>")
-    if builds and builds[0][0] < SHARED_BUILD:  # 3 of 100 is no build to show, empty row and all
+    if builds and builds[0][0] < BUILD_SHARE * players:  # 3 of 100 is no build to show, empty row and all
         return (f"<h2>Talents the top {e(who)} play</h2>{line}<p>No shared build: none is played by more than "
                 f"{builds[0][0]} of the {players} players read. The talents they split on follow.</p>")
     return (f"<h2>Talents the top {e(who)} play</h2>{line}<ul class='hl2'>"
-            f"{builds_html(shown_builds(builds, players), players) or '<li>No build yet.</li>'}</ul>")
+            f"{builds_html(shown_builds(builds, players)) or '<li>No build yet.</li>'}</ul>")
 
 
 def shown_builds(builds: list, players: int) -> list:
-    """The builds enough of the players read play (BUILD_SHARE); the most played always, a complete build to copy."""
-    return [b for i, b in enumerate(builds) if i == 0 or not players or b[0] >= BUILD_SHARE * players]
+    """The builds enough of the players read play (BUILD_SHARE): each one is shown and can be copied."""
+    return [b for b in builds if not players or b[0] >= BUILD_SHARE * players]
 
 
-def builds_html(builds: list, players: int = 0) -> str:
+def builds_html(builds: list) -> str:
     copy = "<button class='btn ghost copy' data-copy='{}'>Copy the talents</button>"
     return "".join(f"<li><b>{e(b[1][:1].upper() + b[1][1:])}</b><small>{b[0]} of the top players"
                    + (f" &middot; {e(b[3])}" if len(b) > 3 and b[3] else "") + "</small>"
-                   + (copy.format(e(b[2])) if b[2] and (not players or b[0] >= COPY_SHARE * players) else
-                      "<small class='muted'>no import string in their logs</small>" if not b[2] else "")
+                   + (copy.format(e(b[2])) if b[2] else "<small class='muted'>no import string in their logs</small>")
                    + "</li>" for b in builds)
 
 
@@ -597,7 +621,7 @@ def role_card(r, everyone: list, mine: bool, chips: bool = True) -> str:
             + f"<p class='small muted'>{r.players} {e(r.spec)}s in the kills read.</p></article>")
 
 
-def contested(con, encounter_id: int, difficulty: int, spec: str, lo: float = 0.2, hi: float = 0.8,
+def contested(con, encounter_id: int, difficulty: int, spec: str, lo: float = 0.3, hi: float = 0.7,
               shown: int = 10) -> tuple[list[tuple[str, float]], int]:
     """The talents the top players of the spec split on (picked by lo to hi of them), the closest to half first,
     and how many players were read: when most play a build of their own, these explain the builds. A hero tree's
@@ -763,8 +787,9 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
         return "<p class='small muted'>Not enough kills read yet.</p>"
     deaths = any(p.deaths_with is not None for p in pres)
 
-    def dd(a, b) -> str:
-        return "" if a is None else f"{a:.1f}" + ("" if b is None else f" <small>({b:.1f} without)</small>")
+    def dd(a, b) -> str:  # deaths are read on fewer kills: too few of them with this spec is said, not left blank
+        return ("<small>too few kills</small>" if a is None else
+                f"{a:.1f}" + ("" if b is None else f" <small>({b:.1f} without)</small>"))
     rows = ""
     for p in pres:
         if p.spec == mine and p.share >= 0.99:  # the corpus is this spec's kills: its row says nothing
@@ -788,6 +813,7 @@ def comps_table(comps: list, n_kills: int) -> str:
     if not comps or all(c.kills < FEW_KILLS for c in comps):  # no composition played enough: no table to read
         return ""
     deaths = any(c.deaths is not None for c in comps)
+    comps = [c for c in comps if c.kills >= FEW_KILLS]  # the same cut as every other table
     rows = "".join(
         f"<tr><td>{e(c.label)}</td><td class='n'>{c.kills} ({_pct(c.share)})</td><td class='n'>{_mmss(c.duration)}</td>"
         + (f"<td class='n'>{'' if c.deaths is None else f'{c.deaths:.1f}' if c.kills >= FEW_KILLS else '<small>too few kills</small>'}</td>"
@@ -795,9 +821,9 @@ def comps_table(comps: list, n_kills: int) -> str:
         for c in comps)
     return ("<table class='hcomp'><thead><tr><th>Healers</th><th>Top kills</th><th>Median kill</th>"
             + ("<th>Deaths a kill</th>" if deaths else "") + f"</tr></thead><tbody>{rows}</tbody></table>"
-            f"<p class='small muted'>Of {n_kills} top kills read. Exact compositions played at least 5 times; the "
-            f"other {n_kills - sum(c.kills for c in comps)} kills play rarer ones. Deaths from {FEW_KILLS} kills of a "
-            f"composition, as in the table above.</p>")
+            f"<p class='small muted'>Of {n_kills} top kills read. Exact compositions played at least {FEW_KILLS} times; the "
+            f"other {n_kills - sum(c.kills for c in comps)} kills play rarer ones. Deaths are a mean over the kills "
+            f"whose deaths were read, shown from {FEW_KILLS} of them.</p>")
 
 
 def render_sheet(h: HealerPrep) -> str:
