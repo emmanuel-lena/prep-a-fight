@@ -339,7 +339,8 @@ class Presence:
     duration_without: float | None
     deaths_with: float | None
     deaths_without: float | None
-    deaths_close: bool = False  # with and without within two standard errors of their difference: no reading
+    deaths_close: bool = False  # with and without within three standard errors of their difference: no reading
+    duration_close: bool = False  # the same for the median kill times
 
 
 def presence(con: sqlite3.Connection, encounter_id: int, difficulty: int,
@@ -359,11 +360,15 @@ def presence(con: sqlite3.Connection, encounter_id: int, difficulty: int,
         with_ = [k for k in ks if s in k[0]]
         without = [k for k in ks if s not in k[0]]
         dw, dwo = [k[2] for k in with_ if k[2] is not None], [k[2] for k in without if k[2] is not None]
+        # the jobs' rule, three standard errors of the difference; a median's error is about 1.25 times a mean's
         close = (len(dw) > 1 and len(dwo) > 1 and abs(st.mean(dw) - st.mean(dwo))
-                 < 2 * (st.variance(dw) / len(dw) + st.variance(dwo) / len(dwo)) ** 0.5)
+                 < 3 * (st.variance(dw) / len(dw) + st.variance(dwo) / len(dwo)) ** 0.5)
+        tw, two = [k[1] for k in with_], [k[1] for k in without]
+        tclose = (len(tw) > 1 and len(two) > 1 and abs(st.median(tw) - st.median(two))
+                  < 3 * 1.25 * (st.variance(tw) / len(tw) + st.variance(two) / len(two)) ** 0.5)
         out.append(Presence(s, len(with_) / len(ks), st.mean(k[0].count(s) for k in with_), len(with_),
                             med([k[1] for k in with_]), med([k[1] for k in without]), mean([k[2] for k in with_]),
-                            mean([k[2] for k in without]), close))  # deaths: a mean (a median of 0s and 1s
+                            mean([k[2] for k in without]), close, tclose))  # deaths: a mean (a median of 0s and 1s
                                                                           # reads as a verdict)
     return sorted(out, key=lambda p: -p.share)
 
@@ -566,7 +571,7 @@ def jobs(r: Role, everyone: list[Role]) -> list[str]:
         out.append(f"heals the tanks: {r.tank:.0%} of its healing goes on them, ±{2 * r.se.get('tank', 0):.0%} "
                    f"(the other healers of these kills: {ref('tank'):.0%})")
     if r.spike >= max(0.05, ref("spike") * SPIKE_HEALER) and clear("spike"):
-        out.append(f"answers the raid's damage spikes: {r.spike:.0%} of its healing lands in them, "
+        out.append(f"answers the raid's big moments: {r.spike:.0%} of its healing lands in them, "
                    f"±{2 * r.se.get('spike', 0):.0%} (the other healers of these kills: {ref('spike'):.0%})")
     if r.dispels >= max(0.2, ref("dispels") * DISPELLER) and clear("dispels"):
         out.append(f"dispels {r.dispels:.1f} times a minute, ±{2 * r.se.get('dispels', 0):.1f} "
@@ -586,8 +591,9 @@ def sample(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> tuple
     4:05 and no death; 19-35% in kills ranked by a Restoration Shaman's healing, 4:50 and 2 deaths)."""
     ensure_tables(con)
     where, params = kills_filter(encounter_id, difficulty)
-    rows = con.execute(f"SELECT f.duration_s, k.deaths FROM heal_kill k JOIN fight f USING(report, fight_id) "
+    rows = con.execute(f"SELECT f.duration_s, k.deaths, f.size FROM heal_kill k JOIN fight f USING(report, fight_id) "
                        f"WHERE {where}", params).fetchall()
     if not rows:
         return 0, 0.0, 0.0
-    return len(rows), st.median(r[0] for r in rows), round(st.mean(r[1] for r in rows), 1)
+    per20 = [r[1] * 20 / r[2] if r[2] else r[1] for r in rows if r[1] is not None]  # as the tables: per 20 players
+    return len(rows), st.median(r[0] for r in rows), round(st.mean(per20), 1) if per20 else 0.0

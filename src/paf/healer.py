@@ -404,6 +404,10 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
             near.append(f"{_mmss(m.t)} {m.boss_spell}".strip() if ok else "")
         n_all = max(1, len(tl.players))  # the share of all the top players pressing it within 8 s of each moment
         support = [sum(1 for ts in per_player if any(abs(x - t) <= 8 for x in ts)) / n_all for t in times]
+        # a moment a quarter of those who press it share at least: under, it is timing that varies (a chip at 12%
+        # of the top players read as a moment next to "no moment most of them share")
+        kept = [i for i, sp in enumerate(support) if sp >= 0.25 * users]
+        times, near, support = [times[i] for i in kept], [near[i] for i in kept], [support[i] for i in kept]
         out.append(Cooldown(name, sid, users, per_kill, times, near, [] if every else alt, every, support))
     return sorted(out, key=lambda c: -c.users)
 
@@ -444,7 +448,8 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
               presses: list | None = None) -> str:
     """A damage-taken curve (per STEP), its big moments as dots, the phases as dashed lines; under it, one row per
     cooldown (Cooldown) with a mark where the top players usually press it: the hit and the button on one time axis."""
-    rows = [c for c in presses or [] if c.times][:PRESS_ROWS]
+    # a lane for a cooldown with a moment 40% of the top players share: a spread one (Divine Steed) has none
+    rows = [c for c in presses or [] if c.times and max(c.support or [1.0]) >= 0.4][:PRESS_ROWS]
     W, H, L, B = 760, 200 + 18 * len(rows), 150 if rows else 46, 24 + 18 * len(rows)
     peak = max(curve, default=0) or 1
     span = max(len(curve) * STEP, 1)
@@ -455,7 +460,9 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
     def y(v: float) -> str:
         return f"{30 + (1 - v / peak) * (H - B - 40):.1f}"  # room above the peaks for their labels
     pts = " ".join(f"{x(i * STEP)},{y(v)}" for i, v in enumerate(curve))
-    marks = "".join(f"<circle cx='{x(m.t)}' cy='{y(m.dtps)}' r='4' class='mk'/>"
+    guides = "".join(f"<line class='gd' x1='{x(m.t)}' x2='{x(m.t)}' y1='{y(m.dtps)}' y2='{H - 22}'/>"
+                     for m in found) if rows else ""  # from each hit down through the lanes
+    marks = guides + "".join(f"<circle cx='{x(m.t)}' cy='{y(m.dtps)}' r='4' class='mk'/>"
                     f"<text x='{float(x(m.t)) + 6:.1f}' y='{float(y(m.dtps)) - 8:.1f}' class='ml'>{_mmss(m.t)}</text>"
                     for m in found)
     lines = "".join(f"<line class='ph' x1='{x(t)}' x2='{x(t)}' y1='22' y2='{H - B}'/>"
@@ -499,7 +506,7 @@ def _shown(name: str) -> str:
 
 def _share(sp: float) -> str:
     """How many of the top players press it then: a chip is no consensus ("1:16 · 28% of them")."""
-    return f" &middot; {_pct(sp)} of them" if sp else ""
+    return f" &middot; {_pct(sp)} of the top players" if sp else ""
 
 
 def _more(c: Cooldown) -> str:
@@ -521,7 +528,7 @@ def cooldowns_html(cds: list[Cooldown]) -> str:
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, n)}{_share(sp)}{_or(c, t)}</span>"
                                         for t, n, sp in zip(c.times, c.near, c.support or [0.0] * len(c.times),
                                                             strict=False))
-                                or "<small>timing varies: no moment most of them share</small>")
+                                or "<small>timing varies: no shared moment</small>")
         + (f"<small class='alt'>on cooldown, about every {c.every:.0f} s</small>" if c.every else
            f"<small class='alt'>{_more(c)} more, timing varies</small>" if c.times and _more(c) else "")
         + "</span></li>"
@@ -813,15 +820,16 @@ def jobs_lead(roles: list, mine: str = "") -> str:
 
 
 NUMS_NOTE = ("On each card, the median player of the spec: the share of the kill's healing (medians over different "
-             "kills, they do not add up); of its own healing, the share on the tanks and in the raid's spikes; "
-             "overheal; dispels a minute, all of them; externals a kill (protective cooldowns cast on another player, "
-             "not on themselves). Externals and overheal follow each spec's kit on every boss: shown, never called "
-             "a job of this boss. The times on a card are the moments most of its players share.")
+             "kills, they do not add up); of its own healing, the share on the tanks and in the raid's big moments; "
+             "overheal; dispels a minute, all of them (the boss tab counts the top healer of each kill); externals a "
+             "kill (protective cooldowns cast on another player, not on themselves). Externals and overheal follow "
+             "each spec's kit on every boss: shown, never called a job of this boss. The times on a card are the "
+             "moments most of its players share.")
 
 
 def _nums(r) -> list[str]:
     """A healer spec's numbers, all of them, the same on every card (NUMS_NOTE says what each is)."""
-    out = [f"{_pct(r.healing)} of the kill's healing", f"{_pct(r.tank)} on the tanks", f"{_pct(r.spike)} in spikes",
+    out = [f"{_pct(r.healing)} of the kill's healing", f"{_pct(r.tank)} on the tanks", f"{_pct(r.spike)} in big moments",
            f"{_pct(r.overheal)} overheal", f"{r.dispels:.1f} dispels a minute",
            f"{r.externals:.1f} externals a kill on average" if r.externals >= 0.05 else "no externals"]
     if r.buffs:
@@ -844,7 +852,7 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
     deaths = any(p.deaths_with is not None for p in pres)
 
     def dd(a, b) -> str:  # deaths are read on fewer kills: too few of them with this spec is said, not left blank
-        return ("<small>too few kills</small>" if a is None else
+        return ("<small>too few with deaths read</small>" if a is None else
                 f"{a:.1f}" + (" <small>(too few without)</small>" if b is None else f" <small>({b:.1f} without)</small>"))
     rows = ""
     for p in pres:
@@ -858,7 +866,8 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
         cells = ("<td class='n' colspan='3'><small>too few kills</small></td>" if few else
                  f"<td class='n'>{p.per_kill:.1f}</td><td class='n'>{_mmss(p.duration_with)}"
                  + (" <small>(too few without)</small>" if few_without or p.duration_without is None
-                    else f" <small>({_mmss(p.duration_without)} without)</small>")
+                    else f" <small>({_mmss(p.duration_without)} without"
+                    + (", within the noise" if p.duration_close else "") + ")</small>")
                  + "</td>" + (f"<td class='n'>{dd(p.deaths_with, None if few_without else p.deaths_without)}"
                               + (" <small>within the noise</small>" if p.deaths_close and p.deaths_with is not None
                                  and not few_without else "") + "</td>" if deaths else ""))
@@ -923,7 +932,10 @@ def render_sheet(h: HealerPrep) -> str:
                          if n and n.split(" ", 1)[0] == _mmss(m.t)]
             if mine_here:  # with its share: a third of the top players is a habit, not the consensus
                 answers.append(f"for the {_mmss(m.t)} hit, "
-                               + _and([f"{e(_shown(n))} ({sp:.0%} of them, about {_mmss(t)})" for n, t, sp in mine_here[:3]]))
+                               + _and([f"{e(_shown(n))} ({_pct(sp)} of them, about {_mmss(t)})"
+                                       for n, t, sp in mine_here[:3]]))
+            else:
+                answers.append(f"for the {_mmss(m.t)} hit, no shared cooldown")
         end = len(h.curve) * STEP
         long = "".join(f" {'From ' + _mmss(a) + ' to the end' if b >= end - STEP else _mmss(a) + ' to ' + _mmss(b)}, "
                        f"the raid takes about {r:.1f}&times; the usual damage without a break."

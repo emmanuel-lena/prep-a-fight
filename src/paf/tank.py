@@ -72,6 +72,7 @@ class TankPrep:
     swap_debuff: str = ""  # the tank ability whose debuff the tanks swap on (measured on them)
     no_taunt: list = field(default_factory=list)  # (ability, its journal sentence): when taunts stop working
     hero: list = field(default_factory=list)  # (hero tree, share of the top players), paf.healer.hero_split
+    damage_kills: int = 0  # kills the tanks' damage curve is the median of
     short_defs: list = field(default_factory=list)  # (spell, share of the top tanks, casts a kill): too frequent
     # for a cooldown, too short for an uptime (Spell Reflection, Demoralizing Shout)
     split: list = field(default_factory=list)  # (talent, share picked) the top players split on
@@ -377,6 +378,7 @@ def render_sheet(p: TankPrep) -> str:
         _plain as plain,
     )
     from paf.healer import (
+        _share,
         build_lead,
         comps_table,
         cooldowns_html,
@@ -395,8 +397,9 @@ def render_sheet(p: TankPrep) -> str:
                   for n, u in p.mitigation) + "".join(
         f"<li><b>{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top tanks"
         + (f" &middot; on cooldown, about every {ev:.0f} s" if ev else "") + "</small>"
-        + (f"<span class='when'>{''.join(f'<span class=chip>{_mmss(t)}</span>' for t in ts)}</span>" if ts else "")
-        + "</li>" for n, u, k, ts, ev in p.short_defs)
+        + (f"<span class='when'>{''.join(f'<span class=chip>{_mmss(t)}{_share(sp)}</span>' for t, sp in zip(ts, sps, strict=False))}</span>"
+           if ts else "")
+        + "</li>" for n, u, k, ts, ev, sps in p.short_defs)
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]
     others = [replace(c, near=["" for _ in c.near]) for c in p.cooldowns  # no buster to answer; taunts: the swaps
               if c not in defs and not _taunt(c.spell_id)]
@@ -416,7 +419,7 @@ def render_sheet(p: TankPrep) -> str:
         m = max(p.moments, key=lambda x: x.ratio)
         own = bool(set(moment_names(m)) & {n for n, _s in p.hitters[:3]})  # any of its abilities a tank hitter
         answers = ([(c.name, c.times, c.support or [0.0] * len(c.times)) for c in defs if not c.every]
-                   + [(n, ts, [0.0] * len(ts)) for n, _u, _k, ts, _ev in p.short_defs])
+                   + [(n, ts, sps) for n, _u, _k, ts, _ev, sps in p.short_defs])
         press = next(((n, t, sp) for n, ts, sps in answers for t, sp in zip(ts, sps, strict=False)
                       if -ANSWER[0] <= t - m.t <= ANSWER[1]), None)
         lead.append(f"Their biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({m.ratio:.1f}&times; the "
@@ -435,7 +438,8 @@ def render_sheet(p: TankPrep) -> str:
                        f", the first time at {_mmss(p.swaps[0])}" + (f" after {e(causes[0])}." if causes[0] else ".")))
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + [
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the top tanks "
-        f"take per second, median of the kills; a dot marks the tanks' biggest damage, whatever casts it.</p><ul class='hl2'>"
+        f"take per second, median of {p.damage_kills or 'the'} kills read; a dot marks the tanks' biggest damage, "
+        f"whatever casts it.</p><ul class='hl2'>"
         f"{moments_html(p.moments, 'tank damage') or '<li>No big moment: steady damage.</li>'}</ul></div>",
         f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
         f"{cooldowns_html(defs) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
@@ -447,6 +451,8 @@ def render_sheet(p: TankPrep) -> str:
         f"{_cause(common, p.stacks) if swap and one else ''}"
         f"{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
                                                           f"</li></ul>" if swap else "")
+        + (f"<p class='small muted'>About {extra} more swaps a kill come at varying times.</p>"
+           if swap and (extra := round(2 * p.taunts_per_kill) - len(p.swaps)) > 0 else "")
         + "".join(f"<p><b>Taunts stop working with {e(n)}:</b> {e(t)} <span class='muted'>(The Encounter Journal"
                   + (f"; the top tanks still swap at {_mmss(p.swaps[-1])}" if p.swaps else "") + ".)</span></p>"
                   for n, t in p.no_taunt)]
@@ -455,7 +461,7 @@ def render_sheet(p: TankPrep) -> str:
               split_html(p.split, p.split_players, p.spec) if p.split else "",
               f"<h2>Trinkets the top {e(p.spec)}s play</h2><ul class='hl2'>"
               f"{trinkets_html(p.trinkets) or '<li>No gear yet.</li>'}</ul>",
-              "<p class='small muted'>No tank sim: these are the top players' choices, not a recommendation.</p>"]
+              ]  # the lead says no sim weighs them
     hit = "".join(f"<li><b>{e(n)}</b><small>{s:.0%} of the damage the top tanks take</small></li>"
                   for n, s in p.hitters)
     jr = "".join(f"<li>{e(plain(x))}</li>" for x in p.journal)

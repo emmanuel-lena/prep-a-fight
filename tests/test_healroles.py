@@ -72,7 +72,7 @@ def test_compositions_and_jobs(monkeypatch):
     rs = {r.spec: r for r in healroles.roles(con, 3470, 4, {10060: "Power Infusion", 98008: "Spirit Link Totem"},
                                              min_players=5)}
     shaman, priest = rs["Restoration Shaman"], rs["Holy Priest"]
-    assert any("spikes: 50%" in j for j in shaman.jobs) and not any("wastes" in j for j in shaman.jobs)
+    assert any("big moments: 50%" in j for j in shaman.jobs) and not any("wastes" in j for j in shaman.jobs)
     # Power Infusion is a damage dealer's buff, said last; Guardian Spirit the protective external
     assert priest.externals == 0.5 and priest.buffs == 1.0 and priest.buff_spells == ["Power Infusion"]
     assert priest.jobs == ["nothing stands out against the other healers"]  # a buff is no healing job
@@ -159,10 +159,10 @@ def test_power_infusion_is_no_job_of_the_boss():
     priest = healroles.Role("Holy Priest", 40, 0.2, 0.07, 0.2, 0.4, 0.6, 3, 0, jobs=[
         "buffs a damage dealer: Power Infusion 2.1 a kill"])
     shaman = healroles.Role("Restoration Shaman", 40, 0.2, 0.07, 0.2, 0.2, 0.6, 3, 0, jobs=[
-        "answers the raid's damage spikes: 26% of its healing lands in them (the other healers 18%)"])
+        "answers the raid's big moments: 26% of its healing lands in them (the other healers 18%)"])
     assert jobs_lead([priest, shaman], "Holy Priest") == (
         "<p class='lead'>Your spec here: nothing specific to this boss stands out against the other healers. "
-        "The others: the Restoration Shaman answers the raid&#x27;s damage spikes: 26% of its healing lands in them "
+        "The others: the Restoration Shaman answers the raid&#x27;s big moments: 26% of its healing lands in them "
         "(the other healers 18%).</p>")
 
 

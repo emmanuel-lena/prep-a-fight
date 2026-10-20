@@ -795,7 +795,11 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     def moments_of(a) -> list[float]:  # a short defensive is a timed answer too (Spell Reflection at 0:35); one
         casts = [p["casts"].get(a.name) or p["casts"].get(a.id) or [] for p in tl.players]  # on cooldown is not
         every = on_cadence(casts, a.per_kill, tl.duration)  # (Demoralizing Shout every 30 s): no moments
-        return ([], every) if every else (press_moments(casts, max(1, round(a.per_kill)), tl.duration)[0], 0.0)
+        if every:
+            return [], every, []
+        times = press_moments(casts, max(1, round(a.per_kill)), tl.duration)[0]
+        n = max(1, len(tl.players))  # each moment's share of the top players, as the cooldowns' chips
+        return times, 0.0, [sum(1 for ts in casts if any(abs(x - t) <= 8 for x in ts)) / n for t in times]
     short_defs = sorted(((a.name, a.users, a.per_kill, *moments_of(a)) for a in tl.abilities
                          if a.users >= 0.5 and a.name not in kept
                          and (cds.get(a.id, (0.0, 1))[0] < healer.COOLDOWN_GAP
@@ -823,6 +827,8 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     p.short_defs = short_defs
     p.hero = healer.hero_split(con, enc.id, diff, spec)
     p.no_taunt = tank.taunt_immunity(bossguide.load(enc.id, diff_name), diff_name)
+    p.damage_kills = con.execute("SELECT COUNT(*) FROM tank_damage d JOIN fight f USING(report, fight_id) "
+                                 "WHERE f.encounter_id=? AND f.difficulty=?", (enc.id, diff)).fetchone()[0]
     step("The stacks the top tanks swap at, and the deaths of each composition")
     tank.fetch_stacks(client, con, enc.id, diff)  # their stacking debuffs, a few kills
     from paf.gamedata import spell_names
@@ -988,7 +994,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     n, dur, dead = healroles.sample(con, enc.id, diff)
     h.role_kills, h.role_median = n, dur
     h.role_sample = (f"kills of the top {healroles.pretty(cls, spec)}s (ranked by their healing), median "
-                     f"{healer._mmss(dur)}, {dead:.1f} deaths a kill")
+                     f"{healer._mmss(dur)}, {dead:.1f} deaths per 20 players")
     for r in h.roles:
         print(f"  {r.spec} ({r.players} healers): {'; '.join(r.jobs)}")
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"
