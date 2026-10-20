@@ -316,3 +316,19 @@ form.settings .set-group>legend{font-size:22px} form.settings>.set-group:first-o
 body.has-side>main .hero-week h2{font-size:30px;line-height:1.15;margin:4px 0 6px}
 body.has-side>main .sheets+h2{margin-top:24px}
 form.settings .set-group>legend{line-height:1.25} form.settings{padding-top:10px}
+/* round 7 */
+main a:not(.btn):not(.bcard):not(.ws-card):not(.rb-d){text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+.set-wcl{margin:10px 0}
+.status .path{font:400 13px var(--font-data)} .status td.small{font-size:13px} /* paths in mono, the rest in the body face */
+.status .btn{font:600 15px var(--font-display);padding:9px 16px;min-width:196px;text-align:center}
+.set-wcl .key-l{max-width:420px} .set-wcl .key-in{max-width:none;width:100%}
+.rl-words{font-size:14px;color:var(--muted);max-width:80ch;margin:0 0 12px}
+.rl-p button{border-color:transparent;background:var(--surface-2)}
+.adv textarea{max-width:80ch} .adv{max-width:80ch}
+.status .path{overflow-wrap:break-word;word-break:normal}
+.rl-p button{flex-direction:row;align-items:baseline;gap:6px;padding:4px 10px} .rl-chips{gap:4px 6px}
+/* round 8: Reclear's raid in the briefing style; Settings' status buttons back to the ghost size */
+.lr-grid{display:block;max-width:1000px} .lr-boss{background:none;border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none;padding:14px 0}
+.lr-boss header b{font:600 19px/1.3 var(--font-reading)}
+.lr-killed{font:600 19px/1.3 var(--font-reading);text-transform:none;letter-spacing:0;color:var(--fg);margin:20px 0 6px}
+.status .btn{font:600 14px var(--font-display);padding:7px 14px;min-width:0;width:100%} .status .val form{width:170px}

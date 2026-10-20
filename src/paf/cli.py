@@ -258,12 +258,12 @@ def cmd_template(args: argparse.Namespace) -> int:
 
     client, enc, diff_name, diff = _encounter_and_difficulty(args)
     con = db.connect()
-    from paf.corpus.analyze import council
+    from paf.corpus.analyze import boss_units, council
     from paf.corpus.units import fetch_boss_auras, fetch_council_stack, fetch_npc_stack, fetch_unit_windows
 
     boss = main_boss(con, enc.id, diff, enc.name)
     fetch_unit_windows(client, con, enc.id, diff, boss)  # secondary units' real windows (cheap, cached)
-    if members := council(con, enc.id, diff):  # how many council members are stacked
+    if members := council(con, enc.id, diff) or boss_units(con, enc.id, diff):  # how many bosses are hit at once
         fetch_council_stack(client, con, enc.id, diff, members)
     fetch_boss_auras(client, con, enc.id, diff, boss)  # auras on the boss: possible damage amps
     fetch_npc_stack(client, con, enc.id, diff)  # adds that never die: how many the top players hit at once
@@ -803,6 +803,7 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
         rare=[c for c in healer.cooldowns(tl, found, min_users=0.25, max_users=0.5)
               if is_defensive(c.spell_id, c.name)],
         character=getattr(profile, "name", "") or "")
+    p.abilities = _role_journal(enc.id, diff_name, "tank", tl)
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(tank.render_sheet(p), encoding="utf-8")
@@ -813,6 +814,19 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     clock.save()
     print(f"\nPrep sheet: {out}")
     return 0
+
+
+def _role_journal(encounter_id: int, diff_name: str, role: str, tl) -> str:
+    """The Encounter Journal's stages for a healer's or a tank's sheet: that role's abilities in full, the others'
+    named (paf.bossguide), with the boss's cast times from the top kills."""
+    from paf import bossguide
+    from paf.icons import icons_for
+
+    sections = bossguide.load(encounter_id, diff_name)
+    if not sections:
+        return ""
+    return bossguide.abilities_html(sections, timings=dict(tl.boss_casts),
+                                    icon_map=icons_for(bossguide.spell_refs(sections)), role=role)
 
 
 def _prep_healer(args: argparse.Namespace, profile=None) -> int:
@@ -847,7 +861,8 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         print(f"No kill of {enc.name} {diff_name} for {spec} {cls} yet.")
         return 1
     curve = healer.raid_curve(con, enc.id, diff, tl.duration)
-    found = healer.moments(curve, tl.boss_casts)
+    roles = bossguide.ability_roles(bossguide.load(enc.id, diff_name))  # a tank buster does not name a raid hit
+    found = healer.moments(curve, tl.boss_casts, skip={n for n, r in roles.items() if r == ["tank"]})
     builds = top_builds(con, enc.id, diff, spec, n=3)
     try:
         fetch_codes(client, con, builds)
@@ -858,6 +873,12 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         healer.cooldowns(tl, found), healer.build_rows(builds),
         healer.trinkets(con, enc.id, diff), bossguide.role_bullets(bossguide.load(enc.id, diff_name), "healer"),
         [(n, t) for n, t, _ in tl.phases], class_name=cls, character=getattr(profile, "name", "") or "")
+    h.abilities = _role_journal(enc.id, diff_name, "healer", tl)
+    from paf.defensives import is_defensive
+
+    worn = {n for n, _i, _s in h.trinkets}
+    h.rare = sorted((c for c in healer.cooldowns(tl, found, min_users=0.02, max_users=0.25)
+                     if c.name not in worn and not is_defensive(c.spell_id, c.name)), key=lambda c: -c.users)[:3]
     step("The top raids' healers: their compositions and what each spec does here")
     healroles.fetch_heal_roles(client, con, enc.id, diff)
     from paf.gamedata import spell_names
@@ -1016,11 +1037,11 @@ def cmd_prep(args: argparse.Namespace) -> int:
         step("Analyzing the corpus")
         boss = main_boss(con, enc.id, diff, enc.name)
         rep = analyze(con, enc.id, diff, boss, spec)
-        from paf.corpus.analyze import council
+        from paf.corpus.analyze import boss_units, council
         from paf.corpus.units import fetch_boss_auras, fetch_council_stack, fetch_npc_stack, fetch_unit_windows
 
         fetch_unit_windows(client, con, enc.id, diff, boss)
-        if members := council(con, enc.id, diff):
+        if members := council(con, enc.id, diff) or boss_units(con, enc.id, diff):  # bosses hit at once
             fetch_council_stack(client, con, enc.id, diff, members)
         fetch_boss_auras(client, con, enc.id, diff, boss)
         fetch_npc_stack(client, con, enc.id, diff)
@@ -1993,7 +2014,7 @@ def _boss_guide(d, con, enc, diff: int, diff_name: str, spec: str, tl, fight, pk
     else:
         _corpus_actions(d, con, enc, diff, spec, sections, mechs)
     d.guide_abilities = bossguide.abilities_html(sections, timings=dict(tl.boss_casts), mechanics=mechs,
-                                                 burst=burst, icon_map=gicons)
+                                                 burst=burst, icon_map=gicons, role="damage")
     return mechs
 
 

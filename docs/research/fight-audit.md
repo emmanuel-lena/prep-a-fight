@@ -43,13 +43,11 @@ a damage dealer can hit (an amp, an immunity, a target) is in it or knowingly le
 
 ## Open
 
-- **Two-boss fights** (Sentinels, Vexhul and Ithraz): `council()` needs no boss over 50% of the boss damage, which
-  two even bosses miss by construction (50.3%). They are modeled as a boss plus windows on the other one. Raising the
-  threshold would also turn Ula'tek and her heart (58% in mythic) into a council; the validation (simulated / real
-  DPS of the top players) decides, see below.
+- **Two-boss fights**: settled by measurement in 0.8.16 (see "Every boss, two specs" below).
 - **Damage-taken reductions between −10% and −90% on the boss** would be ignored (none in this tier).
 - **Recurring phases** other than immunities are still kept at their first start in the corpus (only the display and
-  the NSRT notes use `looped_phases`).
+  the NSRT notes use `looped_phases`). The one boss with such a phase, Sszorak (Howling Maelstrom), validates at
+  1.01 to 1.07 on both specs and difficulties: no visible cost, left as is.
 
 ## Bloodlust (issue #20)
 
@@ -87,3 +85,42 @@ of the top kills, never fewer than 30 kills. It is a second sheet (same plans, t
 phases, waves, boss casts and notes), and every plan is also simmed on it as a sensitivity variant. Nek'zali
 heroic: 4:16 → 5:14 with the intermission at 2:06 instead of 1:42 and a wave of 18 Restless Amani logged 0.8 s
 before Stage Two (which surfaced the boundary rule now in `Fight.__post_init__`).
+
+## Every boss, two specs (paf 0.8.16)
+
+Every fight rebuilt with the current code, then calibrated as a prep does (the add counts scaled until the simulated
+boss share matches the spec's real one), then 4 top players of the spec simmed on it with their own gear, talents and
+real secondary stats. Simulated / real DPS, median (range):
+
+| Boss | Heroic, Elemental | Heroic, Subtlety | Mythic, Elemental | Mythic, Subtlety |
+|---|---|---|---|---|
+| Nymrissa Wavecaller | 1.04 (1.00-1.08) | 0.85 (0.81-0.85) | 1.11 (1.07-1.20) | no corpus |
+| Nek'zali the Soulcoiler | 0.95 (0.91-0.96) | 0.89 (0.81-1.00) | 0.96 (0.93-1.00) | no corpus |
+| Entombed Sentinels | **0.89** (0.89-0.93), was 1.13 | **1.00** (0.97-1.04), was 1.31 | **0.87** (0.85-0.90), was 1.09 | no corpus |
+| The Lost Explorers | 0.91 (0.87-0.93) | 1.06 (0.99-1.09) | 0.93 (0.90-0.97) | no corpus |
+| Vashnik the Malignant | 0.90 (0.79-0.94) | 0.94 (0.87-0.97) | 1.01 (0.95-1.03) | 1.10 (1.06-1.16) |
+| Sszorak | 1.01 (0.95-1.03) | 1.03 (1.00-1.04) | 1.07 (0.97-1.09) | no corpus |
+| The Coiled Altar | 1.02 (0.99-1.08), was 1.05 | no kills in the corpus | 0.88 (0.87-0.90) | no corpus |
+| Ula'tek | 0.90 (0.82-0.93) | no kills in the corpus | 1.03 (1.00-1.06) | no corpus |
+
+Every median between 0.85 and 1.11. What the run found and fixed:
+
+- **A run without the add calibration is not what a prep sims.** Nymrissa simmed at 1.41 for the Subtlety Rogues
+  before calibration: their real boss share is 94% (the murlocs are the ranged players' job; 6% of a Rogue's
+  damage), the fight's 5 murlocs at once came from the Elementals (who hit 5; the Rogues hit 4 when they do, 2 to
+  5). Calibrated on their share (add counts ×0.2), 0.85.
+- **Two bosses the raid keeps apart are not two targets.** Entombed Sentinels' second boss (Blood of Ula'tek) was a
+  target beside the first for the whole fight: every cleave hit both, 1.31 of the real DPS for the Rogues. Measured
+  on 6 kills a spec, the top Elementals and Rogues hit one Sentinel at a time (the Journal's United Defense: the raid
+  keeps them apart). `boss_units` now finds a fight with two or more bosses at their own health (a council, or a
+  50/50 pair that `council()` misses), the prep measures how many the top players hit at once, and a second boss
+  hit alone, up while the first one is attackable, is single target, not a cleave target (`bosses_hit_at_once`).
+  One up while the first is immune stays a target: Nek'zali's Echo of Jawae in her intermission (also "one at a
+  time" in the logs, for that reason). Measured on every multi-boss fight: The Lost Explorers 2 (council, as
+  before), The Twin Fangs 2 (Vexhul and Ithraz stacked: unchanged), The Coiled Altar 1 (Hex Lord Malacrass no longer
+  a cleave target: 1.05 → 1.02), Ula'tek and her heart 1 (the heart is a damage amp, unchanged).
+- **A ranked log made private stopped the whole validation** (The Coiled Altar and Ula'tek mythic): the player is
+  now skipped.
+
+Open: the Subtlety corpus has no mythic kills and no heroic kills of two bosses; Nymrissa heroic's Rogues sim at the
+low end (0.85, the add scale at its floor ×0.2: SimC's target priority keeps some damage on the murlocs).

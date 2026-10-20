@@ -154,6 +154,14 @@ def fetch_council_stack(client: WCLClient, con: sqlite3.Connection, encounter_id
     return len(todo)
 
 
+def bosses_hit_at_once(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> int | None:
+    """Boss units hit at once by the ranked players (median over the measured kills), None when not measured."""
+    where, params = kills_filter(encounter_id, difficulty)
+    vals = [v for (v,) in con.execute(f"SELECT c.targets FROM council_stack c JOIN fight f USING(report, fight_id) "
+                                      f"WHERE {where}", params) if v]
+    return max(1, round(st.median(vals))) if vals else None
+
+
 def council_stack(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> int:
     """Council members hit at once by the ranked players (median over the measured kills), 1 when unknown."""
     where, params = kills_filter(encounter_id, difficulty)

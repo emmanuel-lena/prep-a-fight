@@ -20,3 +20,8 @@
 .recap li[hidden]{display:none}
 .what-sim{margin:6px 0 0} .what-sim label{display:block;margin:6px 0}
 .what-sim label{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start}
+/* the goal: ruled radio rows, not boxes (issue #10) */
+.goals{gap:0;max-width:640px} .goal>span{border:0;border-top:1px solid var(--line);border-radius:0;padding:12px 44px 12px 14px}
+.goal:last-child>span{border-bottom:1px solid var(--line)}
+.goal input:checked+span{background:var(--surface-2);box-shadow:inset 3px 0 0 var(--fg)}
+.goal input:focus-visible+span{outline:2px solid var(--accent);outline-offset:-2px}

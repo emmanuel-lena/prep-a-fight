@@ -520,7 +520,7 @@ def ago(mtime: float, now: float | None = None) -> str:
 DIFF_LABELS = {"lfr": "LFR", "normal": "Normal", "heroic": "Heroic", "mythic": "Mythic"}
 
 
-def boss_cards(items: list[dict], order: tuple[str, ...] = ()) -> str:
+def boss_cards(items: list[dict], order: tuple[str, ...] = (), spec: bool = True) -> str:
     """The prepared bosses as a ruled list, one group per boss in the raid's order: the spec, the difficulty, when;
     the numbers stay in the sheet."""
     from paf import icons
@@ -528,8 +528,9 @@ def boss_cards(items: list[dict], order: tuple[str, ...] = ()) -> str:
     def row(x: dict) -> str:
         cls = (x.get("spec") or "").split(" ")[-1].lower()
         ic = icons.img(icons.CLASS_ICON.format(cls=cls), "medium", "bc-ic") if cls else "<span class='bc-ic'></span>"
-        return (f'<a class="bcard" href="/view/{e(x["key"])}">{ic}<span class="bc-txt">{e(x["spec"] or "Your sheet")}'
-                f' {diff_pill(x["difficulty"])}{"" if "prep" in x["files"] else " <span class=muted>no sim yet</span>"}'
+        who = e(x["spec"] or "Your sheet") + " " if spec else ""  # under "Your sheets as X": said once
+        return (f'<a class="bcard" href="/view/{e(x["key"])}">{ic}<span class="bc-txt">{who}'
+                f'{diff_pill(x["difficulty"])}{"" if "prep" in x["files"] else " <span class=muted>no sim yet</span>"}'
                 f'</span><span class="bc-when">{ago(x["mtime"])}</span></a>')
     groups: dict[str, list[dict]] = {}
     for x in items:
@@ -802,7 +803,7 @@ def characters_strip() -> str:
 
 ADD_FORM = ('<form method="post" action="/profile" class="add-form"><p class="add-help">In game, on that character: '
             'type <code>/simc</code>, then Ctrl+A, Ctrl+C, and paste here. Paste it again after a gear change to '
-            'update it.</p><textarea name="simc" required placeholder="Paste the /simc export here"></textarea>'
+            'update it.</p><textarea name="simc" id="simc-box" required placeholder="Paste the /simc export here"></textarea>'
             '<p><button class="btn go">Add this character</button></p></form>')
 
 
@@ -816,7 +817,8 @@ def characters_page() -> str:
         logs = (f'<form method="post" action="/character/autologs" class="cc-logs"><input type="hidden" name="slug" '
                 f'value="{e(c.slug)}"><input type="hidden" name="on" value="{"0" if c.slug in auto else "1"}">'
                 f'<label><input type="checkbox"{" checked" if c.slug in auto else ""} onchange="this.form.submit()"> '
-                f'<span>Read my last raid when the app starts: <a href="/reclear">Reclear</a> shows what it cost you</span>'
+                f'<span>Check this character&#39;s last raid when the app starts (shown on <a href="/reclear">Reclear'
+                f'</a>)</span>'
                 f'</label></form>')
         ic = icons.img(icons.CLASS_ICON.format(cls=c.class_name.lower()), "large", "cc-ic")
         badge = ('<span class="muted small">from a log: no bags</span>' if c.imported else
@@ -828,7 +830,7 @@ def characters_page() -> str:
                   f'{(" <small class=muted>" + e(c.realm) + "</small>") if c.realm else ""}</b>'
                   f'<span class="cc-spec">{e(c.spec.title())} {e(c.class_name.title())}</span><span>{badge} '
                   f'<span class="muted small">&middot; updated <span>{ago(c.mtime)}</span></span></span></div><div class="cc-act">{play}'
-                  f'<a class="btn ghost" href="#add">Paste a new export</a>'
+                  f'<a class="btn ghost" href="#simc-box" onclick="setTimeout(function(){{document.getElementById(\'simc-box\').focus()}},50)">Paste a new export</a>'
                   f'<details class="rm"><summary class="cc-rm">Remove</summary><div class="rm-ask">'
                   f'<span>Remove this character? Its /simc export is deleted.</span>'
                   f'<form method="post" action="/character/remove"><input type="hidden" name="slug" value="{e(c.slug)}">'
@@ -939,15 +941,16 @@ def reclear_page() -> str:
     if card:
         last = card + lastraid.CARD_JS
     else:
-        last = ("<section class='rc-empty'><h2>No raid of yours read yet</h2><p>Each time it starts, the app reads your "
-                "character's latest log of the current raid and shows here what cost you the most on each boss. "
-                "Once someone in your raid has uploaded the night's log to Warcraft Logs, come back.</p>"
+        last = ("<section class='rc-empty'><p>It shows here what cost you the most on each boss. Raided tonight and "
+                "the log is up on Warcraft Logs? Look now:</p>"
                 "<form method='post' action='/lastraid/again'><button class='btn go'>Look for my last raid now</button>"
                 "</form></section>")
-    return (f"<div class='rc'><header class='rc-head'><h1>Reclear</h1><p class='lead'>Your last raid, read against "
-            f"the top players of your spec: what cost you the most, boss by boss, and where to look in the log.</p>"
-            f"</header>{last}<h2>Dig deeper into your own log</h2><p class='muted'>Each one reads a log you give it: "
-            f"yours, or any raid's.</p>"
+    lead = ("Your last raid, read against the top players of your spec: what cost you the most, boss by boss, and "
+            "where to look in the log." if card else "No raid of yours read yet: the app looks for your character's "
+            "latest log of the current raid each time it starts.")
+    return (f"<div class='rc'><header class='rc-head'><h1>Reclear</h1><p class='lead'>{lead}</p>"
+            f"</header>{last}<h2>Dig deeper into your play</h2><p class='muted'>Each one starts from your raid's latest "
+            f"log; paste another link to read that one instead.</p>"
             f"{workshop.cards(('rotation', 'diff', 'wipe'))}<p class='muted'>The raid's pulls, player by player, and "
             f"your raid night are on <a href='/raidlead'>Raid lead</a>.</p></div>{workshop.CSS}")
 
@@ -1080,7 +1083,7 @@ def raid_board(encs, class_name: str, spec: str) -> str:
             else:
                 href, state, word = f"/boss?boss={x.id}&amp;difficulty={diff}", "no", "prepare"
             if diff == settings.get("difficulty"):  # said under the portrait, without pointing at it
-                said = {"no": "not prepared", "ok": f"ready {word}", "old": "last week&#39;s"}.get(state, word)
+                said = {"no": "not prepared", "ok": f"ready {word}", "old": "redo"}.get(state, word)
                 here = f"<small class='rb-st {state}'>{said}</small>"
             states += (f"<a class='rb-d {state}' href='{href}'><span class='rb-frame {shape}'><span class='rb-in'>"
                        f"{portrait(x)}</span></span><b>{e(DIFF_LABELS.get(diff, diff))}</b><small>{word}</small></a>")
@@ -1109,8 +1112,9 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
                       for x in encs)
     where = e(DIFF_LABELS.get(diff, diff))
     if nxt is not None:  # the next boss to prepare: no list to scroll, the board below picks another one
-        pick = (f'<input type="hidden" name="boss" value="{nxt.id}"><p class="start-next">Next to prepare: '
-                f'<b>{e(nxt.name)}</b>.</p><p class="start-say">For another boss, click it in your raid below.</p>')
+        pick = (f'<input type="hidden" name="boss" value="{nxt.id}"><p class="start-next">'
+                + (f'{len(ready)} of {len(encs)} bosses ready this week. ' if ready else '')
+                + f'Next to prepare: <b>{e(nxt.name)}</b>.</p><p class="start-say">For another boss, click it in your raid below.</p>')
     else:
         pick = ((f'<p class="start-say">Every boss is ready this week in {where}: pick one to prepare again.</p>'
                  if encs else "") + f'<select name="boss" aria-label="Boss" class="big">{options}</select>')
@@ -1133,7 +1137,7 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
     own = [x for x in items if x["key"].endswith("-" + me)]  # the active character's spec first, the others after
     rest = [x for x in items if x not in own]
     mine = ((f'<h2>Your sheets as {e(loaded.spec.title())} {e(loaded.class_name.title())}</h2>'
-             f'<div class="sheets">{boss_cards(own, order)}</div>' if own else "")
+             f'<div class="sheets">{boss_cards(own, order, spec=False)}</div>' if own else "")
             + (f'<h2>Your other specs&#39; sheets</h2><div class="sheets">{boss_cards(rest, order)}</div>' if rest else ""))
     g = settings.get("guild")
     return f"""<section class="home-hero"><form method="get" action="/boss" class="start"><h1>Prepare a boss</h1>
@@ -1251,7 +1255,7 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
 <small>The prep reads your raid's log: if the others already cover the adds, you stay on the boss.</small></span></label>
 """ + f'</div><div class="ob-actions">{nxt}</div></section>')
     body = f"""<div class="boss-cols"><div class="boss-main"><h1>{e(enc.name)} {diff_pill(difficulty)}</h1>
-<p class="lead">{e(est.lead) if est else ""}</p>{f'<p class="last-sheet">{last.strip()}</p>' if last.strip() else ""}
+<p class="lead">{boss_line(enc, difficulty)}{e(est.lead) if est else ""}</p>{f'<p class="last-sheet">{last.strip()}</p>' if last.strip() else ""}
 <form method="post" action="/prep" class="ob story" data-boss="{enc.id}-{e(difficulty)}">
 <input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
 <div class="ob-where" aria-hidden="true"><ol class="ob-dots"><li></li><li></li><li></li><li></li></ol><span class="ob-n">Step <b>1</b> of 4</span></div>
@@ -1388,6 +1392,26 @@ def prepared_link(enc, difficulty: str) -> str:
     if "prep" in item["files"]:
         return f' <a href="/view/{e(key)}">Open the last prep sheet &rarr;</a>'
     return f' <a href="/view/{e(key)}">Open the top players&#39; timelines &rarr;</a>'  # a timeline alone: said so
+
+
+def boss_line(enc, difficulty: str) -> str:
+    """The boss page's first words: what the rebuilt fight holds (adds, the boss away), from its template."""
+    from paf.corpus.template import template_path
+    from paf.fight import Fight
+
+    try:
+        f = Fight.load(template_path(enc.name, difficulty))
+    except (OSError, ValueError, KeyError, TypeError):
+        return ""
+
+    def mmss(t: float) -> str:
+        return f"{int(t // 60)}:{int(t % 60):02d}"
+    adds = sorted({mmss(w.time) for w in f.add_waves if w.scalable}, key=lambda x: tuple(map(int, x.split(":"))))
+    away = [f"{mmss(w.start)} to {mmss(w.start + w.duration)}" for w in f.invulnerable]
+    parts = ([f"adds at {', '.join(adds[:4])}" + (" and later" if len(adds) > 4 else "")] if adds else []) + (
+        [f"the boss away {', '.join(away[:3])}"] if away else [])
+    said = "; ".join(parts) if parts else "one target from the pull to the kill"
+    return e(f"In a {mmss(f.duration)} kill: {said}. ")
 
 
 def _plan_path(enc, difficulty: str) -> Path:

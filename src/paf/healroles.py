@@ -383,7 +383,7 @@ def jobs(r: Role, everyone: list[Role]) -> list[str]:
     if r.overheal <= ref("overheal") * LOW_OVERHEAL and clear("overheal", lower=True):
         out.append(f"wastes little: {r.overheal:.0%} overhealing (the other healers {ref('overheal'):.0%})")
     if not out:
-        out.append("does the same job as the other healers here (no number stands out)")
+        out.append("close to the other healers on every number below")
     return out
 
 

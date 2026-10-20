@@ -64,4 +64,5 @@ def test_the_page_opens_on_the_answer(tmp_path, monkeypatch):
     monkeypatch.setattr(raidlead, "sheet", lambda state, x, diff: sh)
     monkeypatch.setattr(raidlead, "lust_block", lambda sh, difficulty: "")
     page = raidlead.page_body("heroic")
-    assert "4 players in your raid. On the prepared boss: 3 players hit the adds, 2 talent changes." in page
+    assert ("1 boss ready to copy for Discord, for the 4 players of your raid: 3 players hit the adds, 2 talent "
+            "changes.") in page

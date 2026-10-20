@@ -67,7 +67,7 @@ def test_compositions_and_jobs():
     assert any("spikes: 50%" in j for j in shaman.jobs) and any("wastes little" in j for j in shaman.jobs)
     assert any("externals: 1.0" in j for j in priest.jobs)
     assert priest.cd_names == [("Power Infusion", 1.0, [124.5])]
-    assert rs["Restoration Druid"].jobs == ["does the same job as the other healers here (no number stands out)"]
+    assert rs["Restoration Druid"].jobs == ["close to the other healers on every number below"]
 
 
 def test_a_healer_who_never_attacks_is_still_counted():

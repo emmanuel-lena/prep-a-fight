@@ -14,7 +14,7 @@ from paf.cdplan import apl_lines, dump_apl, parse_apl
 from paf.corpus.analyze import kills_filter
 from paf.fight import Fight
 from paf.talent_sim import IMPORT_CODE_QUERY
-from paf.wcl import WCLClient
+from paf.wcl import WCLClient, WCLError
 
 # Warcraft Logs gear array index -> simc slot
 GEAR_SLOTS = {0: "head", 1: "neck", 2: "shoulder", 4: "chest", 5: "waist", 6: "legs", 7: "feet", 8: "wrist",
@@ -108,6 +108,25 @@ def aligned_apl(profile: str, fight: Fight, run_dir: Path) -> tuple[list[str], l
     return apl_lines(apl), apply_rules(apl, choice)
 
 
+def _player_profile(con: sqlite3.Connection, client: WCLClient, r, race: str) -> str | None:
+    """A ranked player's character from their log: talents, gear and real secondary stats; None without them."""
+    code = r["talent_code"]
+    if not code:
+        data = client.query(IMPORT_CODE_QUERY, {"code": r["report"], "f": [r["fight_id"]], "a": r["actor_id"]},
+                            cache_ttl=0)
+        fights = (data["reportData"]["report"] or {}).get("fights") or []
+        code = fights[0].get("talentImportCode") if fights else None
+        if not code:
+            return None
+        con.execute("UPDATE ranked SET talent_code=? WHERE report=? AND fight_id=?", (code, r["report"], r["fight_id"]))
+        con.commit()
+    gear = json.loads(r["gear_json"] or "[]")
+    if not gear:
+        return None
+    prof = profile_from_log(f"rank{r['rank_pos']}", r["class"], r["spec"], race, code, gear)
+    return prof + "\n".join(stat_overrides(client, r["report"], r["fight_id"], r["actor_id"])) + "\n"
+
+
 def validate(con: sqlite3.Connection, client: WCLClient, encounter_id: int, difficulty: int, spec: str,
              fight: Fight, run_dir: Path, *, players: int = 6, race: str = "orc",
              target_error: float = 0.3, align: bool = True) -> list[Check]:
@@ -122,22 +141,12 @@ def validate(con: sqlite3.Connection, client: WCLClient, encounter_id: int, diff
     for r in rows:
         if len(checks) >= players:
             break
-        code = r["talent_code"]
-        if not code:
-            data = client.query(IMPORT_CODE_QUERY, {"code": r["report"], "f": [r["fight_id"]], "a": r["actor_id"]},
-                                cache_ttl=0)
-            fights = (data["reportData"]["report"] or {}).get("fights") or []
-            code = fights[0].get("talentImportCode") if fights else None
-            if not code:
-                continue
-            con.execute("UPDATE ranked SET talent_code=? WHERE report=? AND fight_id=?",
-                        (code, r["report"], r["fight_id"]))
-            con.commit()
-        gear = json.loads(r["gear_json"] or "[]")
-        if not gear:
+        try:  # a log made private since it was ranked: the next player
+            prof = _player_profile(con, client, r, race)
+        except WCLError:
             continue
-        prof = profile_from_log(f"rank{r['rank_pos']}", r["class"], r["spec"], race, code, gear)
-        prof += "\n".join(stat_overrides(client, r["report"], r["fight_id"], r["actor_id"])) + "\n"
+        if prof is None:
+            continue
         if align and apls is None:
             apls = aligned_apl(prof, fight, run_dir) or False
         if apls:

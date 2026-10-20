@@ -361,8 +361,10 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
 
     # secondary boss units (e.g. a heart) share the boss's health: their windows become boss vulnerability
     # windows, with the damage amplification measured in the logs
-    from paf.corpus.units import council_stack, trigger_casts, unit_windows
+    from paf.corpus.units import bosses_hit_at_once, council_stack, trigger_casts, unit_windows
 
+    # the top players hit one boss at a time (measured, not a council): a second boss is not a target beside the first
+    apart = not members and bosses_hit_at_once(con, encounter_id, difficulty) == 1
     measured, ratios = unit_windows(con, encounter_id, difficulty)
     measured = {k: [w for w in ws if w[2] not in members] for k, ws in measured.items()}
     measured = {k: ws for k, ws in measured.items() if ws}
@@ -386,6 +388,10 @@ def build_template(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
             if hit is not None and hit < start - 2:  # the ranked players hit it earlier: it is up from then
                 end, start = max(end, hit + 1), hit  # (Nek'zali's Echo: hit from 1:32, the cast ends at 1:42)
             amp, source = game_amp(encounter_id, w.types[0], diff_name or "heroic")
+            busy = sum(max(0.0, min(end, i.start + i.duration) - max(start, i.start)) for i in invulnerable)
+            if amp is None and apart and busy < (end - start) / 2:  # a second boss up beside an attackable first
+                continue  # one, kept apart (Entombed Sentinels): switching to it is single target, not a cleave
+                # target; one up while the first is away (Nek'zali's Echo in her intermission) stays a target
             if amp is None:
                 # no damage amp in the game data: a second boss with its own health (e.g. a council member),
                 # modeled as a separate target while it is up; the boss notes can turn it into an amp

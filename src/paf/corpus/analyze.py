@@ -83,6 +83,20 @@ def council(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> list
     return members if len(members) >= 2 else []
 
 
+def boss_units(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> list[str]:
+    """The boss units with their own health that each take a real share of the damage (COUNCIL_MIN_SHARE), most
+    damaged first, when there are two or more: a council, and also a two-boss fight like Entombed Sentinels (50/50,
+    which council() misses by construction). Empty for a single boss."""
+    where, params = kills_filter(encounter_id, difficulty)
+    rows = con.execute(
+        f"SELECT d.target, SUM(d.amount) AS s FROM damage_by_target d JOIN fight f USING(report, fight_id) "
+        f"JOIN npc n ON n.name = d.target WHERE {where} AND n.is_boss = 1 GROUP BY d.target ORDER BY s DESC",
+        params).fetchall()
+    total = sum(r[1] or 0 for r in rows)
+    members = [r[0] for r in rows if total and (r[1] or 0) / total >= COUNCIL_MIN_SHARE]
+    return members if len(members) >= 2 else []
+
+
 FOCUS = "focus"  # cohort of the kills fetched only to measure rare specs (paf.raidneed): not the analyzed spec's
 
 

@@ -361,7 +361,7 @@ def page_body(difficulty: str) -> str:
             f"<li><b>{e(t['name'])}</b>: " + (
                 "everyone" if t["whole_raid"] and not t["players"] else
                 (e(", ".join(t["players"])) if t["players"] else "<span class='muted'>nobody fits</span>"))
-            + (f" <small>({'a second boss: everyone hits it' if t['second_boss'] else 'best: ' + e(', '.join(pretty(b) for b in t['best']))})</small>")
+            + (f" <small>({'a second boss' if t['second_boss'] else 'best: ' + e(', '.join(pretty(b) for b in t['best']))})</small>")
             + "</li>" for t in sh["targets"])
         bd = "".join(
             f"<li><b>{e(b['name'])}</b> <small>{e(pretty(b['spec']))}, "
@@ -382,15 +382,20 @@ def page_body(difficulty: str) -> str:
     adds = {p for sh in everything for t in sh["targets"] for p in t["players"]}  # named on an add
     changes = sum(len(sh["builds"]) for sh in everything)
     n = len(everything)
-    answer = (f"<p class='lead rl-answer'>{len(state['players']) - len(bench)} players in your raid. On "
-              f"{'the prepared boss' if n == 1 else f'the {n} prepared bosses'}: "
+    answer = (f"<p class='lead'>{n} {'boss' if n == 1 else 'bosses'} ready to copy for Discord"
+              + (f", {len(missing)} still to prepare" if missing else "") + f", for the {len(state['players']) - len(bench)} "
+              f"players of your raid: "
               + (f"{len(adds)} {'player hits' if len(adds) == 1 else 'players hit'} the adds" if adds else
                  "everyone stays on the boss")
               + (f", {changes} talent {'change' if changes == 1 else 'changes'}." if changes else
                  ", nobody changes talents.") + "</p>") if n else ""
     if answer:  # the answer is the page's lead; what the page does goes
         head = head.replace(lead, answer)
-    return (head + roster + f"<h2>Boss by boss</h2><div class='rl-all'>{allbtn}</div>{miss}<div class='rl-grid'>{cards}</div>"
+    words = ("<p class='rl-words'>Padding talents: the build for an add (more targets); boss talents: the build for "
+             "single target. Both come from the builds the top players of each spec play on an add or on the boss, "
+             "not from a sim. The MRT note is the text the Method Raid Tools addon shows in game.</p>"
+             ) if everything else ""
+    return (head + roster + f"<h2>Boss by boss</h2><div class='rl-all'>{allbtn}</div>{miss}{words}<div class='rl-grid'>{cards}</div>"
             f"{_tools()}{COPY_JS}")
 
 

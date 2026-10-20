@@ -80,3 +80,39 @@ def test_priority_damage_is_dropped_with_several_bosses(tmp_path):
     path.write_text(json.dumps(data))
     res = parse_json(path)
     assert "prioritydps" not in res.baseline and "prioritydps" not in res.profilesets[0].metrics
+
+
+def test_two_bosses_kept_apart_are_one_target(monkeypatch):
+    """Entombed Sentinels (heroic, 2026-10-20): two bosses at 50/50, not a council; the top Elementals and Subtlety
+    Rogues hit one at a time (6 kills each). The second boss used to be a target beside the first (simulated 1.13
+    and 1.31 of the real DPS); kept apart, it is single target (0.89 and 1.00)."""
+    from paf.corpus.analyze import boss_units
+    from paf.corpus.units import bosses_hit_at_once
+
+    monkeypatch.setattr("paf.corpus.template.game_amp", lambda *a: (None, ""))
+    con = corpus(shares=(51, 49, 0))
+    assert council(con, 9, 5) == [] and boss_units(con, 9, 5) == ["Trader", "Sage"]
+    fight, _ = build_template(con, 9, 5, "Trader", "Elemental", "mythic")
+    assert any(w.name.startswith("Sage") for w in fight.add_waves)  # not measured: a target beside the boss
+    assert bosses_hit_at_once(con, 9, 5) is None
+    con.executemany("INSERT INTO council_stack VALUES(?, 1, ?)", [(f"r{k}", 1.0) for k in range(4)])
+    fight, _ = build_template(con, 9, 5, "Trader", "Elemental", "mythic")
+    assert not any(w.name.startswith("Sage") for w in fight.add_waves)
+
+
+def test_a_second_boss_during_the_first_ones_immunity_stays_a_target(monkeypatch):
+    """Nek'zali heroic: the top players hit one boss unit at a time because Nek'zali is immune in her intermission
+    while the Echo of Jawae is up: the Echo stays a target."""
+    monkeypatch.setattr("paf.corpus.template.game_amp", lambda *a: (None, ""))
+    con = corpus(shares=(51, 49, 0))
+    con.execute("DELETE FROM unit_window WHERE name='Sage'")
+    for k in range(10):
+        rep = f"r{k}"
+        con.execute("INSERT INTO unit_window VALUES(?, 1, 'Sage', 100, 40, 1.0)", (rep,))
+        con.execute("INSERT INTO phase VALUES(?, 1, 1, 'Stage One', 0, 0)", (rep,))
+        con.execute("INSERT INTO phase VALUES(?, 1, 2, 'Intermission', 1, 95)", (rep,))
+        con.execute("INSERT INTO phase VALUES(?, 1, 3, 'Stage Two', 0, 150)", (rep,))
+    con.executemany("INSERT INTO council_stack VALUES(?, 1, ?)", [(f"r{k}", 1.0) for k in range(4)])
+    fight, _ = build_template(con, 9, 5, "Trader", "Elemental", "mythic")
+    assert [(w.start, w.duration) for w in fight.invulnerable] == [(95, 55)]
+    assert any(w.name.startswith("Sage") for w in fight.add_waves)

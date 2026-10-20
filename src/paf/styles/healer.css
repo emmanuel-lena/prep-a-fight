@@ -19,3 +19,14 @@
 .hrole h3 small{font:500 13px var(--font-body);color:var(--muted)}
 .hl2 .alt{color:var(--muted);align-self:center;margin-left:4px}
 .rd .pn{fill:var(--muted);font-size:11px}
+/* the healer and tank sheets in the briefing style (issue #10): serif sentence headings, ruled rows, no cards */
+.panel>h2{font:600 26px/1.2 var(--font-reading);letter-spacing:0;text-transform:none;color:var(--fg);margin:44px 0 14px}
+.panel>h2:first-child,.panel>.lead+h2{margin-top:20px}
+.panel>.lead{font:400 22px/1.5 var(--font-reading);color:var(--fg);max-width:68ch;margin:8px 0 6px}
+.panel>.card{background:none;border:0;box-shadow:none;padding:0}
+.panel>p.small{max-width:80ch}
+.hl2{gap:0;max-width:1000px} .hl2 li{border:0;border-top:1px solid var(--line);border-radius:0;background:none;padding:12px 0}
+.hl2 li:last-child{border-bottom:1px solid var(--line)}
+.hrole{border:0;border-top:1px solid var(--line);border-radius:0;background:none;padding:14px 0;margin:0}
+.hrole.mine{border-top:2px solid var(--fg)} .hrole h3{font:600 19px/1.3 var(--font-reading)}
+.rd .ml{font-size:12px;fill:var(--fg)}

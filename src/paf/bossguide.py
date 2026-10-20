@@ -227,6 +227,7 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
         return key(s) in seen and all(again(c) for c in s.children)
 
     seen: dict[tuple, str] = {}  # what a stage repeats from an earlier one: named, not described twice
+    told_text: dict[tuple, tuple[str, set]] = {}  # (kind, title, text) -> (stage, flags): the same words, retagged
     cards = []
     for top in sections:
         if top.kind == "overview":
@@ -245,9 +246,24 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
                 if s.kind == "ability":
                     repeated.setdefault(seen[key(s)], []).append(s.title)
                 continue
+            prior = None
             if s.kind in ("ability", "creature"):
                 seen.setdefault(key(s), top.title)
-            if s.kind == "ability":
+                prior = told_text.setdefault((s.kind, s.title, readable(s.text)), (top.title, set(s.flags)))
+                prior = prior if prior[0] != top.title else None
+            if s.kind == "ability" and key(s) in seen and seen[key(s)] != top.title:  # told before: its name only,
+                pic = icons.img(ctx["icons"].get(s.title, ""), "small")           # for what is new under it
+                rows.append(f'<div class="ab" style="margin-left:{min(depth, 1) * 14}px"><div>{pic}<b>{e(s.title)}</b>'
+                            f' <span class="muted small">as in {e(seen[key(s)])}</span></div></div>')
+            elif s.kind == "ability" and prior:  # the same words as before, a new tag (Vessel of Awakening: deadly)
+                was = prior
+                new = [SHOWN_FLAGS[f] for f in s.flags if f in SHOWN_FLAGS and f not in was[1]]
+                pic = icons.img(ctx["icons"].get(s.title, ""), "small")
+                rows.append(f'<div class="ab" style="margin-left:{min(depth, 1) * 14}px"><div>{pic}<b>{e(s.title)}</b>'
+                            f' <span class="muted small">as in {e(was[0])}'
+                            + (f", now {e(' and '.join(x.lower() for x in new))}" if new else ", changed")
+                            + "</span></div></div>")
+            elif s.kind == "ability":
                 rows.append(_ability(s, depth, ctx))
             elif s.kind == "creature":  # a unit told before: its name, then only what changed under it
                 told = seen.get(key(s), top.title) != top.title

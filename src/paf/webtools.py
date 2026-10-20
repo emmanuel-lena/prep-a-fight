@@ -231,7 +231,7 @@ def settings_page(message: str = "") -> str:
     alt = ("<hr class='set-hr'><p class='small'>Or connect with your Warcraft Logs account instead: one login in your "
            "browser, no key to keep.</p>" + connect_block(lead=False, ghost=True)) if cid and not wcllogin.logged_in() \
         and wcllogin.available() else ""
-    account = (f"<h2>Warcraft Logs</h2><div class='card'>{account}<hr class='set-hr'>" if account else "")
+    account = (f"<h2>Warcraft Logs</h2><div class='set-wcl'>{account}<hr class='set-hr'>" if account else "")
     said = ["SimulationCraft installed" if exe else "SimulationCraft <b>not installed</b> (Get nightly, below)"]
     said.append("Warcraft Logs connected with your account" if wcllogin.logged_in() else
                 "Warcraft Logs read with your own key" if cid else "Warcraft Logs <b>not connected</b> (below)")
@@ -243,7 +243,7 @@ def settings_page(message: str = "") -> str:
 <p class="muted"><a href="/welcome">Show the welcome steps again</a>: your key, your character and your guild, step
 by step.</p>
 </div><div>
-{account if account else "<h2>Warcraft Logs</h2><div class='card'>"}\
+{account if account else "<h2>Warcraft Logs</h2><div class='set-wcl'>"}\
 {'<h3 class="key-h">Your own API key</h3>' if account else ''}
 <p class="small measure">{current} To use another one (a new
 client, or a regenerated secret): create or open it on <a href="https://www.warcraftlogs.com/api/clients"
