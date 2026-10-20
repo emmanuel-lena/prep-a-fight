@@ -136,19 +136,19 @@ def test_what_the_top_healers_dispel_is_measured():
         def query(self, *a, **k):
             return {"reportData": {"report": {"fights": [{"startTime": 0, "endTime": 250000}]}}}
 
-        def events(self, *a, **k):  # each Exploding Infection removed 4 s after the boss casts it
-            return [{"type": "dispel", "extraAbilityGameID": 1, "timestamp": 1000 * (14 + 50 * i)} for i in range(4)] \
-                + [{"type": "dispel", "extraAbilityGameID": 2, "timestamp": 99000}]
+        def events(self, *a, data_type="All", **k):  # each Exploding Infection removed 4 s after it lands
+            if data_type == "Debuffs":
+                return [{"type": "applydebuff", "abilityGameID": 1, "targetID": 30 + i,
+                         "timestamp": 1000 * (10 + 50 * i)} for i in range(4)]
+            return [{"type": "dispel", "extraAbilityGameID": 1, "targetID": 30 + i, "timestamp": 1000 * (14 + 50 * i)}
+                    for i in range(4)] + [{"type": "dispel", "extraAbilityGameID": 2, "timestamp": 99000}]
 
-    for k in range(2):
-        con.executemany("INSERT INTO enemy_cast VALUES(?, 1, 99, 1, 1, 'cast', ?)",
-                        [(f"r{k}", 10.0 + 50 * i) for i in range(4)])
     assert healroles.fetch_dispels(Client(), con, 9, 4) == 2
     names = {1: "Exploding Infection", 2: "Congealing Bolt"}
     got, n = healroles.dispelled(con, 9, 4, names)
     assert n == 2 and got == [("Exploding Infection", 4.0), ("Congealing Bolt", 1.0)]
     assert healroles.dispel_delay(con, 9, 4, "Exploding Infection", names) == (4.0, 8)
-    assert healroles.dispel_delay(con, 9, 4, "Congealing Bolt", names) is None  # never cast by the boss here
+    assert healroles.dispel_delay(con, 9, 4, "Congealing Bolt", names) is None  # not timed: only the most removed
 
 
 def test_power_infusion_is_no_job_of_the_boss():

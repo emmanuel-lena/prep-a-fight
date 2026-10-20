@@ -228,6 +228,7 @@ def test_a_spell_cast_on_another_player_is_one_cast():
              {"type": "cast", "abilityGameID": 10060, "timestamp": 126236, "targetID": 27},  # on themselves: kept
              {"type": "cast", "abilityGameID": 2061, "timestamp": 4100, "targetID": 27}]
     assert [c["timestamp"] for c in without_twins(casts, 27)] == [4027, 126236, 4100]
+    assert len(without_twins(iter(casts), 27)) == 3  # Warcraft Logs' events come as a generator
 
 
 def test_the_twins_go_from_an_existing_corpus(tmp_path):
