@@ -765,12 +765,14 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     step("Analyzing the corpus: what hits the top tanks, their defensives and swaps")
     tank.fetch_tank_damage(client, con, enc.id, diff)
     boss = main_boss(con, enc.id, diff, enc.name)
-    tl = build_timeline(con, enc.id, diff, boss, diff_name, spec)
+    tl = build_timeline(con, enc.id, diff, boss, diff_name, spec, top=10_000)  # all the players read
     if not tl.kills:
         print(f"No kill of {enc.name} {diff_name} for {spec} {cls} yet.")
         return 1
     curve, by, hitters = tank.tank_curves(con, enc.id, diff, tl.duration)
     found = tank.tank_busters(curve, by)
+    healer.name_by_damage(found, by)  # by the window's share, as the raid's moments (a lone point named Slithering
+    # Flame in Stage Two)
     swap_times, taunts = tank.swaps(con, enc.id, diff)
     from paf.defensives import is_defensive
     from paf.gamedata import is_mitigation, spell_cooldowns, weakens_enemy
@@ -910,7 +912,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     step("Analyzing the corpus: the raid damage and the top healers' cooldowns")
     healer.fetch_raid_damage(client, con, enc.id, diff)
     boss = main_boss(con, enc.id, diff, enc.name)
-    tl = build_timeline(con, enc.id, diff, boss, diff_name, spec)
+    tl = build_timeline(con, enc.id, diff, boss, diff_name, spec, top=10_000)  # all the players read
     if not tl.kills:
         print(f"No kill of {enc.name} {diff_name} for {spec} {cls} yet.")
         return 1

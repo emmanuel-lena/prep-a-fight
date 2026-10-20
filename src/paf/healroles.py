@@ -308,7 +308,7 @@ def comps(con: sqlite3.Connection, encounter_id: int, difficulty: int, min_kills
             continue
         ds = [x for _d, x in rows if x is not None]
         out.append(Comp(specs, len(rows), len(rows) / n, st.median(d for d, _x in rows),
-                        round(st.mean(ds), 1) if ds else None))  # deaths: a mean, as in the presence table
+                        round(st.mean(ds), 1) if len(ds) >= DEATH_KILLS else None))  # a mean, on enough kills
     return sorted(out, key=lambda c: -c.kills)
 
 
@@ -331,9 +331,9 @@ def presence(con: sqlite3.Connection, encounter_id: int, difficulty: int,
     ks = list(kills_of(con, encounter_id, difficulty, role).values())
     out = []
 
-    def mean(vals: list) -> float | None:
+    def mean(vals: list) -> float | None:  # deaths are read on fewer kills than the rest: the threshold is theirs
         vals = [v for v in vals if v is not None]
-        return round(st.mean(vals), 1) if vals else None
+        return round(st.mean(vals), 1) if len(vals) >= DEATH_KILLS else None
 
     def med(vals: list) -> float | None:
         vals = [v for v in vals if v is not None]
@@ -447,7 +447,8 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
         mid = st.median(durs.values()) if durs else None
         cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n,
                 press_moments(ps, max(1, round(sum(map(len, ps)) / len(ps))), mid)[0])
-               for ab, ps in cd_times[spec].items() if sum(map(len, ps)) / n >= 0.5 and not _personal(ab, names)]
+               for ab, ps in cd_times[spec].items()  # pressed by half of them at least (Healing Tide Totem: 3%)
+               if len(ps) / n >= 0.5 and not _personal(ab, names)]
         se = {k: (st.stdev(v) / len(v) ** 0.5 if len(v) > 1 else 0.0) for k, v in s.items()}
         out.append(Role(spec, n, st.median(s["healing"]), st.median(s["tank"]), st.median(s["spike"]),
                         st.median(s["overheal"]), st.median(s["dispels"]), st.mean(s["raid"]), st.mean(s["ext"]),
@@ -476,6 +477,7 @@ def _personal(ab: int, names: dict[int, str] | None) -> bool:
 
 
 PULL = 15.0  # seconds: a cooldown pressed on cooldown goes out at the pull
+DEATH_KILLS = 15  # kills with their deaths read under which a mean of deaths is not shown (as paf.healer.FEW_KILLS)
 CADENCE = 0.75  # pressed this share of the most casts its usual gap allows: on cooldown, no moment kept for a hit
 
 

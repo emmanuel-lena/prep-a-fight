@@ -347,7 +347,8 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         near = []
         for t in times:
             m = min(found, key=lambda m: abs(m.t - t), default=None)
-            ok = (not every and m is not None  # on cooldown: near a hit by its cadence, not kept for it
+            ok = (not every and a.per_kill < 4 and m is not None  # on cooldown, or a 1-minute button pressed 4 times
+                  # or more: near a hit by its cadence, not kept for it
                   and -ANSWER[0] <= t - m.t <= ANSWER[1])  # pressed for the hit: just before or in it
             near.append(f"{_mmss(m.t)} {m.boss_spell}".strip() if ok else "")
         out.append(Cooldown(a.name, a.id, a.users, a.per_kill, times, near, [] if every else alt, every))
@@ -408,7 +409,7 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
                     f"<text x='{float(x(t)) + 4:.1f}' y='18' class='pn'>{e(n.split(':')[0])}</text>"
                     for n, t in phases if t > 0)  # the phase changes, named
     ticks = "".join(f"<text x='{x(t)}' y='{H - 6}' class='tk'>{int(t // 60)}:00</text>"
-                    for t in range(0, int(span) + 1, 60))
+                    for t in range(0, int(span) + 1, 60) if t <= span - 20)  # none cut at the right edge
     pos = [v for v in curve if v > 0]
     med = st.median(pos) if pos else 0.0  # the scale the moments are read against (x1.6 the fight's median)
     median = (f"<line class='md' x1='{L}' x2='{W - 10}' y1='{y(med)}' y2='{y(med)}'/>"
@@ -418,7 +419,7 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
     cds = "".join(
         f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(c.name.split(',')[0][:22])}</text>"
         + "".join(f"<rect x='{float(x(t)) - 3:.1f}' y='{H - B + 7 + 18 * i}' width='6' height='11' rx='1.5' "
-                  f"class='cp'><title>{e(c.name)} {_mmss(t)}</title></rect>" for t in c.times)
+                  f"class='cp'><title>{e(c.name)} {_mmss(t)}</title></rect>" for t in c.times if t <= span)
         for i, c in enumerate(rows))
     return (f"<svg viewBox='0 0 {W} {H}' class='rd' role='img' aria-label='{e(label)}'>"
             f"<line class='ax' x1='{L}' x2='{W - 10}' y1='{H - B}' y2='{H - B}'/>{median}{lines}{ticks}"
@@ -537,7 +538,8 @@ def builds_html(builds: list, players: int = 0) -> str:
     copy = "<button class='btn ghost copy' data-copy='{}'>Copy the talents</button>"
     return "".join(f"<li><b>{e(b[1][:1].upper() + b[1][1:])}</b><small>{b[0]} of the top players"
                    + (f" &middot; {e(b[3])}" if len(b) > 3 and b[3] else "") + "</small>"
-                   + (copy.format(e(b[2])) if b[2] and (not players or b[0] >= COPY_SHARE * players) else "")
+                   + (copy.format(e(b[2])) if b[2] and (not players or b[0] >= COPY_SHARE * players) else
+                      "<small class='muted'>no import string in their logs</small>" if not b[2] else "")
                    + "</li>" for b in builds)
 
 
@@ -586,9 +588,12 @@ def role_card(r, everyone: list, mine: bool, chips: bool = True) -> str:
     cooldowns' usual times (left out on your own card: the fight tab gives yours, from the top players of your spec)."""
     cds = "".join([f"<span class='chip'>{e(n)} {', '.join(_mmss(t) for t in ts)}</span>"
                    for n, _k, ts in r.cd_names if ts][:5]) if chips else ""
+    jobs = [j for j in r.jobs if not j.startswith("nothing stands out")]  # the lead says "nothing" once
     return (f"<article class='hrole'><h3>{e(r.spec)}{' <small>(you)</small>' if mine else ''}</h3>"
-            f"<ul class='jobs'>{''.join(f'<li>{e(j)}</li>' for j in r.jobs)}</ul>"
-            f"<p class='nums'>{' · '.join(_nums(r))}</p>" + (f"<p class='when'>{cds}</p>" if cds else "")
+            + (f"<ul class='jobs'>{''.join(f'<li>{e(j)}</li>' for j in jobs)}</ul>" if jobs else "")
+            + f"<p class='nums'>{' · '.join(_nums(r))}</p>" + (f"<p class='when'>{cds}</p>" if cds else "")
+            + ("<p class='small muted'>Its share of the healing is high by design: these kills were picked for your "
+               "spec's top healers.</p>" if mine else "")
             + f"<p class='small muted'>{r.players} {e(r.spec)}s in the kills read.</p></article>")
 
 
@@ -813,26 +818,28 @@ def render_sheet(h: HealerPrep) -> str:
     lead = ""
     if h.moments:
         shown = h.moments[:3]
-        said = [m.boss_spell for m in shown]
         ratios = _and([f"{m.ratio:.1f}&times;" for m in shown])
-        if len(set(said)) == 1 and said[0] and len(shown) > 1:  # one ability each time: said once
-            hits = f"{_and([_mmss(m.t) for m in shown])}, each time {e(said[0])}"
-        else:
-            hits = _and([f"{_mmss(m.t)} ({e(m.boss_spell)})" if m.boss_spell else _mmss(m.t) for m in shown])
+        groups: dict[str, list[Moment]] = {}  # moments of the same ability said together (Vashnik's "mixed
+        for m in shown:                       # damage, most from..." three times in one sentence)
+            groups.setdefault(m.boss_spell, []).append(m)
+        hits = _and([f"{_and([_mmss(m.t) for m in ms])}"
+                     + (f" ({'each time ' if len(ms) > 1 else ''}{e(name)})" if name else "") for name, ms in groups.items()])
         hits += f": {ratios} the usual damage"
-        # a cooldown said for a moment only when the top players' usual press answers it (paf.healer.ANSWER)
+        # a cooldown said for a hit only when the top players' usual press answers it (paf.healer.ANSWER), at the
+        # press's own time
         answers = []
         for m in shown:
-            mine_here = [c.name for c in heals if any(n and n.split(" ", 1)[0] == _mmss(m.t) for n in c.near)
-                         and not _external(c.spell_id)]  # one player's buff (Life Cocoon, Power Infusion): no raid answer
+            mine_here = [(c.name, t) for c in heals if not _external(c.spell_id)  # a buff on one player: no raid answer
+                         for t, n in zip(c.times, c.near, strict=False) if n and n.split(" ", 1)[0] == _mmss(m.t)]
             if mine_here:
-                answers.append(f"at {_mmss(m.t)}, {_and(mine_here[:3])}")
+                answers.append(f"for the {_mmss(m.t)} hit, "
+                               + _and([f"{e(n)} (about {_mmss(t)})" for n, t in mine_here[:3]]))
         end = len(h.curve) * STEP
         long = "".join(f" {'From ' + _mmss(a) + ' to the end' if b >= end - STEP else _mmss(a) + ' to ' + _mmss(b)}, "
                        f"the raid takes about {r:.1f}&times; the usual damage without a break."
                        for a, b, r in sustained(h.curve))
         lead = (f"<p class='lead'>Big raid damage at {hits}.{long}"
-                + (f" Around them the top {e(h.spec)}s press {e('; '.join(answers))}." if answers else
+                + (f" The top {e(h.spec)}s press: {'; '.join(answers)}." if answers else
                    f" No healing cooldown of the top {e(h.spec)}s is kept for them.") + "</p>")
     fight = ([lead] if lead else []) + [
         f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Damage the "
@@ -897,7 +904,8 @@ def render_sheet(h: HealerPrep) -> str:
             name, k = h.dispelled[0]
             stages = stages.replace(f"<b>{e(name)}</b>", f"<b>{e(name)}</b> <span class=\"pill gold\">you dispel "
                                     f"it: {k:.1f} a kill</span>", 1)
-        boss.append(f"<h2>Every ability, phase by phase</h2><div class='stages'>{stages}</div>")
+        boss.append(f"<h2>Every ability{', phase by phase' if '<h3>' in stages else ''}</h2>"  # Vashnik: one phase
+                    f"<div class='stages'>{stages}</div>")
     enough = {p.spec for p in h.presence if p.kills >= FEW_KILLS} if h.presence else {r.spec for r in h.roles}
     shown = sorted((r for r in h.roles if r.spec == h.spec or r.spec in enough), key=lambda r: r.spec != h.spec)
     others = "".join(role_card(r, h.roles, r.spec == h.spec, chips=r.spec != h.spec) for r in shown)

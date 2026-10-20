@@ -412,7 +412,7 @@ def render_sheet(p: TankPrep) -> str:
                     + (f"; the top {e(p.spec)}s press {e(press[0])} for it." if press
                        else f"; most top {e(p.spec)}s press no defensive for it."))
     if p.swaps:
-        lead.append(f"Each of them taunts about {p.taunts_per_kill:.0f} times a kill after the pull"
+        lead.append(f"Each of them taunts about {p.taunts_per_kill:.0f} times a kill after the pull (adds included)"
                     + ((f", most often at about {p.stacks[common][0]} stacks of {e(common)}." if common in p.stacks
                         and p.stacks[common][0] >= 2 else f", swapping after each {e(common)} (the debuff lasts "
                         f"about {p.stacks[common][1]:.0f} s; they never take a second stack)." if common in p.stacks
@@ -445,12 +445,14 @@ def render_sheet(p: TankPrep) -> str:
     hit = "".join(f"<li><b>{e(n)}</b><small>{s:.0%} of the damage the top tanks take</small></li>"
                   for n, s in p.hitters)
     jr = "".join(f"<li>{e(plain(x))}</li>" for x in p.journal)
-    top_hit = journal_lead(p.journal, "tanks")  # what hits them leads the fight tab already: the journal's ask here
+    # the tank's answer here: the swap (the fight tab's lead, its last sentence), else the journal's ask
+    top_hit = f"<p class='lead'>{lead[-1]}</p>" if p.swaps and lead else journal_lead(p.journal, "tanks")
     boss = [top_hit, f"<h2>The abilities that hit the top tanks the most</h2><ul class='hl2'>{hit or '<li>Not measured yet.</li>'}</ul>"]
     if jr:
         boss.append(f"<h2>What the Encounter Journal asks tanks</h2><ul class='hl2'>{jr}</ul>")
     if p.abilities:  # every ability, the tanks' in full and the others' named
-        boss.append(f"<h2>Every ability, phase by phase</h2><div class='stages'>{p.abilities}</div>")
+        boss.append(f"<h2>Every ability{', phase by phase' if '<h3>' in p.abilities else ''}</h2>"
+                    f"<div class='stages'>{p.abilities}</div>")
     have = next((x for x in p.presence if x.spec == p.spec), None)
     deeper = []
     if have and p.presence:
@@ -458,8 +460,13 @@ def render_sheet(p: TankPrep) -> str:
         deeper.append(f"<p class='lead'>Beside a {e(p.spec)}, the top raids play "
                       + (", ".join(f"{e(x.spec)} ({x.share:.0%})" for x in sorted(mates, key=lambda x: -x.share)[:3])
                          if mates else "no other tank spec often") + ".</p>")
-    if others:
-        deeper.append(f"<h2>Your other cooldowns and consumables</h2><ul class='hl2'>{cooldowns_html(others)}</ul>")
+    worn = {n for n, _i, _s in p.trinkets}  # on-use trinkets on the fight tab, as the healers' sheets
+    items = [c for c in others if c.name in worn]
+    rest = [c for c in others if c not in items]
+    if items:
+        fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{cooldowns_html(items)}</ul>")
+    if rest:
+        deeper.append(f"<h2>Your other cooldowns and consumables</h2><ul class='hl2'>{cooldowns_html(rest)}</ul>")
     if p.presence:
         if have and have.share >= 0.99:  # the corpus is this spec's kills
             line = f"These are the top {e(p.spec)}s' kills; the table tells which tanks play beside them."

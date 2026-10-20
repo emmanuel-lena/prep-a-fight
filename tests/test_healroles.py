@@ -61,6 +61,7 @@ def test_compositions_and_jobs(monkeypatch):
             con.execute("INSERT INTO heal_cast VALUES (?,1,1,47788,?,1)", (rep, 200 + k))
         con.execute("INSERT INTO heal_cast VALUES (?,1,0,322109,?,1)", (rep, 220 + k))
         con.execute("INSERT INTO heal_cast VALUES (?,1,0,98008,?,0)", (rep, 30 + k))  # Spirit Link
+    monkeypatch.setattr(healroles, "DEATH_KILLS", 1)  # ten kills here; the sheets need 15 with their deaths read
     cs = healroles.comps(con, 3470, 4, min_kills=1)
     assert [(c.label, c.kills) for c in cs] == [("Holy Priest + Restoration Druid + Restoration Shaman", 6),
                                                ("Holy Priest + Restoration Shaman", 4)]
@@ -181,3 +182,14 @@ def test_a_cooldown_kept_past_the_pull_is_chosen():
     from paf.healroles import on_cadence
 
     assert on_cadence([[35.0, 235.0] for _ in range(8)], 2.0, 278.0) == 0.0
+
+
+def test_deaths_need_enough_kills_with_their_deaths(monkeypatch):
+    """Vashnik tank: "Protection Paladin 1.3 deaths" came from 6 kills with deaths read (40 of the 100 had them)."""
+    from paf import healroles
+
+    monkeypatch.setattr(healroles, "kills_of", lambda *a, **k: {
+        i: ((("Protection Paladin",) if i < 18 else ()), 250.0, (1 if i < 6 else None) if i < 18 else 2)
+        for i in range(60)})
+    pal = next(p for p in healroles.presence(None, 1, 4) if p.spec == "Protection Paladin")
+    assert pal.kills == 18 and pal.deaths_with is None and pal.deaths_without == 2.0
