@@ -532,7 +532,7 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
             continue  # pool, 3 in a Holy Priest's kills, was dropped from the table on 7 sheets of 8 (round 31)
         mid = st.median(durs.values()) if durs else None
         cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n, _shared(ps, n, mid, _cd(ab)), len(ps) / n,
-                (ps, n, _cd(ab)))  # its players' presses: the other healers' cards read each hit's own window
+                (ps, n, _cd(ab), ab))  # its players' presses: the other healers' cards read each hit's own window
                for ab, ps in (cd_times[spec].items() if own else [])  # pressed by half of them at least (HTT: 3%)
                if len(ps) / n >= 0.5 and not _personal(ab, names) and not _untied(ab, ps, mid)
                and sum(map(len, ps)) / len(ps) < 3.5]  # a 1-minute button (Nature's Swiftness, 3.9) is no raid cooldown

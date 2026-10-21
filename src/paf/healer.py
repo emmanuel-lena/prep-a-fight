@@ -1122,8 +1122,8 @@ def _many(split: list, wide: bool = True) -> str:
         lo, hi = SPLIT if wide else (0.35, 0.65)  # paf.healer.contested's default band, else the wide one
         return (f"their builds differ by many small choices, each taken by under {lo:.0%} or over "
                 f"{hi:.0%} of them, except {e(split[0][0])}")
-    return ("their builds differ by many small choices, the closest to 50/50 being "
-            + e(_and([n for n, _s in split[:4]])))
+    return (f"their builds differ by many small choices, {'the most split' if wide else 'the closest to 50/50'} "
+            "being " + e(_and([n for n, _s in split[:4]])))  # none near 50/50 in the wide list (round 44)
 
 
 def build_lead(builds: list, spec: str, players: int, split: list | None = None, wide: bool = True) -> str:
@@ -1222,8 +1222,9 @@ def _in_hit(n: str, ts: list, rest: list, h: float, bar: bool = True) -> tuple |
     there and fewer than BACK_SHARE[0] of those presses come as soon as it is back; without the presses, the moments."""
     if len(rest) < 2:  # no presses carried: its moments
         return next(((n, t, sp) for t, sp, back in ts if -ANSWER[0] <= t - h <= ANSWER[1] and not back), None)
-    ps, total, cd = rest[1]
-    a, b = h - ANSWER[0], h + ANSWER[1]
+    ps, total, cd, *sid = rest[1]
+    ramp = bool(sid) and _ramp_kind(sid[0])  # a ramp lands its hit 8 to 30 s ahead, as the fight tab reads it
+    a, b = (h - RAMP[1], h - RAMP[0]) if ramp else (h - ANSWER[0], h + ANSWER[1])  # (Disc's Evangelism: round 44)
     inside = [(x, max((y for y in p if y < x), default=None)) for p in ps for x in p if a <= x <= b]
     players = sum(1 for p in ps if any(a <= x <= b for x in p))
     if not total or not players or (bar and players < 0.25 * len(ps)):
@@ -1231,7 +1232,7 @@ def _in_hit(n: str, ts: list, rest: list, h: float, bar: bool = True) -> tuple |
     back = sum(1 for x, y in inside if y is not None and cd and x - y <= cd + BACK) / max(1, len(inside))
     if back > BACK_SHARE[0]:
         return None
-    return n, st.median(x for x, _y in inside), players / total, players / max(1, len(ps))
+    return n, st.median(x for x, _y in inside), players / total, players / max(1, len(ps)), ramp
 
 
 def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
@@ -1249,16 +1250,19 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             continue
         per_hit = []
         for h in hits:
-            got = [g[:3] for n, _k, ts, *rest in r.cd_names if not _minute(n)
+            got = [(*g[:3], g[4] if len(g) > 4 else False) for n, _k, ts, *rest in r.cd_names if not _minute(n)
                    for g in [_in_hit(n, ts, rest, h)] if g]
             under = [] if got else sorted((g for n, _k, ts, *rest in r.cd_names if not _minute(n)  # none at the bar:
                                            for g in [_in_hit(n, ts, rest, h, bar=False)] if g and g[2] >= 0.1),
                                           key=lambda x: -x[2])[:1]  # its most pressed, said so (round 41: "none
             per_hit.append((h, sorted(got, key=lambda x: -x[2])[:2], under))  # shared" read as "nothing pressed")
         chips = "".join(f"<span class='chip'>the {_mmss(h)} hit: "
-                        + ("; ".join(f"{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)}" for n, t, sp in got) if got
-                           else "".join(f"{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)} <small>(under a quarter of those who press it: "
-                                        f"{int(pp * 100)}%)</small>" for n, t, sp, pp in (u for u in under if len(u) > 3))
+                        + ("; ".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if rp else ''} &middot; {_pct(sp)}"
+                                     for n, t, sp, rp in got) if got
+                           else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
+                                        f"<small>(under a quarter of those who press it"
+                                        f"{'' if abs(int(pp * 100) - round(sp * 100)) <= 1 else f': {int(pp * 100)}%'})</small>"
+                                        for u in under if len(u) > 4 for n, t, sp, pp in [u[:4]])
                            or "none shared") + "</span>"
                         for h, got, under in per_hit)
         n = getattr(r, "own_players", 0)

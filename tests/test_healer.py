@@ -372,3 +372,11 @@ def test_a_press_is_said_at_its_most_shared_time():
     tl = SimpleNamespace(abilities=[ab], duration=270.0, players=[{"casts": {1: ts}} for ts in per_player])
     c = healer.cooldowns(tl, [], {1: (120.0, 1)})[0]
     assert c.times == [157.0] and c.alt == [144.0]
+
+
+def test_the_other_healers_read_a_ramp_ahead_of_the_hit(monkeypatch):
+    # Discipline Priest, Vashnik (round 44): Evangelism 8-30 s before 0:40 for a quarter, "none shared" in the window
+    monkeypatch.setattr(healer, "_ramp_kind", lambda sid: sid == 472433)
+    ps = [[19.0]] * 30 + [[40.0]] * 10 + [[200.0]] * 60
+    got = healer._in_hit("Evangelism", [], [1.0, (ps, 100, 90.0, 472433)], 40.0)
+    assert got[1] == 19.0 and got[2] == 0.3 and got[4] is True
