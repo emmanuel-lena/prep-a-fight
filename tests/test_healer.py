@@ -214,7 +214,8 @@ def test_a_press_back_from_cooldown_in_a_hit_is_said_and_drawn_as_none():
     h = healer.HealerPrep("Boss", "heroic", "Restoration Druid", 10, 240.0, [100.0] * 48, found, cds, [], [], [], [])
     sheet = healer.render_sheet(h)
     assert "for the 0:40 hit, 100% press Tranquility (about 0:42)" in sheet
-    assert "No cooldown is kept for the 2:40 hit (100% press Tranquility at 2:45, back from cooldown)" in sheet
+    assert ("No cooldown is kept for the 2:40 hit (100% press Tranquility in its window, about 2:45, back from "
+            "cooldown)") in sheet
     assert "2:45 &middot; 100% of the top players &middot; back from cooldown" in sheet
     assert "class='cp off'><title>Tranquility 2:45" in sheet and "class='cp'><title>Tranquility 0:42" in sheet
 
@@ -341,7 +342,8 @@ def test_a_minute_button_in_a_bare_hit_is_named_with_its_reason():
     # Restoration Druid, Nek'zali (round 37): 70% press Convoke 4 s before the 1:15 hit, the lead said nothing
     m = healer.Moment(75.0, 1000.0, 1.6, "Soulcoil Rite")
     cv = healer.Cooldown("Convoke the Spirits", 1, 1.0, 4.0, [6.0, 71.0], support=[0.76, 0.7], why="about every minute")
-    assert healer.landed_in(m, [cv]) == " (70% press Convoke the Spirits at 1:11, pressed about every minute)"
+    assert healer.landed_in(m, [cv]) == (" (70% press Convoke the Spirits in its window, about 1:11, pressed about "
+                                         "every minute)")
     inn = healer.Cooldown("Innervate", 2, 1.0, 2.0, [49.0], presses=[[75.0]] * 11 + [[49.0]] * 89, n_all=100)
     assert healer.landed_in(m, [inn]) == ""  # a mana button answers no hit anywhere: never named
 
@@ -387,3 +389,11 @@ def test_the_pull_opener_is_no_ramp_for_the_first_hit(monkeypatch):
     monkeypatch.setattr(healer, "_ramp_kind", lambda sid: True)
     ps = [[float(k % 10)] for k in range(60)] + [[200.0]] * 40
     assert healer._in_hit("Evangelism", [], [1.0, (ps, 100, 90.0, 1)], 35.0, bar=False) is None
+
+
+def test_a_late_hits_share_is_of_the_kills_that_reach_it():
+    # Protection Warrior, Nek'zali (round 47): 42 of the 100 top kills end before the 3:55 hit
+    c = healer.Cooldown("Shield Wall", 1, 0.9, 2.0, [231.0], presses=[[231.0]] * 19 + [[34.0]] * 70, n_all=100,
+                        lasts=[300.0] * 58 + [200.0] * 42)
+    assert round(healer.hit_share(c, 231.0, 235.0), 2) == 0.33
+    assert healer._reach_note(c, 235.0) == " of the 58 kills that reach it"

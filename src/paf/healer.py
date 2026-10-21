@@ -90,6 +90,7 @@ class Cooldown:
     presses: list = field(default_factory=list)  # each top player's press times (those who press it)
     back_half: list = field(default_factory=list)  # its times about half its players press as soon as it is back
     n_all: int = 0  # the top players read, those who never press it included
+    lasts: list = field(default_factory=list)  # each top player's kill length: a late hit's share is of those reaching it
     rhythms: list = field(default_factory=list)  # (share of the top players, their press times): two groups that
     # press it at different moments all kill long (Disc's Evangelism: 0:04, 1:42, 3:15 or 0:24, 2:07, 3:38)
 
@@ -578,7 +579,8 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
                             alt_of, why, rhythm if len(times) > 1 else 0.0, cd=cd, ramp=ramp,
                             back=sorted(x for x in back if x in times or x in alt),
                             rhythms=sorted(two, key=lambda r: r[1][0]) if two and not (every or why) else [],
-                            presses=per_player, n_all=n_all, back_half=sorted(half)))
+                            presses=per_player, n_all=n_all, back_half=sorted(half),
+                            lasts=[p.get("duration") or tl.duration for p in tl.players]))
     return sorted(out, key=lambda c: -c.users)
 
 
@@ -745,7 +747,18 @@ def hit_share(c: Cooldown, t: float, hit: float) -> float | None:
     if not c.presses or not c.n_all:
         return None
     a, b = (t - 8, t + 8) if c.ramp and hit - t >= RAMP[0] else (hit - ANSWER[0], hit + ANSWER[1])
-    return sum(1 for ts in c.presses if any(a <= x <= b for x in ts)) / c.n_all
+    return sum(1 for ts in c.presses if any(a <= x <= b for x in ts)) / reach(c, hit)
+
+
+def reach(c: Cooldown, hit: float) -> int:
+    """The top players whose kill reaches a hit: a late hit's share is of them (round 47: 42 of the 100 top Prot
+    kills end before Nek'zali's 3:55, its "only 19%" was 33% of those still fighting)."""
+    return max(1, sum(1 for d in c.lasts if d >= hit) if c.lasts else c.n_all)
+
+
+def _reach_note(c: Cooldown, hit: float) -> str:
+    n = reach(c, hit)
+    return f" of the {n} kills that reach it" if c.lasts and n < 0.9 * len(c.lasts) else ""
 
 
 def _secs(mmss: str) -> float:
@@ -818,14 +831,15 @@ def landed_in(m: Moment, cds: list[Cooldown]) -> str:
                for hs in [hit_share(c, m.t, m.t)] if hs and FEW_SHARE <= hs < 0.25]  # (Nek'zali's 0:35: 20% of the top
         if few:  # Discs press Ultimate Penitence in it; the lead said "no cooldown" alone; round 36)
             hs, c = max(few, key=lambda x: x[0])
-            return f" (only {_pct(hs)} press {e(_shown(c.name))} in it)"
+            return f" (only {_pct(hs)}{_reach_note(c, m.t)} press {e(_shown(c.name))} in it)"
         return ""
     # the closest of the presses a quarter make (Disc's 2:01 Evangelism, 9 s before 2:10, over its 1:41 one, 29 s)
     sp, c, t, why = max(near, key=lambda x: (x[0] >= 0.25, -abs(m.t - x[2]), x[0]))
     few = "only " if sp < 0.25 else ""  # under a quarter, as the bare hits' "only N%" (round 39)
+    of = _reach_note(c, m.t) if c.presses else ""  # counted in the hit's window: said, as its chip counts its moment
     if c.ramp and t < m.t - ANSWER[0]:
-        return f" ({few}{_pct(sp)} ramp with {e(_shown(c.name))} at {_mmss(t)}, {e(why)})"
-    return f" ({few}{_pct(sp)} press {e(_shown(c.name))} at {_mmss(t)}, {e(why)})"
+        return f" ({few}{_pct(sp)}{of} ramp with {e(_shown(c.name))} ahead of it, about {_mmss(t)}, {e(why)})"
+    return f" ({few}{_pct(sp)}{of} press {e(_shown(c.name))} in its window, about {_mmss(t)}, {e(why)})"
 
 
 def on_others(con, encounter_id: int, difficulty: int, spec: str, spell_ids: list[int]) -> dict[int, float]:
