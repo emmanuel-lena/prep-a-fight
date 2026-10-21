@@ -1009,8 +1009,9 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     h.dispel_delay = healroles.dispel_delay(con, enc.id, diff, h.dispelled[0][0], names) if h.dispelled else None
     pool = healroles.pooled_kills(enc.id, diff)  # every corpus' kills of the boss: its sheets say the same numbers
     h.roles = healroles.roles(con, enc.id, diff, names, ranked=(cls, spec), pool=pool)
-    n, _dur, _dead = healroles.sample(con, enc.id, diff)
-    h.own_kills, h.own_sample = n, f"the {n} kills of the top {healroles.pretty(cls, spec)}s"
+    n, own_dur, _dead = healroles.sample(con, enc.id, diff)
+    h.own_kills, h.own_median = n, own_dur
+    h.own_sample = f"the {n} kills of the top {healroles.pretty(cls, spec)}s"
     import statistics as st
 
     pooled = [pool[1][k] for k in pool[0] if pool[1].get(k)]

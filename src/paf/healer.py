@@ -112,6 +112,7 @@ class HealerPrep:
     presence: list = field(default_factory=list)  # paf.healroles.Presence of every healer spec
     roles: list = field(default_factory=list)  # paf.healroles.Role, every healer spec measured
     role_kills: int = 0  # kills the roles were measured on
+    own_median: float = 0.0  # their median kill time (slower than the timings' 100: picked by healing)
     own_kills: int = 0  # the top kills whose healing tables are read (150): more than the timings' (100, every cast)
     own_sample: str = ""  # the kills the externals and cooldowns are read on: "the 150 kills of the top Holy Priests"
     role_sample: str = ""  # which kills: "the top Restoration Shamans' kills (ranked by healing), median 4:50, 2 deaths"
@@ -252,7 +253,8 @@ def sustained(curve: list[float], found: list[Moment] | None = None) -> list[tup
 def _x(r: float) -> str:
     """A hit's ratio, rounded down, two decimals under SPIKE: a 1.47x hit read "1.5x" next to "no hit reaches 1.5x"
     (round 31), a 1.36x one "1.3x" next to "1.35x or more counts"."""
-    return f"{int(r * 100 + 1e-9) / 100:.2f}" if r < SPIKE else f"{int(r * 10 + 1e-9) / 10:.1f}"
+    return f"{int(r * 100 + 1e-9) / 100:.2f}" if r < 2 else f"{int(r * 10 + 1e-9) / 10:.1f}"  # 1.59 and 1.60,
+    # not 1.5 and 1.6 (round 37: a 0.01 gap read as 0.1)
 
 
 def moment_names(m: Moment) -> list[str]:
@@ -775,6 +777,7 @@ def back_share(per_player: list[list[float]], t: float, cd: float) -> float:
 
 
 FEW_SHARE = 0.1  # a press in a hit no cooldown is kept for, said under the quarter bar from this share
+MINUTE = "about every minute"  # the reason a button pressed four times a kill or more is tied to no hit
 
 
 def landed_in(m: Moment, cds: list[Cooldown]) -> str:
@@ -785,12 +788,12 @@ def landed_in(m: Moment, cds: list[Cooldown]) -> str:
     for c in cds:
         if _item(c.spell_id) or _external(c.spell_id) == "damage":  # a trinket, Power Infusion on a damage dealer:
             continue                                                  # nothing for the raid's hit
-        if c.why:  # an external (Life Cocoon), a 1-minute button (Nature's Swiftness): no raid answer to name
-            continue
+        if c.why and c.why != MINUTE:  # an external (Life Cocoon), an item: no raid answer to name; a button
+            continue  # pressed about every minute is, with its reason (70% Convoke 4 s before Nek'zali's 1:15; round 37)
         for t, sp in [*zip(c.times, c.support or [], strict=False), *zip(c.alt, c.alt_support or [], strict=False)]:
             ramp = c.ramp and RAMP[0] <= m.t - t <= RAMP[1]  # a ramp lands its hit from 8 to 30 s ahead (Disc's
             if -ANSWER[0] <= t - m.t <= ANSWER[1] or ramp:  # 2:01 Evangelism, 9 s before 2:10; round 36)
-                why = (c.why or ("on cooldown" if c.every else "back from cooldown"
+                why = ("pressed about every minute" if c.why == MINUTE else c.why or ("on cooldown" if c.every else "back from cooldown"
                                  + (" for about half" if t in c.back_half else "") if t in c.back else ""))
                 if why:
                     near.append((sp, c, t, why))
@@ -798,7 +801,9 @@ def landed_in(m: Moment, cds: list[Cooldown]) -> str:
         from paf.defensives import is_defensive
 
         few = [(hs, c) for c in cds if not (c.why or c.every or c.rhythm or _item(c.spell_id)  # a raid button
-                                            or _external(c.spell_id) == "damage" or is_defensive(c.spell_id, c.name))
+                                            or _external(c.spell_id) == "damage" or is_defensive(c.spell_id, c.name)
+                                            or not (c.ramp or any([*c.near, *(c.alt_near or [])])))  # one that
+               # answers a hit somewhere, as the chart's (Innervate, a mana button: "only 11%" on Vashnik's 3:35)
                for hs in [hit_share(c, m.t, m.t)] if hs and FEW_SHARE <= hs < 0.25]  # (Nek'zali's 0:35: 20% of the top
         if few:  # Discs press Ultimate Penitence in it; the lead said "no cooldown" alone; round 36)
             hs, c = max(few, key=lambda x: x[0])
@@ -807,8 +812,8 @@ def landed_in(m: Moment, cds: list[Cooldown]) -> str:
     # the closest of the presses a quarter make (Disc's 2:01 Evangelism, 9 s before 2:10, over its 1:41 one, 29 s)
     sp, c, t, why = max(near, key=lambda x: (x[0] >= 0.25, -abs(m.t - x[2]), x[0]))
     if c.ramp and t < m.t - ANSWER[0]:
-        return f" ({_pct(sp)} have {e(_shown(c.name))} ramp at {_mmss(t)}, {e(why)})"
-    return f" ({_pct(sp)} have {e(_shown(c.name))} land at {_mmss(t)}, {e(why)})"
+        return f" ({_pct(sp)} ramp with {e(_shown(c.name))} at {_mmss(t)}, {e(why)})"
+    return f" ({_pct(sp)} press {e(_shown(c.name))} at {_mmss(t)}, {e(why)})"
 
 
 def on_others(con, encounter_id: int, difficulty: int, spec: str, spell_ids: list[int]) -> dict[int, float]:
@@ -852,7 +857,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None) -> str:
            ", all on another player" if c.on_others >= 0.95 else "") + "</small>"
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, tie(c, t, n))}{_share(_tied_share(c, t, tie(c, t, n), sp))}"
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
-                                           if t in c.back and not c.why else "")
+                                           if t in c.back and not (c.why or c.every) else "")  # its line says it
                                         + f"{_or(c, t, answered)}</span>"
                                         for k, (t, n, sp) in enumerate(zip(c.times, c.near,
                                                                            c.support or [0.0] * len(c.times),
@@ -1515,7 +1520,10 @@ def render_sheet(h: HealerPrep) -> str:
     # the rule, once, under the long cooldowns and their "fewer than half" line (Zephyr's read as part of it)
     fight.append("<p class='small muted'>Only the lead ties a press to a hit; a button on cooldown, cast on another "
                  "player, used while moving or a trinket says why it is not. A time is shown when a quarter of those who "
-                 "press the button share it; its share is of all the top players.</p>")
+                 "press the button share it; its share is of all the top players (for a press tied to a hit: those "
+                 "pressing in that hit's window). \"Back from cooldown\": most of its players press it as soon as it "
+                 "came back from their last use, so it was not saved for what it lands on (\"for about half\": 40 to "
+                 "60% of them).</p>")
     exts = [c for c in heals if _external(c.spell_id) == "protective"]
 
     def fewer(cs: list) -> str:
@@ -1622,7 +1630,9 @@ def render_sheet(h: HealerPrep) -> str:
         else:
             line = f"Few top raids bring a {e(h.spec)} on this boss."
         deeper_first.append(f"<h2>Healers in the top {e(h.spec)}s' kills</h2><p>{line} How often each other healer spec is there in the {n_kills} "
-                      f"top kills read for their healing (the timings need every cast, collected on {h.kills} of them), "
+                      f"top kills read for their healing"
+                      + (f", median {_mmss(h.own_median)}" if h.own_median else "")
+                      + f" (the timings need every cast, collected on {h.kills} of them), "
                       f"and the kills with it against those without it (a reading, not a verdict):</p>"
                       f"{presence_table(h.presence, h.spec)}")
     deeper = deeper_first + [f"<h2>What each healer spec brings here</h2><p class='small muted'>Measured on {h.role_kills:,} "

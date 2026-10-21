@@ -213,7 +213,7 @@ def test_a_press_back_from_cooldown_in_a_hit_is_said_and_drawn_as_none():
     h = healer.HealerPrep("Boss", "heroic", "Restoration Druid", 10, 240.0, [100.0] * 48, found, cds, [], [], [], [])
     sheet = healer.render_sheet(h)
     assert "for the 0:40 hit, 100% press Tranquility (about 0:42)" in sheet
-    assert "No cooldown is kept for the 2:40 hit (100% have Tranquility land at 2:45, back from cooldown)" in sheet
+    assert "No cooldown is kept for the 2:40 hit (100% press Tranquility at 2:45, back from cooldown)" in sheet
     assert "2:45 &middot; 100% of the top players &middot; back from cooldown" in sheet
     assert "class='cp off'><title>Tranquility 2:45" in sheet and "class='cp'><title>Tranquility 0:42" in sheet
 
@@ -327,9 +327,19 @@ def test_a_tied_press_is_counted_in_its_hits_window():
 def test_a_hit_kept_for_none_names_a_few_presses_in_it():
     # Disc, Nek'zali (round 36): 20% of the top Discs press Ultimate Penitence in the 0:35 hit, under the quarter bar
     m = healer.Moment(35.0, 1000.0, 1.6, "Soulcoil Rite")
-    up = healer.Cooldown("Ultimate Penitence", 1, 0.6, 1.0, [75.0], presses=[[36.0]] * 20 + [[75.0]] * 40, n_all=100)
+    up = healer.Cooldown("Ultimate Penitence", 1, 0.6, 1.0, [75.0], ["1:15 Soulcoil Rite"],  # it answers 1:15
+                         presses=[[36.0]] * 20 + [[75.0]] * 40, n_all=100)
     ns = healer.Cooldown("Nature's Swiftness", 2, 0.9, 4.0, [35.0], every=60.0,
                          presses=[[36.0]] * 15 + [[90.0]] * 75, n_all=100)
     assert healer.landed_in(m, [up, ns]) == " (only 20% press Ultimate Penitence in it)"
     up.presses = [[36.0]] * 30 + [[75.0]] * 30  # a quarter or more: no "only"
     assert healer.landed_in(m, [up, ns]) == ""
+
+
+def test_a_minute_button_in_a_bare_hit_is_named_with_its_reason():
+    # Restoration Druid, Nek'zali (round 37): 70% press Convoke 4 s before the 1:15 hit, the lead said nothing
+    m = healer.Moment(75.0, 1000.0, 1.6, "Soulcoil Rite")
+    cv = healer.Cooldown("Convoke the Spirits", 1, 1.0, 4.0, [6.0, 71.0], support=[0.76, 0.7], why="about every minute")
+    assert healer.landed_in(m, [cv]) == " (70% press Convoke the Spirits at 1:11, pressed about every minute)"
+    inn = healer.Cooldown("Innervate", 2, 1.0, 2.0, [49.0], presses=[[75.0]] * 11 + [[49.0]] * 89, n_all=100)
+    assert healer.landed_in(m, [inn]) == ""  # a mana button answers no hit anywhere: never named
