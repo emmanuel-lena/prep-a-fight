@@ -911,7 +911,8 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
         if named is not None and near_t is not None and abs(near_t - when) <= 15:
             named[(c.name, near_t)] = m.t
         elif named is not None:  # no chip near it: its card gets a line of its own (round 66: Spirit Link Totem
-            named[(c.name, ("line", m.t))] = (hs, when, _reach_note(c, m.t))  # "timing varies" under the lead's 2:12)
+            named[(c.name, ("line", m.t))] = (hs, when, _reach_note(c, m.t), reason)  # "timing varies" under the
+            # lead's 2:12), its reason too (round 69: Apotheosis "back from cooldown")
         few_ = "only " if hs < 0.25 else ""
         if not reason:  # a raid button's presses there judged too (round 67: Tip the Scales, "for about half")
             b = _back_in(c, m.t, m.t)
@@ -1010,10 +1011,12 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
                                 or "<small>timing varies: no shared moment</small>")
         + _pull_chip(c)
         + "".join(f"<small class='alt'>in the window of the {_mmss(k[1][1])} hit: {_pct(v[0])} of the top players"
-                  f"{v[2]}, about {_mmss(v[1])}</small>" for k, v in (named or {}).items()
+                  f"{v[2]}, about {_mmss(v[1])}{', ' + v[3] if len(v) > 3 and v[3] else ''}</small>"
+                  for k, v in (named or {}).items()
                   if k[0] == c.name and isinstance(k[1], tuple))
         + ("<small class='alt'>two rhythms, by their first press: " + "; or ".join(
-            f"from {_mmss(ts[0])}, then {_and([_mmss(t) for t in ts[1:]])}" for _sp, ts in c.rhythms)
+            f"from {_mmss((moved or {}).get((c.name, ts[0]), ts[0]))}, then "
+            f"{_and([_mmss((moved or {}).get((c.name, t), t)) for t in ts[1:]])}" for _sp, ts in c.rhythms)
            + "</small>"
            if c.rhythms else "")
         + (f"<small class='alt'>on cooldown, about every {c.every:.0f} s</small>" if c.every else
@@ -1416,7 +1419,7 @@ def _minute(name: str) -> bool:
         return False
 
 
-def _in_hit(n: str, ts: list, rest: list, h: float, bar: bool = True) -> tuple | None:
+def _in_hit(n: str, ts: list, rest: list, h: float, bar: bool = True, back_ok: bool = False) -> tuple | None:
     """(button, time, share) of a spec's healers pressing it in a hit's answer window, as the fight tab counts a tied
     press: over the window, not within 8 s of a moment's peak (the Evokers' Rewind for Nek'zali's 1:15: 26% in the
     window, 20% around its 1:13 peak, so "none shared"; round 40). Kept when a quarter of those who press it are
@@ -1433,7 +1436,7 @@ def _in_hit(n: str, ts: list, rest: list, h: float, bar: bool = True) -> tuple |
     if not total or not players or (bar and players < 0.25 * len(ps)):
         return None
     back = sum(1 for x, y in inside if y is not None and cd and x - y <= cd + BACK) / max(1, len(inside))
-    if back > BACK_SHARE[0]:
+    if back > BACK_SHARE[0] and not back_ok:
         return None
     return n, st.median(x for x, _y in inside), players / total, players / max(1, len(ps)), ramp
 
@@ -1458,6 +1461,11 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             under = [] if got else sorted((g for n, _k, ts, *rest in r.cd_names if not _minute(n)  # none at the bar:
                                            for g in [_in_hit(n, ts, rest, h, bar=False)] if g and g[2] >= 0.1),
                                           key=lambda x: -x[2])[:1]  # its most pressed, said so (round 41: "none
+            held = [] if got or under else sorted(  # none held for it: its presses there come back from cooldown,
+                (g for n, _k, ts, *rest in r.cd_names if not _minute(n)  # said, not "none shared" (round 69:
+                 for g in [_in_hit(n, ts, rest, h, bar=False, back_ok=True)] if g and g[2] >= 0.1),  # Conduit 25%)
+                key=lambda x: -x[2])[:1]
+            under = under or [("back", *g) for g in held]
             per_hit.append((h, sorted(got, key=lambda x: -x[2])[:2], under))  # shared" read as "nothing pressed")
         chips = "".join(f"<span class='chip'>the {_mmss(h)} hit: "
                         + ("; ".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if rp else ''} &middot; {_pct(sp)}"
@@ -1465,7 +1473,9 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
                                         f"<small>(under a quarter of those who press it"
                                         f"{', the same share' if f'{int(pp * 100)}%' == _pct(sp) else f': {int(pp * 100)}%'})</small>"
-                                        for u in under if len(u) > 4 for n, t, sp, pp in [u[:4]])
+                                        for u in under if len(u) > 4 and u[0] != "back" for n, t, sp, pp in [u[:4]])
+                           or "".join(f"none held for it <small>({e(_shown(u[1]))} {_mmss(u[2])} &middot; {_pct(u[3])}, "
+                                      "back from cooldown)</small>" for u in under if u[0] == "back")
                            or "none shared") + "</span>"
                         for h, got, under in per_hit)
         n = getattr(r, "own_players", 0)  # under 100: a few players' habit, said (Disc: 43; round 46)
@@ -1479,7 +1489,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             "of the spec's healers who press it do so in the hit's window (5 s before to 8 s after; a ramp button, as "
             "Evangelism, 8 to 30 s ahead, never the pull's opener before 0:12), its share of all "
             "that spec's healers there; else its most pressed button, if a tenth of the spec's healers press it there, "
-            "marked \"under a quarter\" with the share of those who press it; \"none shared\": no button reaches that; "
+            "marked \"under a quarter\" with the share of those who press it; \"none held for it\": its presses there "
+            "come back from cooldown; \"none shared\": no button reaches that; "
             "\"few players\": under 100 of the spec's healers in these kills, a habit of a few. "
             "A button whose presses there come back from cooldown for over 40% of them is no answer, as on the fight "
             "tab.</p>")
