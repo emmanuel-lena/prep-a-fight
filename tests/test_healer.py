@@ -181,12 +181,23 @@ def test_every_healer_spec_in_one_table():
                            externals=0.5, buffs=1.4, buff_spells=["Power Infusion"], players=40, jobs=[], cd_names=[])
     shaman = SimpleNamespace(spec="Restoration Shaman", healing=0.27, tank=0.12, spike=0.29, overheal=0.2,
                              dispels=1.1, externals=0.0, buffs=0.0, buff_spells=[], players=38,
-                             jobs=["removes Essence Rend"], cd_names=[("Ascendance", 1, [(35.0, 0.38)], 0.9)])
+                             jobs=["removes Essence Rend"], cd_names=[("Ascendance", 1, [(35.0, 0.38, False)], 0.9)])
     table = healer.roles_table([shaman, disc], "Restoration Shaman")
     assert "<th>Buffs given a kill</th>" in table and "1.4 <small>Power Infusion</small>" in table
     assert "Restoration Shaman <small>(you)</small>" in table and "&ndash;" in table
     more = healer.roles_more([shaman, disc], "Restoration Shaman")
-    assert "removes Essence Rend" in more and "Ascendance" not in more  # your own times are on the fight tab
+    assert "removes Essence Rend" not in more and "Ascendance" not in more  # the lead's jobs; your times: fight tab
+
+
+def test_the_other_healers_cooldowns_on_the_hits_keep_a_button_pressed_on_cooldown():
+    # Vashnik heroic (round 29): Tranquility at 0:43 for the 0:40 hit, again at 2:45 as soon as it is back; the
+    # list was empty on 13 sheets of 14 when a button pressed on cooldown went whole
+    druid = SimpleNamespace(spec="Restoration Druid", jobs=[], cd_names=[
+        ("Tranquility", 2.0, [(43.0, 0.42, False), (225.0, 0.24, True)], 0.9)])
+    hits = [healer.Moment(40.0, 1000.0, 5.0, "Caustic Surge"), healer.Moment(220.0, 1000.0, 5.0, "Toxic Vapor")]
+    more = healer.roles_more([druid], "Holy Priest", hits)
+    assert "Tranquility 0:43 &middot; 42% of them</span>" in more
+    assert "Tranquility 3:45 &middot; 24% of them &middot; back from cooldown" in more
 
 
 def test_a_press_back_from_cooldown_in_a_hit_is_said_and_drawn_as_none():
@@ -239,8 +250,8 @@ def test_a_ramp_answers_the_hit_after_it(monkeypatch):
                           [])
     sheet = healer.render_sheet(h)
     assert "for the 0:40 hit, 100% press Evangelism (about 0:24, a ramp ahead of it)" in sheet
-    assert ("their next Evangelism comes back from cooldown 28 s ahead of the 2:10 hit (about 1:42) and 20 s "
-            "ahead of the 3:35 hit (about 3:15)") in sheet
+    assert ("Evangelism, pressed again as soon as it is back, lands 28 s ahead of the 2:10 hit (about 1:42, for "
+            "100%) and 20 s ahead of the 3:35 hit (about 3:15, for 100%)") in sheet
     assert "0:24 &middot; 16 s before the 0:40 hit" in sheet
     assert "1:42 &middot; 100% of the top players &middot; back from cooldown" in sheet
 
@@ -267,3 +278,11 @@ def test_jobs_lead_says_either_only_when_your_spec_has_no_job():
     assert "No other healer spec stands out." in healer.jobs_lead([mine, other], "Holy Priest")
     assert "either" not in healer.jobs_lead([mine, other], "Holy Priest")
     assert "stands out either" in healer.jobs_lead([other], "Restoration Shaman")
+
+
+def test_two_rhythms_are_said_apart():
+    # Disc, Vashnik heroic (round 29): 25 players press Evangelism at 0:04, 1:42, 3:15, 23 at 0:24, 2:07, 3:38
+    per_player = [[4.0, 102.0, 195.0]] * 25 + [[24.0, 127.0, 218.0]] * 23 + [[60.0]] * 2
+    got = healer.rhythms(per_player, [4.0, 127.0, 218.0], [24.0, 102.0, 195.0], 50)
+    assert got == [(0.5, [4.0, 102.0, 195.0]), (0.46, [24.0, 127.0, 218.0])]
+    assert healer.rhythms(per_player[:30], [4.0, 127.0, 218.0], [24.0, 102.0, 195.0], 50) == []  # 5 of 50: no

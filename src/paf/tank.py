@@ -515,7 +515,7 @@ def render_sheet(p: TankPrep) -> str:
                   + (f"never reached in the {k} top kills read" if not hit and k else
                      f"reached in {hit} of the {k} top kills read" if k else "not measured") + ".)</span></p>"
                   for n, t, hit, k in p.no_taunt if hit or not k)]  # never reached: one line on the boss tab
-    change = [build_lead(p.builds, p.spec, p.split_players or p.kills, p.split),
+    change = [build_lead(p.builds, p.spec, p.split_players or p.kills, p.split, p.split_wide),
               talents_html(p.builds, p.split_players or p.kills, f"{p.spec}s", p.hero),
               split_html(p.split, p.split_players, p.spec, p.split_wide) if p.split else "",
               f"<h2>Trinkets the top {e(p.spec)}s play</h2><ul class='hl2'>"

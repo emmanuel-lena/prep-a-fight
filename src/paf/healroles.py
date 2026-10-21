@@ -480,19 +480,34 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
                 own[ab].append(t)
             for ab, ts in own.items():
                 cd_times[spec][ab].append(ts)
+    shown: dict[str, dict[str, list[float]]] = stats  # the table's shares: every corpus' kills when pooled
+    if pool:
+        shown = defaultdict(lambda: defaultdict(list))
+        for k, hs in pool[0].items():
+            total = sum(h[5] for h in hs) or 1
+            minutes = (pool[1].get(k) or 60) / 60
+            for h in hs:
+                tot, over = h[5] or 0, h[6] or 0
+                p = shown[pretty(h[3], h[4])]
+                p["healing"].append(tot / total)
+                p["tank"].append(h[7] / tot if tot else 0)
+                p["spike"].append(h[8] or 0)
+                p["overheal"].append(over / (tot + over) if tot + over else 0)
+                p["dispels"].append((h[9] or 0) / minutes)
     out = []
     for spec, s in stats.items():
-        n = len(s["healing"])
+        n = len(s["healing"])  # this corpus' players of the spec: its cooldowns' and externals' base
         if n < min_players:
             continue
+        t = shown.get(spec) or s
         mid = st.median(durs.values()) if durs else None
-        cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n, _shared(ps, n, mid), len(ps) / n)
+        cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n, _shared(ps, n, mid, _cd(ab)), len(ps) / n)
                for ab, ps in cd_times[spec].items()  # pressed by half of them at least (Healing Tide Totem: 3%)
                if len(ps) / n >= 0.5 and not _personal(ab, names) and not _untied(ab, ps, mid)
                and sum(map(len, ps)) / len(ps) < 3.5]  # a 1-minute button (Nature's Swiftness, 3.9) is no raid cooldown
-        se = {k: (st.stdev(v) / len(v) ** 0.5 if len(v) > 1 else 0.0) for k, v in s.items()}
-        out.append(Role(spec, n, st.median(s["healing"]), st.median(s["tank"]), st.median(s["spike"]),
-                        st.median(s["overheal"]), st.median(s["dispels"]), st.mean(s["raid"]), st.mean(s["ext"]),
+        se = {k: (st.stdev(v) / len(v) ** 0.5 if len(v) > 1 else 0.0) for k, v in [*s.items(), *t.items()]}
+        out.append(Role(spec, len(t["healing"]), st.median(t["healing"]), st.median(t["tank"]), st.median(t["spike"]),
+                        st.median(t["overheal"]), st.median(t["dispels"]), st.mean(s["raid"]), st.mean(s["ext"]),
                         sorted(cds, key=lambda c: -c[1]),
                         se={"tank": se["tank"], "spike": se["spike"], "overheal": se["overheal"],
                             "dispels": se["dispels"], "raid_cds": se["raid"], "externals": se["ext"]},
@@ -507,33 +522,37 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
     return sorted(out, key=lambda r: -r.players)
 
 
-def _shared(ps: list[list[float]], n: int, end: float | None) -> list[tuple[float, float]]:
-    """(moment, share of the spec's players pressing it within 8 s) for a card: the moments a quarter of those who
-    press it share at least, as the fight tab's (a card showed Ascendance 0:51 for 23% as "most of them")."""
+def _shared(ps: list[list[float]], n: int, end: float | None, cd: float = 0.0) -> list[tuple[float, float, bool]]:
+    """(moment, share of the spec's players pressing it within 8 s, back from cooldown) for a card: the moments a
+    quarter of those who press it share at least, as the fight tab's (a card showed Ascendance 0:51 for 23% as "most
+    of them"); back from cooldown read per player, as the fight tab's (paf.healer.back_share)."""
+    from paf.healer import back_share
+
     times = press_moments(ps, max(1, round(sum(map(len, ps)) / len(ps))), end)[0]  # the main moments
     users = len(ps) / n if n else 0
     out = [(t, sum(1 for ts in ps if any(abs(x - t) <= 8 for x in ts)) / n) for t in times]
-    return [(t, sp) for t, sp in out if sp >= 0.25 * users]
+    return [(t, sp, back_share(ps, t, cd) > 0.5) for t, sp in out if sp >= 0.25 * users]
+
+
+def _cd(ab: int) -> float:
+    try:
+        from paf.gamedata import spell_cooldowns
+
+        return spell_cooldowns().get(ab, (0.0, 1))[0]
+    except Exception:  # noqa: BLE001 - offline
+        return 0.0
 
 
 def _untied(ab: int, ps: list[list[float]], end: float | None) -> bool:
     """A button the fight tab never ties to a hit, left off the cards too (they said so and showed Power Infusion):
-    any external, a cast-while-moving button, an item, one on cooldown or about every minute."""
-    from itertools import pairwise
-
+    any external, a cast-while-moving button, an item, one about every minute. A button pressed again as soon as it
+    is back stays: its first press can land in a hit (Divine Hymn, Aura Mastery, Tranquility and Rewind on Vashnik's
+    0:45 hit), its later moments say they are back from cooldown (the round-29 review found the list empty on 13
+    sheets of 14 when the whole button went)."""
     from paf.healer import _item, _moving
 
-    try:
-        from paf.gamedata import spell_cooldowns
-
-        cd = spell_cooldowns().get(ab, (0.0, 1))[0]
-    except Exception:  # noqa: BLE001 - offline
-        cd = 0.0
     per = sum(map(len, ps)) / len(ps) if ps else 0
-    gaps = [y - x for ts in ps for x, y in pairwise(sorted(ts))]
-    rhythm = bool(gaps and cd and st.median(gaps) <= 1.15 * cd)  # pressed again as soon as it is back
-    return bool(external_kind(ab) or _moving(ab) or _item(ab) or per >= 3.5 or rhythm
-                or on_cadence(ps, per, end or 0))
+    return bool(external_kind(ab) or _moving(ab) or _item(ab) or per >= 3.5 or on_cadence(ps, per, end or 0))
 
 
 def _personal(ab: int, names: dict[int, str] | None) -> bool:

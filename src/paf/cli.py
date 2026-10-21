@@ -826,7 +826,7 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
         character=getattr(profile, "name", "") or "")
     p.split, p.split_players = healer.contested(con, enc.id, diff, spec)
     if not p.split:  # no talent 35-65%: the ones they differ on most, said as such
-        p.split, p.split_players = healer.contested(con, enc.id, diff, spec, lo=0.15, hi=0.85, shown=6)
+        p.split, p.split_players = healer.contested(con, enc.id, diff, spec, *healer.SPLIT, shown=6)
         p.split_wide = bool(p.split)
     p.builds = healer.build_rows(builds, p.split)  # the most played build's side of each split
     p.short_defs = short_defs
@@ -970,7 +970,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     h.casts = {n: len(ts) for n, ts in tl.boss_casts}
     h.split, h.split_players = healer.contested(con, enc.id, diff, spec)
     if not h.split:  # no talent 35-65%: the ones they differ on most, said as such
-        h.split, h.split_players = healer.contested(con, enc.id, diff, spec, lo=0.15, hi=0.85, shown=6)
+        h.split, h.split_players = healer.contested(con, enc.id, diff, spec, *healer.SPLIT, shown=6)
         h.split_wide = bool(h.split)
     h.builds = healer.build_rows(builds, h.split)  # the most played build's side of each split
     from paf.gamedata import dispel_type
@@ -1008,12 +1008,16 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     h.dispelled, h.dispel_kills = healroles.dispelled(con, enc.id, diff, names)
     h.dispel_text = _dispel_text(sections, h.dispelled[0][0], diff_name) if h.dispelled else ""
     h.dispel_delay = healroles.dispel_delay(con, enc.id, diff, h.dispelled[0][0], names) if h.dispelled else None
-    h.roles = healroles.roles(con, enc.id, diff, names, ranked=(cls, spec),  # jobs: every corpus' kills of the boss
-                              pool=healroles.pooled_kills(enc.id, diff))
-    n, dur, dead = healroles.sample(con, enc.id, diff)
-    h.role_kills, h.role_median = n, dur
-    h.role_sample = (f"kills of the top {healroles.pretty(cls, spec)}s (ranked by their healing), median "
-                     f"{healer._mmss(dur)}, {dead:.1f} deaths per 20 players")
+    pool = healroles.pooled_kills(enc.id, diff)  # every corpus' kills of the boss: its sheets say the same numbers
+    h.roles = healroles.roles(con, enc.id, diff, names, ranked=(cls, spec), pool=pool)
+    n, _dur, _dead = healroles.sample(con, enc.id, diff)
+    h.own_sample = f"the {n} kills of the top {healroles.pretty(cls, spec)}s"
+    import statistics as st
+
+    pooled = [pool[1][k] for k in pool[0] if pool[1].get(k)]
+    h.role_kills, h.role_median = len(pool[0]), (st.median(pooled) if pooled else 0.0)
+    h.role_sample = (f"kills of the boss read for any spec's sheet, each kill's top-ranked player left out (its kill "
+                     f"was picked for it), median {healer._mmss(h.role_median)}")
     for r in h.roles:
         print(f"  {r.spec} ({r.players} healers): {'; '.join(r.jobs)}")
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"
