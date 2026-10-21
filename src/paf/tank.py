@@ -481,7 +481,7 @@ def render_sheet(p: TankPrep) -> str:
         lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({_x(m.ratio)}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
                     + (f"; {big[2]:.0%} of the top {e(p.spec)}s press {e(big[0])} for it (about {_mmss(big[1])})."
-                       if big else f"; no defensive of theirs is shared for it{landed_in(m, defs, named)}."))
+                       if big else f"; no defensive of theirs is kept for it{landed_in(m, defs, named)}."))
         # the other dots in time order: their most shared press, or one clause for those with none
         pairs = [(x, answer(x)) for x in sorted(p.moments, key=lambda x: x.t) if x is not m]
         said = [f"for the {_mmss(x.t)} hit, {a[2]:.0%} press {e(a[0])} (about {_mmss(a[1])})" for x, a in pairs if a]
@@ -491,7 +491,7 @@ def render_sheet(p: TankPrep) -> str:
         if said:
             lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 0:35 hit, 41% press Spell Reflection"
         if bare:
-            lead.append(f"No defensive is shared for {', nor '.join(bare)}"  # each hit its own aside (round 42)
+            lead.append(f"No defensive is kept for {', nor '.join(bare)}"  # each hit its own aside (round 42)
                         + (" either." if not big and len(bare) == 1 else "."))  # "nor ... either": once is enough
         # a hit that comes with a swap (Vashnik's 1:35 and 2:55, after Dripping Fangs): the time is the link
         with_swap = [(x, w) for x in p.moments for w in p.swaps if abs(w - x.t) <= ANSWER[0]]

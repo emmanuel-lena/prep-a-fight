@@ -746,19 +746,21 @@ def hit_share(c: Cooldown, t: float, hit: float) -> float | None:
     (within 8 s of the press) counted Revival up to 13 s after Vashnik's 0:40 hit: 49% against 35% (round 34)."""
     if not c.presses or not c.n_all:
         return None
-    a, b = (t - 8, t + 8) if c.ramp and hit - t >= RAMP[0] else (hit - ANSWER[0], hit + ANSWER[1])
+    # a ramp's own window ends where the hit's begins: no press counts both ways (round 52)
+    a, b = ((t - 8, min(t + 8, hit - ANSWER[0])) if c.ramp and hit - t >= RAMP[0]
+            else (hit - ANSWER[0], hit + ANSWER[1]))
     return sum(1 for ts in c.presses if any(a <= x <= b for x in ts)) / reach(c, hit)
 
 
 def reach(c: Cooldown, hit: float) -> int:
     """The top players whose kill reaches a hit: a late hit's share is of them (round 47: 42 of the 100 top Prot
     kills end before Nek'zali's 3:55, its "only 19%" was 33% of those still fighting)."""
-    return max(1, sum(1 for d in c.lasts if d >= hit) if c.lasts else c.n_all)
+    return max(1, sum(1 for d in c.lasts if d >= hit + ANSWER[1]) if c.lasts else c.n_all)  # through its window
 
 
 def _reach_note(c: Cooldown, hit: float) -> str:
     n = reach(c, hit)
-    return f", in the {n} kills that reach it" if c.lasts and n < 0.9 * len(c.lasts) else ""
+    return f", in the {n} kills still going after it" if c.lasts and n < 0.9 * len(c.lasts) else ""
 
 
 def _secs(mmss: str) -> float:
@@ -1233,6 +1235,7 @@ def roles_table(roles: list, mine: str = "") -> str:
             + "<th>Players</th>")
     rows = "".join(
         f"<tr class='{'mine' if r.spec == mine else ''}'><td>{e(r.spec)}{' <small>(you)</small>' if r.spec == mine else ''}"
+        f"{' <small>few players</small>' if r.players < 100 else ''}"
         f"</td><td class='n'>{_pct(r.healing)}</td><td class='n'>{_pct(r.tank)}</td><td class='n'>{_pct(r.spike)}</td>"
         f"<td class='n'>{_pct(r.overheal)}</td><td class='n'>{r.dispels:.1f}</td>"
         f"<td class='n'>{few if r.externals < 0 else f'{r.externals:.1f}' if r.externals >= 0.05 else '&ndash;'}</td>"
@@ -1304,7 +1307,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                      for n, t, sp, rp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
                                         f"<small>(under a quarter of those who press it"
-                                        f"{f': {int(pp * 100)}%' if abs(int(pp * 100) - round(sp * 100)) >= 3 else ''})</small>"
+                                        f": {int(pp * 100)}%)</small>"
                                         for u in under if len(u) > 4 for n, t, sp, pp in [u[:4]])
                            or "none shared") + "</span>"
                         for h, got, under in per_hit)
