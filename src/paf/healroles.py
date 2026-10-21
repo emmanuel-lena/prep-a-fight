@@ -754,8 +754,8 @@ def _top_check(top: list, durs: dict, spec: str, m: str) -> str:
     if a >= JOB_RATIO * b and a - b >= JOB_GAP[m]:
         return ""
     fmt = (lambda x: f"{x:.1f}") if m == "dispels" else (lambda x: f"{x:.0%}")
-    return (f"; the top players ranked by their healing do not: the top {spec}s {fmt(a)}, the other specs' "
-            f"top healers {fmt(b)} ({len(me)} and {len(them)} players)")
+    return (f"; the top players ranked by their healing do not: the median top {spec} {fmt(a)}, the other specs' "
+            f"{fmt(b)} ({len(me)} and {len(them)} ranked players, one in each top kill of each healer spec's sheet)")
 
 
 def paired_jobs(per_kill: dict, durs: dict, own: tuple[str, str] | None = None, top: list | None = None

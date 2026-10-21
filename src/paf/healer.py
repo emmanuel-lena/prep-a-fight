@@ -1187,7 +1187,7 @@ def roles_table(roles: list, mine: str = "") -> str:
     cover = next((r.spike_cover for r in roles if getattr(r, "spike_cover", 0)), 0.0)
     head = ("<th>Healer</th><th>Healing share</th><th>On tanks</th>"
             f"<th>Its healing in spikes{f' <small>(spikes: {_pct(cover)} of the fight)</small>' if cover else ''}</th>"
-            "<th>Overheal</th><th>Dispels a minute</th><th>Externals given a kill</th>"
+            "<th>Overheal</th><th>Dispels a minute</th><th>Externals given a kill <small>(every player)</small></th>"
             + ("<th>Buffs given a kill</th>" if buffs else "")
             + "<th>Players</th>")
     rows = "".join(
@@ -1257,8 +1257,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             per_hit.append((h, sorted(got, key=lambda x: -x[2])[:2], under))  # shared" read as "nothing pressed")
         chips = "".join(f"<span class='chip'>the {_mmss(h)} hit: "
                         + ("; ".join(f"{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)}" for n, t, sp in got) if got
-                           else "".join(f"{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)} <small>({int(pp * 100)}% of those who "
-                                        f"press it: under a quarter)</small>" for n, t, sp, pp in (u for u in under if len(u) > 3))
+                           else "".join(f"{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)} <small>(under a quarter of those who press it: "
+                                        f"{int(pp * 100)}%)</small>" for n, t, sp, pp in (u for u in under if len(u) > 3))
                            or "none shared") + "</span>"
                         for h, got, under in per_hit)
         n = getattr(r, "own_players", 0)

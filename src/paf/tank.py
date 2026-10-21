@@ -486,7 +486,8 @@ def render_sheet(p: TankPrep) -> str:
                         f"{'come' if len(with_swap) > 1 else 'comes'} with a tank swap (at "
                         f"{_and([_mmss(w) for _x, w in with_swap])}).")
     if p.swaps:
-        taunts = f"{p.taunts_per_kill:.1f}".removesuffix(".0")  # 4.5, or 4 (round 39: "4.0" read as precision)
+        # a tank's share of the kill's swaps, at least half the shared moments (round 43: "about 4" beside 9 swaps)
+        taunts = f"{max(p.taunts_per_kill, len(p.swaps) / 2):.1f}".removesuffix(".0")
         lead.append(f"Each top tank taunts about {taunts} times a kill after the pull (swaps on adds count)"
                     + ((f", most often at about {p.stacks[common][0]} stacks of {e(common)}." if common in p.stacks
                         and p.stacks[common][0] >= 2 else f", swapping after each {e(common)} (the debuff lasts "
@@ -511,7 +512,9 @@ def render_sheet(p: TankPrep) -> str:
         f"{cooldowns_html(defs, answered) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
         "<p class='small muted'>Only the lead ties a press to a hit; a button on cooldown, a potion or a trinket says "
         "why it is not. A time is shown when a quarter of those who press the button share it; its share is of all "
-        "the top players.</p>"
+        "the top players; \"or\": the time other top players press the same press instead. \"Back from cooldown\": "
+        "most of its players press it as soon as it came back from their last use, so it was not saved for what it "
+        "lands on (\"for about half\": 40 to 60% of them).</p>"
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
            f"</p>" if p.rare else ""),
         f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"
