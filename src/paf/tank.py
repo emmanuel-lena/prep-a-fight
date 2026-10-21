@@ -473,7 +473,8 @@ def render_sheet(p: TankPrep) -> str:
         if said:
             lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 0:35 hit, 41% press Spell Reflection"
         if bare:
-            lead.append(f"No defensive is shared for {_and(bare)}" + (" either." if not big else "."))
+            lead.append(f"No defensive is shared for {', nor '.join(bare)}"  # each hit its own aside (round 42)
+                        + (" either." if not big else "."))
         # a hit that comes with a swap (Vashnik's 1:35 and 2:55, after Dripping Fangs): the time is the link
         with_swap = [(x, w) for x in p.moments for w in p.swaps if abs(w - x.t) <= ANSWER[0]]
         # said only when swaps are rare enough for it to mean something: one every 28 s (Vashnik) lands within 5 s

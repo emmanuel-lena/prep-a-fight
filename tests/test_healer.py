@@ -361,7 +361,8 @@ def test_no_job_kept_by_the_top_players_is_the_answer():
     sh = SimpleNamespace(spec="Restoration Shaman", jobs=["nothing stands out against the other healers"])
     lead = healer.jobs_lead([hp, sh], "Restoration Shaman")
     assert lead.startswith("<p class='lead'>No healer spec has a job of its own here that the top players keep.</p>")
-    assert "On average across every healer: the Holy Paladin heals the tanks more" in lead
+    assert "On average across every healer (means paired within each kill" in lead
+    assert "the Holy Paladin heals the tanks more: 9%" in lead
 
 
 def test_a_press_is_said_at_its_most_shared_time():

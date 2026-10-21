@@ -1231,7 +1231,7 @@ def _in_hit(n: str, ts: list, rest: list, h: float, bar: bool = True) -> tuple |
     back = sum(1 for x, y in inside if y is not None and cd and x - y <= cd + BACK) / max(1, len(inside))
     if back > BACK_SHARE[0]:
         return None
-    return n, st.median(x for x, _y in inside), players / total
+    return n, st.median(x for x, _y in inside), players / total, players / max(1, len(ps))
 
 
 def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
@@ -1249,7 +1249,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             continue
         per_hit = []
         for h in hits:
-            got = [g for n, _k, ts, *rest in r.cd_names if not _minute(n)
+            got = [g[:3] for n, _k, ts, *rest in r.cd_names if not _minute(n)
                    for g in [_in_hit(n, ts, rest, h)] if g]
             under = [] if got else sorted((g for n, _k, ts, *rest in r.cd_names if not _minute(n)  # none at the bar:
                                            for g in [_in_hit(n, ts, rest, h, bar=False)] if g and g[2] >= 0.1),
@@ -1257,8 +1257,9 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             per_hit.append((h, sorted(got, key=lambda x: -x[2])[:2], under))  # shared" read as "nothing pressed")
         chips = "".join(f"<span class='chip'>the {_mmss(h)} hit: "
                         + ("; ".join(f"{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)}" for n, t, sp in got) if got
-                           else "".join(f"{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)}, under a quarter of those who press it"
-                                        for n, t, sp in under) or "none shared") + "</span>"
+                           else "".join(f"{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)} <small>({_pct(pp)} of those who "
+                                        f"press it: under a quarter)</small>" for n, t, sp, pp in (u for u in under if len(u) > 3))
+                           or "none shared") + "</span>"
                         for h, got, under in per_hit)
         n = getattr(r, "own_players", 0)
         out += (f"<li><b>{e(r.spec)}</b>" + (f"<small>{n} healers</small>" if n else "")
@@ -1269,7 +1270,9 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             f"<ul class='hl2'>{out}</ul><p class='small muted'>From the same kills as the table, every player of each spec (that spec's "
             "own sheet reads its top players, so its times can differ): a button is shown for a hit when a quarter "
             "of the spec's healers who press it do so in the hit's window (5 s before to 8 s after), its share of all "
-            "that spec's healers there; presses mostly back from cooldown are no answer, as on the fight tab.</p>")
+            "that spec's healers there; else its most pressed button, if a tenth of the spec's healers press it there, "
+            "marked \"under a quarter\" with the share of those who press it; \"none shared\": no button reaches that. "
+            "Presses mostly back from cooldown are no answer, as on the fight tab.</p>")
 
 
 def _job(r) -> str:
@@ -1293,7 +1296,8 @@ def jobs_lead(roles: list, mine: str = "") -> str:
     found = [(r.spec, _job(r)) for r in roles if _job(r)]
     if found and all("only on average" in j for _s, j in found):
         return ("<p class='lead'>No healer spec has a job of its own here that the top players keep.</p>"
-                "<p class='small muted'>On average across every healer: "
+                "<p class='small muted'>On average across every healer (means paired within each kill; the table "
+                "below shows each spec's median player): "
                 + "; ".join(f"the {e(sp)} {e(j.replace(', but only on average', '', 1))}" for sp, j in found)
                 + ".</p>")
     you = next((r for r in roles if r.spec == mine), None)
@@ -1513,7 +1517,7 @@ def render_sheet(h: HealerPrep) -> str:
             if not alts:
                 return ""
             a, x = max(alts, key=lambda y: y[1])
-            gap = int(abs(t - a))
+            gap = int(abs(_secs(_mmss(t)) - _secs(_mmss(a))))  # from the times shown (0:44 and 0:23: 21 s)
             return f"; another {_pct(x)} press it about {_mmss(a)}, {gap} s {'earlier' if a < t else 'later'}"
         # a ramp button answering several hits is one clause (Evangelism thrice in a row read as a list)
         ramps: dict[str, list] = {}
@@ -1577,13 +1581,14 @@ def render_sheet(h: HealerPrep) -> str:
     fight.append("<p class='small muted'>Only the lead ties a press to a hit; a button on cooldown, cast on another "
                  "player, used while moving or a trinket says why it is not. A time is shown when a quarter of those who "
                  "press the button share it; its share is of all the top players (for a press tied to a hit: those "
-                 "pressing in that hit's window). \"Back from cooldown\": most of its players press it as soon as it "
+                 "pressing in that hit's window); \"or\": the time other top players press the same press instead. "
+                 "\"Back from cooldown\": most of its players press it as soon as it "
                  "came back from their last use, so it was not saved for what it lands on (\"for about half\": 40 to "
                  "60% of them).</p>")
     exts = [c for c in heals if _external(c.spell_id) == "protective"]
 
     def fewer(cs: list) -> str:
-        return ("<p class='small muted'>Fewer than half of them press "
+        return (f"<p class='small muted'>Fewer than half of the top {e(h.spec)}s press "
                 + ", ".join(f"{e(c.name)} ({c.users:.0%}, {_and([_mmss(t) for t in c.times]) or 'no shared moment'})"
                             for c in cs) + ".</p>") if cs else ""
     buffers = [c for c in heals if _external(c.spell_id) == "damage"]  # Power Infusion: a buff on a damage dealer
@@ -1673,6 +1678,7 @@ def render_sheet(h: HealerPrep) -> str:
               f"the table, jobs and the other healers: {h.role_kills:,} kills of this boss, every spec's" if h.role_kills
               else "",
               f"the raid's damage: {h.raid_kills} kills" if h.raid_kills else "",
+              "each job: the kills holding the spec and another healer, its own count said",
               f"dispel timings: {h.dispel_kills} kills" if getattr(h, "dispel_kills", 0) else ""]
     deeper_first.append("<p class='small muted'>Where the numbers come from: "
                         + "; ".join(x for x in counts if x) + ".</p>")
