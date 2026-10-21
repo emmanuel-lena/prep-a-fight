@@ -1411,7 +1411,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                      for n, t, sp, rp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
                                         f"<small>(under a quarter of those who press it"
-                                        f"{', the same share' if _pct(pp) == _pct(sp) else f': {_pct(pp)}'})</small>"
+                                        f"{', the same share' if f'{int(pp * 100)}%' == _pct(sp) else f': {int(pp * 100)}%'})</small>"
                                         for u in under if len(u) > 4 for n, t, sp, pp in [u[:4]])
                            or "none shared") + "</span>"
                         for h, got, under in per_hit)
@@ -1686,8 +1686,9 @@ def render_sheet(h: HealerPrep) -> str:
                 return ""
             a, x = max(alts, key=lambda y: y[1])
             gap = int(abs(_secs(_mmss(hit)) - _secs(_mmss(a))))  # from the hit, as the times shown (round 45)
-            return (f"; another {_pct(x)} press it about {_mmss(a)}, {gap} s {'before' if a < hit else 'after'} the "
-                    "hit")
+            out = not (c.ramp or -ANSWER[0] <= a - hit <= ANSWER[1])  # outside its window: no answer, said so (round
+            return (f"; another {_pct(x)} press it about {_mmss(a)}, {gap} s {'before' if a < hit else 'after'} the "  # 61)
+                    "hit" + (", outside its window" if out else ""))
         # a ramp button answering several hits is one clause (Evangelism thrice in a row read as a list)
         ramps: dict[str, list] = {}
         for k, ps in by_press.items():
