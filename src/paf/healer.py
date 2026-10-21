@@ -758,7 +758,7 @@ def reach(c: Cooldown, hit: float) -> int:
 
 def _reach_note(c: Cooldown, hit: float) -> str:
     n = reach(c, hit)
-    return f" of the {n} kills that reach it" if c.lasts and n < 0.9 * len(c.lasts) else ""
+    return f", in the {n} kills that reach it" if c.lasts and n < 0.9 * len(c.lasts) else ""
 
 
 def _secs(mmss: str) -> float:
@@ -766,7 +766,7 @@ def _secs(mmss: str) -> float:
     return int(m) * 60 + int(sec)
 
 
-def _or(c: Cooldown, t: float, answered: set | None = None) -> str:
+def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None = None) -> str:
     """The other habits nearest this moment, said on its chip ("1:18, or 0:36 for some"): another player's choice
     for the same press, never an extra one."""
     near = [(a, sp, n) for a, sp, k, n in zip(c.alt, c.alt_support or [0.0] * len(c.alt),
@@ -780,7 +780,11 @@ def _or(c: Cooldown, t: float, answered: set | None = None) -> str:
     near = [(a, _tied_share(c, a, n, sp) if sp else sp, n) for a, sp, n in near]  # a tied habit: its hit's window
     def back(a: float) -> str:  # tagged as the main time is (Evangelism's 1:42 habit, round 29)
         return f" &middot; back from cooldown{' for about half' if a in c.back_half else ''}"
-    return ", or " + ", ".join((f"{_chip(a, n)} for {_pct(sp)}" if sp else f"{_chip(a, n)} for some")
+    def share(a: float, sp: float, n: str) -> str:  # a habit the lead names for a hit: its count, said (round 51)
+        if (c.name, a) in (named or {}):
+            return " for" + _named(c, a, named, n, sp).replace(" of the top players", "")
+        return f" for {_pct(sp)}" if sp else " for some"
+    return ", or " + ", ".join(f"{_chip(a, n)}{share(a, sp, n)}"
                                + (back(a) if a in c.back and not c.why else "") for a, sp, n in near)
 
 
@@ -837,7 +841,7 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None) -> str:
                for hs in [hit_share(c, m.t, m.t)] if hs and FEW_SHARE <= hs < 0.25]  # (Nek'zali's 0:35: 20% of the top
         if few:  # Discs press Ultimate Penitence in it; the lead said "no cooldown" alone; round 36)
             hs, c = max(few, key=lambda x: x[0])
-            return f" (only {_pct(hs)}{_reach_note(c, m.t)} press {e(_shown(c.name))} in it)"
+            return f" (only {_pct(hs)} press {e(_shown(c.name))} in it{_reach_note(c, m.t)})"
         return ""
     # the closest of the presses a quarter make (Disc's 2:01 Evangelism, 9 s before 2:10, over its 1:41 one, 29 s)
     sp, c, t, why = max(near, key=lambda x: (x[0] >= 0.25, -abs(m.t - x[2]), x[0]))
@@ -846,8 +850,8 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None) -> str:
     few = "only " if sp < 0.25 else ""  # under a quarter, as the bare hits' "only N%" (round 39)
     of = _reach_note(c, m.t) if c.presses else ""  # counted in the hit's window: said, as its chip counts its moment
     if c.ramp and t < m.t - ANSWER[0]:
-        return f" ({few}{_pct(sp)}{of} ramp with {e(_shown(c.name))} ahead of it, about {_mmss(t)}, {e(why)})"
-    return f" ({few}{_pct(sp)}{of} press {e(_shown(c.name))} in its window, about {_mmss(t)}, {e(why)})"
+        return f" ({few}{_pct(sp)} ramp with {e(_shown(c.name))} ahead of it{of}, about {_mmss(t)}, {e(why)})"
+    return f" ({few}{_pct(sp)} press {e(_shown(c.name))} in its window{of}, about {_mmss(t)}, {e(why)})"
 
 
 def on_others(con, encounter_id: int, difficulty: int, spec: str, spell_ids: list[int]) -> dict[int, float]:
@@ -892,7 +896,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, tie(c, t, n))}{_named(c, t, named, tie(c, t, n), sp)}"
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
                                            if t in c.back and not (c.why or c.every) else "")  # its line says it
-                                        + f"{_or(c, t, answered)}</span>"
+                                        + f"{_or(c, t, answered, named)}</span>"
                                         for k, (t, n, sp) in enumerate(zip(c.times, c.near,
                                                                            c.support or [0.0] * len(c.times),
                                                                            strict=False)))
@@ -1313,7 +1317,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             "of the spec's healers who press it do so in the hit's window (5 s before to 8 s after; a ramp button, as "
             "Evangelism, 8 to 30 s ahead, never the pull's opener before 0:12), its share of all "
             "that spec's healers there; else its most pressed button, if a tenth of the spec's healers press it there, "
-            "marked \"under a quarter\" with the share of those who press it; \"none shared\": no button reaches that. "
+            "marked \"under a quarter\" with the share of those who press it; \"none shared\": no button reaches that; "
+            "\"few players\": under 100 of the spec's healers in these kills, a habit of a few. "
             "Presses mostly back from cooldown are no answer, as on the fight tab.</p>")
 
 
@@ -1407,9 +1412,10 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
                  f"<td class='n'>{p.per_kill:.1f}</td><td class='n'>{_mmss(p.duration_with)}"
                  + (" <small>(too few without)</small>" if few_without or p.duration_without is None
                     else f" <small>({_mmss(p.duration_without)} without"
-                    + ("" if p.duration_close else ", beyond the noise") + ")</small>")
+                    + ("" if p.duration_close or p.kills < WIDE_KILLS else ", beyond the noise") + ")</small>")
                  + "</td>" + (f"<td class='n'>{dd(p.deaths_with, None if few_without else p.deaths_without)}"
                               + (" <small>(these deaths: beyond the noise)</small>" if not p.deaths_close and p.deaths_with is not None
+                                 and p.kills >= WIDE_KILLS  # a wide reading is never marked (round 51: 21 kills)
                                  and not few_without else "") + "</td>" if deaths else ""))
         if few and not deaths:
             cells = "<td class='n' colspan='2'><small>too few kills</small></td>"

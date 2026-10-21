@@ -396,4 +396,4 @@ def test_a_late_hits_share_is_of_the_kills_that_reach_it():
     c = healer.Cooldown("Shield Wall", 1, 0.9, 2.0, [231.0], presses=[[231.0]] * 19 + [[34.0]] * 70, n_all=100,
                         lasts=[300.0] * 58 + [200.0] * 42)
     assert round(healer.hit_share(c, 231.0, 235.0), 2) == 0.33
-    assert healer._reach_note(c, 235.0) == " of the 58 kills that reach it"
+    assert healer._reach_note(c, 235.0) == ", in the 58 kills that reach it"
