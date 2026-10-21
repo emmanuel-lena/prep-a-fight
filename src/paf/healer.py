@@ -753,7 +753,7 @@ def _share(sp: float) -> str:
 
 def _more(c: Cooldown) -> str:
     """The casts a kill no shared moment shows ("+1"): the count always matches the "a kill" number."""
-    n = round(c.per_kill) - len(c.times) - (1 if _pull_chip(c) else 0)  # the pull chip shows one
+    n = round(c.per_kill) - len(c.times)  # the pull chip is the first press's other habit, not another press
     return f"+{n}" if n > 0 else ""
 
 
@@ -913,6 +913,10 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
         elif named is not None:  # no chip near it: its card gets a line of its own (round 66: Spirit Link Totem
             named[(c.name, ("line", m.t))] = (hs, when, _reach_note(c, m.t))  # "timing varies" under the lead's 2:12)
         few_ = "only " if hs < 0.25 else ""
+        if not reason:  # a raid button's presses there judged too (round 67: Tip the Scales, "for about half")
+            b = _back_in(c, m.t, m.t)
+            reason = ("" if b is None or b <= BACK_SHARE[0] else "back from cooldown"
+                      + (" for about half" if b <= BACK_SHARE[1] else ""))
         return (f" ({few_}{_pct(hs)} press {e(_shown(c.name))} in its window{_reach_note(c, m.t)}, about "
                 f"{_mmss(when)}{', ' + reason if reason else ''})")
     best_near = max((x[0] for x in near), default=0.0)
@@ -1034,9 +1038,9 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
                + (" for about half" if b <= BACK_SHARE[1] else ""))
         if _pct(hs) == _pct(sp):  # one count: said once, its time only when 5 s or more off (round 60)
             return (f"{_base(c, hs, hit)} &middot; {where} the {_mmss(hit)} hit"
-                    + (f", about {_mmss(when)}" if abs(when - t) >= 5 else ""))  # its chip's tag says it
+                    + (f", about {_mmss(when)}" if _mmss(when) != _mmss(t) else ""))  # the lead's time (round 67)
         return (f"{_share(sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
-                + (f", about {_mmss(when)}" if abs(when - t) >= 5 else "") + tag)  # a time 5 s off or more (r. 59)
+                + (f", about {_mmss(when)}" if _mmss(when) != _mmss(t) else "") + tag)  # the lead's time (round 67)
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
         return _base(c, hs, _secs(n.partition(" ")[0]))
     return _share(sp)
@@ -1804,7 +1808,7 @@ def render_sheet(h: HealerPrep) -> str:
                                  for c in rare) + " on this boss.</p>")
     # the rule, once, under the long cooldowns and their "fewer than half" line (Zephyr's read as part of it)
     fight.append("<p class='small muted'>Only the lead ties a press to a hit; a button on cooldown, cast on another "
-                 "player, used while moving or a trinket says why it is not. A time is shown when a quarter of those who "
+                 "player, used while moving or a trinket says why it is not; a time with no hit named lands on none. A time is shown when a quarter of those who "
                  "press the button share it; its share is of all the top players pressing within 8 s of it (for a press the "
                  "lead names for a hit, tied "
                  "to it or the closest to a hit kept for none: those "
