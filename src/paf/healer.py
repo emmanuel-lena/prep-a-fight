@@ -923,7 +923,9 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
         if on_cd:  # a button pressed on cooldown lands there: said, or "no long cooldown" is false (round 57: Stasis)
             hs, c = max(on_cd, key=lambda x: x[0])
             return said(c, hs, "on cooldown")
-        return f" (no {word} of theirs pressed by a tenth of them in it)" if cds else ""  # (round 59: Lay on Hands,
+        some = next((c for c in cds if c.lasts), None)  # in the kills still going, as every share (round 65)
+        return (f" (no {word} of theirs pressed by a tenth of them in it{_reach_note(some, m.t) if some else ''})"
+                if cds else "")  # (round 59: Lay on Hands,
         # Avatar are long buttons, no raid cooldown nor defensive)  # (round 56: shorter
         # buttons, Divine Toll's 30 s, are not on the sheet's cards)
     # the closest of the presses a quarter make (Disc's 2:01 Evangelism, 9 s before 2:10, over its 1:41 one, 29 s)
@@ -1675,8 +1677,8 @@ def render_sheet(h: HealerPrep) -> str:
         for hit_t, xs in tops.items():  # a tied press drawn and said at its counted presses' time when its moment is
             for x in xs:                # 5 s or more off (round 64: Divine Hymn "0:47" for presses at 0:41)
                 inside = _counted(x[4], x[1], hit_t) if x[4].presses else []
-                if inside and abs(st.median(inside) - x[1]) >= 5:
-                    moved[(x[0], x[1])] = st.median(inside)
+                if inside and _mmss(st.median(inside)) != _mmss(x[1]):  # any shown difference (round 65: 0:42
+                    moved[(x[0], x[1])] = st.median(inside)                 # in the lead, 0:44 on the chip)
         # one press answering either of two hits (Aura Mastery at 0:36 for some, 1:19 for others) is said once
         by_press: dict[tuple, list] = {}
         for hit, xs in sorted(tops.items()):

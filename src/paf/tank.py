@@ -502,9 +502,11 @@ def render_sheet(p: TankPrep) -> str:
         if said:
             lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 0:35 hit, 41% press Spell Reflection"
         first_none = not big and "no long defensive" in lead[0]
-        if quiet:  # "nor": the biggest moment said the same
-            lead.append(f"{'Nor' if first_none else 'No long defensive of theirs is pressed by a tenth of them'} in "
-                        f"the {_and([_mmss(x.t) for x in quiet])} hit{'s' if len(quiet) > 1 else ''}.")
+        hits = f"the window of the {_and([_mmss(x.t) for x in quiet])} hit{'s' if len(quiet) > 1 else ''}"
+        if quiet and first_none:  # "nor": the biggest moment said the same, in one sentence (round 65)
+            lead[0] = lead[0].rstrip(".") + f", nor in {hits}."
+        elif quiet:
+            lead.append(f"No long defensive of theirs is pressed by a tenth of them in {hits}.")
         if bare:
             lead.append(f"No defensive is kept for {', nor '.join(bare)}.")  # each hit its own aside (round 42)
         # a hit that comes with a swap (Vashnik's 1:35 and 2:55, after Dripping Fangs): the time is the link
