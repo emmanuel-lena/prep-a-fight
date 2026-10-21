@@ -87,6 +87,8 @@ class Cooldown:
     back: list = field(default_factory=list)  # its times most players press as soon as it is back (back_share)
     ramp: bool = False  # pressed 8 to 30 s before the hits it answers (paf.healer.RAMP): a ramp, said so
     on_others: float = -1.0  # an external: the share of its casts on another player (Life Cocoon 0.81); -1 unread
+    presses: list = field(default_factory=list)  # each top player's press times (those who press it)
+    n_all: int = 0  # the top players read, those who never press it included
     rhythms: list = field(default_factory=list)  # (share of the top players, their press times): two groups that
     # press it at different moments all kill long (Disc's Evangelism: 0:04, 1:42, 3:15 or 0:24, 2:07, 3:38)
 
@@ -561,7 +563,8 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         out.append(Cooldown(name, sid, users, per_kill, times, near, alt, every, support, alt_support, alt_near,
                             alt_of, why, rhythm if len(times) > 1 else 0.0, cd=cd, ramp=ramp,
                             back=sorted(x for x in back if x in times or x in alt),
-                            rhythms=sorted(two, key=lambda r: r[1][0]) if two and not (every or why) else []))
+                            rhythms=sorted(two, key=lambda r: r[1][0]) if two and not (every or why) else [],
+                            presses=per_player, n_all=n_all))
     return sorted(out, key=lambda c: -c.users)
 
 
@@ -721,6 +724,21 @@ def _more(c: Cooldown) -> str:
     return f"+{n}" if n > 0 else ""
 
 
+def hit_share(c: Cooldown, t: float, hit: float) -> float | None:
+    """The share of the top players with a press of c in the hit's answer window (5 s before to 8 s after it; a ramp:
+    within 8 s of its own time, ahead of the hit): what a press tied to a hit is said with. The moment's own share
+    (within 8 s of the press) counted Revival up to 13 s after Vashnik's 0:40 hit: 49% against 35% (round 34)."""
+    if not c.presses or not c.n_all:
+        return None
+    a, b = (t - 8, t + 8) if c.ramp and hit - t >= RAMP[0] else (hit - ANSWER[0], hit + ANSWER[1])
+    return sum(1 for ts in c.presses if any(a <= x <= b for x in ts)) / c.n_all
+
+
+def _secs(mmss: str) -> float:
+    m, _, sec = mmss.partition(":")
+    return int(m) * 60 + int(sec)
+
+
 def _or(c: Cooldown, t: float, answered: set | None = None) -> str:
     """The other habits nearest this moment, said on its chip ("1:18, or 0:36 for some"): another player's choice
     for the same press, never an extra one."""
@@ -732,6 +750,7 @@ def _or(c: Cooldown, t: float, answered: set | None = None) -> str:
         return ""
     # every other habit, each said, with the hit it answers as the main time is ("0:34 · 1 s before the 0:35 hit")
     near = [(a, sp, n if answered is None or (c.name, a) in answered else "") for a, sp, n in near]
+    near = [(a, _tied_share(c, a, n, sp) if sp else sp, n) for a, sp, n in near]  # a tied habit: its hit's window
     back = " &middot; back from cooldown"  # tagged as the main time is (Evangelism's 1:42 habit, round 29)
     return ", or " + ", ".join((f"{_chip(a, n)} for {_pct(sp)}" if sp else f"{_chip(a, n)} for some")
                                + (back if a in c.back and not c.why else "") for a, sp, n in near)
@@ -809,7 +828,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None) -> str:
         f"<li><b>{e(_shown(c.name))}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill"
         + (f", {_pct(c.on_others)} of the presses on another player" if 0 <= c.on_others < 0.95 else
            ", all on another player" if c.on_others >= 0.95 else "") + "</small>"
-        "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, tie(c, t, n))}{_share(sp)}"
+        "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, tie(c, t, n))}{_share(_tied_share(c, t, tie(c, t, n), sp))}"
                                         + (" &middot; back from cooldown"
                                            if t in c.back and not c.why else "")
                                         + f"{_or(c, t, answered)}</span>"
@@ -827,6 +846,13 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None) -> str:
            f"{e(c.why)}: not tied to a hit</small>" if c.why and c.times else "")
         + "</span></li>"
         for c in cds)
+
+
+def _tied_share(c: Cooldown, t: float, n: str, sp: float) -> float:
+    """A chip's share: in its hit's answer window when the lead ties it to the hit (hit_share), so the chip and the
+    lead give one number; else the moment's own."""
+    hs = hit_share(c, t, _secs(n.partition(" ")[0])) if n else None
+    return sp if hs is None else hs
 
 
 def _near(n: str) -> str:
@@ -1226,7 +1252,8 @@ def nums_note(roles: list, own: str = "") -> str:
              f"A spike is 5 s at 1.5 times the kill's median damage{spikes}, counted kill by kill: the fight tab's "
              "median curve smooths most of them away. The shares come from different kills and "
              "do not add up; externals and overheal follow each kit.")
-    method = ("Externals and buffs: a mean, on others only, from the same kills. Jobs: paired within each kill, Benjamini-Hochberg at 5% over every spec and "
+    method = ("Externals and buffs: a mean over every player of the spec (not only the top ones the fight tab "
+              "reads), on others only. Jobs: paired within each kill, Benjamini-Hochberg at 5% over every spec and "
               "number. The boss tab's dispels count the top player only.")
     return f"{e(plain)}</p><p class='small muted'>{e(method)}"
 
@@ -1277,7 +1304,8 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
              if not marked else "")
             + f"<table class='hcomp'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"
             "<p class='small muted'>A difference with and without a spec is marked when it is beyond the noise "
-            "(three standard errors); unmarked, it is within it.</p>")
+            "(three standard errors: still clear when every spec and number of the table is tested at once); "
+            "unmarked, it is within it. A mark is a reading of these kills, not a reason to bring a spec.</p>")
 
 
 def comps_table(comps: list, n_kills: int) -> str:
@@ -1346,7 +1374,8 @@ def render_sheet(h: HealerPrep) -> str:
             if not mine_here:
                 bare.append(_mmss(m.t))
             for c, t, sp, press in mine_here[:3]:
-                by_name.setdefault(c.name, []).append((m.t, t, sp, press, c))
+                hs = hit_share(c, t, m.t)  # counted in the hit's window, as the chip of a tied press says
+                by_name.setdefault(c.name, []).append((m.t, t, sp if hs is None else hs, press, c))
 
         # one cooldown per hit, the one most of them press then; a second as common within the noise (Avenging
         # Wrath 36%, Aura Mastery 35% on Vashnik's 0:40 hit) is named with it; the other habits are on the rows below
@@ -1357,9 +1386,10 @@ def render_sheet(h: HealerPrep) -> str:
         n_read = max(1, h.kills)
         for hit, xs in tops.items():  # a ramp's time ahead of the hit first when as many press it (Evangelism
             xs.sort(key=lambda x: (-x[2], not (x[4].ramp and hit - x[1] >= RAMP[0])))  # 1:42 over 2:07, 36% both
-            noise = (xs[0][2] * (1 - xs[0][2]) / n_read) ** 0.5
+            def noise(p: float, q: float = xs[0][2]) -> float:  # the gap's standard error, both shares' (round 34:
+                return ((q * (1 - q) + p * (1 - p)) / n_read) ** 0.5  # Apotheosis 29% hid Divine Hymn 27%)
             # two buttons, never one twice (Evangelism at 2:07 and its 1:42 habit: one press, its most pressed time)
-            tops[hit] = [x for i, x in enumerate(xs) if x[2] >= xs[0][2] - noise
+            tops[hit] = [x for i, x in enumerate(xs) if x[2] >= xs[0][2] - noise(x[2])
                          and x[0] not in {y[0] for y in xs[:i]}][:2]
         lead_names = list(dict.fromkeys(x[0] for xs in tops.values() for x in xs))
         answered = {(x[0], x[1]) for xs in tops.values() for x in xs}  # what the chart draws full
@@ -1438,8 +1468,8 @@ def render_sheet(h: HealerPrep) -> str:
                     "cooldowns", heals, set(lead_names), answered)
     fight = ([lead] if lead else []) + [
         f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Raid "
-        f"damage taken per second, median of {h.raid_kills or 'the'} top kills of this boss read for any spec's sheet "
-        f"(each the same boss: every healer sheet shows the same hits); "
+        f"damage taken per second, median of the {h.raid_kills or 'top'} kills of this boss whose raid damage is recorded "
+        f"(up to 40 for each spec read: every healer sheet shows the same hits); "
         + ("under it, the cooldowns the lead ties to a hit (an outline: another press of the same button). " if lead_names
            else "no cooldown is kept for these hits, so none is drawn. ")
         + "A dot is a big moment, "
@@ -1468,14 +1498,18 @@ def render_sheet(h: HealerPrep) -> str:
         return ("<p class='small muted'>Fewer than half of them press "
                 + ", ".join(f"{e(c.name)} ({c.users:.0%}, {_and([_mmss(t) for t in c.times]) or 'no shared moment'})"
                             for c in cs) + ".</p>") if cs else ""
+    buffers = [c for c in heals if _external(c.spell_id) == "damage"]  # Power Infusion: a buff on a damage dealer
+    buff_note = (f" {_and([e(_shown(c.name)) for c in buffers])}, a buff cast on a damage dealer, is with your long "
+                 "cooldowns above." if buffers else "")  # round 34: "fewer than half cast one" read as PI's absence
     if exts:  # cast on another player: their own group, apart from the raid cooldowns
         fight.append(f"<h2>Your externals{f', where the top {e(h.spec)}s cast them' if any(c.times for c in exts) else ''}"
                      f"</h2><ul class='hl2'>"
-                     f"{cooldowns_html(exts, answered)}</ul>{fewer(rare_ext)}")
+                     f"{cooldowns_html(exts, answered)}</ul>{fewer(rare_ext)}"
+                     + (f"<p class='small muted'>{buff_note.strip()}</p>" if buff_note else ""))
     elif rare_ext:  # Pain Suppression at 34%: still an external, never filed with the defensives
         fight.append(f"<h2>Your externals</h2><p class='small muted'>Fewer than half of the top {e(h.spec)}s cast one here: "
                      + ", ".join(f"{e(c.name)} ({c.users:.0%}, {_and([_mmss(t) for t in c.times]) or 'no shared moment'})"
-                                 for c in rare_ext) + ".</p>")
+                                 for c in rare_ext) + f".{buff_note}</p>")
     if defs or rare_def:
         fight.append(f"<h2>Your defensives</h2><ul class='hl2'>{cooldowns_html(defs, answered)}</ul>{fewer(rare_def)}")
     if items:
@@ -1543,6 +1577,15 @@ def render_sheet(h: HealerPrep) -> str:
     others = roles_table(shown, h.spec) + roles_more(shown, h.spec, h.moments)
     few = [p.spec for p in h.presence if p.spec not in {r.spec for r in shown}]
     deeper_first: list[str] = [jobs_lead(shown, h.spec)]  # the cards below only: a spec too rare has no claim
+    # every sample of the sheet, once (round 34: five kill counts and no map)
+    counts = [f"your cooldowns' timings: the {h.kills} top {e(h.spec)} kills (every cast read)",
+              f"the healers in them: {h.own_kills or h.kills} top kills" if h.own_kills else "",
+              f"the table, jobs and the other healers: {h.role_kills:,} kills of this boss, every spec's" if h.role_kills
+              else "",
+              f"the raid's damage: {h.raid_kills} kills" if h.raid_kills else "",
+              f"dispel timings: {h.dispel_kills} kills" if getattr(h, "dispel_kills", 0) else ""]
+    deeper_first.append("<p class='small muted'>Where the numbers come from: "
+                        + "; ".join(x for x in counts if x) + ".</p>")
     if h.presence:
         have = next((x for x in h.presence if x.spec == h.spec), None)
         if have and have.share >= 0.99:  # the corpus is your spec's top players' kills: they all have one

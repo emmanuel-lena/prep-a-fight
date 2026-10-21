@@ -497,8 +497,10 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
         for abs_ in merged.values():
             if len(abs_) > 1:
                 main = max(abs_, key=lambda a: len(by_ab[a]))
-                nm[main] = " / ".join(dict.fromkeys(nm.get(a, f"spell {a}") for a in
-                                                    sorted(abs_, key=lambda a: -len(by_ab[a]))))
+                total = sum(len(by_ab[a]) for a in abs_)  # a side a quarter of them take is named, as on the
+                nm[main] = " / ".join(dict.fromkeys(nm.get(a, f"spell {a}") for a in  # spec's own sheet (Ascendance,
+                                                    sorted(abs_, key=lambda a: -len(by_ab[a]))  # not "/ Healing
+                                                    if len(by_ab[a]) >= 0.25 * total))  # Tide Totem")
                 for a in abs_:
                     if a != main:
                         by_ab[main].extend(by_ab.pop(a))

@@ -478,7 +478,8 @@ def render_sheet(p: TankPrep) -> str:
         with_swap = [(x, w) for x in p.moments for w in p.swaps if abs(w - x.t) <= ANSWER[0]]
         # said only when swaps are rare enough for it to mean something: one every 28 s (Vashnik) lands within 5 s
         # of any time one time in three
-        chance = len(p.swaps) * 2 * ANSWER[0] / max(p.duration, 1)
+        n_swaps = max(len(p.swaps), 2 * round(p.taunts_per_kill or 0))  # every swap of a kill, not only those
+        chance = n_swaps * 2 * ANSWER[0] / max(p.duration, 1)  # shared: each tank taunts, two taunts a swap pair
         if with_swap and chance < 1 / 3:
             lead.append(f"The {_and([_mmss(x.t) for x, _w in with_swap])} hit{'s' if len(with_swap) > 1 else ''} "
                         f"{'come' if len(with_swap) > 1 else 'comes'} with a tank swap (at "
@@ -500,7 +501,7 @@ def render_sheet(p: TankPrep) -> str:
                     "the swaps", [*defs, *shorts, *lane], {"Tank swaps", *(n for n, _t in answered)}, answered)
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + [
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the top tanks "
-        f"take per second, median of {p.damage_kills or 'the'} kills; under it, the defensives the lead ties to a hit (an "
+        f"take per second, median of {p.damage_kills or 'the'} kills (the tanks' damage is read on up to 40 of the top kills); under it, the defensives the lead ties to a hit (an "
         f"outline: another press of the same button) and the swaps. A dot is the tanks' biggest damage, whatever "
         f"casts it.</p><ul class='hl2'>"
         f"{moments_html(p.moments, 'tank damage') or '<li>No big moment: steady damage.</li>'}</ul></div>",

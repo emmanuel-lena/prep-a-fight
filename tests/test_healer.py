@@ -313,3 +313,12 @@ def test_a_ramp_of_one_rhythm_says_the_other(monkeypatch):
     sheet = healer.render_sheet(h)
     assert "Evangelism is their ramp ahead of the 0:40 and 2:20 hits" in sheet
     assert "the other 32% press it from the pull on its cooldown, about 0:04, 1:42 and 3:15" in sheet
+
+
+def test_a_tied_press_is_counted_in_its_hits_window():
+    # Mistweaver, Vashnik (round 34): Revival "49% about 0:45" counted presses up to 0:53, 13 s after the 0:40 hit
+    c = healer.Cooldown("Revival", 1, 0.9, 1.0, [45.0], presses=[[42.0]] * 35 + [[52.0]] * 14 + [[100.0]] * 41,
+                        n_all=100)
+    assert healer.hit_share(c, 45.0, 40.0) == 0.35
+    c.ramp = True  # a ramp 17 s ahead: its own time's window
+    assert healer.hit_share(c, 23.0, 40.0) == 0.0
