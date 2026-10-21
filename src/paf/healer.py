@@ -751,7 +751,7 @@ def _share(sp: float) -> str:
 
 def _more(c: Cooldown) -> str:
     """The casts a kill no shared moment shows ("+1"): the count always matches the "a kill" number."""
-    n = round(c.per_kill) - len(c.times)
+    n = round(c.per_kill) - len(c.times) - (1 if _pull_chip(c) else 0)  # the pull chip shows one
     return f"+{n}" if n > 0 else ""
 
 
@@ -1003,8 +1003,9 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
 def _pull_chip(c: Cooldown) -> str:
     """The pull group the lead names for a first press ("23% open with it at the pull"), on its card too (rounds 54,
     60: the lead quoted a group no chip showed), when no moment of the card is already at the pull."""
-    if not c.presses or not c.n_all or any(x <= PULL for x in [*c.times, *c.alt]) or round(c.per_kill) > 2:
-        return ""
+    if (not c.presses or not c.n_all or any(x <= PULL for x in [*c.times, *c.alt]) or round(c.per_kill) > 2
+            or round(c.per_kill) - len(c.times) <= 0):  # a press the card does not show already (not Ascendance's
+        return ""                                          # 0:05 beside its 0:35 and 3:45, 2 a kill)
     first = [ts[0] for ts in c.presses if ts and ts[0] <= PULL]
     if len(first) < 0.2 * c.n_all:
         return ""
