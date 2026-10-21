@@ -217,6 +217,12 @@ def sustained(curve: list[float], found: list[Moment] | None = None) -> list[tup
     return out
 
 
+def _x(r: float) -> str:
+    """A hit's ratio, rounded down, two decimals under SPIKE: a 1.47x hit read "1.5x" next to "no hit reaches 1.5x"
+    (round 31), a 1.36x one "1.3x" next to "1.35x or more counts"."""
+    return f"{int(r * 100 + 1e-9) / 100:.2f}" if r < SPIKE else f"{int(r * 10 + 1e-9) / 10:.1f}"
+
+
 def moment_names(m: Moment) -> list[str]:
     """The abilities a moment is named after: "mixed damage, most from A and B" -> [A, B]."""
     return [x for x in m.boss_spell.removeprefix("mostly ").removeprefix("after ").split(" and ") if x]
@@ -546,9 +552,11 @@ def rhythms(per_player: list[list[float]], times: list[float], alt: list[float],
             at = [ts[i] for ts in g if len(ts) > i]
             if len(at) < len(g) / 2:
                 break
-            mid = st.median(at)  # said at the chips' moment when one is near, so both give one time (round 30)
-            near = min(marks, key=lambda m: abs(m - mid))
-            moments.append(near if abs(near - mid) <= 8 else mid)
+            mid = st.median(at)  # said at the chips' moment, so both give one time (round 30); a press no chip
+            near = min(marks, key=lambda m: abs(m - mid))  # shows: no rhythm line (round 31: Apotheosis "2:52"
+            if abs(near - mid) > 8:  # next to a 3:11 chip)
+                return []
+            moments.append(near)
         out.append((len(g) / n_all, moments))
     a, b = out[0][1], out[1][1]
     if len(a) < 2 or len(b) < 2 or any(abs(x - y) <= 8 for x, y in zip(a, b, strict=False)):
@@ -658,7 +666,7 @@ def _per_s(v: float) -> str:
 def moments_html(found: list[Moment], what: str) -> str:
     """what: kept for the callers; a moment no boss cast explains shows its time only."""
     return "".join(f"<li><b>{_mmss(m.t)}</b><span>{e(m.boss_spell) if m.boss_spell else ''}</span>"
-                   f"<small>{m.ratio:.1f}&times; the usual damage</small></li>" for m in found)
+                   f"<small>{_x(m.ratio)}&times; the usual damage</small></li>" for m in found)
 
 
 def _shown(name: str) -> str:
@@ -763,7 +771,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None) -> str:
         return n if answered is None or (c.name, t) in answered else ""
     return "".join(
         f"<li><b>{e(_shown(c.name))}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill"
-        + (f", {_pct(c.on_others)} of them on another player" if 0 <= c.on_others < 0.95 else
+        + (f", {_pct(c.on_others)} of the presses on another player" if 0 <= c.on_others < 0.95 else
            ", all on another player" if c.on_others >= 0.95 else "") + "</small>"
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, tie(c, t, n))}{_share(sp)}"
                                         + (" &middot; back from cooldown"
@@ -773,8 +781,8 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None) -> str:
                                                                            c.support or [0.0] * len(c.times),
                                                                            strict=False)))
                                 or "<small>timing varies: no shared moment</small>")
-        + ("<small class='alt'>two rhythms, by their first press: " + "; ".join(
-            f"{_pct(sp)} start at {_mmss(ts[0])}, then {_and([_mmss(t) for t in ts[1:]])}" for sp, ts in c.rhythms)
+        + ("<small class='alt'>two rhythms, by their first press: " + "; or ".join(
+            f"from {_mmss(ts[0])}, then {_and([_mmss(t) for t in ts[1:]])}" for _sp, ts in c.rhythms)
            + "</small>"
            if c.rhythms else "")
         + (f"<small class='alt'>on cooldown, about every {c.every:.0f} s</small>" if c.every else
@@ -1074,7 +1082,8 @@ def roles_table(roles: list, mine: str = "") -> str:
     not be compared)."""
     if not roles:
         return ""
-    buffs = any(r.buffs for r in roles)
+    buffs = any(r.buffs > 0 for r in roles)
+    few = "<small>too few here</small>"  # a spec read in the pool, too rare in this sheet's kills for its casts
     cover = next((r.spike_cover for r in roles if getattr(r, "spike_cover", 0)), 0.0)
     head = ("<th>Healer</th><th>Healing share</th><th>On tanks</th>"
             f"<th>In spikes{f' ({_pct(cover)} of the fight)' if cover else ''}</th>"
@@ -1084,8 +1093,8 @@ def roles_table(roles: list, mine: str = "") -> str:
         f"<tr class='{'mine' if r.spec == mine else ''}'><td>{e(r.spec)}{' <small>(you)</small>' if r.spec == mine else ''}"
         f"</td><td class='n'>{_pct(r.healing)}</td><td class='n'>{_pct(r.tank)}</td><td class='n'>{_pct(r.spike)}</td>"
         f"<td class='n'>{_pct(r.overheal)}</td><td class='n'>{r.dispels:.1f}</td>"
-        f"<td class='n'>{f'{r.externals:.1f}' if r.externals >= 0.05 else '&ndash;'}</td>"
-        + (f"<td class='n'>{f'{r.buffs:.1f} <small>{e(_and(r.buff_spells))}</small>' if r.buffs else '&ndash;'}</td>"
+        f"<td class='n'>{few if r.externals < 0 else f'{r.externals:.1f}' if r.externals >= 0.05 else '&ndash;'}</td>"
+        + (f"<td class='n'>{few if r.buffs < 0 else f'{r.buffs:.1f} <small>{e(_and(r.buff_spells))}</small>' if r.buffs else '&ndash;'}</td>"
            if buffs else "")
         + f"<td class='n'>{r.players}</td></tr>" for r in roles)
     return f"<table class='hcomp'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"  # each kill's ranked
@@ -1113,6 +1122,9 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
     out = ""
     for r in roles:
         if r.spec == mine:
+            continue
+        if getattr(r, "raid_cds", 0) < 0:  # read in the pool only: too few of its healers in this sheet's kills for their casts
+            out += f"<li><b>{e(r.spec)}</b><small>too few in these kills to read its casts</small></li>"
             continue
         per_hit = []
         for h in hits:
@@ -1265,9 +1277,9 @@ def render_sheet(h: HealerPrep) -> str:
     lead, lead_names, answered = "", [], set()
     if h.moments:
         shown = h.moments[:3]
-        ratios = (f"{'both' if len(shown) == 2 else 'each'} {shown[0].ratio:.1f}&times;"
-                  if len({round(m.ratio, 1) for m in shown}) == 1 and len(shown) > 1
-                  else _and([f"{m.ratio:.1f}&times;" for m in shown]))
+        ratios = (f"{'both' if len(shown) == 2 else 'each'} {_x(shown[0].ratio)}&times;"
+                  if len({_x(m.ratio) for m in shown}) == 1 and len(shown) > 1
+                  else _and([f"{_x(m.ratio)}&times;" for m in shown]))
         groups: dict[str, list[Moment]] = {}  # moments of the same ability said together (Vashnik's "mixed
         for m in shown:                       # damage, most from..." three times in one sentence)
             groups.setdefault(m.boss_spell, []).append(m)
@@ -1275,10 +1287,10 @@ def render_sheet(h: HealerPrep) -> str:
         hits = (sep.join if sep else _and)([f"{_and([_mmss(m.t) for m in ms])}"
                      + (f" ({'each time ' if len(ms) > 1 else ''}{e(name)})" if name else "") for name, ms in groups.items()])
         hits += f": {ratios} the usual damage"
-        if any(round(m.ratio, 1) < SPIKE for m in shown):  # said, not left to a reader of the 1.5x rule (round 29)
+        if any(m.ratio < SPIKE for m in shown):  # said, not left to a reader of the 1.5x rule (round 29)
             hits += (" (no hit reaches 1.5&times; here: these are the highest waves)"  # the rule moments() applied,
                      if max(m.ratio for m in h.moments) < SPIKE else  # not the rounded figures (1.45 shows 1.5)
-                     " (a hit within a tenth of 1.5&times; counts too)")
+                     f" (a hit at {SPIKE * 0.9:.2f}&times; or more counts too)")
         # a cooldown said for a hit only when the top players' usual press answers it (paf.healer.ANSWER), at the
         # press's own time
         bare = []
@@ -1474,8 +1486,9 @@ def render_sheet(h: HealerPrep) -> str:
                                     f"{e(h.spec)}s dispel it {k:.1f} times a kill)</small>", 1)
         boss.append(f"<h2>Every ability{', phase by phase' if '<h3>' in stages else ''}</h2>"  # Vashnik: one phase
                     f"<div class='stages'>{stages}</div>")
-    enough = {p.spec for p in h.presence if p.kills >= FEW_KILLS} if h.presence else {r.spec for r in h.roles}
-    shown = sorted((r for r in h.roles if r.spec == h.spec or r.spec in enough), key=lambda r: r.spec != h.spec)
+    # every spec the pool reads (paf.healroles.POOL_PLAYERS): the Disc Priest, 3 in a Holy Priest's kills, has 43
+    # in the pool; its casts unread here are said so in its cells
+    shown = sorted(h.roles, key=lambda r: r.spec != h.spec)
     others = roles_table(shown, h.spec) + roles_more(shown, h.spec, h.moments)
     few = [p.spec for p in h.presence if p.spec not in {r.spec for r in shown}]
     deeper_first: list[str] = [jobs_lead(shown, h.spec)]  # the cards below only: a spec too rare has no claim

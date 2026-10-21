@@ -235,7 +235,7 @@ def test_an_external_says_how_many_go_on_another_player():
     assert healer.on_others(con, 3470, 4, "Mistweaver", [116849]) == {116849: 0.8}
     cd = healer.Cooldown("Life Cocoon", 116849, 1.0, 4.0, [30.0], [""], why="cast on another player", on_others=0.8)
     row = healer.cooldowns_html([cd])
-    assert "80% of them on another player" in row and "mostly cast on another player" in row
+    assert "80% of the presses on another player" in row and "mostly cast on another player" in row
 
 
 def test_a_ramp_answers_the_hit_after_it(monkeypatch):
@@ -284,8 +284,14 @@ def test_two_rhythms_are_said_apart():
     # Disc, Vashnik heroic (round 29): 31 players press Evangelism at 0:04, 1:42, 3:15, 30 at 0:24, 2:01, 3:35, their
     # second press spread from 1:47 to 2:15
     per_player = ([[4.0, 95.0 + k % 3 * 7, 195.0] for k in range(31)]
-                  + [[24.0, 108.0 + k % 4 * 9, 215.0] for k in range(30)] + [[60.0]] * 39)
+                  + [[24.0, 118.0 + k % 4 * 6, 215.0] for k in range(30)] + [[60.0]] * 39)
     got = healer.rhythms(per_player, [4.0, 127.0, 218.0], [24.0, 102.0, 195.0], 100)
     # 3:35 said at the chip's 3:38
-    assert [(sp, [round(t) for t in ts]) for sp, ts in got] == [(0.31, [4, 102, 195]), (0.3, [24, 117, 218])]
+    assert [(sp, [round(t) for t in ts]) for sp, ts in got] == [(0.31, [4, 102, 195]), (0.3, [24, 127, 218])]
     assert healer.rhythms(per_player[:40], [4.0, 127.0, 218.0], [24.0, 102.0, 195.0], 100) == []  # 9 of 100: no
+
+
+def test_no_rhythm_line_for_a_press_no_chip_shows():
+    # Holy Priest, Nek'zali (round 31): the 0:34 group's second Apotheosis at 2:52, no chip there (3:11)
+    per_player = [[34.0, 172.0]] * 30 + [[72.0, 226.0]] * 30
+    assert healer.rhythms(per_player, [34.0, 191.0], [72.0, 226.0], 100) == []

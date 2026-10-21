@@ -398,6 +398,7 @@ def render_sheet(p: TankPrep) -> str:
         SWAP_LANE,
         _chip,
         _share,
+        _x,
         build_lead,
         comps_table,
         cooldowns_html,
@@ -460,7 +461,7 @@ def render_sheet(p: TankPrep) -> str:
                         if -ANSWER[0] <= t - m.t <= ANSWER[1] and sp and not (phys and magic[n])),  # cut on a melee
                        key=lambda x: x[2], default=None)  # hit (Spell Reflection on Vashnik's 2:55, round 30)
         big = answer(m)  # the biggest moment and its answer first, then the other hits in time order
-        lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({m.ratio:.1f}&times; the "
+        lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({_x(m.ratio)}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
                     + (f"; {big[2]:.0%} of the top {e(p.spec)}s press {e(big[0])} for it (about {_mmss(big[1])})."
                        if big else f"; no defensive of theirs is shared for it{landed_in(m, defs)}."))

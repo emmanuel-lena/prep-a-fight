@@ -413,13 +413,14 @@ class Role:
 # Benjamini-Hochberg over the boss's specs x metrics, and an effect floor: about 1% of bosses get a false job by
 # chance (labels shuffled), where one sheet's 40 kills at three standard errors fired none or noise
 JOB_KILLS = 20  # kills with the spec and another healer, at least
+POOL_PLAYERS = 40  # a spec's healer-kills in the pool under which its row is left out of the table
 JOB_Q = 0.05  # the false discovery rate over the boss's tests
 JOB_RATIO = 1.2  # the spec's mean, at least this many times the other healers'
 JOB_GAP = {"tank": 0.015, "spike": 0.02, "dispels": 0.15}  # ... and at least this far above it
 
 
 def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: dict[int, str] | None = None,
-          min_players: int = 8, ranked: tuple[str, str] | None = None, pool: tuple[dict, dict] | None = None
+          min_players: int = 8, ranked: tuple[str, str] | None = None, pool: tuple[dict, dict, dict] | None = None
           ) -> list[Role]:
     """What each healer spec does on this boss, against the other healers of the same kills. pool: every corpus'
     kills of the boss (pooled_kills), for the jobs; else this corpus' kills, its ranked healer left out."""
@@ -495,27 +496,31 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
                 p["overheal"].append(over / (tot + over) if tot + over else 0)
                 p["dispels"].append((h[9] or 0) / minutes)
     out = []
-    for spec, s in stats.items():
+    for spec in sorted({*stats, *shown}):
+        s = stats.get(spec) or defaultdict(list)
         n = len(s["healing"])  # this corpus' players of the spec: its cooldowns' and externals' base
-        if n < min_players:
-            continue
         t = shown.get(spec) or s
+        own = n >= min_players  # its externals, buffs and cooldowns read here; else unread (-1), said so
+        if len(t["healing"]) < (POOL_PLAYERS if pool else min_players):  # the Disc Priest: 43 players in the
+            continue  # pool, 3 in a Holy Priest's kills, was dropped from the table on 7 sheets of 8 (round 31)
         mid = st.median(durs.values()) if durs else None
         cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n, _shared(ps, n, mid, _cd(ab)), len(ps) / n)
-               for ab, ps in cd_times[spec].items()  # pressed by half of them at least (Healing Tide Totem: 3%)
+               for ab, ps in (cd_times[spec].items() if own else [])  # pressed by half of them at least (HTT: 3%)
                if len(ps) / n >= 0.5 and not _personal(ab, names) and not _untied(ab, ps, mid)
                and sum(map(len, ps)) / len(ps) < 3.5]  # a 1-minute button (Nature's Swiftness, 3.9) is no raid cooldown
         se = {k: (st.stdev(v) / len(v) ** 0.5 if len(v) > 1 else 0.0) for k, v in [*s.items(), *t.items()]}
         out.append(Role(spec, len(t["healing"]), st.median(t["healing"]), st.median(t["tank"]), st.median(t["spike"]),
-                        st.median(t["overheal"]), st.median(t["dispels"]), st.mean(s["raid"]), st.mean(s["ext"]),
+                        st.median(t["overheal"]), st.median(t["dispels"]), st.mean(s["raid"]) if own else -1.0,
+                        st.mean(s["ext"]) if own else -1.0,
                         sorted(cds, key=lambda c: -c[1]),
                         se={"tank": se["tank"], "spike": se["spike"], "overheal": se["overheal"],
                             "dispels": se["dispels"], "raid_cds": se["raid"], "externals": se["ext"]},
-                        buffs=st.mean(s["buff"]),
+                        buffs=st.mean(s["buff"]) if own else -1.0,
                         buff_spells=[(names or {}).get(ab, f"spell {ab}") for ab, _ in buff_casts[spec].most_common()]))
-    cover = [x for (x,) in con.execute(f"SELECT k.spike_share FROM heal_kill k JOIN fight f USING(report, fight_id) "
-                                       f"WHERE {where}", params) if x is not None]
-    found = paired_jobs(*pool) if pool else paired_jobs(per_kill, durs, ranked)
+    cover = list(pool[2].values()) if pool else [  # the spikes' share of the fight, on the column's own kills
+        x for (x,) in con.execute(f"SELECT k.spike_share FROM heal_kill k JOIN fight f USING(report, fight_id) "
+                                  f"WHERE {where}", params) if x is not None]
+    found = paired_jobs(pool[0], pool[1]) if pool else paired_jobs(per_kill, durs, ranked)
     for r in out:
         r.jobs = found.get(r.spec) or ["nothing stands out against the other healers"]
         r.spike_cover = st.mean(cover) if cover else 0.0
@@ -589,6 +594,9 @@ def on_cadence(per_player: list[list[float]], per_kill: float, duration: float) 
     return gap if gap and per_kill >= CADENCE * (1 + duration / gap) else 0.0
 
 
+DENSE = 3.0  # a moment is said at the time with the most presses within this many seconds (ranked_peaks)
+
+
 def press_moments(per_player: list[list[float]], keep: int, end: float | None = None
                   ) -> tuple[list[float], list[float], list[float]]:
     """(the moments most top players press a cooldown at, other moments some press it at, the moment each of those
@@ -613,7 +621,7 @@ def press_moments(per_player: list[list[float]], keep: int, end: float | None = 
         return round(st.median(ranks)) if ranks else 0
     by_rank: dict[int, float] = {}
     others: list[tuple[float, int]] = []
-    for t, _n in ranked_peaks(lists):
+    for t, _n in ranked_peaks(lists, dense=DENSE):
         if end is not None and t > end:
             continue
         r = rank(t)
@@ -632,16 +640,18 @@ def _key(cls: str | None, spec: str | None) -> tuple[str, str]:
     return ((cls or "").replace(" ", "").lower(), (spec or "").replace(" ", "").lower())
 
 
-def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None) -> tuple[dict, dict]:
+def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None) -> tuple[dict, dict, dict]:
     """Every healer of every kill of the boss read in any corpus (healer and tank corpora alike), each kill once, and
     each corpus' ranked player left out (its kill was picked for it): the sheets of a boss then say the same jobs,
     where one corpus' kills gave the Holy Priest's dispels on Vashnik as 1.8 against 0.9 on one sheet and 1.3 against
-    0.7 on another. Returns (per kill, its healers' heal_stat rows) and (per kill, its duration)."""
+    0.7 on another. Returns (per kill, its healers' heal_stat rows), (per kill, its duration) and (per kill, the
+    share of it the raid's damage spikes take)."""
     from paf.config import data_dir
 
     rows: dict[tuple[str, int], dict[int, tuple]] = defaultdict(dict)
     out: dict[tuple[str, int], set[int]] = defaultdict(set)  # the ranked players, in any corpus
     durs: dict[tuple[str, int], float] = {}
+    cover: dict[tuple[str, int], float] = {}  # the raid's damage spikes' share of each kill (heal_kill)
     for path in paths if paths is not None else sorted(data_dir().glob("corpus-*.sqlite")):
         con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
         try:
@@ -654,6 +664,10 @@ def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None) 
                 per[(r[0], r[1])].append(r)
             for rep, fid, d in con.execute(f"SELECT report, fight_id, duration_s FROM fight f WHERE {where}", params):
                 durs[(rep, fid)] = d
+            for rep, fid, x in con.execute(f"SELECT k.report, k.fight_id, k.spike_share FROM heal_kill k "
+                                           f"JOIN fight f USING(report, fight_id) WHERE {where}", params):
+                if x is not None:
+                    cover[(rep, fid)] = x
             for rep, fid, cls, spec, aid in con.execute(
                     f"SELECT r.report, r.fight_id, r.class, r.spec, r.actor_id FROM ranked r "
                     f"JOIN fight f USING(report, fight_id) WHERE {where}", params):
@@ -669,7 +683,8 @@ def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None) 
         finally:
             con.close()
     per_kill = {k: [h for a, h in hs.items() if a not in out[k]] for k, hs in rows.items()}
-    return {k: hs for k, hs in per_kill.items() if hs}, durs
+    per_kill = {k: hs for k, hs in per_kill.items() if hs}
+    return per_kill, durs, {k: x for k, x in cover.items() if k in per_kill}
 
 
 def paired_jobs(per_kill: dict, durs: dict, own: tuple[str, str] | None = None) -> dict[str, list[str]]:

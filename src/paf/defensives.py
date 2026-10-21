@@ -75,8 +75,10 @@ def peaks(per_kill: list[list[float]], window: float = WINDOW, support: float = 
 
 
 def ranked_peaks(per_kill: list[list[float]], window: float = WINDOW,
-                 support: float = SUPPORT) -> list[tuple[float, int]]:
-    """peaks() with how many kills have a cast there, the best supported first."""
+                 support: float = SUPPORT, dense: float = 0.0) -> list[tuple[float, int]]:
+    """peaks() with how many kills have a cast there, the best supported first. dense: said at the time with the
+    most casts within this many seconds, not the median of the window (two groups 10 s apart, the Evoker's Rewind at
+    1:10-1:14 and 1:20-1:24, gave "1:16", a time almost nobody presses)."""
     left = [sorted(ts) for ts in per_kill]
     out = []
     while True:
@@ -88,7 +90,10 @@ def ranked_peaks(per_kill: list[list[float]], window: float = WINDOW,
         if best is None or best_n < support * len(per_kill):
             return out
         near = sorted(x for ts in left for x in ts if abs(x - best) <= window)
-        out.append((near[len(near) // 2], best_n))
+        if dense:
+            out.append((max(near, key=lambda t: (sum(abs(x - t) <= dense for x in near), -abs(t - best))), best_n))
+        else:
+            out.append((near[len(near) // 2], best_n))
         left = [[x for x in ts if abs(x - best) > window] for ts in left]
 
 
