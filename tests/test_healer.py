@@ -269,7 +269,7 @@ def test_back_from_cooldown_is_read_per_player():
 def test_the_talents_they_differ_on_most_when_none_splits_them():
     # Holy Paladin: no talent taken by 35-65% of them, so the change tab names the ones they differ on most
     page = healer.split_html([("Tower of Radiance", 0.22)], 100, "Holy Paladin", wide=True)
-    assert "differ on most</h2>" in page and "None is taken by 35 to 65% of them" in page
+    assert "differ on most</h2>" in page and "At most one is taken by 35 to 65% of them" in page
 
 
 def test_jobs_lead_says_either_only_when_your_spec_has_no_job():
@@ -312,7 +312,7 @@ def test_a_ramp_of_one_rhythm_says_the_other(monkeypatch):
     h = healer.HealerPrep("Boss", "heroic", "Discipline Priest", 100, 270.0, [100.0] * 54, found, [cd], [], [], [], [])
     sheet = healer.render_sheet(h)
     assert "Evangelism is their ramp ahead of the 0:40 and 2:20 hits" in sheet
-    assert "the other 32% press it from the pull on its cooldown, about 0:04, 1:42 and 3:15" in sheet
+    assert "another 32% press it from the pull on its cooldown, about 0:04, 1:42 and 3:15" in sheet
 
 
 def test_a_tied_press_is_counted_in_its_hits_window():

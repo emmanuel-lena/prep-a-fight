@@ -825,7 +825,7 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
               if is_defensive(c.spell_id, c.name)],
         character=getattr(profile, "name", "") or "")
     p.split, p.split_players = healer.contested(con, enc.id, diff, spec)
-    if not p.split:  # no talent 35-65%: the ones they differ on most, said as such
+    if len(p.split) < 2:  # no talent 35-65%: the ones they differ on most, said as such
         p.split, p.split_players = healer.contested(con, enc.id, diff, spec, *healer.SPLIT, shown=6)
         p.split_wide = bool(p.split)
     p.builds = healer.build_rows(builds, p.split)  # the most played build's side of each split
@@ -968,7 +968,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         x.on_others = shares.get(x.spell_id, -1.0)
     h.casts = {n: len(ts) for n, ts in tl.boss_casts}
     h.split, h.split_players = healer.contested(con, enc.id, diff, spec)
-    if not h.split:  # no talent 35-65%: the ones they differ on most, said as such
+    if len(h.split) < 2:  # one talent 35-65% or none: the ones they differ on most, said as such
         h.split, h.split_players = healer.contested(con, enc.id, diff, spec, *healer.SPLIT, shown=6)
         h.split_wide = bool(h.split)
     h.builds = healer.build_rows(builds, h.split)  # the most played build's side of each split

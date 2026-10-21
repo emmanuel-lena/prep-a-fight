@@ -555,12 +555,14 @@ def _shared(ps: list[list[float]], n: int, end: float | None, cd: float = 0.0) -
     """(moment, share of the spec's players pressing it within 8 s, back from cooldown) for a card: the moments a
     quarter of those who press it share at least, as the fight tab's (a card showed Ascendance 0:51 for 23% as "most
     of them"); back from cooldown read per player, as the fight tab's (paf.healer.back_share)."""
-    from paf.healer import back_share
+    from paf.healer import BACK_SHARE, back_share
 
-    times = press_moments(ps, max(1, round(sum(map(len, ps)) / len(ps))), end)[0]  # the main moments
+    main, alt, _of = press_moments(ps, max(1, round(sum(map(len, ps)) / len(ps))), end)
+    times = sorted({*main, *alt})  # the other habits too, as the fight tab reads them (round 35: Revival's 0:35
+    # habit, 31% of the Mistweavers, was hidden behind its 1:15 main moment, 24%)
     users = len(ps) / n if n else 0
     out = [(t, sum(1 for ts in ps if any(abs(x - t) <= 8 for x in ts)) / n) for t in times]
-    return [(t, sp, back_share(ps, t, cd) > 0.5) for t, sp in out if sp >= 0.25 * users]
+    return [(t, sp, back_share(ps, t, cd) > BACK_SHARE[0]) for t, sp in out if sp >= 0.25 * users]
 
 
 def _cd(ab: int) -> float:

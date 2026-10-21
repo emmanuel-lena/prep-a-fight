@@ -88,6 +88,7 @@ class Cooldown:
     ramp: bool = False  # pressed 8 to 30 s before the hits it answers (paf.healer.RAMP): a ramp, said so
     on_others: float = -1.0  # an external: the share of its casts on another player (Life Cocoon 0.81); -1 unread
     presses: list = field(default_factory=list)  # each top player's press times (those who press it)
+    back_half: list = field(default_factory=list)  # its times about half its players press as soon as it is back
     n_all: int = 0  # the top players read, those who never press it included
     rhythms: list = field(default_factory=list)  # (share of the top players, their press times): two groups that
     # press it at different moments all kill long (Disc's Evangelism: 0:04, 1:42, 3:15 or 0:24, 2:07, 3:38)
@@ -518,7 +519,9 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         why = ("" if every else "cast on another player" if _external(sid) else "a cast-while-moving button"
                if _moving(sid) else "a movement button" if _speed(sid) else _item_why(name, sid) if _item(sid) else "about every minute" if per_kill >= 4
                else "")
-        back = {x for x in [*times, *alt] if back_share(per_player, x, cd) > 0.5}  # pressed as soon as it is back
+        shares = {x: back_share(per_player, x, cd) for x in [*times, *alt]}
+        back = {x for x, b in shares.items() if b > BACK_SHARE[0]}  # pressed as soon as it is back; about half
+        half = {x for x, b in shares.items() if BACK_SHARE[0] < b <= BACK_SHARE[1]}  # of them: no tie either
         tied = not (every or why)  # on cooldown, a 1-minute button, a
         near = []  # buff on one player, a cast-while-moving: near a hit by chance, not kept for it
         for t in times:
@@ -564,7 +567,7 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
                             alt_of, why, rhythm if len(times) > 1 else 0.0, cd=cd, ramp=ramp,
                             back=sorted(x for x in back if x in times or x in alt),
                             rhythms=sorted(two, key=lambda r: r[1][0]) if two and not (every or why) else [],
-                            presses=per_player, n_all=n_all))
+                            presses=per_player, n_all=n_all, back_half=sorted(half)))
     return sorted(out, key=lambda c: -c.users)
 
 
@@ -751,12 +754,16 @@ def _or(c: Cooldown, t: float, answered: set | None = None) -> str:
     # every other habit, each said, with the hit it answers as the main time is ("0:34 · 1 s before the 0:35 hit")
     near = [(a, sp, n if answered is None or (c.name, a) in answered else "") for a, sp, n in near]
     near = [(a, _tied_share(c, a, n, sp) if sp else sp, n) for a, sp, n in near]  # a tied habit: its hit's window
-    back = " &middot; back from cooldown"  # tagged as the main time is (Evangelism's 1:42 habit, round 29)
+    def back(a: float) -> str:  # tagged as the main time is (Evangelism's 1:42 habit, round 29)
+        return f" &middot; back from cooldown{' for about half' if a in c.back_half else ''}"
     return ", or " + ", ".join((f"{_chip(a, n)} for {_pct(sp)}" if sp else f"{_chip(a, n)} for some")
-                               + (back if a in c.back and not c.why else "") for a, sp, n in near)
+                               + (back(a) if a in c.back and not c.why else "") for a, sp, n in near)
 
 
 BACK = 8.0  # seconds past its cooldown a press still counts as pressed as soon as it is back
+# the share of a moment's players pressing it as soon as it is back over which it is no answer; up to the second, said
+# "for about half": Disc's Evangelism at 2:01 sat at 0.52, a tie to the 2:10 hit decided by a coin flip (round 35)
+BACK_SHARE = (0.4, 0.6)
 
 
 def back_share(per_player: list[list[float]], t: float, cd: float) -> float:
@@ -829,7 +836,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None) -> str:
         + (f", {_pct(c.on_others)} of the presses on another player" if 0 <= c.on_others < 0.95 else
            ", all on another player" if c.on_others >= 0.95 else "") + "</small>"
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, tie(c, t, n))}{_share(_tied_share(c, t, tie(c, t, n), sp))}"
-                                        + (" &middot; back from cooldown"
+                                        + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
                                            if t in c.back and not c.why else "")
                                         + f"{_or(c, t, answered)}</span>"
                                         for k, (t, n, sp) in enumerate(zip(c.times, c.near,
@@ -1116,9 +1123,9 @@ NOT_ADVICE = " Their choices, not a recommendation: no sim weighs them."
 
 def split_html(split: list, players: int, spec: str, wide: bool = False) -> str:
     """The talents the top players split on, with how often each is picked: what the builds above hide. wide: none
-    is taken by 35 to 65% of them (Holy Paladin), so the talents they differ on most, from 15 to 85%."""
-    return ((f"<h2>The talents the top {e(spec)}s differ on most</h2><p>None is taken by 35 to 65% of them, so "
-             f"these are the ones between 15 and 85%: the share of the {players} players read who take each, closest "
+    or one is taken by 35 to 65% of them (Holy Paladin, Holy Priest), so the talents they differ on most, 15 to 85%."""
+    return ((f"<h2>The talents the top {e(spec)}s differ on most</h2><p>At most one is taken by 35 to 65% of "
+             f"them, so these are the ones between 15 and 85%: the share of the {players} players read who take each, closest "
              "to half first:</p>" if wide else
              f"<h2>The talents the top {e(spec)}s split on</h2><p>The share of the {players} players read "
              "who take each, closest to half first:</p>") + "<ul class='hl2 split'>"
@@ -1416,9 +1423,9 @@ def render_sheet(h: HealerPrep) -> str:
             c = ps[0][3]
             ramp_ts = {round(t) for _h, t, _sp, _c in ps}
             rest = [(sp, ts) for sp, ts in c.rhythms if not ramp_ts & {round(t) for t in ts}]
-            return "".join(f"; the other {_pct(sp)} press it from the pull on its cooldown, about "
+            return "".join(f"; another {_pct(sp)} press it from the pull on its cooldown, about "
                            f"{_and([_mmss(t) for t in ts])}" if ts and ts[0] <= 10 else
-                           f"; the other {_pct(sp)} press it about {_and([_mmss(t) for t in ts])}" for sp, ts in rest[:1])
+                           f"; another {_pct(sp)} press it about {_and([_mmss(t) for t in ts])}" for sp, ts in rest[:1])
 
         def clause(key: tuple, ps: list) -> tuple[float, str]:
             if len(key) == 1:  # two cooldowns as common for one hit
@@ -1427,7 +1434,8 @@ def render_sheet(h: HealerPrep) -> str:
             n, press = key
             if len(ps) == 1:
                 hit, t, sp, c = ps[0]
-                return hit, f"for the {_mmss(hit)} hit, {_pct(sp)} press {e(_shown(n))} (about {_mmss(t)}{ramp_of(c, t, hit)})"
+                return hit, (f"for the {_mmss(hit)} hit, {_pct(sp)} press {e(_shown(n))} (about {_mmss(t)}"
+                             f"{ramp_of(c, t, hit)})" + (_other([(hit, t, sp, c)]) if ramp_of(c, t, hit) else ""))
             return ps[0][0], (f"{which(n, press, ps[0][3])} goes on " + _and(
                 [f"the {_mmss(hit)} hit ({_pct(sp)}, about {_mmss(t)})" for hit, t, sp, _c in ps], "or"))
         # a ramp button answering several hits is one clause (Evangelism thrice in a row read as a list)
