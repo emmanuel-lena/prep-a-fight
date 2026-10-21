@@ -485,7 +485,8 @@ def render_sheet(p: TankPrep) -> str:
                         f"{'come' if len(with_swap) > 1 else 'comes'} with a tank swap (at "
                         f"{_and([_mmss(w) for _x, w in with_swap])}).")
     if p.swaps:
-        lead.append(f"Each top tank taunts about {p.taunts_per_kill:.1f} times a kill after the pull (swaps on adds count)"
+        taunts = f"{p.taunts_per_kill:.1f}".removesuffix(".0")  # 4.5, or 4 (round 39: "4.0" read as precision)
+        lead.append(f"Each top tank taunts about {taunts} times a kill after the pull (swaps on adds count)"
                     + ((f", most often at about {p.stacks[common][0]} stacks of {e(common)}." if common in p.stacks
                         and p.stacks[common][0] >= 2 else f", swapping after each {e(common)} (the debuff lasts "
                         f"about {p.stacks[common][1]:.0f} s; they never take a second stack)." if common in p.stacks

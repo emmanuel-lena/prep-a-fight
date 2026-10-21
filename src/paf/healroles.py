@@ -464,8 +464,9 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
     buff_casts: dict[str, Counter] = defaultdict(Counter)
     stats: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
     cd_times: dict[str, dict[int, list[list[float]]]] = defaultdict(lambda: defaultdict(list))  # per player-kill
+    whole_of = pool[5] if pool and len(pool) > 5 else {}  # each kill's whole healing, its ranked player's included
     for k, hs in per_kill.items():
-        total = sum(h[5] for h in hs) or 1
+        total = whole_of.get(k) or sum(h[5] for h in hs) or 1
         minutes = (durs.get(k) or 1) / 60
         for h in hs:
             spec, tot, over, tank, spike, disp = pretty(h[3], h[4]), h[5], h[6], h[7], h[8], h[9]
@@ -508,8 +509,9 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
     shown: dict[str, dict[str, list[float]]] = stats  # the table's shares: every corpus' kills when pooled
     if pool:
         shown = defaultdict(lambda: defaultdict(list))
-        for k, hs in pool[0].items():
-            total = sum(h[5] for h in hs) or 1
+        whole = pool[5] if len(pool) > 5 else {}
+        for k, hs in pool[0].items():  # a share of the kill's whole healing, its ranked player's included (round
+            total = whole.get(k) or sum(h[5] for h in hs) or 1  # 39: of the others', a third too high)
             minutes = (pool[1].get(k) or 60) / 60
             for h in hs:
                 tot, over = h[5] or 0, h[6] or 0
@@ -667,13 +669,14 @@ def _key(cls: str | None, spec: str | None) -> tuple[str, str]:
     return ((cls or "").replace(" ", "").lower(), (spec or "").replace(" ", "").lower())
 
 
-def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None) -> tuple[dict, dict, dict, dict, list]:
+def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None
+                 ) -> tuple[dict, dict, dict, dict, list, dict]:
     """Every healer of every kill of the boss read in any corpus (healer and tank corpora alike), each kill once, and
     each corpus' ranked player left out (its kill was picked for it): the sheets of a boss then say the same jobs,
     where one corpus' kills gave the Holy Priest's dispels on Vashnik as 1.8 against 0.9 on one sheet and 1.3 against
     0.7 on another. Returns (per kill, its healers' heal_stat rows), (per kill, its duration) and (per kill, the
     share of it the raid's damage spikes take), (per healer of a kill, its long cooldowns' casts) and the ranked
-    players' own rows (a job is checked on them too)."""
+    players' own rows (a job is checked on them too) and each kill's whole healing (a share is of it)."""
     from paf.config import data_dir
 
     rows: dict[tuple[str, int], dict[int, tuple]] = defaultdict(dict)
@@ -720,11 +723,12 @@ def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None) 
         finally:
             con.close()
     top = [h for k, hs in rows.items() for a, h in hs.items() if a in out[k]]  # the ranked players themselves
+    whole = {k: sum(h[5] or 0 for h in hs.values()) for k, hs in rows.items()}  # each kill's healing, all of it
     per_kill = {k: [h for a, h in hs.items() if a not in out[k]] for k, hs in rows.items()}
     per_kill = {k: hs for k, hs in per_kill.items() if hs}
     kept = {(h[0], h[1], h[2]) for hs in per_kill.values() for h in hs}
     return (per_kill, durs, {k: x for k, x in cover.items() if k in per_kill},
-            {k: v for k, v in casts.items() if k in kept}, top)
+            {k: v for k, v in casts.items() if k in kept}, top, whole)
 
 
 TOP_PLAYERS = 10  # ranked players of a spec, at least, to check a job on them
@@ -748,7 +752,7 @@ def _top_check(top: list, durs: dict, spec: str, m: str) -> str:
     if a >= JOB_RATIO * b and a - b >= JOB_GAP[m]:
         return ""
     fmt = (lambda x: f"{x:.1f}") if m == "dispels" else (lambda x: f"{x:.0%}")
-    return (f"; not among the top players ranked by their healing: the top {spec}s {fmt(a)}, the other specs' "
+    return (f"; the top players ranked by their healing do not: the top {spec}s {fmt(a)}, the other specs' "
             f"top healers {fmt(b)} ({len(me)} and {len(them)} players)")
 
 
@@ -807,7 +811,8 @@ def paired_jobs(per_kill: dict, durs: dict, own: tuple[str, str] | None = None, 
         else:
             out[spec].append(f"dispels more: {a:.1f} times a minute, against {b:.1f} for the other healers of the "
                              f"same kills ({n} kills){held}")
-    return dict(out)
+    return {spec: [j.replace("more:", "more, but only on average:", 1) if "do not:" in j else j for j in js]
+            for spec, js in out.items()}
 
 
 def sample(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> tuple[int, float, float]:

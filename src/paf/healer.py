@@ -811,9 +811,10 @@ def landed_in(m: Moment, cds: list[Cooldown]) -> str:
         return ""
     # the closest of the presses a quarter make (Disc's 2:01 Evangelism, 9 s before 2:10, over its 1:41 one, 29 s)
     sp, c, t, why = max(near, key=lambda x: (x[0] >= 0.25, -abs(m.t - x[2]), x[0]))
+    few = "only " if sp < 0.25 else ""  # under a quarter, as the bare hits' "only N%" (round 39)
     if c.ramp and t < m.t - ANSWER[0]:
-        return f" ({_pct(sp)} ramp with {e(_shown(c.name))} at {_mmss(t)}, {e(why)})"
-    return f" ({_pct(sp)} press {e(_shown(c.name))} at {_mmss(t)}, {e(why)})"
+        return f" ({few}{_pct(sp)} ramp with {e(_shown(c.name))} at {_mmss(t)}, {e(why)})"
+    return f" ({few}{_pct(sp)} press {e(_shown(c.name))} at {_mmss(t)}, {e(why)})"
 
 
 def on_others(con, encounter_id: int, difficulty: int, spec: str, spell_ids: list[int]) -> dict[int, float]:
@@ -1318,7 +1319,7 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
                     else f" <small>({_mmss(p.duration_without)} without"
                     + ("" if p.duration_close else ", beyond the noise") + ")</small>")
                  + "</td>" + (f"<td class='n'>{dd(p.deaths_with, None if few_without else p.deaths_without)}"
-                              + (" <small>beyond the noise</small>" if not p.deaths_close and p.deaths_with is not None
+                              + (" <small>(these deaths: beyond the noise)</small>" if not p.deaths_close and p.deaths_with is not None
                                  and not few_without else "") + "</td>" if deaths else ""))
         if few and not deaths:
             cells = "<td class='n' colspan='2'><small>too few kills</small></td>"
