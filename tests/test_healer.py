@@ -409,3 +409,14 @@ def test_a_late_tied_chip_says_its_base_and_a_named_time_is_its_presses():
     m = healer.Moment(235.0, 1000.0, 1.5, "Hollowing Strikes")
     c.why, c.back, c.support = "", [231.0], [0.24]
     assert "about 3:54" in healer.landed_in(m, [c])  # the presses counted (3:54), not the moment (3:51)
+
+
+def test_a_button_on_cooldown_keeps_a_held_habit_for_a_hit():
+    # Holy Paladin, Nek'zali (round 74): 26% hold their first Avenging Wrath for the 0:35 hit, the rest press it from
+    # the pull on its 120 s cooldown; the held group was dropped with the button's "on cooldown" label
+    ab = SimpleNamespace(id=1, name="Avenging Wrath", users=1.0, per_kill=2.0)
+    per_player = [[4.0, 126.0]] * 60 + [[35.0, 180.0]] * 30 + [[]] * 10
+    tl = SimpleNamespace(abilities=[ab], duration=270.0, players=[{"casts": {1: ts}} for ts in per_player])
+    found = [healer.Moment(35.0, 1000.0, 1.6, "Soulcoil Rite")]
+    c = healer.cooldowns(tl, found, {1: (120.0, 1)})[0]
+    assert 35.0 in [round(a) for a in c.alt] and any(n.startswith("0:35") for n in c.alt_near)

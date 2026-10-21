@@ -561,15 +561,19 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         # of the top players read as a moment next to "no moment most of them share")
         kept = [i for i, sp in enumerate(support) if sp >= 0.25 * users]
         times, near, support = [times[i] for i in kept], [near[i] for i in kept], [support[i] for i in kept]
-        alt, alt_of = ([], []) if every else (alt, alt_of)
+        # a button on cooldown keeps another habit of a press its players do not make as soon as it is back (round
+        # 74: 26% of the top Holy Paladins hold their first Avenging Wrath for Nek'zali's 0:35, the rest from the pull)
+        if every:
+            keep = [i for i, x in enumerate(alt) if x not in back]
+            alt, alt_of = [alt[i] for i in keep], [alt_of[i] for i in keep]
         alt_support = [sum(1 for ts in per_player if any(abs(x - t) <= 8 for x in ts)) / n_all for t in alt]
         kept = [i for i, sp in enumerate(alt_support) if sp >= 0.25 * users  # the same quarter as the moments,
                 and alt_of[i] in times]  # of a moment still shown
         alt, alt_support, alt_of = [alt[i] for i in kept], [alt_support[i] for i in kept], [alt_of[i] for i in kept]
-        alt_near = []  # another habit answers a hit too (Aura Mastery at 0:36 for 28%: the 0:35 hit)
-        for t in alt:
+        alt_near = []  # another habit answers a hit too (Aura Mastery at 0:36 for 28%: the 0:35 hit), a button on
+        for t in alt:  # cooldown's too when its players hold it (not back: Avenging Wrath at 0:35)
             m = min(found, key=lambda m: abs(m.t - t), default=None)
-            ok = (tied and m is not None and -ANSWER[0] <= t - m.t <= ANSWER[1]
+            ok = ((tied or (every and not why)) and m is not None and -ANSWER[0] <= t - m.t <= ANSWER[1]
                   and t not in back)
             alt_near.append(f"{_mmss(m.t)} {m.boss_spell}".strip() if ok else "")
         # a ramp: pressed 8 to 30 s before the hits, on two of them at least and on most presses (Disc's
