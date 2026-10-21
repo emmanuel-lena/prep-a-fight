@@ -853,9 +853,13 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None) -> str:
         named[(c.name, t)] = m.t
     few = "only " if sp < 0.25 else ""  # under a quarter, as the bare hits' "only N%" (round 39)
     of = _reach_note(c, m.t) if c.presses else ""  # counted in the hit's window: said, as its chip counts its moment
-    if c.ramp and t < m.t - ANSWER[0]:
-        return f" ({few}{_pct(sp)} ramp with {e(_shown(c.name))} ahead of it{of}, about {_mmss(t)}, {e(why)})"
-    return f" ({few}{_pct(sp)} press {e(_shown(c.name))} in its window{of}, about {_mmss(t)}, {e(why)})"
+    ramp = c.ramp and t < m.t - ANSWER[0]
+    a, b = (t - 8, min(t + 8, m.t - ANSWER[0])) if ramp else (m.t - ANSWER[0], m.t + ANSWER[1])
+    inside = [x for ts in c.presses for x in ts if a <= x <= b]
+    when = _mmss(st.median(inside) if inside else t)  # the presses counted, not the moment's (round 53: "2:20" for a
+    if ramp:                                          # window ending at 2:18, its presses at 2:14)
+        return f" ({few}{_pct(sp)} ramp with {e(_shown(c.name))} ahead of it{of}, about {when}, {e(why)})"
+    return f" ({few}{_pct(sp)} press {e(_shown(c.name))} in its window{of}, about {when}, {e(why)})"
 
 
 def on_others(con, encounter_id: int, difficulty: int, spec: str, spell_ids: list[int]) -> dict[int, float]:
@@ -923,8 +927,18 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
     hit = (named or {}).get((c.name, t))
     if hit is not None and (hs := hit_share(c, t, hit)) is not None:
         where = "ahead of" if c.ramp and t < hit - ANSWER[0] else "in the window of"  # a ramp: around its own time
-        return f"{_share(hs)} {where} the {_mmss(hit)} hit"
-    return _share(_tied_share(c, t, n, sp))
+        return f"{_base(c, hs, hit)} {where} the {_mmss(hit)} hit"
+    if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
+        return _base(c, hs, _secs(n.partition(" ")[0]))
+    return _share(sp)
+
+
+def _base(c: Cooldown, hs: float, hit: float) -> str:
+    """A hit's share on a chip, of what the lead counts it of: "33% of the 58 kills still going" when a late hit's
+    kills are fewer (round 53: "33% of the top players" read as 33 of 100, for 19 of 58)."""
+    n = reach(c, hit)
+    of = f"of the {n} kills still going" if c.lasts and n < 0.9 * len(c.lasts) else "of the top players"
+    return f" &middot; {_pct(hs)} {of}"
 
 
 def _tied_share(c: Cooldown, t: float, n: str, sp: float) -> float:
@@ -1307,7 +1321,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                      for n, t, sp, rp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
                                         f"<small>(under a quarter of those who press it"
-                                        f": {int(pp * 100)}%)</small>"
+                                        f"{'' if int(pp * 100) == round(sp * 100) else f': {int(pp * 100)}%'})</small>"
                                         for u in under if len(u) > 4 for n, t, sp, pp in [u[:4]])
                            or "none shared") + "</span>"
                         for h, got, under in per_hit)
@@ -1564,9 +1578,13 @@ def render_sheet(h: HealerPrep) -> str:
                 return hit, (f"for the {_mmss(hit)} hit, {_pct(sp)} press {e(_shown(n))} (about {_mmss(t)}"
                              f"{ramp_of(c, t, hit)})" + (_other([(hit, t, sp, c)]) if ramp_of(c, t, hit) else
                                                          _also(c, press, t, sp, hit)))
-            return ps[0][0], (f"{which(n, press, ps[0][3])} goes on " + _and(  # the most shared hit first
+            c0 = ps[0][3]
+            first = which(n, press, c0).startswith("their first") or round(c0.per_kill) <= 1
+            pull = (sum(1 for ts in c0.presses if ts and ts[0] <= PULL) / c0.n_all) if first and c0.n_all else 0.0
+            return ps[0][0], (f"{which(n, press, c0)} goes on " + _and(  # the most shared hit first
                 [f"the {_mmss(hit)} hit ({_pct(sp)}, about {_mmss(t)})"
-                 for hit, t, sp, _c in sorted(ps, key=lambda p: -p[2])], "or"))
+                 for hit, t, sp, _c in sorted(ps, key=lambda p: -p[2])], "or")
+                + (f"; {_pct(pull)} open with it at the pull" if pull >= 0.2 else ""))  # round 53: 22% Hymns
 
         def _also(c, press: float, t: float, sp: float, hit: float) -> str:
             """Another habit of the same press about as shared, tied to no hit: said, or the lead hides a third of
@@ -1642,7 +1660,8 @@ def render_sheet(h: HealerPrep) -> str:
                  "player, used while moving or a trinket says why it is not. A time is shown when a quarter of those who "
                  "press the button share it; its share is of all the top players (for a press the lead names for a hit, tied "
                  "to it or the closest to a hit kept for none: those "
-                 "pressing in that hit's window); \"or\": the time other top players press the same press instead. "
+                 "pressing in that hit's window: 5 s before to 8 s after it starts, a ramp 8 to 30 s ahead); \"or\": the time "
+                 "other top players press the same press instead. "
                  "\"Back from cooldown\": most of its players press it as soon as it "
                  "came back from their last use, so it was not saved for what it lands on (\"for about half\": 40 to "
                  "60% of them).</p>")
