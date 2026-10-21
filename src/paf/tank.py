@@ -505,10 +505,8 @@ def render_sheet(p: TankPrep) -> str:
         hits = f"the window of the {_and([_mmss(x.t) for x in quiet])} hit{'s' if len(quiet) > 1 else ''}"
         if quiet and first_none:  # "nor": the biggest moment said the same, in one sentence (round 65)
             lead[0] = lead[0].rstrip(".") + f", nor in {hits}."
-        elif quiet:  # the pattern of every other hit (round 68)
-            lead.append(f"No defensive is kept for the {_and([_mmss(x.t) for x in quiet])} "
-                        f"hit{'s' if len(quiet) > 1 else ''} (no long defensive of theirs pressed by a tenth of them "
-                        "in it).")
+        elif quiet:  # the pattern of every other hit, in one sentence with them (round 68)
+            bare = [f"the {_mmss(x.t)} hit{none}" for x in quiet] + bare
         if bare:
             lead.append(f"No defensive is kept for {', nor '.join(bare)}.")  # each hit its own aside (round 42)
         # a hit that comes with a swap (Vashnik's 1:35 and 2:55, after Dripping Fangs): the time is the link
