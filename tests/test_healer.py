@@ -150,7 +150,8 @@ def test_one_press_for_either_hit_is_said_once():
     cds = healer.cooldowns(tl, found, {1: (180.0, 1)})
     h = healer.HealerPrep("Boss", "heroic", "Holy Paladin", 9, 240.0, [100.0] * 48, found, cds, [], [], [], [])
     sheet = healer.render_sheet(h)
-    assert "their Aura Mastery goes on the 0:35 hit (44%, about 0:36) or the 1:15 hit (56%, about 1:19)" in sheet
+    # the most shared hit first
+    assert "their Aura Mastery goes on the 1:15 hit (56%, about 1:19) or the 0:35 hit (44%, about 0:36)" in sheet
     assert "for the 1:15 hit, 56% press" not in sheet
 
 
@@ -352,3 +353,21 @@ def test_the_other_healers_are_read_over_the_hits_window():
     assert got[0] == "Rewind" and got[2] == 0.26
     back = [[10.0, 75.0]] * 30 + [[200.0]] * 50  # every press back from a 60 s cooldown: no answer
     assert healer._in_hit("X", [], [0.8, (back, 100, 60.0)], 75.0) is None
+
+
+def test_no_job_kept_by_the_top_players_is_the_answer():
+    # Nek'zali (round 41): every job found is taken back on the ranked players
+    hp = SimpleNamespace(spec="Holy Paladin", jobs=["heals the tanks more, but only on average: 9% against 7%"])
+    sh = SimpleNamespace(spec="Restoration Shaman", jobs=["nothing stands out against the other healers"])
+    lead = healer.jobs_lead([hp, sh], "Restoration Shaman")
+    assert lead.startswith("<p class='lead'>No healer spec has a job of its own here that the top players keep.</p>")
+    assert "On average across every healer: the Holy Paladin heals the tanks more" in lead
+
+
+def test_a_press_is_said_at_its_most_shared_time():
+    # Restoration Druid, Nek'zali (round 41): Convoke's third press "2:24 · 27%, or 2:37 for 28%"
+    ab = SimpleNamespace(id=1, name="Convoke the Spirits", users=1.0, per_kill=1.0)
+    per_player = [[144.0]] * 27 + [[157.0]] * 28 + [[]] * 45
+    tl = SimpleNamespace(abilities=[ab], duration=270.0, players=[{"casts": {1: ts}} for ts in per_player])
+    c = healer.cooldowns(tl, [], {1: (120.0, 1)})[0]
+    assert c.times == [157.0] and c.alt == [144.0]

@@ -501,6 +501,15 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         if two:
             (_sa, a), (_sb, b) = sorted(two, key=lambda r: -r[0])
             times, alt, alt_of = list(a), list(b[:len(a)]), list(a[:len(b)])
+        else:  # a press's most shared time is its main one, its habits after (round 41: Convoke "2:24 · 27%, or 2:37
+            def near_n(t: float, per_player=per_player) -> int:  # for 28%" put the smaller first)
+                return sum(1 for ts in per_player if any(abs(x - t) <= 8 for x in ts))
+            for k, (x, of) in enumerate(zip(alt, alt_of, strict=False)):
+                if of in times and near_n(x) > near_n(of):
+                    j = times.index(of)
+                    times[j], alt[k] = x, of
+                    alt_of = [x if o == of else o for o in alt_of]
+            times = sorted(times)
         every = on_cadence(per_player, per_kill, tl.duration)
         cd = max((base or {}).get(i, (0.0, 1))[0] for i in ids)
         if every and (any(abs((y - x) - every) > 0.15 * every for x, y in pairwise(times))
@@ -1206,7 +1215,7 @@ def _minute(name: str) -> bool:
         return False
 
 
-def _in_hit(n: str, ts: list, rest: list, h: float) -> tuple | None:
+def _in_hit(n: str, ts: list, rest: list, h: float, bar: bool = True) -> tuple | None:
     """(button, time, share) of a spec's healers pressing it in a hit's answer window, as the fight tab counts a tied
     press: over the window, not within 8 s of a moment's peak (the Evokers' Rewind for Nek'zali's 1:15: 26% in the
     window, 20% around its 1:13 peak, so "none shared"; round 40). Kept when a quarter of those who press it are
@@ -1217,7 +1226,7 @@ def _in_hit(n: str, ts: list, rest: list, h: float) -> tuple | None:
     a, b = h - ANSWER[0], h + ANSWER[1]
     inside = [(x, max((y for y in p if y < x), default=None)) for p in ps for x in p if a <= x <= b]
     players = sum(1 for p in ps if any(a <= x <= b for x in p))
-    if not total or players < 0.25 * len(ps):
+    if not total or not players or (bar and players < 0.25 * len(ps)):
         return None
     back = sum(1 for x, y in inside if y is not None and cd and x - y <= cd + BACK) / max(1, len(inside))
     if back > BACK_SHARE[0]:
@@ -1242,10 +1251,15 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
         for h in hits:
             got = [g for n, _k, ts, *rest in r.cd_names if not _minute(n)
                    for g in [_in_hit(n, ts, rest, h)] if g]
-            per_hit.append((h, sorted(got, key=lambda x: -x[2])[:2]))
+            under = [] if got else sorted((g for n, _k, ts, *rest in r.cd_names if not _minute(n)  # none at the bar:
+                                           for g in [_in_hit(n, ts, rest, h, bar=False)] if g and g[2] >= 0.1),
+                                          key=lambda x: -x[2])[:1]  # its most pressed, said so (round 41: "none
+            per_hit.append((h, sorted(got, key=lambda x: -x[2])[:2], under))  # shared" read as "nothing pressed")
         chips = "".join(f"<span class='chip'>the {_mmss(h)} hit: "
-                        + ("; ".join(f"{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)}" for n, t, sp in got)
-                           if got else "none shared") + "</span>" for h, got in per_hit)
+                        + ("; ".join(f"{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)}" for n, t, sp in got) if got
+                           else "".join(f"{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)}, under a quarter of those who press it"
+                                        for n, t, sp in under) or "none shared") + "</span>"
+                        for h, got, under in per_hit)
         n = getattr(r, "own_players", 0)
         out += (f"<li><b>{e(r.spec)}</b>" + (f"<small>{n} healers</small>" if n else "")
                 + f"<span class='when'>{chips}</span></li>")
@@ -1273,7 +1287,14 @@ def _pace(h) -> str:
 
 
 def jobs_lead(roles: list, mine: str = "") -> str:
-    """The deeper tab's answer: your spec's job first, then the other healer specs whose job stands out."""
+    """The deeper tab's answer: your spec's job first, then the other healer specs whose job stands out. When every
+    job found is one the top players do not keep, that is the answer, the averages in a small line (round 41: 110
+    words in the lead's type to take each job back)."""
+    found = [(r.spec, _job(r)) for r in roles if _job(r)]
+    if found and all("only on average" in j for _s, j in found):
+        return ("<p class='lead'>No healer spec has a job of its own here that the top players keep.</p>"
+                "<p class='small muted'>On average across every healer: "
+                + "; ".join(f"the {e(sp)} {e(j)}" for sp, j in found) + ".</p>")
     you = next((r for r in roles if r.spec == mine), None)
     head = ""
     if you:
@@ -1476,9 +1497,22 @@ def render_sheet(h: HealerPrep) -> str:
             if len(ps) == 1:
                 hit, t, sp, c = ps[0]
                 return hit, (f"for the {_mmss(hit)} hit, {_pct(sp)} press {e(_shown(n))} (about {_mmss(t)}"
-                             f"{ramp_of(c, t, hit)})" + (_other([(hit, t, sp, c)]) if ramp_of(c, t, hit) else ""))
-            return ps[0][0], (f"{which(n, press, ps[0][3])} goes on " + _and(
-                [f"the {_mmss(hit)} hit ({_pct(sp)}, about {_mmss(t)})" for hit, t, sp, _c in ps], "or"))
+                             f"{ramp_of(c, t, hit)})" + (_other([(hit, t, sp, c)]) if ramp_of(c, t, hit) else
+                                                         _also(c, press, t, sp)))
+            return ps[0][0], (f"{which(n, press, ps[0][3])} goes on " + _and(  # the most shared hit first
+                [f"the {_mmss(hit)} hit ({_pct(sp)}, about {_mmss(t)})"
+                 for hit, t, sp, _c in sorted(ps, key=lambda p: -p[2])], "or"))
+
+        def _also(c, press: float, t: float, sp: float) -> str:
+            """Another habit of the same press about as shared, tied to no hit: said, or the lead hides a third of
+            them (Avenging Wrath "33% about 0:44", another 33% at 0:23; round 41)."""
+            alts = [(a, x) for a, x, of in zip(c.alt, c.alt_support or [], c.alt_of or c.alt, strict=False)
+                    if of == press and a != t and x >= 0.8 * sp]
+            if not alts:
+                return ""
+            a, x = max(alts, key=lambda y: y[1])
+            gap = int(abs(t - a))
+            return f"; another {_pct(x)} press it about {_mmss(a)}, {gap} s {'earlier' if a < t else 'later'}"
         # a ramp button answering several hits is one clause (Evangelism thrice in a row read as a list)
         ramps: dict[str, list] = {}
         for k, ps in by_press.items():
