@@ -389,6 +389,13 @@ def _cause(common: str, stacks: dict) -> str:
     return f" (most of them right after {e(common)}: a timing in the logs)"
 
 
+def _none_for(note: str) -> str:
+    """The biggest moment with no defensive kept: its aside said as the sentence, not twice (round 62)."""
+    if note == " (no long defensive of theirs pressed by a tenth of them in it)":
+        return "; no long defensive of theirs is pressed by a tenth of them in it."
+    return f"; no defensive of theirs is kept for it{note}."
+
+
 def render_sheet(p: TankPrep) -> str:
     """The tank's sheet in the four sections of every role's sheet (issue #27): The fight (what hits you and when,
     your defensives where the top tanks press them, the swaps), What to change (mitigation, talents, trinkets), The
@@ -482,7 +489,7 @@ def render_sheet(p: TankPrep) -> str:
         lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({_x(m.ratio)}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
                     + (f"; {big[2]:.0%} of the top {e(p.spec)}s press {e(big[0])} for it (about {_mmss(big[1])})."
-                       if big else f"; no defensive of theirs is kept for it{landed_in(m, defs, named, 'long defensive')}."))
+                       if big else _none_for(landed_in(m, defs, named, 'long defensive'))))
         # the other dots in time order: their most shared press, or one clause for those with none
         pairs = [(x, answer(x)) for x in sorted(p.moments, key=lambda x: x.t) if x is not m]
         said = [f"for the {_mmss(x.t)} hit, {a[2]:.0%} press {e(a[0])} (about {_mmss(a[1])})" for x, a in pairs if a]
@@ -494,13 +501,12 @@ def render_sheet(p: TankPrep) -> str:
         bare = [f"the {_mmss(x.t)} hit{n}" for x, n in notes if n != none]
         if said:
             lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 0:35 hit, 41% press Spell Reflection"
-        if quiet:
-            lead.append(f"No long defensive of theirs is pressed by a tenth of them in the "
-                        f"{_and([_mmss(x.t) for x in quiet])} hit{'s' if len(quiet) > 1 else ''}"
-                        + (" either." if not big and none in lead[0] else "."))
+        first_none = not big and "no long defensive" in lead[0]
+        if quiet:  # "nor": the biggest moment said the same
+            lead.append(f"{'Nor' if first_none else 'No long defensive of theirs is pressed by a tenth of them'} in "
+                        f"the {_and([_mmss(x.t) for x in quiet])} hit{'s' if len(quiet) > 1 else ''}.")
         if bare:
-            lead.append(f"No defensive is kept for {', nor '.join(bare)}"  # each hit its own aside (round 42)
-                        + (" either." if not big and len(bare) == 1 else "."))  # "nor ... either": once is enough
+            lead.append(f"No defensive is kept for {', nor '.join(bare)}.")  # each hit its own aside (round 42)
         # a hit that comes with a swap (Vashnik's 1:35 and 2:55, after Dripping Fangs): the time is the link
         with_swap = [(x, w) for x in p.moments for w in p.swaps if abs(w - x.t) <= ANSWER[0]]
         # said only when swaps are rare enough for it to mean something: one every 28 s (Vashnik) lands within 5 s
