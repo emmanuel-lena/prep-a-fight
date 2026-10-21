@@ -444,6 +444,7 @@ def render_sheet(p: TankPrep) -> str:
     swap = "".join(f"<span class='chip'>{_mmss(t)}{f' after {e(c)}' if c and not (one and c == common) else ''}</span>"
                    for t, c in zip(p.swaps, causes, strict=False))
     lead, answered = [], set()
+    named: dict = {}  # the press the lead names for each hit kept for none: its chip counts that window too
     tied: dict[tuple[str, float], float] = {}  # a tied press's share in its hit's window: the lead's, on its chip
     if p.moments:
         m = max(p.moments, key=lambda x: x.ratio)
@@ -480,13 +481,13 @@ def render_sheet(p: TankPrep) -> str:
         lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({_x(m.ratio)}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
                     + (f"; {big[2]:.0%} of the top {e(p.spec)}s press {e(big[0])} for it (about {_mmss(big[1])})."
-                       if big else f"; no defensive of theirs is shared for it{landed_in(m, defs)}."))
+                       if big else f"; no defensive of theirs is shared for it{landed_in(m, defs, named)}."))
         # the other dots in time order: their most shared press, or one clause for those with none
         pairs = [(x, answer(x)) for x in sorted(p.moments, key=lambda x: x.t) if x is not m]
         said = [f"for the {_mmss(x.t)} hit, {a[2]:.0%} press {e(a[0])} (about {_mmss(a[1])})" for x, a in pairs if a]
         answered = {(a[0], a[1]) for a in [big, *(a for _x, a in pairs)] if a}  # the chart draws these full
         tied.update({(a[0], a[1]): a[2] for a in [big, *(a for _x, a in pairs)] if a})
-        bare = [f"the {_mmss(x.t)} hit{landed_in(x, defs)}" for x, a in pairs if not a]
+        bare = [f"the {_mmss(x.t)} hit{landed_in(x, defs, named)}" for x, a in pairs if not a]
         if said:
             lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 0:35 hit, 41% press Spell Reflection"
         if bare:
@@ -526,7 +527,7 @@ def render_sheet(p: TankPrep) -> str:
         f"casts it.</p><ul class='hl2'>"
         f"{moments_html(p.moments, 'tank damage') or '<li>No big moment: steady damage.</li>'}</ul></div>",
         f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
-        f"{cooldowns_html(defs, answered) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
+        f"{cooldowns_html(defs, answered, named) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
         "<p class='small muted'>Only the lead ties a press to a hit; a button on cooldown, a potion or a trinket says "
         "why it is not. A time is shown when a quarter of those who press the button share it; its share is of all "
         "the top players (for a press the lead names for a hit: those pressing in that hit's window); \"or\": the time other top players press the same press instead. \"Back from cooldown\": "

@@ -799,11 +799,12 @@ def back_share(per_player: list[list[float]], t: float, cd: float) -> float:
 
 
 FEW_SHARE = 0.1  # a press in a hit no cooldown is kept for, said under the quarter bar from this share
+SLACK = 3.0  # seconds past the answer window a moment may sit when its presses are counted in the window
 PULL = 12.0  # seconds: a press before this is the pull's opener, never a ramp for the first hit (round 45)
 MINUTE = "about every minute"  # the reason a button pressed four times a kill or more is tied to no hit
 
 
-def landed_in(m: Moment, cds: list[Cooldown]) -> str:
+def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None) -> str:
     """The press most of them make inside a hit no cooldown is kept for, and why it is no answer: "(35% have
     Tranquility land at 3:43, back from cooldown)". Every button and habit is read (Celestial Conduit's 2:11 habit,
     Life Cocoon), the same for healers and tanks."""
@@ -815,11 +816,16 @@ def landed_in(m: Moment, cds: list[Cooldown]) -> str:
             continue  # pressed about every minute is, with its reason (70% Convoke 4 s before Nek'zali's 1:15; round 37)
         for t, sp in [*zip(c.times, c.support or [], strict=False), *zip(c.alt, c.alt_support or [], strict=False)]:
             ramp = c.ramp and RAMP[0] <= m.t - t <= RAMP[1]  # a ramp lands its hit from 8 to 30 s ahead (Disc's
-            if -ANSWER[0] <= t - m.t <= ANSWER[1] or ramp:  # 2:01 Evangelism, 9 s before 2:10; round 36)
+            # 2:01 Evangelism, 9 s before 2:10; round 36); a moment just past the window counts when its presses
+            # are counted in it (Celestial Conduit's 3:43, 34% in Vashnik's 3:35 window; round 50)
+            slack = SLACK if c.presses else 0.0
+            if -ANSWER[0] - slack <= t - m.t <= ANSWER[1] + slack or ramp:
                 why = ("pressed about every minute" if c.why == MINUTE else c.why or ("on cooldown" if c.every else "back from cooldown"
                                  + (" for about half" if t in c.back_half else "") if t in c.back else ""))
                 if why:  # its share in the hit's window, as a tied press's (round 45: Convoke's 70% was its cluster's)
                     hs = hit_share(c, t, m.t)
+                    if hs is not None and not hs:
+                        continue
                     near.append((sp if hs is None else hs, c, t, why))
     if not near:  # no moment shown there: the most common press in its window all the same, under the quarter bar
         from paf.defensives import is_defensive
@@ -835,6 +841,8 @@ def landed_in(m: Moment, cds: list[Cooldown]) -> str:
         return ""
     # the closest of the presses a quarter make (Disc's 2:01 Evangelism, 9 s before 2:10, over its 1:41 one, 29 s)
     sp, c, t, why = max(near, key=lambda x: (x[0] >= 0.25, -abs(m.t - x[2]), x[0]))
+    if named is not None and c.presses:  # its chip gives the same count, said of this hit (round 50)
+        named[(c.name, t)] = m.t
     few = "only " if sp < 0.25 else ""  # under a quarter, as the bare hits' "only N%" (round 39)
     of = _reach_note(c, m.t) if c.presses else ""  # counted in the hit's window: said, as its chip counts its moment
     if c.ramp and t < m.t - ANSWER[0]:
@@ -872,7 +880,7 @@ def _rank(named: list[str]):
     return key
 
 
-def cooldowns_html(cds: list[Cooldown], answered: set | None = None) -> str:
+def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict | None = None) -> str:
     """The cooldown rows. answered: the (button, time) pairs the lead ties to a hit; a chip says its hit only for
     those, so no chip reads as an answer the lead and the chart do not give (Apotheosis "1 s before the 0:35 hit")."""
     def tie(c: Cooldown, t: float, n: str) -> str:
@@ -881,7 +889,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None) -> str:
         f"<li><b>{e(_shown(c.name))}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill"
         + (f", {_pct(c.on_others)} of the presses on another player" if 0 <= c.on_others < 0.95 else
            ", all on another player" if c.on_others >= 0.95 else "") + "</small>"
-        "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, tie(c, t, n))}{_share(_tied_share(c, t, tie(c, t, n), sp))}"
+        "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, tie(c, t, n))}{_named(c, t, named, tie(c, t, n), sp)}"
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
                                            if t in c.back and not (c.why or c.every) else "")  # its line says it
                                         + f"{_or(c, t, answered)}</span>"
@@ -899,6 +907,16 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None) -> str:
            f"{e(c.why)}: not tied to a hit</small>" if c.why and c.times else "")
         + "</span></li>"
         for c in cds)
+
+
+def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
+    """A chip's share: of the hit's window when the lead names this press for a hit kept for none, said so, as the
+    lead's count (round 50: "1:11 · 70%" under a lead saying 61% in the 1:15 window); else _tied_share's."""
+    hit = (named or {}).get((c.name, t))
+    if hit is not None and (hs := hit_share(c, t, hit)) is not None:
+        where = "ahead of" if c.ramp and t < hit - ANSWER[0] else "in the window of"  # a ramp: around its own time
+        return f"{_share(hs)} {where} the {_mmss(hit)} hit"
+    return _share(_tied_share(c, t, n, sp))
 
 
 def _tied_share(c: Cooldown, t: float, n: str, sp: float) -> float:
@@ -1447,6 +1465,7 @@ def render_sheet(h: HealerPrep) -> str:
     heals = [c for c in own if not is_defensive(c.spell_id, c.name) and c not in items]
     defs = [c for c in own if c not in heals and c not in items]
     lead, lead_names, answered = "", [], set()
+    named: dict = {}  # the press the lead names for each hit kept for none: its chip counts that window too
     if h.moments:
         shown = h.moments[:3]
         ratios = (f"{'both' if len(shown) == 2 else 'each'} {_x(shown[0].ratio)}&times;"
@@ -1575,7 +1594,7 @@ def render_sheet(h: HealerPrep) -> str:
             """A press the cards show in a hit kept for none (Tranquility's second at 3:43, back from cooldown): said,
             so "no cooldown" never sits next to a chip in the hit."""
             m = next(x for x in shown if _mmss(x.t) == hit)
-            return landed_in(m, h.cooldowns)
+            return landed_in(m, h.cooldowns, named)
         # each hit with its own bracket: "the 2:10 hit, nor the 3:40 hit (35% have...)", never one bracket read
         # as covering both
         said_each = [f"the {b} hit{landed(b)}" for b in bare]
@@ -1597,7 +1616,7 @@ def render_sheet(h: HealerPrep) -> str:
            "before, matched by timing)") + f".</p><ul class='hl2'>"
         f"{moments_html(h.moments, 'raid damage') or '<li>No big moment: steady raid damage.</li>'}</ul></div>",
         f"<h2>Your long cooldowns, where the top {e(h.spec)}s press them</h2><ul class='hl2'>"
-        f"{cooldowns_html(sorted((c for c in heals if _external(c.spell_id) != 'protective'), key=_rank(lead_names)), answered) or '<li>Not enough top players in the corpus yet.</li>'}</ul>"]
+        f"{cooldowns_html(sorted((c for c in heals if _external(c.spell_id) != 'protective'), key=_rank(lead_names)), answered, named) or '<li>Not enough top players in the corpus yet.</li>'}</ul>"]
     rare_kept = [c for c in h.rare if c not in utility]
     rare = [c for c in rare_kept if c not in items and not is_defensive(c.spell_id, c.name)
             and _external(c.spell_id) != "protective"]  # the others go to their own section
@@ -1628,14 +1647,14 @@ def render_sheet(h: HealerPrep) -> str:
     if exts:  # cast on another player: their own group, apart from the raid cooldowns
         fight.append(f"<h2>Your externals{f', where the top {e(h.spec)}s cast them' if any(c.times for c in exts) else ''}"
                      f"</h2><ul class='hl2'>"
-                     f"{cooldowns_html(exts, answered)}</ul>{fewer(rare_ext)}"
+                     f"{cooldowns_html(exts, answered, named)}</ul>{fewer(rare_ext)}"
                      + (f"<p class='small muted'>{buff_note.strip()}</p>" if buff_note else ""))
     elif rare_ext:  # Pain Suppression at 34%: still an external, never filed with the defensives
         fight.append(f"<h2>Your externals</h2><p class='small muted'>Fewer than half of the top {e(h.spec)}s cast one here: "
                      + ", ".join(f"{e(c.name)} ({c.users:.0%}, {_and([_mmss(t) for t in c.times]) or 'no shared moment'})"
                                  for c in rare_ext) + f".{buff_note}</p>")
     if defs or rare_def:
-        fight.append(f"<h2>Your defensives</h2><ul class='hl2'>{cooldowns_html(defs, answered)}</ul>{fewer(rare_def)}")
+        fight.append(f"<h2>Your defensives</h2><ul class='hl2'>{cooldowns_html(defs, answered, named)}</ul>{fewer(rare_def)}")
     if items:
         fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{cooldowns_html(items, answered)}</ul>")
     potions = h.potions or [c for c in h.cooldowns if _item(c.spell_id) and c not in items]  # as the tank's
