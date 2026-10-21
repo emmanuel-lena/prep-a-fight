@@ -258,3 +258,12 @@ def test_the_talents_they_differ_on_most_when_none_splits_them():
     # Holy Paladin: no talent taken by 35-65% of them, so the change tab names the ones they differ on most
     page = healer.split_html([("Tower of Radiance", 0.22)], 100, "Holy Paladin", wide=True)
     assert "differ on most</h2>" in page and "None is taken by 35 to 65% of them" in page
+
+
+def test_jobs_lead_says_either_only_when_your_spec_has_no_job():
+    from types import SimpleNamespace as N
+    mine = N(spec="Holy Priest", jobs=["dispels more: 1.4 times a minute"])
+    other = N(spec="Restoration Shaman", jobs=["nothing stands out against the other healers"])
+    assert "No other healer spec stands out." in healer.jobs_lead([mine, other], "Holy Priest")
+    assert "either" not in healer.jobs_lead([mine, other], "Holy Priest")
+    assert "stands out either" in healer.jobs_lead([other], "Restoration Shaman")

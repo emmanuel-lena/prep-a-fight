@@ -1092,7 +1092,8 @@ def jobs_lead(roles: list, mine: str = "") -> str:
                 "Your spec here: nothing stands out against the other healers of the same kills. ")
     lines = [f"the {r.spec} {_job(r)}" for r in roles if r.spec != mine and _job(r)]
     if not lines:
-        return f"<p class='lead'>{e(head)}No other healer spec stands out either.</p>"
+        rest = "No other healer spec stands out either." if not you or not _job(you) else "No other healer spec stands out."
+        return f"<p class='lead'>{e(head)}{rest}</p>"
     return f"<p class='lead'>{e(head)}The others: " + "; ".join(e(x) for x in lines) + ".</p>"
 
 
