@@ -1039,7 +1039,12 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
             f"{_and([_mmss((moved or {}).get((c.name, t), t)) for t in ts[1:]])}" for _sp, ts in c.rhythms)
            + "</small>"
            if c.rhythms else "")
-        + (f"<small class='alt'>on cooldown, about every {c.every:.0f} s</small>" if c.every else
+        + (f"<small class='alt'>on cooldown, about every {c.every:.0f} s</small>" if c.every and not _held(c) else
+           # a held habit kept (only one for a hit is): the cadence is the other group's (round 79: Avenging Wrath
+           # "on cooldown" beside 26% holding it for 0:35, whose later presses vary)
+           f"<small class='alt'>on cooldown from {_mmss(c.times[0])}, about every {c.every:.0f} s; those holding it "
+           f"for {_and([_mmss((moved or {}).get((c.name, a), a)) for a in _held(c)])} press it again at varying "
+           "times</small>" if c.every else
            f"<small class='alt'>{_more(c)} more at varying times</small>" if c.times and _more(c) else "")
         + (f"<small class='alt'>{'mostly ' if c.why.startswith('cast on another') and 0 <= c.on_others < 0.95 else ''}"
            f"{e(c.why)}: not tied to a hit</small>" if c.why and c.times else "")
@@ -1087,6 +1092,11 @@ def _tw(c: Cooldown, t: float, hit: float) -> str:
     1:13), else its moment's."""
     inside = _counted(c, t, hit) if c.presses else []
     return _mmss(st.median(inside) if inside else t)
+
+
+def _held(c: Cooldown) -> list[float]:
+    """A button on cooldown's habits held for a hit (Avenging Wrath at 0:35, the rest from the pull)."""
+    return [a for a, n in zip(c.alt, c.alt_near or [""] * len(c.alt), strict=False) if n]
 
 
 def _why_not(c: Cooldown, t: float) -> str:
@@ -1502,8 +1512,10 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                         if _pct(pp) != _pct(sp) else "")  # bar reads, rounded as the share (r. 76-77)
                                      for n, t, sp, rp, pp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
-                                        f"<small>(under a quarter of those who press it"
-                                        f": {int(pp * 100)}%{' of them too' if f'{int(pp * 100)}%' == _pct(sp) else ''})</small>"
+                                        + (f"<small>({'every' if sp >= pp - 1e-9 else 'nearly every'} {e(r.spec)} "
+                                           "presses it: under a quarter of them here)</small>"  # round 79: "24% of
+                                           if f"{int(pp * 100)}%" == _pct(sp) else  # them too" read as nonsense
+                                           f"<small>(under a quarter of those who press it: {int(pp * 100)}%)</small>")
                                         for u in under if len(u) > 4 and u[0] != "back" for n, t, sp, pp in [u[:4]])
                            or "".join(f"none held for it <small>({e(_shown(u[1]))} {_mmss(u[2])} &middot; {_pct(u[3])}, "
                                       "back from cooldown)</small>" for u in under if u[0] == "back")
@@ -1522,8 +1534,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             "ahead, never the pull's opener before 0:12.<br><b>A button shown:</b> a quarter of the spec's healers who "
             "press it do so in the window; its share is of all that spec's healers, then of those who press it when "
             "that differs.<br><b>\"Under a quarter\":</b> no button reaches that; its most pressed one, if a tenth of "
-            "the spec's healers press it there, with the share of those who press it (\"of them too\" when it is the "
-            "same).<br><b>\"None held for it\":</b> its presses there come back from cooldown.<br><b>\"None "
+            "the spec's healers press it there, with the share of those who press it (\"every … presses it\" when that is nearly all of "
+            "them).<br><b>\"None held for it\":</b> its presses there come back from cooldown.<br><b>\"None "
             "shared\":</b> no button reaches a tenth.<br><b>\"Few players\":</b> under 100 of the spec's healers in "
             "these kills, a habit of a few.<br><b>Back from cooldown:</b> a button whose presses there come back from "
             "cooldown for over 40% of them is no answer, as on the fight tab.</p>")
@@ -1591,7 +1603,8 @@ def nums_note(roles: list, own: str = "") -> str:
                        "and beyond chance. With two bosses read, a job may be a habit of the spec rather than of this "
                        "boss."),
              ("A spike", f"5 s at 1.5 times the kill's median damage{spikes}, counted kill by kill: the fight tab's "
-                         "median curve smooths most of them away."),
+                         "median curve smooths most of them away. A spec whose share of healing in them is above "
+                         "that heals harder in spikes than the rest of the time."),  # round 79: 24% against what
              ("The shares", "from different kills, so they do not add up; externals and overheal follow each kit.")]
     method = ("Externals and buffs: a mean over every player of the spec (not only the top ones the fight tab "
               "reads), on others only. Jobs: paired within each kill, Benjamini-Hochberg at 5% over every spec and "

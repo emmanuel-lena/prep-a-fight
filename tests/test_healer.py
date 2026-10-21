@@ -459,3 +459,14 @@ def test_a_chip_says_back_from_cooldown_once():
                         lasts=[300.0] * 58 + [200.0] * 42, back=[231.0], back_half=[231.0], support=[0.24])
     out = healer.cooldowns_html([c], set(), {("Shield Wall", 231.0): 235.0})
     assert out.count("back from cooldown") == 1, out
+
+
+def test_a_cadence_names_its_group_beside_a_held_habit():
+    # Holy Paladin, Nek'zali (round 79): "on cooldown, about every 122 s" beside 26% holding Avenging Wrath for 0:35
+    c = healer.Cooldown("Avenging Wrath", 1, 1.0, 3.0, [4.0, 125.0, 248.0], ["", "", ""], alt=[35.0],
+                        every=122.0, alt_support=[0.29], alt_near=["0:35 Soulcoil Rite"], alt_of=[4.0])
+    out = healer.cooldowns_html([c], {("Avenging Wrath", 35.0)})
+    assert ("on cooldown from 0:04, about every 122 s; those holding it for 0:35 press it again at varying times"
+            in out)
+    c.alt_near = [""]
+    assert "on cooldown, about every 122 s<" in healer.cooldowns_html([c])
