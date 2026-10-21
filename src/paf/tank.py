@@ -514,9 +514,9 @@ def render_sheet(p: TankPrep) -> str:
         if said:
             lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 0:35 hit, 41% press Spell Reflection"
         first_none = not big and "no long defensive" in lead[0]
-        hits = f"the window of the {_and([at(x) for x in quiet])} hit{'s' if len(quiet) > 1 else ''}"
+        hits = f"the {_and([at(x) for x in quiet])} hit{'s' if len(quiet) > 1 else ''}"
         if quiet and first_none:  # "nor": the biggest moment said the same, in one sentence (round 65)
-            lead[0] = lead[0].rstrip(".") + f", nor in {hits}."
+            lead[0] = lead[0].rstrip(".") + f", nor for {hits}."  # (round 77: "nor in the window of", no subject)
         elif quiet:  # the pattern of every other hit, in one sentence with them (round 68)
             bare = [f"the {at(x)} hit{none}" for x in quiet] + bare
         if bare:

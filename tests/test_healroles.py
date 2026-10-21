@@ -280,8 +280,16 @@ def test_a_job_is_checked_on_the_ranked_players():
     top = ([(f"r{k}", 1, 0, "Priest", "Holy", 100, 30, 8, 0.2, 4) for k in range(15)]
            + [(f"r{k}", 1, 1, "Paladin", "Holy", 100, 30, 8, 0.2, 4) for k in range(15, 30)])
     assert healroles._top_check(top, durs, "Holy Priest", "dispels") == (
-        "; the top players ranked by their healing fall short of it: the median top Holy Priest 1.0, the other "
+        "; among the top players ranked by their healing there is no gap: the median top Holy Priest 1.0, the other "
         "specs' 1.0 "
         "(15 and 15 ranked players, one in each top kill of each healer spec's sheet)")
     top = [(*h[:9], 8 if h[3] == "Priest" else 4) for h in top]  # 2.0 against 1.0: it holds, nothing said
     assert healroles._top_check(top, durs, "Holy Priest", "dispels") == ""
+
+
+def test_an_or_time_whose_players_count_for_its_press_is_the_same_group():
+    # Preservation Evoker, Vashnik (round 77): Stasis "3:22 · 48%, or 3:29 for 37%", the same players counted twice
+    from paf.healroles import press_moments
+    per_player = [[196 + i * 0.4] for i in range(30)] + [[206 + i * 0.4] for i in range(32)] + [[]] * 38
+    times, alt, _of = press_moments(per_player, 1, 300.0)
+    assert len(times) == 1 and alt == []  # 3:35 shared by most of 3:25's players: one group

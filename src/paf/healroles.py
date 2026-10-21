@@ -662,7 +662,12 @@ def press_moments(per_player: list[list[float]], keep: int, end: float | None = 
             by_rank[r] = t
         else:
             others.append((t, r))
-    alt = [(t, by_rank[r]) for t, r in sorted(others) if r in by_rank]  # a habit of a press kept, else no moment
+    def same(t: float, k: float) -> bool:  # most of a habit's players counted at its press already: one group
+        at = [ts for ts in lists if any(abs(x - t) <= WINDOW for x in ts)]  # (round 77: Stasis "3:22 for 48%, or
+        both = sum(1 for ts in at if any(abs(x - k) <= WINDOW for x in ts))  # 3:29 for 37%", 29 of its 42 in both;
+        return bool(at) and both > len(at) / 2  # Convoke's 2:24 and 2:37 share 3)
+    alt = [(t, by_rank[r]) for t, r in sorted(others) if r in by_rank and not same(t, by_rank[r])]  # a habit of a
+    # press kept, else no moment
     return sorted(by_rank.values()), [t for t, _ in alt], [k for _, k in alt]
 
 
@@ -734,6 +739,7 @@ def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None
 
 
 TOP_PLAYERS = 10  # ranked players of a spec, at least, to check a job on them
+TOP_SAYS = "; among the top players ranked by their healing"  # a job they do not keep, said after it
 
 
 def _top_check(top: list, durs: dict, spec: str, m: str) -> str:
@@ -754,7 +760,9 @@ def _top_check(top: list, durs: dict, spec: str, m: str) -> str:
     if a >= JOB_RATIO * b and a - b >= JOB_GAP[m]:
         return ""
     fmt = (lambda x: f"{x:.1f}") if m == "dispels" else (lambda x: f"{x:.0%}")
-    return (f"; the top players ranked by their healing fall short of it: the median top {spec} {fmt(a)}, the "
+    # what the top players show, said plainly (round 77: "fall short of it" beside "8%, the other specs' 8%")
+    gap = "there is no gap" if fmt(a) == fmt(b) else "the gap is under a job's (a fifth more)"
+    return (f"{TOP_SAYS} {gap}: the median top {spec} {fmt(a)}, the "
             f"other specs' "
             f"{fmt(b)} ({len(me)} and {len(them)} ranked players, one in each top kill of each healer spec's sheet)")
 
@@ -814,7 +822,7 @@ def paired_jobs(per_kill: dict, durs: dict, own: tuple[str, str] | None = None, 
         else:
             out[spec].append(f"dispels more: {a:.1f} times a minute, against {b:.1f} for the other healers of the "
                              f"same kills ({n} kills){held}")
-    return {spec: [j.replace("more:", "more, but only on average:", 1) if "fall short of it:" in j else j for j in js]
+    return {spec: [j.replace("more:", "more, but only on average:", 1) if TOP_SAYS in j else j for j in js]
             for spec, js in out.items()}
 
 

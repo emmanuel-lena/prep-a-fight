@@ -1495,8 +1495,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             per_hit.append((h, sorted(got, key=lambda x: -x[2])[:2], under))  # shared" read as "nothing pressed")
         chips = "".join(f"<span class='chip'>the {_mmss(h)} hit: "
                         + ("; ".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if rp else ''} &middot; {_pct(sp)}"
-                                     + (f" <small>({int(pp * 100)}% of those who press it)</small>"  # the share
-                                        if f"{int(pp * 100)}%" != _pct(sp) else "")  # the bar reads (round 76)
+                                     + (f" <small>({_pct(pp)} of those who press it)</small>"  # the share the
+                                        if _pct(pp) != _pct(sp) else "")  # bar reads, rounded as the share (r. 76-77)
                                      for n, t, sp, rp, pp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
                                         f"<small>(under a quarter of those who press it"
@@ -1511,17 +1511,19 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                 + f"<span class='when'>{chips}</span></li>")
     if not out:
         return ""
+    # one definition a line, as the fight tab's (round 77)
     return ("<h2>The other healers' cooldowns on the big hits</h2>"
-            f"<ul class='hl2'>{out}</ul><p class='small muted'>From the same kills as the table, every player of each spec (that spec's "
-            "own sheet reads its top players, so its times can differ): a button is shown for a hit when a quarter "
-            "of the spec's healers who press it do so in the hit's window (5 s before to 8 s after; a ramp button, as "
-            "Evangelism, 8 to 30 s ahead, never the pull's opener before 0:12), its share of all "
-            "that spec's healers there, then the share of those who press it when it differs; else its most pressed button, if a tenth of the spec's healers press it there, "
-            "marked \"under a quarter\" with the share of those who press it (\"of them too\" when it is the same); \"none held for it\": its presses there "
-            "come back from cooldown; \"none shared\": no button reaches that; "
-            "\"few players\": under 100 of the spec's healers in these kills, a habit of a few. "
-            "A button whose presses there come back from cooldown for over 40% of them is no answer, as on the fight "
-            "tab.</p>")
+            f"<ul class='hl2'>{out}</ul><p class='small muted'>From the same kills as the table, every player of each "
+            "spec (that spec's own sheet reads its top players, so its times can differ).<br><b>A hit's "
+            "window:</b> 5 s before to 8 s after it starts; a ramp button, as Evangelism, 8 to 30 s "
+            "ahead, never the pull's opener before 0:12.<br><b>A button shown:</b> a quarter of the spec's healers who "
+            "press it do so in the window; its share is of all that spec's healers, then of those who press it when "
+            "that differs.<br><b>\"Under a quarter\":</b> no button reaches that; its most pressed one, if a tenth of "
+            "the spec's healers press it there, with the share of those who press it (\"of them too\" when it is the "
+            "same).<br><b>\"None held for it\":</b> its presses there come back from cooldown.<br><b>\"None "
+            "shared\":</b> no button reaches a tenth.<br><b>\"Few players\":</b> under 100 of the spec's healers in "
+            "these kills, a habit of a few.<br><b>Back from cooldown:</b> a button whose presses there come back from "
+            "cooldown for over 40% of them is no answer, as on the fight tab.</p>")
 
 
 def _job(r) -> str:
@@ -1570,17 +1572,21 @@ def nums_note(roles: list, own: str = "") -> str:
     round-29 review: one 90-word block of statistics)."""
     cover = next((r.spike_cover for r in roles if getattr(r, "spike_cover", 0)), 0.0)
     spikes = f" ({_pct(cover)} of the fight)" if cover else ""
-    plain = ("Each row is the spec's median player in these kills. A spec has a job when it does clearly more than "
-             "the other healers of the same kills: a fifth more at least, and beyond chance. With two bosses read, a "
-             "job may be a habit of the spec rather than of this boss. "
-             f"A spike is 5 s at 1.5 times the kill's median damage{spikes}, counted kill by kill: the fight tab's "
-             "median curve smooths most of them away. The shares come from different kills and "
-             "do not add up; externals and overheal follow each kit. A spec's players are every healer of it in these "
-             "kills but each kill's ranked one, so a spec whose own sheet collected few other kills reads thin.")
+    # one definition a line, as the fight tab's (round 77: one paragraph of six)
+    plain = [("A row", "the spec's median player in these kills; a spec's players are every healer of it in these "
+                       "kills but each kill's ranked one, so a spec whose own sheet collected few other kills reads "
+                       "thin."),
+             ("A job", "the spec does clearly more than the other healers of the same kills: a fifth more at least, "
+                       "and beyond chance. With two bosses read, a job may be a habit of the spec rather than of this "
+                       "boss."),
+             ("A spike", f"5 s at 1.5 times the kill's median damage{spikes}, counted kill by kill: the fight tab's "
+                         "median curve smooths most of them away."),
+             ("The shares", "from different kills, so they do not add up; externals and overheal follow each kit.")]
     method = ("Externals and buffs: a mean over every player of the spec (not only the top ones the fight tab "
               "reads), on others only. Jobs: paired within each kill, Benjamini-Hochberg at 5% over every spec and "
               "number. The boss tab's dispels count the top player only.")
-    return f"{e(plain)}</p><p class='small muted'>{e(method)}"
+    return ("<br>".join(f"<b>{e(k)}:</b> {e(v)}" for k, v in plain)
+            + f"</p><p class='small muted'>{e(method)}")
 
 
 def _plain(text: str) -> str:
@@ -1964,17 +1970,17 @@ def render_sheet(h: HealerPrep) -> str:
             line = f"{_pct(have.share)} of the top kills bring a {e(h.spec)} ({have.per_kill:.1f} a kill when they do)."
         else:
             line = f"Few top raids bring a {e(h.spec)} on this boss."
-        deeper_first.append(f"<h2>Healers in the top {e(h.spec)}s' kills</h2><p>{line} How often each other healer spec is there in the {n_kills} "
-                      f"top kills read for their healing"
-                      + (f", median {_mmss(h.own_median)}" if h.own_median else "")
+        deeper_first.append(f"<h2>Healers in the top {e(h.spec)}s' kills</h2><p>{line} In the {n_kills} top kills read for "
+                      f"their healing"  # the casts' 100 said under "Where the numbers come from" (round 77)
+                      + (f" (median {_mmss(h.own_median)}" if h.own_median else "")
                       + (f", {'slower' if h.own_median > h.duration else 'faster'} than the {h.kills} top kills' "
                          f"{_mmss(h.duration)}: picked by their healing, not their kill time"
                          if h.own_median and abs(h.own_median - h.duration) >= 10 else "")
-                      + f" (the timings need every cast, collected on {h.kills} of them), "
-                      f"and the kills with it against those without it (a reading, not a verdict):</p>"
+                      + (")" if h.own_median else "") + ": how often each other healer spec is there, and the kills "
+                      "with it against those without it (a reading, not a verdict).</p>"
                       f"{presence_table(h.presence, h.spec)}")
     deeper = deeper_first + [f"<h2>What each healer spec brings here</h2><p class='small muted'>Measured on {h.role_kills:,} "
-              f"{e(h.role_sample or 'top kills')}.{_pace(h)} {nums_note(h.roles, h.own_sample)}</p>{others or '<p>Not measured yet.</p>'}"
+              f"{e(h.role_sample or 'top kills')}.{_pace(h)}<br>{nums_note(h.roles, h.own_sample)}</p>{others or '<p>Not measured yet.</p>'}"
               + (f"<p class='small muted'>Too few healers measured: {e(', '.join(few))}.</p>" if few else ""),
               (f"<h2>The healer compositions played most</h2>{comps_table(h.comps, n_kills)}"
                if comps_table(h.comps, n_kills) else "")]
