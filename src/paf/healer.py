@@ -907,6 +907,10 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
     def said(c: Cooldown, hs: float, reason: str) -> str:  # one wording for every hit kept for none (round 58),
         inside = _counted(c, m.t, m.t)                       # its time the counted presses', its chip named
         when = st.median(inside) if inside else m.t
+        if not reason:  # a raid button's presses there judged too (round 67: Tip the Scales, "for about half"),
+            b = _back_in(c, m.t, m.t)  # before its card line keeps it (round 69)
+            reason = ("" if b is None or b <= BACK_SHARE[0] else "back from cooldown"
+                      + (" for about half" if b <= BACK_SHARE[1] else ""))
         near_t = min([*c.times, *c.alt], key=lambda x: abs(x - when), default=None)
         if named is not None and near_t is not None and abs(near_t - when) <= 15:
             named[(c.name, near_t)] = m.t
@@ -914,10 +918,6 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
             named[(c.name, ("line", m.t))] = (hs, when, _reach_note(c, m.t), reason)  # "timing varies" under the
             # lead's 2:12), its reason too (round 69: Apotheosis "back from cooldown")
         few_ = "only " if hs < 0.25 else ""
-        if not reason:  # a raid button's presses there judged too (round 67: Tip the Scales, "for about half")
-            b = _back_in(c, m.t, m.t)
-            reason = ("" if b is None or b <= BACK_SHARE[0] else "back from cooldown"
-                      + (" for about half" if b <= BACK_SHARE[1] else ""))
         return (f" ({few_}{_pct(hs)} press {e(_shown(c.name))} in its window{_reach_note(c, m.t)}, about "
                 f"{_mmss(when)}{', ' + reason if reason else ''})")
     best_near = max((x[0] for x in near), default=0.0)
