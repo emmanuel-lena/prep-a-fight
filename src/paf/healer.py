@@ -848,7 +848,9 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
                 + (f", about {_mmss(st.median(inside))}" if inside else "") + tag)
     sp_of = {a: sp for a, sp, _n in near}
     return ", or " + ", ".join(f"{_chip((moved or {}).get((c.name, a), a), n)}" + (f" for {_pct(sp)}" if sp else " for some")
-                               + (back(a) if a in c.back and not c.why else "") + window(a, n) for a, sp, n in near)
+                               + ("" if window(a, n) and "back from cooldown" in window(a, n) else
+                                  back(a) if a in c.back and not c.why else "")  # the window's reading alone (r. 72)
+                               + window(a, n) for a, sp, n in near)
 
 
 BACK = 8.0  # seconds past its cooldown a press still counts as pressed as soon as it is back
@@ -1879,7 +1881,8 @@ def render_sheet(h: HealerPrep) -> str:
     # a dispel every healer does: said as what the top players do, not as this spec's job (Dig deeper says those)
     aura = h.dispelled[0][0] if h.dispelled else ""
     first = ([f"<p class='lead'>The top {e(h.spec)} of each kill removes {e(aura)} {h.dispelled[0][1]:.1f} times "
-              f"(timed on {h.dispel_kills} of their kills, a lighter read than the cooldowns' 100){when}."
+              f"(a mean over {h.dispel_kills} of their kills, timed: a lighter read than the cooldowns' 100; the "
+              f"Dig deeper tab's rates a minute are medians over every kill){when}."
               + (f" {e(h.dispel_text)}" if h.dispel_text else "") + fed + "</p>"]  # the journal's other text: below
              if h.dispelled and h.dispelled[0][1] >= 1 else [journal_lead(h.journal, "healers")])
     boss = first + (
