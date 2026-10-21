@@ -546,6 +546,8 @@ def render_sheet(p: TankPrep) -> str:
         boss.append(f"<h2>What the Encounter Journal asks tanks</h2><ul class='hl2'>{jr}</ul>")
     if p.abilities:  # every ability, the tanks' in full and the others' named
         boss.append(f"<h2>Every ability{', phase by phase' if '<h3>' in p.abilities else ''}</h2>"
+                    f"<p class='small muted'>The times are the boss's casts in the {p.kills} top {e(p.spec)} kills "
+                    f"(median {_mmss(p.duration)}): a slower or faster raid sees the later ones shift.</p>"
                     f"<div class='stages'>{p.abilities}</div>")
     have = next((x for x in p.presence if x.spec == p.spec), None)
     deeper = []

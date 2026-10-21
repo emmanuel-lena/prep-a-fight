@@ -774,6 +774,9 @@ def back_share(per_player: list[list[float]], t: float, cd: float) -> float:
     return (sum(1 for x, y in near if y is not None and x - y <= cd + BACK) / len(near)) if near and cd else 0.0
 
 
+FEW_SHARE = 0.1  # a press in a hit no cooldown is kept for, said under the quarter bar from this share
+
+
 def landed_in(m: Moment, cds: list[Cooldown]) -> str:
     """The press most of them make inside a hit no cooldown is kept for, and why it is no answer: "(35% have
     Tranquility land at 3:43, back from cooldown)". Every button and habit is read (Celestial Conduit's 2:11 habit,
@@ -791,9 +794,15 @@ def landed_in(m: Moment, cds: list[Cooldown]) -> str:
                                  + (" for about half" if t in c.back_half else "") if t in c.back else ""))
                 if why:
                     near.append((sp, c, t, why))
-    if not near:
+    if not near:  # no moment shown there: the most common press in its window all the same, under the quarter bar
+        few = [(hs, c) for c in cds if not (c.why or _item(c.spell_id) or _external(c.spell_id) == "damage")
+               for hs in [hit_share(c, m.t, m.t)] if hs and hs >= FEW_SHARE]  # (Nek'zali's 0:35: 20% of the top
+        if few:  # Discs press Ultimate Penitence in it; the lead said "no cooldown" alone; round 36)
+            hs, c = max(few, key=lambda x: x[0])
+            return f" (only {_pct(hs)} press {e(_shown(c.name))} in it)"
         return ""
-    sp, c, t, why = max(near, key=lambda x: x[0])
+    # the closest of the presses a quarter make (Disc's 2:01 Evangelism, 9 s before 2:10, over its 1:41 one, 29 s)
+    sp, c, t, why = max(near, key=lambda x: (x[0] >= 0.25, -abs(m.t - x[2]), x[0]))
     if c.ramp and t < m.t - ANSWER[0]:
         return f" ({_pct(sp)} have {e(_shown(c.name))} ramp at {_mmss(t)}, {e(why)})"
     return f" ({_pct(sp)} have {e(_shown(c.name))} land at {_mmss(t)}, {e(why)})"
@@ -1215,7 +1224,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
     if not out:
         return ""
     return ("<h2>The other healers' cooldowns on the big hits</h2>"
-            f"<ul class='hl2'>{out}</ul><p class='small muted'>From the same kills as the table: a time is shown when a quarter "
+            f"<ul class='hl2'>{out}</ul><p class='small muted'>From the same kills as the table, every player of each spec (that spec's "
+            "own sheet reads its top players, so its times can differ): a time is shown when a quarter "
             "of the spec's healers who press the button share it, its share of all that spec's healers there; a press "
             "back from cooldown is no answer, as on the fight tab.</p>")
 
@@ -1581,6 +1591,8 @@ def render_sheet(h: HealerPrep) -> str:
             stages = stages.replace(f"<b>{e(name)}</b>", f"<b>{e(name)}</b> <small class=\"muted\">(the top "
                                     f"{e(h.spec)}s dispel it {k:.1f} times a kill)</small>", 1)
         boss.append(f"<h2>Every ability{', phase by phase' if '<h3>' in stages else ''}</h2>"  # Vashnik: one phase
+                    f"<p class='small muted'>The times are the boss's casts in the {h.kills} top {e(h.spec)} kills "
+                    f"(median {_mmss(h.duration)}): a slower or faster raid sees the later ones shift.</p>"
                     f"<div class='stages'>{stages}</div>")
     # every spec the pool reads (paf.healroles.POOL_PLAYERS): the Disc Priest, 3 in a Holy Priest's kills, has 43
     # in the pool; its casts unread here are said so in its cells
