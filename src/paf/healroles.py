@@ -826,6 +826,14 @@ def paired_jobs(per_kill: dict, durs: dict, own: tuple[str, str] | None = None, 
             for spec, js in out.items()}
 
 
+def timed_in(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> int:
+    """Of the kills the roles were measured on, those whose every cast was read (the sheet's timings)."""
+    ensure_tables(con)
+    where, params = heal_filter(encounter_id, difficulty)
+    return con.execute(f"SELECT COUNT(*) FROM heal_kill k JOIN fight f USING(report, fight_id) WHERE {where} "
+                       "AND f.status = 'done'", params).fetchone()[0]
+
+
 def sample(con: sqlite3.Connection, encounter_id: int, difficulty: int) -> tuple[int, float, float]:
     """The kills the roles were measured on: (kills, median kill time, mean deaths). Shown with the roles: the
     sample changes them (Nek'zali heroic, the same specs: overheal 46-63% in kills ranked by an Elemental's damage,

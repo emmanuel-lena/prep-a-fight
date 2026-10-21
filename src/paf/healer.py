@@ -116,6 +116,7 @@ class HealerPrep:
     role_kills: int = 0  # kills the roles were measured on
     own_median: float = 0.0  # their median kill time (slower than the timings' 100: picked by healing)
     own_kills: int = 0  # the top kills whose healing tables are read (150): more than the timings' (100, every cast)
+    own_timed: int = 0  # of them, the timings' kills (Restoration Shaman, Nek'zali: 99 of 100 in 149)
     own_sample: str = ""  # the kills the externals and cooldowns are read on: "the 150 kills of the top Holy Priests"
     role_sample: str = ""  # which kills: "the top Restoration Shamans' kills (ranked by healing), median 4:50, 2 deaths"
     class_name: str = ""
@@ -1019,7 +1020,9 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip((moved or {}).get((c.name, t), t), tie(c, t, n))}"
                                         + _split(_named(c, t, named, tie(c, t, n), sp))[0]
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
-                                           if t in c.back and not (c.why or c.every) else "")  # its line says it
+                                           if t in c.back and not (c.why or c.every)  # its line says it; its
+                                           and "back from cooldown" not in _split(_named(c, t, named, tie(c, t, n), sp))[1]
+                                           else "")  # window's reading alone, as an "or" time's (round 78)
                                         + _split(_named(c, t, named, tie(c, t, n), sp))[1]  # each time its own
                                         + f"{_or(c, t, answered, named, moved)}</span>"  # window, then the "or" (r. 68)
                                         for k, (t, n, sp) in enumerate(zip(c.times, c.near,
@@ -1414,7 +1417,7 @@ def roles_table(roles: list, mine: str = "") -> str:
     few = "<small>too few here</small>"  # a spec read in the pool, too rare in this sheet's kills for its casts
     cover = next((r.spike_cover for r in roles if getattr(r, "spike_cover", 0)), 0.0)
     head = ("<th>Healer</th><th>Healing share</th><th>On tanks</th>"
-            f"<th>Share of its healing in spikes{f' <small>(kill by kill; the spikes are {_pct(cover)} of the fight)</small>' if cover else ''}</th>"
+            f"<th>Healing in spikes{f' <small>(share; spikes {_pct(cover)} of the fight)</small>' if cover else ''}</th>"
             "<th>Overheal</th><th>Dispels a minute</th><th>Externals given a kill <small>(every player)</small></th>"
             + ("<th>Buffs given a kill</th>" if buffs else "")
             + "<th>Players</th>")
@@ -1545,12 +1548,20 @@ def jobs_lead(roles: list, mine: str = "") -> str:
     job found is one the top players do not keep, that is the answer, the averages in a small line (round 41: 110
     words in the lead's type to take each job back)."""
     found = [(r.spec, _job(r)) for r in roles if _job(r)]
+    by = {r.spec: r for r in roles}
+
+    def table(sp: str, j: str) -> str:  # the table's own number beside the means (round 78: 1.4, 1.0 and the
+        r = by[sp]                       # table's 1.2 for one Holy Priest dispel rate, left to the reader)
+        key = "dispels" if j.startswith("dispels") else "tank" if "tanks" in j else "spike" if "spikes" in j else ""
+        x = getattr(r, key, None) if key else None
+        v = "" if x is None else f"{x:.1f}" if key == "dispels" else _pct(x)
+        return f" (the table's median {sp}: {v})" if v else ""
     if found and all("only on average" in j for _s, j in found):
         return ("<p class='lead'>No healer spec has a job of its own here that the top players keep.</p>"
                 "<p class='small muted'>On average across every healer (means paired within each kill, so a spec ahead "
                 "here need not be ahead in the table below, which shows each spec's median player): "
                 + "; ".join(f"the {e(sp)} {e(re.sub(r' [(][0-9]+ and [0-9]+ ranked players, [^)]*[)]', '', j.replace(', but only on average', '', 1)))}"
-                            for sp, j in found)
+                            f"{e(table(sp, j))}" for sp, j in found)
                 + ". The top players: the ranked one of each top kill of each healer spec's sheet.</p>")  # once
     you = next((r for r in roles if r.spec == mine), None)
     head = ""
@@ -1914,9 +1925,10 @@ def render_sheet(h: HealerPrep) -> str:
     # a dispel every healer does: said as what the top players do, not as this spec's job (Dig deeper says those)
     aura = h.dispelled[0][0] if h.dispelled else ""
     first = ([f"<p class='lead'>The top {e(h.spec)} of each kill removes {e(aura)} {h.dispelled[0][1]:.1f} times "
-              f"(a mean over {h.dispel_kills} of their kills, timed: a lighter read than the cooldowns' 100; the "
-              f"Dig deeper tab's rates a minute are medians over every kill){when}."
-              + (f" {e(h.dispel_text)}" if h.dispel_text else "") + fed + "</p>"]  # the journal's other text: below
+              f"a kill{when}." + (f" {e(h.dispel_text)}" if h.dispel_text else "") + fed + "</p>"  # the journal's
+              f"<p class='small muted'>A mean over {h.dispel_kills} of their kills, timed: a lighter read than the "
+              f"cooldowns' {h.kills}; the Dig deeper tab's rates a minute are medians over every kill.</p>"]  # method
+             # under the lead, not in it (round 78)
              if h.dispelled and h.dispelled[0][1] >= 1 else [journal_lead(h.journal, "healers")])
     boss = first + (
         [f"<h2>What the Encounter Journal asks healers</h2><ul class='hl2'>{jr}</ul>"] if jr else [])
@@ -1953,7 +1965,13 @@ def render_sheet(h: HealerPrep) -> str:
     deeper_first: list[str] = [jobs_lead(shown, h.spec)]  # the cards below only: a spec too rare has no claim
     # every sample of the sheet, once (round 34: five kill counts and no map)
     counts = [f"your cooldowns' timings: the {h.kills} top {e(h.spec)} kills (every cast read)",
-              f"the healers in them: {h.own_kills or h.kills} top kills" if h.own_kills else "",
+              # the 150 against the 100 said (round 78), counted, not assumed: the timed kills are read first, yet
+              # not always all (Restoration Shaman, Nek'zali: 99 of 100 in 149)
+              (f"the healers in them: {h.own_kills} top kills"
+               + (f" ({'the' if h.own_timed == h.kills else f'{h.own_timed} of the'} timings' {h.kills} and "
+                  f"{h.own_kills - h.own_timed} more, read for their healers only)"
+                  if h.own_timed and h.own_kills > h.own_timed else ""))
+              if h.own_kills else "",
               f"the table, jobs and the other healers: {h.role_kills:,} kills of this boss, every spec's" if h.role_kills
               else "",
               f"the raid's damage: {h.raid_kills} kills" if h.raid_kills else "",

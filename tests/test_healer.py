@@ -367,6 +367,8 @@ def test_no_job_kept_by_the_top_players_is_the_answer():
     assert lead.startswith("<p class='lead'>No healer spec has a job of its own here that the top players keep.</p>")
     assert "On average across every healer (means paired within each kill" in lead
     assert "the Holy Paladin heals the tanks more: 9%" in lead
+    hp.tank = 0.08  # the table's own number beside the means (round 78)
+    assert "against 7% (the table&#x27;s median Holy Paladin: 8%)" in healer.jobs_lead([hp, sh], "Restoration Shaman")
 
 
 def test_a_press_is_said_at_its_most_shared_time():
@@ -447,3 +449,13 @@ def test_a_button_on_cooldowns_far_habit_is_dropped():
     tl = SimpleNamespace(abilities=[ab], duration=270.0, players=[{"casts": {1: ts}} for ts in per_player])
     c = healer.cooldowns(tl, [], {1: (90.0, 1)})[0]
     assert c.every and 230.0 not in c.times and 230.0 not in c.alt
+
+
+def test_a_chip_says_back_from_cooldown_once():
+    # Protection Warrior, Nek'zali (round 78): Shield Wall "3:51 · 24% · back from cooldown for about half · in the
+    # window of the 3:55 hit: 28% …, back from cooldown for about half"
+    c = healer.Cooldown("Shield Wall", 1, 0.9, 2.0, [231.0], [""], cd=180.0,
+                        presses=[[50.0, 234.0]] * 10 + [[234.0]] * 9 + [[34.0]] * 70, n_all=100,
+                        lasts=[300.0] * 58 + [200.0] * 42, back=[231.0], back_half=[231.0], support=[0.24])
+    out = healer.cooldowns_html([c], set(), {("Shield Wall", 231.0): 235.0})
+    assert out.count("back from cooldown") == 1, out
