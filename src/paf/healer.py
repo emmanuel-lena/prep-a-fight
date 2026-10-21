@@ -880,8 +880,10 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None) -> str:
         # buttons, Divine Toll's 30 s, are not on the sheet's cards)
     # the closest of the presses a quarter make (Disc's 2:01 Evangelism, 9 s before 2:10, over its 1:41 one, 29 s)
     # a ramp button is read on its ramp window first (round 56: Disc's 3:35 read on the hit's, 29% for 39%)
-    sp, c, t, why = max(near, key=lambda x: (x[0] >= 0.25, x[1].ramp and m.t - x[2] >= RAMP[0], -abs(m.t - x[2]),
-                                              x[0]))
+    # and a raid cooldown before a button pressed about every minute or on cooldown (Tranquility 21%, back from
+    # cooldown, over Convoke's 19% on Vashnik's 3:35; round 57)
+    sp, c, t, why = max(near, key=lambda x: (x[0] >= 0.25, x[1].ramp and m.t - x[2] >= RAMP[0],
+                                              not (x[1].why == MINUTE or x[1].every), -abs(m.t - x[2]), x[0]))
     if named is not None and c.presses:  # its chip gives the same count, said of this hit (round 50)
         named[(c.name, t)] = m.t
     few = "only " if sp < 0.25 else ""  # under a quarter, as the bare hits' "only N%" (round 39)
