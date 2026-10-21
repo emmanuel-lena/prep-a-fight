@@ -723,7 +723,7 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
         + "".join(f"<rect x='{float(x((moved or {}).get((c.name, t), t))) - 4:.1f}' y='{H - B + 6 + 18 * i}' "
                   f"width='8' height='13' rx='2' "
                   f"class='cp{'' if t in tied else ' off'}'><title>{e(c.name)} {_mmss((moved or {}).get((c.name, t), t))}"
-                  f"{'' if t in tied else ' (tied to no hit)'}</title></rect>"
+                  f"{'' if t in tied else ' (tied to no hit' + _why_not(c, t) + ')'}</title></rect>"
                   for t in [*c.times, *c.alt] if t <= span
                   for tied in [{a for a in [*c.times, *c.alt] if (c.name, a) in answered} if answered is not None
                                else {a for a, n in [*zip(c.times, c.near, strict=False),
@@ -1073,6 +1073,14 @@ def _tw(c: Cooldown, t: float, hit: float) -> str:
     1:13), else its moment's."""
     inside = _counted(c, t, hit) if c.presses else []
     return _mmss(st.median(inside) if inside else t)
+
+
+def _why_not(c: Cooldown, t: float) -> str:
+    """An untied mark's reason on hover, as its card gives it (round 75: an outline on a hit's dot read "tied to no
+    hit" with no word why)."""
+    reason = (c.why or ("on cooldown" if c.every else "back from cooldown" if t in c.back else
+                        "at the pull" if t <= PULL else ""))
+    return f": {reason}" if reason else ""
 
 
 def _split(chip: str) -> tuple[str, str]:
