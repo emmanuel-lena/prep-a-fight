@@ -815,7 +815,8 @@ def _secs(mmss: str) -> float:
     return int(m) * 60 + int(sec)
 
 
-def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None = None) -> str:
+def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None = None,
+        moved: dict | None = None) -> str:
     """The other habits nearest this moment, said on its chip ("1:18, or 0:36 for some"): another player's choice
     for the same press, never an extra one."""
     near = [(a, sp, n) for a, sp, k, n in zip(c.alt, c.alt_support or [0.0] * len(c.alt),
@@ -836,8 +837,8 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
             hit = _secs(n.partition(" ")[0])
         if hit is None or (hs := hit_share(c, a, hit)) is None:
             return ""
-        if n and not (named or {}).get((c.name, a)):  # tied: its chip names the hit already
-            return f" &middot; in its window:{_base(c, hs, hit).replace(' &middot;', '')}"
+        if n and not (named or {}).get((c.name, a)):  # tied: its chip names the hit already; one share when equal
+            return "" if _pct(hs) == _pct(sp_of[a]) else f" &middot; in its window:{_base(c, hs, hit).replace(' &middot;', '')}"
         where = "ahead of" if c.ramp and a < hit - ANSWER[0] else "in the window of"
         inside = _counted(c, a, hit)
         b = None if c.why == MINUTE else _back_in(c, a, hit)
@@ -845,7 +846,8 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
                + (" for about half" if b <= BACK_SHARE[1] else ""))
         return (f" &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
                 + (f", about {_mmss(st.median(inside))}" if inside else "") + tag)
-    return ", or " + ", ".join(f"{_chip(a, n)}" + (f" for {_pct(sp)}" if sp else " for some")
+    sp_of = {a: sp for a, sp, _n in near}
+    return ", or " + ", ".join(f"{_chip((moved or {}).get((c.name, a), a), n)}" + (f" for {_pct(sp)}" if sp else " for some")
                                + (back(a) if a in c.back and not c.why else "") + window(a, n) for a, sp, n in near)
 
 
@@ -908,6 +910,8 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
         near_t = min([*c.times, *c.alt], key=lambda x: abs(x - when), default=None)
         if named is not None and near_t is not None and abs(near_t - when) <= 15:
             named[(c.name, near_t)] = m.t
+        elif named is not None:  # no chip near it: its card gets a line of its own (round 66: Spirit Link Totem
+            named[(c.name, ("line", m.t))] = (hs, when, _reach_note(c, m.t))  # "timing varies" under the lead's 2:12)
         few_ = "only " if hs < 0.25 else ""
         return (f" ({few_}{_pct(hs)} press {e(_shown(c.name))} in its window{_reach_note(c, m.t)}, about "
                 f"{_mmss(when)}{', ' + reason if reason else ''})")
@@ -994,13 +998,16 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
                                         + _split(_named(c, t, named, tie(c, t, n), sp))[0]
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
                                            if t in c.back and not (c.why or c.every) else "")  # its line says it
-                                        + f"{_or(c, t, answered, named)}"  # the "or" by its own press (round 58),
+                                        + f"{_or(c, t, answered, named, moved)}"  # the "or" by its own press (r. 58),
                                         + _split(_named(c, t, named, tie(c, t, n), sp))[1] + "</span>"  # the window last
                                         for k, (t, n, sp) in enumerate(zip(c.times, c.near,
                                                                            c.support or [0.0] * len(c.times),
                                                                            strict=False)))
                                 or "<small>timing varies: no shared moment</small>")
         + _pull_chip(c)
+        + "".join(f"<small class='alt'>in the window of the {_mmss(k[1][1])} hit: {_pct(v[0])} of the top players"
+                  f"{v[2]}, about {_mmss(v[1])}</small>" for k, v in (named or {}).items()
+                  if k[0] == c.name and isinstance(k[1], tuple))
         + ("<small class='alt'>two rhythms, by their first press: " + "; or ".join(
             f"from {_mmss(ts[0])}, then {_and([_mmss(t) for t in ts[1:]])}" for _sp, ts in c.rhythms)
            + "</small>"
@@ -1026,7 +1033,7 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
         tag = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"
                + (" for about half" if b <= BACK_SHARE[1] else ""))
         if _pct(hs) == _pct(sp):  # one count: said once, its time only when 5 s or more off (round 60)
-            return (f"{_base(c, hs, hit)} {where} the {_mmss(hit)} hit"
+            return (f"{_base(c, hs, hit)} &middot; {where} the {_mmss(hit)} hit"
                     + (f", about {_mmss(when)}" if abs(when - t) >= 5 else ""))  # its chip's tag says it
         return (f"{_share(sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
                 + (f", about {_mmss(when)}" if abs(when - t) >= 5 else "") + tag)  # a time 5 s off or more (r. 59)

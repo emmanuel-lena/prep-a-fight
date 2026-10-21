@@ -216,7 +216,8 @@ def test_a_press_back_from_cooldown_in_a_hit_is_said_and_drawn_as_none():
     assert "for the 0:40 hit, 100% press Tranquility (about 0:42)" in sheet
     assert ("No cooldown is kept for the 2:40 hit (100% press Tranquility in its window, about 2:45, back from "
             "cooldown)") in sheet
-    assert "2:45 &middot; 100% of the top players in the window of the 2:40 hit &middot; back from cooldown" in sheet
+    assert ("2:45 &middot; 100% of the top players &middot; back from cooldown &middot; in the window of the 2:40 "
+            "hit") in sheet
     assert "class='cp off'><title>Tranquility 2:45" in sheet and "class='cp'><title>Tranquility 0:42" in sheet
 
 
@@ -256,7 +257,7 @@ def test_a_ramp_answers_the_hit_after_it(monkeypatch):
     assert "for the 0:40 hit, 100% press Evangelism (about 0:24, a ramp ahead of it)" in sheet
     assert "pressed again as soon as it is back" not in sheet  # its rhythm line says it (round 30)
     assert "0:24 &middot; 16 s before the 0:40 hit" in sheet
-    assert "1:42 &middot; 100% of the top players ahead of the 2:10 hit &middot; back from cooldown" in sheet
+    assert "1:42 &middot; 100% of the top players &middot; back from cooldown &middot; ahead of the 2:10 hit" in sheet
 
 
 def test_back_from_cooldown_is_read_per_player():
