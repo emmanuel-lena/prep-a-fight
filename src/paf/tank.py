@@ -500,7 +500,7 @@ def render_sheet(p: TankPrep) -> str:
                     "the swaps", [*defs, *shorts, *lane], {"Tank swaps", *(n for n, _t in answered)}, answered)
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + [
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the top tanks "
-        f"take per second, median of {p.damage_kills or 'the'} kills; under it, the defensives the lead names (an "
+        f"take per second, median of {p.damage_kills or 'the'} kills; under it, the defensives the lead ties to a hit (an "
         f"outline: another press of the same button) and the swaps. A dot is the tanks' biggest damage, whatever "
         f"casts it.</p><ul class='hl2'>"
         f"{moments_html(p.moments, 'tank damage') or '<li>No big moment: steady damage.</li>'}</ul></div>",

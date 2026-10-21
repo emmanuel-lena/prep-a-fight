@@ -183,7 +183,8 @@ def test_every_healer_spec_in_one_table():
                              dispels=1.1, externals=0.0, buffs=0.0, buff_spells=[], players=38,
                              jobs=["removes Essence Rend"], cd_names=[("Ascendance", 1, [(35.0, 0.38, False)], 0.9)])
     table = healer.roles_table([shaman, disc], "Restoration Shaman")
-    assert "<th>Buffs given a kill</th>" in table and "1.4 <small>Power Infusion</small>" in table
+    assert "<th>Buffs given a kill <small>(this sheet's kills)</small></th>" in table
+    assert "1.4 <small>Power Infusion</small>" in table
     assert "Restoration Shaman <small>(you)</small>" in table and "&ndash;" in table
     more = healer.roles_more([shaman, disc], "Restoration Shaman")
     assert "removes Essence Rend" not in more and "Ascendance" not in more  # the lead's jobs; your times: fight tab
@@ -281,17 +282,20 @@ def test_jobs_lead_says_either_only_when_your_spec_has_no_job():
 
 
 def test_two_rhythms_are_said_apart():
-    # Disc, Vashnik heroic (round 29): 31 players press Evangelism at 0:04, 1:42, 3:15, 30 at 0:24, 2:01, 3:35, their
-    # second press spread from 1:47 to 2:15
-    per_player = ([[4.0, 95.0 + k % 3 * 7, 195.0] for k in range(31)]
-                  + [[24.0, 118.0 + k % 4 * 6, 215.0] for k in range(30)] + [[60.0]] * 39)
+    # Disc, Vashnik heroic (round 32): 32 players press Evangelism at 0:04, 1:42, 3:15, 38 at 0:23, 2:01, 3:35, their
+    # second press spread from 1:46 to 2:18
+    per_player = ([[4.0, 99.0 + k % 3 * 3, 195.0] for k in range(32)]
+                  + [[23.0, 106.0 + k % 5 * 7, 215.0] for k in range(38)] + [[60.0]] * 30)
     got = healer.rhythms(per_player, [4.0, 127.0, 218.0], [24.0, 102.0, 195.0], 100)
-    # 3:35 said at the chip's 3:38
-    assert [(sp, [round(t) for t in ts]) for sp, ts in got] == [(0.31, [4, 102, 195]), (0.3, [24, 127, 218])]
-    assert healer.rhythms(per_player[:40], [4.0, 127.0, 218.0], [24.0, 102.0, 195.0], 100) == []  # 9 of 100: no
+    assert [(sp, [round(t) for t in ts]) for sp, ts in got] == [(0.32, [4, 102, 195]), (0.38, [23, 120, 215])]
+    assert healer.rhythms(per_player[:40], [4.0, 127.0, 218.0], [24.0, 102.0, 195.0], 100) == []  # 8 of 100: no
 
 
-def test_no_rhythm_line_for_a_press_no_chip_shows():
-    # Holy Priest, Nek'zali (round 31): the 0:34 group's second Apotheosis at 2:52, no chip there (3:11)
-    per_player = [[34.0, 172.0]] * 30 + [[72.0, 226.0]] * 30
-    assert healer.rhythms(per_player, [34.0, 191.0], [72.0, 226.0], 100) == []
+def test_a_button_with_two_rhythms_takes_their_moments():
+    # the chips read 0:03, 2:11, 3:39: one group's opener with the other's later presses (round 32)
+    ab = SimpleNamespace(id=1, name="Evangelism", users=0.7, per_kill=3.0)
+    per_player = ([[4.0, 102.0, 195.0]] * 32 + [[23.0, 121.0, 215.0]] * 38 + [[]] * 30)
+    tl = SimpleNamespace(abilities=[ab], duration=270.0, players=[{"casts": {1: ts}} for ts in per_player])
+    c = healer.cooldowns(tl, [], {1: (90.0, 1)})[0]
+    assert [round(t) for t in c.times] == [23, 121, 215] and [round(t) for t in c.alt] == [4, 102, 195]
+    assert [round(t) for t in c.alt_of] == [23, 121, 215] and len(c.rhythms) == 2

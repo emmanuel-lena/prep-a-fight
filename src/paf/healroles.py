@@ -406,6 +406,7 @@ class Role:
     buffs: float = 0.0  # damage buffs cast on another player (Power Infusion), per kill
     buff_spells: list[str] = field(default_factory=list)  # their names, the most cast first
     spike_cover: float = 0.0  # the share of the fight the raid's damage spikes take: the spike share's baseline
+    own_players: int = 0  # its healers in this sheet's kills: its externals', buffs' and cooldowns' base
 
 
 # a job (the jobs audit, 2026-10-20: docs/research/healer-roles.md): paired within each kill, the ranked healer of the
@@ -420,7 +421,7 @@ JOB_GAP = {"tank": 0.015, "spike": 0.02, "dispels": 0.15}  # ... and at least th
 
 
 def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: dict[int, str] | None = None,
-          min_players: int = 8, ranked: tuple[str, str] | None = None, pool: tuple[dict, dict, dict] | None = None
+          min_players: int = 15, ranked: tuple[str, str] | None = None, pool: tuple[dict, dict, dict] | None = None
           ) -> list[Role]:
     """What each healer spec does on this boss, against the other healers of the same kills. pool: every corpus'
     kills of the boss (pooled_kills), for the jobs; else this corpus' kills, its ranked healer left out."""
@@ -515,7 +516,7 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
                         sorted(cds, key=lambda c: -c[1]),
                         se={"tank": se["tank"], "spike": se["spike"], "overheal": se["overheal"],
                             "dispels": se["dispels"], "raid_cds": se["raid"], "externals": se["ext"]},
-                        buffs=st.mean(s["buff"]) if own else -1.0,
+                        buffs=st.mean(s["buff"]) if own else -1.0, own_players=n,
                         buff_spells=[(names or {}).get(ab, f"spell {ab}") for ab, _ in buff_casts[spec].most_common()]))
     cover = list(pool[2].values()) if pool else [  # the spikes' share of the fight, on the column's own kills
         x for (x,) in con.execute(f"SELECT k.spike_share FROM heal_kill k JOIN fight f USING(report, fight_id) "
