@@ -512,7 +512,9 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         if two and not all(shared(t) for _sp, ts in two for t in ts):  # a press too spread to show (Divine Hymn's
             two = []  # second, Nek'zali): no rhythm, or the row would lose it
         if two:
-            (_sa, a), (_sb, b) = sorted(two, key=lambda r: -r[0])
+            def shared_at(t: float, per_player=per_player) -> int:  # the chip's own count (round 59: the 0:04
+                return sum(1 for ts in per_player if any(abs(x - t) <= 8 for x in ts))  # group led at 31% for 36%)
+            (_sa, a), (_sb, b) = sorted(two, key=lambda r: -shared_at(r[1][0]))
             times, alt, alt_of = list(a), list(b[:len(a)]), list(a[:len(b)])
         else:  # a press's most shared time is its main one, its habits after (round 41: Convoke "2:24 · 27%, or 2:37
             def near_n(t: float, per_player=per_player) -> int:  # for 28%" put the smaller first)
@@ -843,7 +845,7 @@ PULL = 12.0  # seconds: a press before this is the pull's opener, never a ramp f
 MINUTE = "about every minute"  # the reason a button pressed four times a kill or more is tied to no hit
 
 
-def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None) -> str:
+def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: str = "raid cooldown") -> str:
     """The press most of them make inside a hit no cooldown is kept for, and why it is no answer: "(35% have
     Tranquility land at 3:43, back from cooldown)". Every button and habit is read (Celestial Conduit's 2:11 habit,
     Life Cocoon), the same for healers and tanks."""
@@ -897,7 +899,8 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None) -> str:
         if on_cd:  # a button pressed on cooldown lands there: said, or "no long cooldown" is false (round 57: Stasis)
             hs, c = max(on_cd, key=lambda x: x[0])
             return said(c, hs, "on cooldown")
-        return " (no long cooldown of theirs pressed by a tenth of them in it)" if cds else ""  # (round 56: shorter
+        return f" (no {word} of theirs pressed by a tenth of them in it)" if cds else ""  # (round 59: Lay on Hands,
+        # Avatar are long buttons, no raid cooldown nor defensive)  # (round 56: shorter
         # buttons, Divine Toll's 30 s, are not on the sheet's cards)
     # the closest of the presses a quarter make (Disc's 2:01 Evangelism, 9 s before 2:10, over its 1:41 one, 29 s)
     # a ramp button is read on its ramp window first (round 56: Disc's 3:35 read on the hit's, 29% for 39%)
@@ -989,7 +992,7 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
         if round(hs * 100) == round(sp * 100) and _mmss(when) == _mmss(t):  # one count, one time: said once
             return f"{_base(c, hs, hit)} {where} the {_mmss(hit)} hit"
         return (f"{_share(sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
-                f", about {_mmss(when)}")
+                + (f", about {_mmss(when)}" if abs(when - t) >= 5 else ""))  # a time 5 s off or more (round 59)
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
         return _base(c, hs, _secs(n.partition(" ")[0]))
     return _share(sp)
@@ -1393,7 +1396,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                      for n, t, sp, rp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
                                         f"<small>(under a quarter of those who press it"
-                                        f"{', the same share' if int(pp * 100) == round(sp * 100) else f': {int(pp * 100)}%'})</small>"
+                                        f"{', the same share' if _pct(pp) == _pct(sp) else f': {_pct(pp)}'})</small>"
                                         for u in under if len(u) > 4 for n, t, sp, pp in [u[:4]])
                            or "none shared") + "</span>"
                         for h, got, under in per_hit)
