@@ -285,9 +285,13 @@ def name_by_damage(found: list[Moment], by: dict[str, list[float]], width: int =
 
 def raid_curve(con, encounter_id: int, difficulty: int, duration: float, pool: bool = False) -> list[float]:
     """Median raid damage taken per second, per STEP seconds, over the kills that have it (pool: every corpus')."""
+    rows = _raid_rows(con, "raid_damage", encounter_id, difficulty, pool)
+    if pool and rows:  # the pooled kills' own length, not this sheet's: the same curve and ratios on every sheet
+        lengths = [max((len(v) for v in json.loads(se).values()), default=0) * stp for stp, se in rows]
+        duration = st.median(lengths) or duration
     n = int(duration // STEP) + 1
     per_bucket: list[list[float]] = [[] for _ in range(n)]
-    for step, series in _raid_rows(con, "raid_damage", encounter_id, difficulty, pool):
+    for step, series in rows:
         data = json.loads(series)
         total: list[float] = []
         for values in data.values():
