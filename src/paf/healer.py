@@ -781,8 +781,10 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
     def back(a: float) -> str:  # tagged as the main time is (Evangelism's 1:42 habit, round 29)
         return f" &middot; back from cooldown{' for about half' if a in c.back_half else ''}"
     def share(a: float, sp: float, n: str) -> str:  # a habit the lead names for a hit: its count, said (round 51)
-        if (c.name, a) in (named or {}):
-            return " for" + _named(c, a, named, n, sp).replace(" of the top players", "")
+        hit = (named or {}).get((c.name, a))
+        if hit is not None and (hs := hit_share(c, a, hit)) is not None:
+            where = "ahead of" if c.ramp and a < hit - ANSWER[0] else "in the window of"
+            return f" for {_pct(hs)} {where} the {_mmss(hit)} hit"
         return f" for {_pct(sp)}" if sp else " for some"
     return ", or " + ", ".join(f"{_chip(a, n)}{share(a, sp, n)}"
                                + (back(a) if a in c.back and not c.why else "") for a, sp, n in near)
