@@ -1189,7 +1189,7 @@ def roles_table(roles: list, mine: str = "") -> str:
     few = "<small>too few here</small>"  # a spec read in the pool, too rare in this sheet's kills for its casts
     cover = next((r.spike_cover for r in roles if getattr(r, "spike_cover", 0)), 0.0)
     head = ("<th>Healer</th><th>Healing share</th><th>On tanks</th>"
-            f"<th>Its healing in spikes{f' <small>(spikes: {_pct(cover)} of the fight)</small>' if cover else ''}</th>"
+            f"<th>Its healing in spikes{f' <small>(kill by kill, {_pct(cover)} of the fight)</small>' if cover else ''}</th>"
             "<th>Overheal</th><th>Dispels a minute</th><th>Externals given a kill <small>(every player)</small></th>"
             + ("<th>Buffs given a kill</th>" if buffs else "")
             + "<th>Players</th>")
@@ -1270,8 +1270,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                         for u in under if len(u) > 4 for n, t, sp, pp in [u[:4]])
                            or "none shared") + "</span>"
                         for h, got, under in per_hit)
-        n = getattr(r, "own_players", 0)
-        out += (f"<li><b>{e(r.spec)}</b>" + (f"<small>{n} healers</small>" if n else "")
+        n = getattr(r, "own_players", 0)  # under 100: a few players' habit, said (Disc: 43; round 46)
+        out += (f"<li><b>{e(r.spec)}</b>" + (f"<small>{n} healers{', few players' if n < 100 else ''}</small>" if n else "")
                 + f"<span class='when'>{chips}</span></li>")
     if not out:
         return ""
@@ -1347,6 +1347,7 @@ def _plain(text: str) -> str:
     return re.sub(r"[\[\]]", "", text)
 
 
+WIDE_KILLS = 30  # a spec in fewer kills: its with/without numbers swing wide, said on its row (round 46)
 FEW_KILLS = 15  # a spec in fewer of the kills read: its numbers say little (Vengeance, 10 kills: "0.0 deaths")
 
 
@@ -1379,7 +1380,8 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
         if few and not deaths:
             cells = "<td class='n' colspan='2'><small>too few kills</small></td>"
         rows += (f"<tr class='{'mine ' if p.spec == mine else ''}{'few' if few else ''}'><td>{e(p.spec)}</td>"
-                 f"<td class='n'>{_pct(p.share)} <small>({p.kills} kill{'s' if p.kills != 1 else ''})</small></td>"
+                 f"<td class='n'>{_pct(p.share)} <small>({p.kills} kill{'s' if p.kills != 1 else ''}"
+                 f"{', a wide reading' if FEW_KILLS <= p.kills < WIDE_KILLS else ''})</small></td>"
                  f"{cells}</tr>")
     head = (f"<th>{what}</th><th>Top kills with one</th><th>Per kill</th><th>Median kill</th>"
             + ("<th>Deaths per 20 players</th>" if deaths else ""))
@@ -1591,7 +1593,7 @@ def render_sheet(h: HealerPrep) -> str:
     # the rule, once, under the long cooldowns and their "fewer than half" line (Zephyr's read as part of it)
     fight.append("<p class='small muted'>Only the lead ties a press to a hit; a button on cooldown, cast on another "
                  "player, used while moving or a trinket says why it is not. A time is shown when a quarter of those who "
-                 "press the button share it; its share is of all the top players (for a press tied to a hit: those "
+                 "press the button share it; its share is of all the top players (for a press the lead names for a hit: those "
                  "pressing in that hit's window); \"or\": the time other top players press the same press instead. "
                  "\"Back from cooldown\": most of its players press it as soon as it "
                  "came back from their last use, so it was not saved for what it lands on (\"for about half\": 40 to "

@@ -512,7 +512,7 @@ def render_sheet(p: TankPrep) -> str:
         f"{cooldowns_html(defs, answered) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
         "<p class='small muted'>Only the lead ties a press to a hit; a button on cooldown, a potion or a trinket says "
         "why it is not. A time is shown when a quarter of those who press the button share it; its share is of all "
-        "the top players (for a press tied to a hit: those pressing in that hit's window); \"or\": the time other top players press the same press instead. \"Back from cooldown\": "
+        "the top players (for a press the lead names for a hit: those pressing in that hit's window); \"or\": the time other top players press the same press instead. \"Back from cooldown\": "
         "most of its players press it as soon as it came back from their last use, so it was not saved for what it "
         "lands on (\"for about half\": 40 to 60% of them).</p>"
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
