@@ -496,7 +496,9 @@ def render_sheet(p: TankPrep) -> str:
                        if big else _none_for(landed_in(m, defs, named, 'long defensive'))))
         # the other dots in time order: their most shared press, or one clause for those with none
         pairs = [(x, answer(x)) for x in sorted(p.moments, key=lambda x: x.t) if x is not m]
-        said = [f"for the {_mmss(x.t)} hit, {a[2]:.0%} press {e(a[0])} (about {when(a, x)})" for x, a in pairs if a]
+        def at(x: Moment) -> str:  # each hit with its size, as the biggest moment (round 76: "the 1:35 hit" never
+            return f"{_mmss(x.t)} ({_x(x.ratio)}&times;)"  # sized, 1.46x, out of time order after the biggest)
+        said = [f"for the {at(x)} hit, {a[2]:.0%} press {e(a[0])} (about {when(a, x)})" for x, a in pairs if a]
         answered = {(a[0], a[1]) for a in [big, *(a for _x, a in pairs)] if a}  # the chart draws these full
         tied.update({(a[0], a[1]): a[2] for a in [big, *(a for _x, a in pairs)] if a})
         from paf.healer import _counted
@@ -508,15 +510,15 @@ def render_sheet(p: TankPrep) -> str:
         notes = [(x, landed_in(x, defs, named, 'long defensive')) for x, a in pairs if not a]
         none = " (no long defensive of theirs pressed by a tenth of them in it)"
         quiet = [x for x, n in notes if n == none]  # the same aside once, for every such hit (round 62)
-        bare = [f"the {_mmss(x.t)} hit{n}" for x, n in notes if n != none]
+        bare = [f"the {at(x)} hit{n}" for x, n in notes if n != none]
         if said:
             lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 0:35 hit, 41% press Spell Reflection"
         first_none = not big and "no long defensive" in lead[0]
-        hits = f"the window of the {_and([_mmss(x.t) for x in quiet])} hit{'s' if len(quiet) > 1 else ''}"
+        hits = f"the window of the {_and([at(x) for x in quiet])} hit{'s' if len(quiet) > 1 else ''}"
         if quiet and first_none:  # "nor": the biggest moment said the same, in one sentence (round 65)
             lead[0] = lead[0].rstrip(".") + f", nor in {hits}."
         elif quiet:  # the pattern of every other hit, in one sentence with them (round 68)
-            bare = [f"the {_mmss(x.t)} hit{none}" for x in quiet] + bare
+            bare = [f"the {at(x)} hit{none}" for x in quiet] + bare
         if bare:
             lead.append(f"No defensive is kept for {', nor '.join(bare)}.")  # each hit its own aside (round 42)
         # a hit that comes with a swap (Vashnik's 1:35 and 2:55, after Dripping Fangs): the time is the link
@@ -557,13 +559,14 @@ def render_sheet(p: TankPrep) -> str:
         f"{moments_html(p.moments, 'tank damage') or '<li>No big moment: steady damage.</li>'}</ul></div>",
         f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
         f"{cooldowns_html(defs, answered, named, moved_t) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
-        "<p class='small muted'>Only the lead ties a press to a hit; a button on cooldown, a potion or a trinket says "
-        "why it is not. A time is shown when a quarter of those who press the button share it; its share is of all "
-        "the top players pressing within 8 s of it (for a press the lead names for a hit: those pressing in that hit's window, 5 s before to 8 s "
-        "after it starts); a time with no hit named lands on none, or the lead keeps another button for it; "
-        "\"or\": the time other top players press the same press instead. \"Back from cooldown\": "
-        "most of its players press it as soon as it came back from their last use, so it was not saved for what it "
-        "lands on (\"for about half\": 40 to 60% of them); either keeps it from counting for the hit.</p>"
+        "<p class='small muted'><b>Tied to a hit:</b> only the lead ties a press to a hit; a button on cooldown, a "
+        "potion or a trinket says why it is not; a time with no hit named lands on none, or the lead keeps another "
+        "button for it.<br><b>A time shown:</b> a quarter of those who press the button share it.<br><b>Its share:</b> "
+        "of all the top players pressing within 8 s of it; for a press the lead names for a hit, of those pressing "
+        "in that hit's window, 5 s before to 8 s after it starts.<br><b>\"or\":</b> the time other top players press "
+        "the same press instead.<br><b>\"Back from cooldown\":</b> most of its players press it as soon as it came "
+        "back from their last use, so it was not saved for what it lands on (\"for about half\": 40 to 60% of them); "
+        "either keeps it from counting for the hit.</p>"
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
            f"</p>" if p.rare else ""),
         f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"

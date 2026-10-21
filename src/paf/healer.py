@@ -545,6 +545,13 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         why = ("" if every else "cast on another player" if _external(sid) else "a cast-while-moving button"
                if _moving(sid) else "a movement button" if _speed(sid) else _item_why(name, sid) if _item(sid) else "about every minute" if per_kill >= 4
                else "")
+        if why == MINUTE or every:  # pressed about every minute or on cooldown: a habit far from its press is
+            far = [i for i, (x, of) in enumerate(zip(alt, alt_of, strict=False)) if abs(x - of) > OR_NEAR
+                   and (why or not any(-ANSWER[0] <= x - m.t <= ANSWER[1] for m in found))]  # a held habit
+            # for a hit stays the press's other time (round 74: Avenging Wrath held for 0:35, the rest on cooldown)
+            times = sorted([*times, *(alt[i] for i in far if all(abs(alt[i] - t) > 8 for t in times))])
+            alt, alt_of = ([x for i, x in enumerate(alt) if i not in far],  # another moment of its own, not "or"
+                           [x for i, x in enumerate(alt_of) if i not in far])  # (round 76: "2:09 …, or 1:22")
         shares = {x: back_share(per_player, x, cd) for x in [*times, *alt]}
         back = {x for x, b in shares.items() if b > BACK_SHARE[0]}  # pressed as soon as it is back; about half
         half = {x for x, b in shares.items() if BACK_SHARE[0] < b <= BACK_SHARE[1]}  # of them: no tie either
@@ -874,6 +881,7 @@ def back_share(per_player: list[list[float]], t: float, cd: float) -> float:
 FEW_SHARE = 0.1  # a press in a hit no cooldown is kept for, said under the quarter bar from this share
 SLACK = 3.0  # seconds past the answer window a moment may sit when its presses are counted in the window
 PULL = 12.0  # seconds: a press before this is the pull's opener, never a ramp for the first hit (round 45)
+OR_NEAR = 20.0  # seconds: the farthest "or" time of a button pressed about every minute or on cooldown
 MINUTE = "about every minute"  # the reason a button pressed four times a kill or more is tied to no hit
 
 
@@ -1403,7 +1411,7 @@ def roles_table(roles: list, mine: str = "") -> str:
     few = "<small>too few here</small>"  # a spec read in the pool, too rare in this sheet's kills for its casts
     cover = next((r.spike_cover for r in roles if getattr(r, "spike_cover", 0)), 0.0)
     head = ("<th>Healer</th><th>Healing share</th><th>On tanks</th>"
-            f"<th>Its healing in spikes{f' <small>(kill by kill, {_pct(cover)} of the fight)</small>' if cover else ''}</th>"
+            f"<th>Share of its healing in spikes{f' <small>(kill by kill; the spikes are {_pct(cover)} of the fight)</small>' if cover else ''}</th>"
             "<th>Overheal</th><th>Dispels a minute</th><th>Externals given a kill <small>(every player)</small></th>"
             + ("<th>Buffs given a kill</th>" if buffs else "")
             + "<th>Players</th>")
@@ -1470,7 +1478,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             continue
         per_hit = []
         for h in hits:
-            got = [(*g[:3], g[4] if len(g) > 4 else False) for n, _k, ts, *rest in r.cd_names if not _minute(n)
+            got = [(*g[:3], g[4] if len(g) > 4 else False, g[3] if len(g) > 4 else g[2])
+                   for n, _k, ts, *rest in r.cd_names if not _minute(n)
                    for g in [_in_hit(n, ts, rest, h)] if g]
             under = [] if got else sorted((g for n, _k, ts, *rest in r.cd_names if not _minute(n)  # none at the bar:
                                            for g in [_in_hit(n, ts, rest, h, bar=False)] if g and g[2] >= 0.1),
@@ -1483,7 +1492,9 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             per_hit.append((h, sorted(got, key=lambda x: -x[2])[:2], under))  # shared" read as "nothing pressed")
         chips = "".join(f"<span class='chip'>the {_mmss(h)} hit: "
                         + ("; ".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if rp else ''} &middot; {_pct(sp)}"
-                                     for n, t, sp, rp in got) if got
+                                     + (f" <small>({int(pp * 100)}% of those who press it)</small>"  # the share
+                                        if f"{int(pp * 100)}%" != _pct(sp) else "")  # the bar reads (round 76)
+                                     for n, t, sp, rp, pp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
                                         f"<small>(under a quarter of those who press it"
                                         f": {int(pp * 100)}%{' of them too' if f'{int(pp * 100)}%' == _pct(sp) else ''})</small>"
@@ -1502,7 +1513,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             "own sheet reads its top players, so its times can differ): a button is shown for a hit when a quarter "
             "of the spec's healers who press it do so in the hit's window (5 s before to 8 s after; a ramp button, as "
             "Evangelism, 8 to 30 s ahead, never the pull's opener before 0:12), its share of all "
-            "that spec's healers there; else its most pressed button, if a tenth of the spec's healers press it there, "
+            "that spec's healers there, then the share of those who press it when it differs; else its most pressed button, if a tenth of the spec's healers press it there, "
             "marked \"under a quarter\" with the share of those who press it (\"of them too\" when it is the same); \"none held for it\": its presses there "
             "come back from cooldown; \"none shared\": no button reaches that; "
             "\"few players\": under 100 of the spec's healers in these kills, a habit of a few. "
@@ -1531,8 +1542,8 @@ def jobs_lead(roles: list, mine: str = "") -> str:
     found = [(r.spec, _job(r)) for r in roles if _job(r)]
     if found and all("only on average" in j for _s, j in found):
         return ("<p class='lead'>No healer spec has a job of its own here that the top players keep.</p>"
-                "<p class='small muted'>On average across every healer (means paired within each kill; the table "
-                "below shows each spec's median player): "
+                "<p class='small muted'>On average across every healer (means paired within each kill, so a spec ahead "
+                "here need not be ahead in the table below, which shows each spec's median player): "
                 + "; ".join(f"the {e(sp)} {e(re.sub(r' [(][0-9]+ and [0-9]+ ranked players, [^)]*[)]', '', j.replace(', but only on average', '', 1)))}"
                             for sp, j in found)
                 + ". The top players: the ranked one of each top kill of each healer spec's sheet.</p>")  # once
@@ -1833,16 +1844,16 @@ def render_sheet(h: HealerPrep) -> str:
                      + ", ".join(f"{e(c.name)} ({c.users:.0%}, {_and([_mmss(t) for t in c.times]) or 'no shared moment'})"
                                  for c in rare) + " on this boss.</p>")
     # the rule, once, under the long cooldowns and their "fewer than half" line (Zephyr's read as part of it)
-    fight.append("<p class='small muted'>Only the lead ties a press to a hit; a button on cooldown, cast on another "
-                 "player, used while moving or a trinket says why it is not; a time with no hit named lands on none. A time is shown when a quarter of those who "
-                 "press the button share it; its share is of all the top players pressing within 8 s of it (for a press the "
-                 "lead names for a hit, tied "
-                 "to it or the closest to a hit kept for none: those "
-                 "pressing in that hit's window: 5 s before to 8 s after it starts, a ramp 8 to 30 s ahead); \"or\": the time "
-                 "other top players press the same press instead. "
-                 "\"Back from cooldown\": most of its players press it as soon as it "
-                 "came back from their last use, so it was not saved for what it lands on (\"for about half\": 40 to "
-                 "60% of them); either keeps it from counting for the hit.</p>")
+    # one definition a line, the term first (round 76: 120 words in one paragraph read as no reference)
+    fight.append("<p class='small muted'><b>Tied to a hit:</b> only the lead ties a press to a hit; a button on "
+                 "cooldown, cast on another player, used while moving or a trinket says why it is not; a time with no "
+                 "hit named lands on none.<br><b>A time shown:</b> a quarter of those who press the button share "
+                 "it.<br><b>Its share:</b> of all the top players pressing within 8 s of it; for a press the lead names "
+                 "for a hit (tied to it, or the closest to a hit kept for none), of those pressing in that hit's "
+                 "window: 5 s before to 8 s after it starts, a ramp 8 to 30 s ahead.<br><b>\"or\":</b> the time other "
+                 "top players press the same press instead.<br><b>\"Back from cooldown\":</b> most of its players "
+                 "press it as soon as it came back from their last use, so it was not saved for what it lands on "
+                 "(\"for about half\": 40 to 60% of them); either keeps it from counting for the hit.</p>")
     exts = [c for c in heals if _external(c.spell_id) == "protective"]
 
     def fewer(cs: list) -> str:

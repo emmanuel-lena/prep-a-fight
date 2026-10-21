@@ -420,3 +420,21 @@ def test_a_button_on_cooldown_keeps_a_held_habit_for_a_hit():
     found = [healer.Moment(35.0, 1000.0, 1.6, "Soulcoil Rite")]
     c = healer.cooldowns(tl, found, {1: (120.0, 1)})[0]
     assert 35.0 in [round(a) for a in c.alt] and any(n.startswith("0:35") for n in c.alt_near)
+
+
+def test_a_minute_buttons_far_habit_is_a_moment_of_its_own():
+    # Restoration Druid, Vashnik (round 76): Nature's Swiftness "2:09 · 28% …, or 1:22 for 27%", 47 s apart
+    ab = SimpleNamespace(id=1, name="Nature's Swiftness", users=1.0, per_kill=4.0)
+    per_player = [[10.0, 70.0, 129.0, 190.0]] * 50 + [[10.0, 82.0, 160.0, 230.0]] * 45 + [[]] * 5
+    tl = SimpleNamespace(abilities=[ab], duration=270.0, players=[{"casts": {1: ts}} for ts in per_player])
+    c = healer.cooldowns(tl, [], {1: (60.0, 1)}, min_users=0.0)[0]
+    assert c.why == healer.MINUTE and {160.0, 230.0} <= set(c.times)
+    assert all(abs(a - o) <= healer.OR_NEAR for a, o in zip(c.alt, c.alt_of, strict=False))
+
+
+def test_the_other_healers_chip_gives_the_share_the_bar_reads():
+    # Nek'zali (round 76): Tranquility "1:14 · 24%" passed the quarter bar on those who press it, unsaid
+    rd = SimpleNamespace(spec="Restoration Druid", raid_cds=1, own_players=150,
+                         cd_names=[("Tranquility", 1, [], 0.8, ([[74.0]] * 24 + [[200.0]] * 56, 100, 180.0))])
+    out = healer.roles_more([rd], found=[healer.Moment(75.0, 1000.0, 1.6, "Soulcoil Rite")])
+    assert "Tranquility 1:14 &middot; 24% <small>(30% of those who press it)</small>" in out
