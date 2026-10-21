@@ -1757,7 +1757,8 @@ def render_sheet(h: HealerPrep) -> str:
             """Another habit of the same press about as shared, tied to no hit: said, or the lead hides a third of
             them (Avenging Wrath "33% about 0:44", another 33% at 0:23; round 41)."""
             alts = [(a, x) for a, x, of in zip(c.alt, c.alt_support or [], c.alt_of or c.alt, strict=False)
-                    if of == press and a != t and x >= 0.8 * sp]
+                    if of == press and a != t and x >= 0.8 * sp
+                    and (c.name, a) not in answered]  # one tied to another hit is said there (round 75)
             if not alts:
                 return ""
             a, x = max(alts, key=lambda y: y[1])
