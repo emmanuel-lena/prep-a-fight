@@ -434,7 +434,7 @@ def render_sheet(p: TankPrep) -> str:
                        for n, u in p.mitigation) + "".join(
             f"<li><b>{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top players"
             + (f" &middot; on cooldown, about every {ev:.0f} s" if ev else "") + "</small>"
-            + ("<span class='when'>" + "".join(f"<span class='chip'>{_chip(t, hit_of(n, t))}"
+            + ("<span class='when'>" + "".join(f"<span class='chip'>{_chip(moved_t.get((n, t), t), hit_of(n, t))}"
                                                f"{_share(tied.get((n, t), sp) if hit_of(n, t) else sp)}</span>"
                                                for t, sp in zip(ts, sps, strict=False)) + "</span>" if ts else "")
             + "</li>" for n, u, k, ts, ev, sps, *_rest in p.short_defs)
@@ -453,6 +453,7 @@ def render_sheet(p: TankPrep) -> str:
     lead, answered = [], set()
     named: dict = {}  # the press the lead names for each hit kept for none: its chip counts that window too
     tied: dict[tuple[str, float], float] = {}  # a tied press's share in its hit's window: the lead's, on its chip
+    moved_t: dict[tuple[str, float], float] = {}  # ... and its counted presses' time, when it reads differently
     if p.moments:
         m = max(p.moments, key=lambda x: x.ratio)
         own = bool(set(moment_names(m)) & {n for n, _s in p.hitters[:3]})  # any of its abilities a tank hitter
@@ -467,7 +468,7 @@ def render_sheet(p: TankPrep) -> str:
 
         # each button's presses, for its share in a hit's window (round 48: Spell Reflection "41%" was its moment's,
         # 38% in the 0:35 window, as the healers' leads count)
-        from paf.healer import hit_share
+        from paf.healer import _tw, hit_share
 
         pressed = {c.name: c for c in defs}
         for n, u, k, ts, _ev, _sps, *rest in p.short_defs:
@@ -485,16 +486,25 @@ def render_sheet(p: TankPrep) -> str:
             return max(((n, t, window(n, t, sp, m.t)) for n, ts, sps in answers for t, sp in zip(ts, sps, strict=False)
                         if -ANSWER[0] <= t - m.t <= ANSWER[1] and sp and not (phys and magic[n])),  # never a magic
                        key=lambda x: x[2], default=None)  # cut on a melee hit (Spell Reflection on 2:55, round 30)
+        def when(a: tuple, hit: Moment) -> str:  # its counted presses' time, as the healers' (round 70: "about
+            return _tw(pressed[a[0]], a[1], hit.t) if a[0] in pressed else _mmss(a[1])  # 0:32" for presses at 0:33)
+
         big = answer(m)  # the biggest moment and its answer first, then the other hits in time order
         lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({_x(m.ratio)}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
-                    + (f"; {big[2]:.0%} of the top {e(p.spec)}s press {e(big[0])} for it (about {_mmss(big[1])})."
+                    + (f"; {big[2]:.0%} of the top {e(p.spec)}s press {e(big[0])} for it (about {when(big, m)})."
                        if big else _none_for(landed_in(m, defs, named, 'long defensive'))))
         # the other dots in time order: their most shared press, or one clause for those with none
         pairs = [(x, answer(x)) for x in sorted(p.moments, key=lambda x: x.t) if x is not m]
-        said = [f"for the {_mmss(x.t)} hit, {a[2]:.0%} press {e(a[0])} (about {_mmss(a[1])})" for x, a in pairs if a]
+        said = [f"for the {_mmss(x.t)} hit, {a[2]:.0%} press {e(a[0])} (about {when(a, x)})" for x, a in pairs if a]
         answered = {(a[0], a[1]) for a in [big, *(a for _x, a in pairs)] if a}  # the chart draws these full
         tied.update({(a[0], a[1]): a[2] for a in [big, *(a for _x, a in pairs)] if a})
+        from paf.healer import _counted
+
+        for a, x in [(big, m), *((a, x) for x, a in pairs)]:  # its chip at its counted presses' time (round 70)
+            inside = _counted(pressed[a[0]], a[1], x.t) if a and a[0] in pressed else []
+            if inside and _mmss(st.median(inside)) != _mmss(a[1]):
+                moved_t[(a[0], a[1])] = st.median(inside)
         notes = [(x, landed_in(x, defs, named, 'long defensive')) for x, a in pairs if not a]
         none = " (no long defensive of theirs pressed by a tenth of them in it)"
         quiet = [x for x, n in notes if n == none]  # the same aside once, for every such hit (round 62)
@@ -545,7 +555,7 @@ def render_sheet(p: TankPrep) -> str:
         f"moments of damage, whatever casts it: a wave as high may go undotted.</p><ul class='hl2'>"
         f"{moments_html(p.moments, 'tank damage') or '<li>No big moment: steady damage.</li>'}</ul></div>",
         f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
-        f"{cooldowns_html(defs, answered, named) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
+        f"{cooldowns_html(defs, answered, named, moved_t) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
         "<p class='small muted'>Only the lead ties a press to a hit; a button on cooldown, a potion or a trinket says "
         "why it is not. A time is shown when a quarter of those who press the button share it; its share is of all "
         "the top players pressing within 8 s of it (for a press the lead names for a hit: those pressing in that hit's window, 5 s before to 8 s "

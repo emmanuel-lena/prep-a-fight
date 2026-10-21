@@ -754,7 +754,8 @@ def _top_check(top: list, durs: dict, spec: str, m: str) -> str:
     if a >= JOB_RATIO * b and a - b >= JOB_GAP[m]:
         return ""
     fmt = (lambda x: f"{x:.1f}") if m == "dispels" else (lambda x: f"{x:.0%}")
-    return (f"; the top players ranked by their healing do not: the median top {spec} {fmt(a)}, the other specs' "
+    return (f"; the top players ranked by their healing fall short of it: the median top {spec} {fmt(a)}, the "
+            f"other specs' "
             f"{fmt(b)} ({len(me)} and {len(them)} ranked players, one in each top kill of each healer spec's sheet)")
 
 
@@ -813,7 +814,7 @@ def paired_jobs(per_kill: dict, durs: dict, own: tuple[str, str] | None = None, 
         else:
             out[spec].append(f"dispels more: {a:.1f} times a minute, against {b:.1f} for the other healers of the "
                              f"same kills ({n} kills){held}")
-    return {spec: [j.replace("more:", "more, but only on average:", 1) if "do not:" in j else j for j in js]
+    return {spec: [j.replace("more:", "more, but only on average:", 1) if "fall short of it:" in j else j for j in js]
             for spec, js in out.items()}
 
 

@@ -280,7 +280,8 @@ def test_a_job_is_checked_on_the_ranked_players():
     top = ([(f"r{k}", 1, 0, "Priest", "Holy", 100, 30, 8, 0.2, 4) for k in range(15)]
            + [(f"r{k}", 1, 1, "Paladin", "Holy", 100, 30, 8, 0.2, 4) for k in range(15, 30)])
     assert healroles._top_check(top, durs, "Holy Priest", "dispels") == (
-        "; the top players ranked by their healing do not: the median top Holy Priest 1.0, the other specs' 1.0 "
+        "; the top players ranked by their healing fall short of it: the median top Holy Priest 1.0, the other "
+        "specs' 1.0 "
         "(15 and 15 ranked players, one in each top kill of each healer spec's sheet)")
     top = [(*h[:9], 8 if h[3] == "Priest" else 4) for h in top]  # 2.0 against 1.0: it holds, nothing said
     assert healroles._top_check(top, durs, "Holy Priest", "dispels") == ""
