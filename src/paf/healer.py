@@ -969,6 +969,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
                                                                            c.support or [0.0] * len(c.times),
                                                                            strict=False)))
                                 or "<small>timing varies: no shared moment</small>")
+        + _pull_chip(c)
         + ("<small class='alt'>two rhythms, by their first press: " + "; or ".join(
             f"from {_mmss(ts[0])}, then {_and([_mmss(t) for t in ts[1:]])}" for _sp, ts in c.rhythms)
            + "</small>"
@@ -989,13 +990,26 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
         where = "ahead of" if c.ramp and t < hit - ANSWER[0] else "in the window of"  # a ramp: around its own time
         inside = _counted(c, t, hit)  # its own moment, then the lead's count with its own time (round 54)
         when = st.median(inside) if inside else t
-        if round(hs * 100) == round(sp * 100) and _mmss(when) == _mmss(t):  # one count, one time: said once
-            return f"{_base(c, hs, hit)} {where} the {_mmss(hit)} hit"
+        if _pct(hs) == _pct(sp):  # one count: said once, its time only when 5 s or more off (round 60)
+            return (f"{_base(c, hs, hit)} {where} the {_mmss(hit)} hit"
+                    + (f", about {_mmss(when)}" if abs(when - t) >= 5 else ""))
         return (f"{_share(sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
                 + (f", about {_mmss(when)}" if abs(when - t) >= 5 else ""))  # a time 5 s off or more (round 59)
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
         return _base(c, hs, _secs(n.partition(" ")[0]))
     return _share(sp)
+
+
+def _pull_chip(c: Cooldown) -> str:
+    """The pull group the lead names for a first press ("23% open with it at the pull"), on its card too (rounds 54,
+    60: the lead quoted a group no chip showed), when no moment of the card is already at the pull."""
+    if not c.presses or not c.n_all or any(x <= PULL for x in [*c.times, *c.alt]) or round(c.per_kill) > 2:
+        return ""
+    first = [ts[0] for ts in c.presses if ts and ts[0] <= PULL]
+    if len(first) < 0.2 * c.n_all:
+        return ""
+    return (f"<span class='chip'>{_mmss(st.median(first))} &middot; {_pct(len(first) / c.n_all)} of the top "
+            "players, at the pull</span>")
 
 
 def _split(chip: str) -> tuple[str, str]:
@@ -1734,7 +1748,8 @@ def render_sheet(h: HealerPrep) -> str:
     # the rule, once, under the long cooldowns and their "fewer than half" line (Zephyr's read as part of it)
     fight.append("<p class='small muted'>Only the lead ties a press to a hit; a button on cooldown, cast on another "
                  "player, used while moving or a trinket says why it is not. A time is shown when a quarter of those who "
-                 "press the button share it; its share is of all the top players (for a press the lead names for a hit, tied "
+                 "press the button share it; its share is of all the top players pressing within 8 s of it (for a press the "
+                 "lead names for a hit, tied "
                  "to it or the closest to a hit kept for none: those "
                  "pressing in that hit's window: 5 s before to 8 s after it starts, a ramp 8 to 30 s ahead); \"or\": the time "
                  "other top players press the same press instead. "
