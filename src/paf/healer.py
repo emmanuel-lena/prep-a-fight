@@ -1474,7 +1474,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                      for n, t, sp, rp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
                                         f"<small>(under a quarter of those who press it"
-                                        f"{', the same share' if f'{int(pp * 100)}%' == _pct(sp) else f': {int(pp * 100)}%'})</small>"
+                                        f": {int(pp * 100)}%{' of them too' if f'{int(pp * 100)}%' == _pct(sp) else ''})</small>"
                                         for u in under if len(u) > 4 and u[0] != "back" for n, t, sp, pp in [u[:4]])
                            or "".join(f"none held for it <small>({e(_shown(u[1]))} {_mmss(u[2])} &middot; {_pct(u[3])}, "
                                       "back from cooldown)</small>" for u in under if u[0] == "back")
@@ -1491,7 +1491,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             "of the spec's healers who press it do so in the hit's window (5 s before to 8 s after; a ramp button, as "
             "Evangelism, 8 to 30 s ahead, never the pull's opener before 0:12), its share of all "
             "that spec's healers there; else its most pressed button, if a tenth of the spec's healers press it there, "
-            "marked \"under a quarter\" with the share of those who press it; \"none held for it\": its presses there "
+            "marked \"under a quarter\" with the share of those who press it (\"of them too\" when it is the same); \"none held for it\": its presses there "
             "come back from cooldown; \"none shared\": no button reaches that; "
             "\"few players\": under 100 of the spec's healers in these kills, a habit of a few. "
             "A button whose presses there come back from cooldown for over 40% of them is no answer, as on the fight "
