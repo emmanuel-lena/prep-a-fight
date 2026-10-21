@@ -785,14 +785,17 @@ def landed_in(m: Moment, cds: list[Cooldown]) -> str:
         if c.why:  # an external (Life Cocoon), a 1-minute button (Nature's Swiftness): no raid answer to name
             continue
         for t, sp in [*zip(c.times, c.support or [], strict=False), *zip(c.alt, c.alt_support or [], strict=False)]:
-            if -ANSWER[0] <= t - m.t <= ANSWER[1]:  # each time read on its own players (back_share)
+            ramp = c.ramp and RAMP[0] <= m.t - t <= RAMP[1]  # a ramp lands its hit from 8 to 30 s ahead (Disc's
+            if -ANSWER[0] <= t - m.t <= ANSWER[1] or ramp:  # 2:01 Evangelism, 9 s before 2:10; round 36)
                 why = (c.why or ("on cooldown" if c.every else "back from cooldown"
-                                 if t in c.back else ""))
+                                 + (" for about half" if t in c.back_half else "") if t in c.back else ""))
                 if why:
                     near.append((sp, c, t, why))
     if not near:
         return ""
     sp, c, t, why = max(near, key=lambda x: x[0])
+    if c.ramp and t < m.t - ANSWER[0]:
+        return f" ({_pct(sp)} have {e(_shown(c.name))} ramp at {_mmss(t)}, {e(why)})"
     return f" ({_pct(sp)} have {e(_shown(c.name))} land at {_mmss(t)}, {e(why)})"
 
 
