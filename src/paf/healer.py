@@ -418,6 +418,16 @@ def _moving(spell_id: int) -> bool:
         return False
 
 
+def _raid(spell_id: int) -> bool:
+    """A button that heals, shields or cuts the raid's damage (paf.gamedata.raid_kind); offline, none."""
+    try:
+        from paf.gamedata import raid_kind
+
+        return raid_kind(spell_id)
+    except Exception:  # noqa: BLE001 - offline
+        return False
+
+
 def _ramp_kind(spell_id: int) -> bool:
     """A ramp's button by the game data (paf.gamedata.is_ramp_kind): Evangelism, Rapture, Spirit Shell."""
     try:
@@ -862,20 +872,31 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None) -> str:
     # 3:35), read in the window under the quarter bar (Nek'zali's 0:35: 20% of the top Discs press Ultimate Penitence)
     few = [(hs, c) for c in cds if not (c.why or c.every or _item(c.spell_id)
                                         or _external(c.spell_id) == "damage" or is_defensive(c.spell_id, c.name)
-                                        or not (c.ramp or any([*c.near, *(c.alt_near or [])])))
-           for hs in [hit_share(c, m.t, m.t)] if hs and FEW_SHARE <= hs < 0.25]
+                                        or not (c.ramp or any([*c.near, *(c.alt_near or [])]) or _raid(c.spell_id)))
+           for hs in [hit_share(c, m.t, m.t)] if hs and FEW_SHARE <= hs < 0.25]  # (a raid kind by the game data
+    # counts too: Spirit Link Totem, 17% in Vashnik's 2:10, timing varies elsewhere; round 58)
+
+    def said(c: Cooldown, hs: float, reason: str) -> str:  # one wording for every hit kept for none (round 58),
+        inside = _counted(c, m.t, m.t)                       # its time the counted presses', its chip named
+        when = st.median(inside) if inside else m.t
+        near_t = min([*c.times, *c.alt], key=lambda x: abs(x - when), default=None)
+        if named is not None and near_t is not None and abs(near_t - when) <= 15:
+            named[(c.name, near_t)] = m.t
+        few_ = "only " if hs < 0.25 else ""
+        return (f" ({few_}{_pct(hs)} press {e(_shown(c.name))} in its window{_reach_note(c, m.t)}, about "
+                f"{_mmss(when)}{', ' + reason if reason else ''})")
     best_near = max((x[0] for x in near), default=0.0)
     rhythm_only = all(x[1].why == MINUTE or x[1].every for x in near)
     # under the bar, a raid cooldown about as common wins over a button pressed about every minute (round 57:
     # Nature's Swiftness 16% named over Spirit Link Totem's 17%, Convoke 19% over Tranquility's 21%)
     if few and (not near or (best_near < 0.25 and rhythm_only and max(h for h, _c in few) >= best_near - 0.03)):
         hs, c = max(few, key=lambda x: x[0])
-        return f" (only {_pct(hs)} press {e(_shown(c.name))} in it{_reach_note(c, m.t)})"
+        return said(c, hs, "")
     if not near:
         on_cd = [(hs, c) for c in cds if c.every for hs in [hit_share(c, m.t, m.t)] if hs and hs >= FEW_SHARE]
         if on_cd:  # a button pressed on cooldown lands there: said, or "no long cooldown" is false (round 57: Stasis)
             hs, c = max(on_cd, key=lambda x: x[0])
-            return f" ({_pct(hs)} press {e(_shown(c.name))} in it, on cooldown{_reach_note(c, m.t)})"
+            return said(c, hs, "on cooldown")
         return " (no long cooldown of theirs pressed by a tenth of them in it)" if cds else ""  # (round 56: shorter
         # buttons, Divine Toll's 30 s, are not on the sheet's cards)
     # the closest of the presses a quarter make (Disc's 2:01 Evangelism, 9 s before 2:10, over its 1:41 one, 29 s)
@@ -935,10 +956,12 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
         f"<li><b>{e(_shown(c.name))}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill"
         + (f", {_pct(c.on_others)} of the presses on another player" if 0 <= c.on_others < 0.95 else
            ", all on another player" if c.on_others >= 0.95 else "") + "</small>"
-        "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, tie(c, t, n))}{_named(c, t, named, tie(c, t, n), sp)}"
+        "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, tie(c, t, n))}"
+                                        + _split(_named(c, t, named, tie(c, t, n), sp))[0]
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
                                            if t in c.back and not (c.why or c.every) else "")  # its line says it
-                                        + f"{_or(c, t, answered, named)}</span>"
+                                        + f"{_or(c, t, answered, named)}"  # the "or" by its own press (round 58),
+                                        + _split(_named(c, t, named, tie(c, t, n), sp))[1] + "</span>"  # the window last
                                         for k, (t, n, sp) in enumerate(zip(c.times, c.near,
                                                                            c.support or [0.0] * len(c.times),
                                                                            strict=False)))
@@ -970,6 +993,15 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
         return _base(c, hs, _secs(n.partition(" ")[0]))
     return _share(sp)
+
+
+def _split(chip: str) -> tuple[str, str]:
+    """A named chip's own share, and its hit's window clause, said after its "or" times."""
+    for mark in (" &middot; in the window of", " &middot; ahead of"):
+        if mark in chip:
+            i = chip.index(mark)
+            return chip[:i], chip[i:]
+    return chip, ""
 
 
 def _base(c: Cooldown, hs: float, hit: float) -> str:

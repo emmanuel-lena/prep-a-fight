@@ -463,3 +463,18 @@ def magic_only(spell_id: int, depth: int = 2) -> bool:
         return any(magic_only(int(r["EffectTriggerSpell"]), depth - 1) for r in rows
                    if r.get("Effect") == "64" and int(r.get("EffectTriggerSpell") or 0))
     return False
+
+
+RAID_EFFECTS = {"10", "136", "28"}  # heal, heal a share of health, summon (a totem: Spirit Link, Healing Tide)
+RAID_AURAS = {"8", "69", "87", "23", "108"}  # periodic heal, absorb, damage taken, periodic trigger, spell modifier
+
+
+def raid_kind(spell_id: int, depth: int = 1) -> bool:
+    """A button that heals, shields or cuts the raid's damage, by the game data: Spirit Link Totem (a summon, -% damage
+    taken), Tranquility, Rewind, Apotheosis; not Innervate (mana regeneration and haste), whose presses in a hit say
+    nothing of it."""
+    rows = _filtered_rows("SpellEffect", "SpellID", spell_id)
+    if any(r.get("Effect") in RAID_EFFECTS or r.get("EffectAura") in RAID_AURAS for r in rows):
+        return True
+    return bool(depth) and any(raid_kind(int(r["EffectTriggerSpell"]), depth - 1) for r in rows
+                               if int(r.get("EffectTriggerSpell") or 0))

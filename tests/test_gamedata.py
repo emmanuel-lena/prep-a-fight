@@ -119,3 +119,12 @@ def test_a_magic_only_cut_and_a_physical_hit(monkeypatch):
     monkeypatch.setattr(gamedata, "_filtered_rows", lambda _t, _c, sid, locale="": rows.get(sid, []))
     assert gamedata.magic_only(23920) and not gamedata.magic_only(871)
     assert gamedata.physical_only("Melee")
+
+
+def test_a_raid_button_by_the_game_data(monkeypatch):
+    # Spirit Link Totem summons a totem; Innervate gives mana and haste: no raid button (round 58)
+    rows = {98008: [{"Effect": "28"}, {"Effect": "3"}], 29166: [{"Effect": "6", "EffectAura": "21"}],
+            220207: [{"Effect": "6", "EffectAura": "23", "EffectTriggerSpell": "220214"}],
+            220214: [{"Effect": "136"}]}
+    monkeypatch.setattr(gamedata, "_filtered_rows", lambda _t, _c, sid, locale="": rows.get(sid, []))
+    assert gamedata.raid_kind(98008) and gamedata.raid_kind(220207) and not gamedata.raid_kind(29166)

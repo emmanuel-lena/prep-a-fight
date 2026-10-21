@@ -333,9 +333,10 @@ def test_a_hit_kept_for_none_names_a_few_presses_in_it():
                          presses=[[36.0]] * 20 + [[75.0]] * 40, n_all=100)
     ns = healer.Cooldown("Nature's Swiftness", 2, 0.9, 4.0, [35.0], every=60.0,
                          presses=[[36.0]] * 15 + [[90.0]] * 75, n_all=100)
-    assert healer.landed_in(m, [up, ns]) == " (only 20% press Ultimate Penitence in it)"
+    assert healer.landed_in(m, [up, ns]) == " (only 20% press Ultimate Penitence in its window, about 0:36)"
     up.presses = [[36.0]] * 30 + [[75.0]] * 30  # a quarter or more: no "only"
-    assert healer.landed_in(m, [up, ns]) == " (15% press Nature&#x27;s Swiftness in it, on cooldown)"
+    assert healer.landed_in(m, [up, ns]) == (" (only 15% press Nature&#x27;s Swiftness in its window, about 0:36, "
+                                             "on cooldown)")
 
 
 def test_a_minute_button_in_a_bare_hit_is_named_with_its_reason():
