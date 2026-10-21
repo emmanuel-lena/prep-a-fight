@@ -758,8 +758,8 @@ def hit_share(c: Cooldown, t: float, hit: float) -> float | None:
 
 def _window(c: Cooldown, t: float, hit: float) -> tuple[float, float]:
     """A press's window for a hit: the hit's answer window, or a ramp's own, ending where the hit's begins (round 52)."""
-    if c.ramp and hit - t >= RAMP[0]:
-        return t - 8, min(t + 8, hit - ANSWER[0])
+    if c.ramp and hit - t >= RAMP[0]:  # the ramp window the footnote states, 8 to 30 s ahead, never the pull's
+        return max(hit - RAMP[1], PULL), hit - RAMP[0]  # opener (round 55: counted around one chip, 30% for 36%)
     return hit - ANSWER[0], hit + ANSWER[1]
 
 
@@ -867,7 +867,7 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None) -> str:
         if few:  # Discs press Ultimate Penitence in it; the lead said "no cooldown" alone; round 36)
             hs, c = max(few, key=lambda x: x[0])
             return f" (only {_pct(hs)} press {e(_shown(c.name))} in it{_reach_note(c, m.t)})"
-        return ""
+        return " (no button of theirs pressed by a tenth of them in it)" if cds else ""  # said (round 55)
     # the closest of the presses a quarter make (Disc's 2:01 Evangelism, 9 s before 2:10, over its 1:41 one, 29 s)
     sp, c, t, why = max(near, key=lambda x: (x[0] >= 0.25, -abs(m.t - x[2]), x[0]))
     if named is not None and c.presses:  # its chip gives the same count, said of this hit (round 50)
@@ -949,7 +949,7 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
         where = "ahead of" if c.ramp and t < hit - ANSWER[0] else "in the window of"  # a ramp: around its own time
         inside = _counted(c, t, hit)  # its own moment, then the lead's count with its own time (round 54)
         when = st.median(inside) if inside else t
-        if round(hs * 100) == round(sp * 100) and abs(when - t) < 1.5:  # one count, one time: said once
+        if round(hs * 100) == round(sp * 100) and _mmss(when) == _mmss(t):  # one count, one time: said once
             return f"{_base(c, hs, hit)} {where} the {_mmss(hit)} hit"
         return (f"{_share(sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
                 f", about {_mmss(when)}")
@@ -1347,7 +1347,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                      for n, t, sp, rp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
                                         f"<small>(under a quarter of those who press it"
-                                        f"{'' if int(pp * 100) == round(sp * 100) else f': {int(pp * 100)}%'})</small>"
+                                        f": {int(pp * 100)}%)</small>"
                                         for u in under if len(u) > 4 for n, t, sp, pp in [u[:4]])
                            or "none shared") + "</span>"
                         for h, got, under in per_hit)
