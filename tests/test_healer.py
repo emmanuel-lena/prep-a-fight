@@ -322,3 +322,14 @@ def test_a_tied_press_is_counted_in_its_hits_window():
     assert healer.hit_share(c, 45.0, 40.0) == 0.35
     c.ramp = True  # a ramp 17 s ahead: its own time's window
     assert healer.hit_share(c, 23.0, 40.0) == 0.0
+
+
+def test_a_hit_kept_for_none_names_a_few_presses_in_it():
+    # Disc, Nek'zali (round 36): 20% of the top Discs press Ultimate Penitence in the 0:35 hit, under the quarter bar
+    m = healer.Moment(35.0, 1000.0, 1.6, "Soulcoil Rite")
+    up = healer.Cooldown("Ultimate Penitence", 1, 0.6, 1.0, [75.0], presses=[[36.0]] * 20 + [[75.0]] * 40, n_all=100)
+    ns = healer.Cooldown("Nature's Swiftness", 2, 0.9, 4.0, [35.0], every=60.0,
+                         presses=[[36.0]] * 15 + [[90.0]] * 75, n_all=100)
+    assert healer.landed_in(m, [up, ns]) == " (only 20% press Ultimate Penitence in it)"
+    up.presses = [[36.0]] * 30 + [[75.0]] * 30  # a quarter or more: no "only"
+    assert healer.landed_in(m, [up, ns]) == ""

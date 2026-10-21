@@ -795,8 +795,11 @@ def landed_in(m: Moment, cds: list[Cooldown]) -> str:
                 if why:
                     near.append((sp, c, t, why))
     if not near:  # no moment shown there: the most common press in its window all the same, under the quarter bar
-        few = [(hs, c) for c in cds if not (c.why or _item(c.spell_id) or _external(c.spell_id) == "damage")
-               for hs in [hit_share(c, m.t, m.t)] if hs and hs >= FEW_SHARE]  # (Nek'zali's 0:35: 20% of the top
+        from paf.defensives import is_defensive
+
+        few = [(hs, c) for c in cds if not (c.why or c.every or c.rhythm or _item(c.spell_id)  # a raid button
+                                            or _external(c.spell_id) == "damage" or is_defensive(c.spell_id, c.name))
+               for hs in [hit_share(c, m.t, m.t)] if hs and FEW_SHARE <= hs < 0.25]  # (Nek'zali's 0:35: 20% of the top
         if few:  # Discs press Ultimate Penitence in it; the lead said "no cooldown" alone; round 36)
             hs, c = max(few, key=lambda x: x[0])
             return f" (only {_pct(hs)} press {e(_shown(c.name))} in it)"
