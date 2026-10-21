@@ -1294,7 +1294,8 @@ def jobs_lead(roles: list, mine: str = "") -> str:
     if found and all("only on average" in j for _s, j in found):
         return ("<p class='lead'>No healer spec has a job of its own here that the top players keep.</p>"
                 "<p class='small muted'>On average across every healer: "
-                + "; ".join(f"the {e(sp)} {e(j)}" for sp, j in found) + ".</p>")
+                + "; ".join(f"the {e(sp)} {e(j.replace(', but only on average', '', 1))}" for sp, j in found)
+                + ".</p>")
     you = next((r for r in roles if r.spec == mine), None)
     head = ""
     if you:
@@ -1492,7 +1493,8 @@ def render_sheet(h: HealerPrep) -> str:
         def clause(key: tuple, ps: list) -> tuple[float, str]:
             if len(key) == 1:  # two cooldowns as common for one hit
                 return key[0], (f"for the {_mmss(key[0])} hit, " + _and(
-                    [f"{_pct(sp)} press {e(_shown(n))} (about {_mmss(t)}{ramp_of(c, t, key[0])})" for n, t, sp, _p, c in ps]))
+                    [f"{_pct(sp)} press {e(_shown(n))} (about {_mmss(t)}{ramp_of(c, t, key[0])}"
+                     f"{_also(c, p, t, sp).replace('; another', ', another')})" for n, t, sp, p, c in ps]))
             n, press = key
             if len(ps) == 1:
                 hit, t, sp, c = ps[0]
