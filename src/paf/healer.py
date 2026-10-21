@@ -867,9 +867,12 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None) -> str:
         if few:  # Discs press Ultimate Penitence in it; the lead said "no cooldown" alone; round 36)
             hs, c = max(few, key=lambda x: x[0])
             return f" (only {_pct(hs)} press {e(_shown(c.name))} in it{_reach_note(c, m.t)})"
-        return " (no button of theirs pressed by a tenth of them in it)" if cds else ""  # said (round 55)
+        return " (no long cooldown of theirs pressed by a tenth of them in it)" if cds else ""  # (round 56: shorter
+        # buttons, Divine Toll's 30 s, are not on the sheet's cards)
     # the closest of the presses a quarter make (Disc's 2:01 Evangelism, 9 s before 2:10, over its 1:41 one, 29 s)
-    sp, c, t, why = max(near, key=lambda x: (x[0] >= 0.25, -abs(m.t - x[2]), x[0]))
+    # a ramp button is read on its ramp window first (round 56: Disc's 3:35 read on the hit's, 29% for 39%)
+    sp, c, t, why = max(near, key=lambda x: (x[0] >= 0.25, x[1].ramp and m.t - x[2] >= RAMP[0], -abs(m.t - x[2]),
+                                              x[0]))
     if named is not None and c.presses:  # its chip gives the same count, said of this hit (round 50)
         named[(c.name, t)] = m.t
     few = "only " if sp < 0.25 else ""  # under a quarter, as the bare hits' "only N%" (round 39)
@@ -1364,7 +1367,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             "that spec's healers there; else its most pressed button, if a tenth of the spec's healers press it there, "
             "marked \"under a quarter\" with the share of those who press it; \"none shared\": no button reaches that; "
             "\"few players\": under 100 of the spec's healers in these kills, a habit of a few. "
-            "Presses mostly back from cooldown are no answer, as on the fight tab.</p>")
+            "A button whose presses there come back from cooldown for over 40% of them is no answer, as on the fight "
+            "tab.</p>")
 
 
 def _job(r) -> str:

@@ -335,7 +335,7 @@ def test_a_hit_kept_for_none_names_a_few_presses_in_it():
                          presses=[[36.0]] * 15 + [[90.0]] * 75, n_all=100)
     assert healer.landed_in(m, [up, ns]) == " (only 20% press Ultimate Penitence in it)"
     up.presses = [[36.0]] * 30 + [[75.0]] * 30  # a quarter or more: no "only"
-    assert healer.landed_in(m, [up, ns]) == " (no button of theirs pressed by a tenth of them in it)"
+    assert healer.landed_in(m, [up, ns]) == " (no long cooldown of theirs pressed by a tenth of them in it)"
 
 
 def test_a_minute_button_in_a_bare_hit_is_named_with_its_reason():
@@ -345,7 +345,7 @@ def test_a_minute_button_in_a_bare_hit_is_named_with_its_reason():
     assert healer.landed_in(m, [cv]) == (" (70% press Convoke the Spirits in its window, about 1:11, pressed about "
                                          "every minute)")
     inn = healer.Cooldown("Innervate", 2, 1.0, 2.0, [49.0], presses=[[75.0]] * 11 + [[49.0]] * 89, n_all=100)
-    assert healer.landed_in(m, [inn]) == " (no button of theirs pressed by a tenth of them in it)"
+    assert healer.landed_in(m, [inn]) == " (no long cooldown of theirs pressed by a tenth of them in it)"
 
 
 def test_the_other_healers_are_read_over_the_hits_window():
