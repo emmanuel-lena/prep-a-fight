@@ -1321,8 +1321,9 @@ def jobs_lead(roles: list, mine: str = "") -> str:
         return ("<p class='lead'>No healer spec has a job of its own here that the top players keep.</p>"
                 "<p class='small muted'>On average across every healer (means paired within each kill; the table "
                 "below shows each spec's median player): "
-                + "; ".join(f"the {e(sp)} {e(j.replace(', but only on average', '', 1))}" for sp, j in found)
-                + ".</p>")
+                + "; ".join(f"the {e(sp)} {e(re.sub(r' [(][0-9]+ and [0-9]+ ranked players, [^)]*[)]', '', j.replace(', but only on average', '', 1)))}"
+                            for sp, j in found)
+                + ". The top players: the ranked one of each top kill of each healer spec's sheet.</p>")  # once
     you = next((r for r in roles if r.spec == mine), None)
     head = ""
     if you:

@@ -796,11 +796,13 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     def moments_of(a) -> list[float]:  # a short defensive is a timed answer too (Spell Reflection at 0:35); one
         casts = [p["casts"].get(a.name) or p["casts"].get(a.id) or [] for p in tl.players]  # on cooldown is not
         every = on_cadence(casts, a.per_kill, tl.duration)  # (Demoralizing Shout every 30 s): no moments
+        lasts = [p.get("duration") or tl.duration for p in tl.players]  # a hit's share: of the kills reaching it
         if every:
-            return [], every, []
+            return [], every, [], casts, lasts
         times = press_moments(casts, max(1, round(a.per_kill)), tl.duration)[0]
         n = max(1, len(tl.players))  # each moment's share of the top players, as the cooldowns' chips
-        return times, 0.0, [sum(1 for ts in casts if any(abs(x - t) <= 8 for x in ts)) / n for t in times]
+        return (times, 0.0, [sum(1 for ts in casts if any(abs(x - t) <= 8 for x in ts)) / n for t in times],
+                casts, lasts)
     short_defs = sorted(((a.name, a.users, a.per_kill, *moments_of(a)) for a in tl.abilities
                          if a.users >= 0.5 and a.name not in kept
                          and (cds.get(a.id, (0.0, 1))[0] < healer.COOLDOWN_GAP

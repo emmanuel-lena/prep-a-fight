@@ -427,9 +427,10 @@ def render_sheet(p: TankPrep) -> str:
                        for n, u in p.mitigation) + "".join(
             f"<li><b>{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top players"
             + (f" &middot; on cooldown, about every {ev:.0f} s" if ev else "") + "</small>"
-            + ("<span class='when'>" + "".join(f"<span class='chip'>{_chip(t, hit_of(n, t))}{_share(sp)}</span>"
+            + ("<span class='when'>" + "".join(f"<span class='chip'>{_chip(t, hit_of(n, t))}"
+                                               f"{_share(tied.get((n, t), sp) if hit_of(n, t) else sp)}</span>"
                                                for t, sp in zip(ts, sps, strict=False)) + "</span>" if ts else "")
-            + "</li>" for n, u, k, ts, ev, sps in p.short_defs)
+            + "</li>" for n, u, k, ts, ev, sps, *_rest in p.short_defs)
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]
     others = [replace(c, near=["" for _ in c.near]) for c in p.cooldowns  # no buster to answer; taunts: the swaps
               if c not in defs and not _taunt(c.spell_id)]
@@ -443,23 +444,38 @@ def render_sheet(p: TankPrep) -> str:
     swap = "".join(f"<span class='chip'>{_mmss(t)}{f' after {e(c)}' if c and not (one and c == common) else ''}</span>"
                    for t, c in zip(p.swaps, causes, strict=False))
     lead, answered = [], set()
+    tied: dict[tuple[str, float], float] = {}  # a tied press's share in its hit's window: the lead's, on its chip
     if p.moments:
         m = max(p.moments, key=lambda x: x.ratio)
         own = bool(set(moment_names(m)) & {n for n, _s in p.hitters[:3]})  # any of its abilities a tank hitter
         answers = ([(c.name, [t for t, n in zip(c.times, c.near, strict=False) if n],  # a press back from
                      [sp for sp, n in zip(c.support or [0.0] * len(c.times), c.near, strict=False) if n])  # cooldown
                     for c in defs if not c.every]  # is no answer (Shield Wall's 3:51)
-                   + [(n, ts, sps) for n, _u, _k, ts, _ev, sps in p.short_defs])
+                   + [(n, ts, sps) for n, _u, _k, ts, _ev, sps, *_rest in p.short_defs])
         from paf.gamedata import magic_only, physical_only, same_name_spells
 
         ids = {c.name: [c.spell_id] for c in defs}
         magic = {n: any(magic_only(i) for i in ids.get(n) or same_name_spells().get(n, [])) for n, _ts, _sps in answers}
 
+        # each button's presses, for its share in a hit's window (round 48: Spell Reflection "41%" was its moment's,
+        # 38% in the 0:35 window, as the healers' leads count)
+        from paf.healer import hit_share
+
+        pressed = {c.name: c for c in defs}
+        for n, u, k, ts, _ev, _sps, *rest in p.short_defs:
+            if rest:
+                pressed[n] = Cooldown(n, 0, u, k, ts, presses=[x for x in rest[0] if x],
+                                      n_all=len(rest[0]), lasts=rest[1])
+
+        def window(n: str, t: float, sp: float, hit: float) -> float:
+            hs = hit_share(pressed[n], t, hit) if n in pressed else None
+            return sp if hs is None else hs
+
         def answer(m: Moment) -> tuple | None:  # the most shared press for a hit (Spell Reflection, 41% at 0:33,
             phys = bool(moment_names(m)) and all(physical_only(x) for x in moment_names(m))  # before Shield Wall);
-            return max(((n, t, sp) for n, ts, sps in answers for t, sp in zip(ts, sps, strict=False)  # never a magic
-                        if -ANSWER[0] <= t - m.t <= ANSWER[1] and sp and not (phys and magic[n])),  # cut on a melee
-                       key=lambda x: x[2], default=None)  # hit (Spell Reflection on Vashnik's 2:55, round 30)
+            return max(((n, t, window(n, t, sp, m.t)) for n, ts, sps in answers for t, sp in zip(ts, sps, strict=False)
+                        if -ANSWER[0] <= t - m.t <= ANSWER[1] and sp and not (phys and magic[n])),  # never a magic
+                       key=lambda x: x[2], default=None)  # cut on a melee hit (Spell Reflection on 2:55, round 30)
         big = answer(m)  # the biggest moment and its answer first, then the other hits in time order
         lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({_x(m.ratio)}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
@@ -469,6 +485,7 @@ def render_sheet(p: TankPrep) -> str:
         pairs = [(x, answer(x)) for x in sorted(p.moments, key=lambda x: x.t) if x is not m]
         said = [f"for the {_mmss(x.t)} hit, {a[2]:.0%} press {e(a[0])} (about {_mmss(a[1])})" for x, a in pairs if a]
         answered = {(a[0], a[1]) for a in [big, *(a for _x, a in pairs)] if a}  # the chart draws these full
+        tied.update({(a[0], a[1]): a[2] for a in [big, *(a for _x, a in pairs)] if a})
         bare = [f"the {_mmss(x.t)} hit{landed_in(x, defs)}" for x, a in pairs if not a]
         if said:
             lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 0:35 hit, 41% press Spell Reflection"
@@ -496,7 +513,7 @@ def render_sheet(p: TankPrep) -> str:
                        if one else
                        f", the first time at {_mmss(p.swaps[0])}" + (f" after {e(causes[0])}." if causes[0] else ".")))
     # the chart's lanes: the defensives and short ones, the lead's answer first (Spell Reflection had none)
-    shorts = [Cooldown(n, 0, u, k, ts, ["" for _ in ts], support=sps) for n, u, k, ts, _ev, sps in p.short_defs if ts]
+    shorts = [Cooldown(n, 0, u, k, ts, ["" for _ in ts], support=sps) for n, u, k, ts, _ev, sps, *_r in p.short_defs if ts]
     lane = [Cooldown("Tank swaps", SWAP_LANE, 1.0, len(p.swaps), p.swaps, [""] * len(p.swaps))] if p.swaps else []
     if not p.moments:
         answered = set()
