@@ -438,3 +438,12 @@ def test_the_other_healers_chip_gives_the_share_the_bar_reads():
                          cd_names=[("Tranquility", 1, [], 0.8, ([[74.0]] * 24 + [[200.0]] * 56, 100, 180.0))])
     out = healer.roles_more([rd], found=[healer.Moment(75.0, 1000.0, 1.6, "Soulcoil Rite")])
     assert "Tranquility 1:14 &middot; 24% <small>(30% of those who press it)</small>" in out
+
+
+def test_a_button_on_cooldowns_far_habit_is_dropped():
+    # Mistweaver Monk, Nek'zali (round 77): Celestial Conduit "on cooldown, about every 97 s" showed 3:20 and 3:46
+    ab = SimpleNamespace(id=1, name="Celestial Conduit", users=1.0, per_kill=3.0)
+    per_player = [[5.0, 100.0, 195.0]] * 55 + [[5.0, 100.0, 230.0]] * 45
+    tl = SimpleNamespace(abilities=[ab], duration=270.0, players=[{"casts": {1: ts}} for ts in per_player])
+    c = healer.cooldowns(tl, [], {1: (90.0, 1)})[0]
+    assert c.every and 230.0 not in c.times and 230.0 not in c.alt

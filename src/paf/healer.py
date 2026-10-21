@@ -545,13 +545,16 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         why = ("" if every else "cast on another player" if _external(sid) else "a cast-while-moving button"
                if _moving(sid) else "a movement button" if _speed(sid) else _item_why(name, sid) if _item(sid) else "about every minute" if per_kill >= 4
                else "")
-        if why == MINUTE or every:  # pressed about every minute or on cooldown: a habit far from its press is
-            far = [i for i, (x, of) in enumerate(zip(alt, alt_of, strict=False)) if abs(x - of) > OR_NEAR
-                   and (why or not any(-ANSWER[0] <= x - m.t <= ANSWER[1] for m in found))]  # a held habit
-            # for a hit stays the press's other time (round 74: Avenging Wrath held for 0:35, the rest on cooldown)
-            times = sorted([*times, *(alt[i] for i in far if all(abs(alt[i] - t) > 8 for t in times))])
-            alt, alt_of = ([x for i, x in enumerate(alt) if i not in far],  # another moment of its own, not "or"
-                           [x for i, x in enumerate(alt_of) if i not in far])  # (round 76: "2:09 …, or 1:22")
+        # an "or" time is the same press 20 s away at most (round 76: Nature's Swiftness "2:09 …, or 1:22"); farther,
+        # a minute button's is a moment of its own, a button on cooldown's is dropped, its cadence says where it lands
+        # (round 77: Celestial Conduit "every 97 s" read 3:20 and 3:46); a habit held for a hit stays (round 74:
+        # Avenging Wrath held for 0:35, the rest on cooldown)
+        if why == MINUTE or every:
+            far = {i for i, (x, of) in enumerate(zip(alt, alt_of, strict=False)) if abs(x - of) > OR_NEAR
+                   and (why or not any(-ANSWER[0] <= x - m.t <= ANSWER[1] for m in found))}
+            if why:
+                times = sorted([*times, *(alt[i] for i in far if all(abs(alt[i] - t) > 8 for t in times))])
+            alt, alt_of = [x for i, x in enumerate(alt) if i not in far], [x for i, x in enumerate(alt_of) if i not in far]
         shares = {x: back_share(per_player, x, cd) for x in [*times, *alt]}
         back = {x for x, b in shares.items() if b > BACK_SHARE[0]}  # pressed as soon as it is back; about half
         half = {x for x, b in shares.items() if BACK_SHARE[0] < b <= BACK_SHARE[1]}  # of them: no tie either
