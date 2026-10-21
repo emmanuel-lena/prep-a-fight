@@ -670,7 +670,8 @@ SWAP_LANE = -1  # a Cooldown with this spell id is the tank swaps' lane: ticks, 
 
 
 def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, float]], label: str,
-              presses: list | None = None, named: set[str] | None = None, answered: set | None = None) -> str:
+              presses: list | None = None, named: set[str] | None = None, answered: set | None = None,
+              moved: dict | None = None) -> str:
     """A damage-taken curve (per STEP), its big moments as dots, the phases as dashed lines; under it, one row per
     cooldown (Cooldown) with a mark where the top players usually press it: the hit and the button on one time axis."""
     # a lane for a cooldown with a moment 40% of the top players share: a spread one (Divine Steed) has none
@@ -715,8 +716,9 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
                    f"<title>{e(c.name)} {_mmss(t)}</title></line>" for t in c.times if t <= span))
         if c.spell_id == SWAP_LANE else
         f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(_shown(c.name).split(',')[0][:22])}</text>"
-        + "".join(f"<rect x='{float(x(t)) - 4:.1f}' y='{H - B + 6 + 18 * i}' width='8' height='13' rx='2' "
-                  f"class='cp{'' if t in tied else ' off'}'><title>{e(c.name)} {_mmss(t)}"
+        + "".join(f"<rect x='{float(x((moved or {}).get((c.name, t), t))) - 4:.1f}' y='{H - B + 6 + 18 * i}' "
+                  f"width='8' height='13' rx='2' "
+                  f"class='cp{'' if t in tied else ' off'}'><title>{e(c.name)} {_mmss((moved or {}).get((c.name, t), t))}"
                   f"{'' if t in tied else ' (tied to no hit)'}</title></rect>"
                   for t in [*c.times, *c.alt] if t <= span
                   for tied in [{a for a in [*c.times, *c.alt] if (c.name, a) in answered} if answered is not None
@@ -824,22 +826,27 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
         return ""
     # every other habit, each said, with the hit it answers as the main time is ("0:34 · 1 s before the 0:35 hit")
     near = [(a, sp, n if answered is None or (c.name, a) in answered else "") for a, sp, n in near]
-    near = [(a, _tied_share(c, a, n, sp) if sp else sp, n) for a, sp, n in near]  # a tied habit: its hit's window
+    # a tied habit keeps its moment's share; its hit's window count follows, as a named one's (round 64: "or 0:23
+    # for 36%" beside a main "0:04 · 31%" mixed a window share with a moment's)
     def back(a: float) -> str:  # tagged as the main time is (Evangelism's 1:42 habit, round 29)
         return f" &middot; back from cooldown{' for about half' if a in c.back_half else ''}"
-    def window(a: float) -> str:  # a habit the lead names for a hit: its count, after the habit's own tag, with
-        hit = (named or {}).get((c.name, a))  # its own back-from-cooldown reading (rounds 51, 63)
+    def window(a: float, n: str = "") -> str:  # a habit the lead names or ties for a hit: its count, after the
+        hit = (named or {}).get((c.name, a))      # habit's own tag, with its own back-from-cooldown reading
+        if hit is None and n:                     # (rounds 51, 63, 64)
+            hit = _secs(n.partition(" ")[0])
         if hit is None or (hs := hit_share(c, a, hit)) is None:
             return ""
+        if n and not (named or {}).get((c.name, a)):  # tied: its chip names the hit already
+            return f" &middot; in its window:{_base(c, hs, hit).replace(' &middot;', '')}"
         where = "ahead of" if c.ramp and a < hit - ANSWER[0] else "in the window of"
         inside = _counted(c, a, hit)
-        b = _back_in(c, a, hit)
+        b = None if c.why == MINUTE else _back_in(c, a, hit)
         tag = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"
                + (" for about half" if b <= BACK_SHARE[1] else ""))
         return (f" &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
                 + (f", about {_mmss(st.median(inside))}" if inside else "") + tag)
     return ", or " + ", ".join(f"{_chip(a, n)}" + (f" for {_pct(sp)}" if sp else " for some")
-                               + (back(a) if a in c.back and not c.why else "") + window(a) for a, sp, n in near)
+                               + (back(a) if a in c.back and not c.why else "") + window(a, n) for a, sp, n in near)
 
 
 BACK = 8.0  # seconds past its cooldown a press still counts as pressed as soon as it is back
@@ -971,7 +978,8 @@ def _rank(named: list[str]):
     return key
 
 
-def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict | None = None) -> str:
+def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict | None = None,
+                   moved: dict | None = None) -> str:
     """The cooldown rows. answered: the (button, time) pairs the lead ties to a hit; a chip says its hit only for
     those, so no chip reads as an answer the lead and the chart do not give (Apotheosis "1 s before the 0:35 hit")."""
     def tie(c: Cooldown, t: float, n: str) -> str:
@@ -980,7 +988,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
         f"<li><b>{e(_shown(c.name))}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill"
         + (f", {_pct(c.on_others)} of the presses on another player" if 0 <= c.on_others < 0.95 else
            ", all on another player" if c.on_others >= 0.95 else "") + "</small>"
-        "<span class='when'>" + ("".join(f"<span class='chip'>{_chip(t, tie(c, t, n))}"
+        "<span class='when'>" + ("".join(f"<span class='chip'>{_chip((moved or {}).get((c.name, t), t), tie(c, t, n))}"
                                         + _split(_named(c, t, named, tie(c, t, n), sp))[0]
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
                                            if t in c.back and not (c.why or c.every) else "")  # its line says it
@@ -1011,7 +1019,8 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
         where = "ahead of" if c.ramp and t < hit - ANSWER[0] else "in the window of"  # a ramp: around its own time
         inside = _counted(c, t, hit)  # its own moment, then the lead's count with its own time (round 54)
         when = st.median(inside) if inside else t
-        b = _back_in(c, t, hit)  # the window's own back-from-cooldown reading (round 63)
+        b = None if c.why == MINUTE else _back_in(c, t, hit)  # its own reading (round 63); a minute button's
+        # reason is the lead's, not "back from cooldown" (round 64: Convoke)
         tag = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"
                + (" for about half" if b <= BACK_SHARE[1] else ""))
         if _pct(hs) == _pct(sp):  # one count: said once, its time only when 5 s or more off (round 60)
@@ -1613,6 +1622,7 @@ def render_sheet(h: HealerPrep) -> str:
     defs = [c for c in own if c not in heals and c not in items]
     lead, lead_names, answered = "", [], set()
     named: dict = {}  # the press the lead names for each hit kept for none: its chip counts that window too
+    moved: dict = {}  # a tied press whose counted presses sit 5 s or more from its moment: drawn and said there
     if h.moments:
         shown = h.moments[:3]
         ratios = (f"{'both' if len(shown) == 2 else 'each'} {_x(shown[0].ratio)}&times;"
@@ -1662,6 +1672,11 @@ def render_sheet(h: HealerPrep) -> str:
                          and x[0] not in {y[0] for y in xs[:i]}][:2]
         lead_names = list(dict.fromkeys(x[0] for xs in tops.values() for x in xs))
         answered = {(x[0], x[1]) for xs in tops.values() for x in xs}  # what the chart draws full
+        for hit_t, xs in tops.items():  # a tied press drawn and said at its counted presses' time when its moment is
+            for x in xs:                # 5 s or more off (round 64: Divine Hymn "0:47" for presses at 0:41)
+                inside = _counted(x[4], x[1], hit_t) if x[4].presses else []
+                if inside and abs(st.median(inside) - x[1]) >= 5:
+                    moved[(x[0], x[1])] = st.median(inside)
         # one press answering either of two hits (Aura Mastery at 0:36 for some, 1:19 for others) is said once
         by_press: dict[tuple, list] = {}
         for hit, xs in sorted(tops.items()):
@@ -1755,7 +1770,7 @@ def render_sheet(h: HealerPrep) -> str:
                 + (f" Among the top {e(h.spec)}s, {'; '.join(answers)}." if answers else "")
                 + (f" No cooldown is kept for {bare_said}." if bare else "") + "</p>")
     svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight, and the top players' healing "
-                    "cooldowns", heals, set(lead_names), answered)
+                    "cooldowns", heals, set(lead_names), answered, moved)
     fight = ([lead] if lead else []) + [
         f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Raid "
         f"damage taken per second, median of the {h.raid_kills or 'top'} kills of this boss whose raid damage is recorded "
@@ -1768,7 +1783,7 @@ def render_sheet(h: HealerPrep) -> str:
            "before, matched by timing)") + f".</p><ul class='hl2'>"
         f"{moments_html(h.moments, 'raid damage') or '<li>No big moment: steady raid damage.</li>'}</ul></div>",
         f"<h2>Your long cooldowns, where the top {e(h.spec)}s press them</h2><ul class='hl2'>"
-        f"{cooldowns_html(sorted((c for c in heals if _external(c.spell_id) != 'protective'), key=_rank(lead_names)), answered, named) or '<li>Not enough top players in the corpus yet.</li>'}</ul>"]
+        f"{cooldowns_html(sorted((c for c in heals if _external(c.spell_id) != 'protective'), key=_rank(lead_names)), answered, named, moved) or '<li>Not enough top players in the corpus yet.</li>'}</ul>"]
     rare_kept = [c for c in h.rare if c not in utility]
     rare = [c for c in rare_kept if c not in items and not is_defensive(c.spell_id, c.name)
             and _external(c.spell_id) != "protective"]  # the others go to their own section
