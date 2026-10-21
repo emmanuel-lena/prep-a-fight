@@ -524,11 +524,13 @@ RHYTHM_SHARE = 0.2  # of the top players, each of two rhythms at least
 
 def rhythms(per_player: list[list[float]], times: list[float], alt: list[float], n_all: int) -> list:
     """Two groups pressing a button at different moments the whole kill long: each player's presses matched to the
-    nearest moment shown (within 8 s), the two most common full sequences, kept when each is RHYTHM_SHARE of the
-    top players and they share no moment (Disc's Evangelism on Vashnik: 25 players at 0:04, 1:42, 3:15, 23 at 0:24,
-    2:07, 3:38; the chips mixed them with "or" and the lead read 1:42 as the next press after 2:07)."""
+    nearest moment shown (within 8 s), grouped by their first two; the two largest groups, kept when each is
+    RHYTHM_SHARE of the top players and they share no moment, each said by the moments most of its players press
+    (Disc's Evangelism on Vashnik: 0:04, 1:42, 3:15 or 0:24, 2:07, 3:38; the chips mixed them with "or" and the lead
+    read 1:42 as the next press after 2:07). Full sequences are too strict: a fourth press or a late third one
+    left 14 and 12 of 100 players in them."""
     marks = sorted({*times, *alt})
-    seqs: Counter = Counter()
+    groups: dict[tuple, list[list[float]]] = {}
     for ts in per_player:
         seq = []
         for x in ts:
@@ -536,13 +538,22 @@ def rhythms(per_player: list[list[float]], times: list[float], alt: list[float],
             if m is None or abs(m - x) > 8:
                 break
             seq.append(m)
-        else:
-            if len(seq) >= 2:
-                seqs[tuple(seq)] += 1
-    two = seqs.most_common(2)
-    if len(two) < 2 or two[1][1] < RHYTHM_SHARE * n_all or set(two[0][0]) & set(two[1][0]):
+        if len(seq) >= 2:
+            groups.setdefault(tuple(seq[:2]), []).append(seq)
+    two = sorted(groups.items(), key=lambda kv: -len(kv[1]))[:2]
+    if len(two) < 2 or len(two[1][1]) < RHYTHM_SHARE * n_all:
         return []
-    return [(k / n_all, list(seq)) for seq, k in two]
+    out = []
+    for _key, seqs in two:
+        moments = []
+        for i in range(max(map(len, seqs))):
+            at = Counter(q[i] for q in seqs if len(q) > i)
+            m, k = at.most_common(1)[0]
+            if k < len(seqs) / 2:
+                break
+            moments.append(m)
+        out.append((len(seqs) / n_all, moments))
+    return [] if set(out[0][1]) & set(out[1][1]) else out
 
 
 def trinkets(con, encounter_id: int, difficulty: int, top: int = 100) -> list[tuple[str, int, float]]:
