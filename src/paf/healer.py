@@ -1176,7 +1176,7 @@ def roles_table(roles: list, mine: str = "") -> str:
     few = "<small>too few here</small>"  # a spec read in the pool, too rare in this sheet's kills for its casts
     cover = next((r.spike_cover for r in roles if getattr(r, "spike_cover", 0)), 0.0)
     head = ("<th>Healer</th><th>Healing share</th><th>On tanks</th>"
-            f"<th>In spikes{f' ({_pct(cover)} of the fight)' if cover else ''}</th>"
+            f"<th>Its healing in spikes{f' <small>(spikes: {_pct(cover)} of the fight)</small>' if cover else ''}</th>"
             "<th>Overheal</th><th>Dispels a minute</th><th>Externals given a kill</th>"
             + ("<th>Buffs given a kill</th>" if buffs else "")
             + "<th>Players</th>")

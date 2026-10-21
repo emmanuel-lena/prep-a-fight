@@ -485,7 +485,7 @@ def render_sheet(p: TankPrep) -> str:
                         f"{'come' if len(with_swap) > 1 else 'comes'} with a tank swap (at "
                         f"{_and([_mmss(w) for _x, w in with_swap])}).")
     if p.swaps:
-        lead.append(f"Each top tank taunts about {p.taunts_per_kill:.0f} times a kill after the pull (swaps on adds count)"
+        lead.append(f"Each top tank taunts about {p.taunts_per_kill:.1f} times a kill after the pull (swaps on adds count)"
                     + ((f", most often at about {p.stacks[common][0]} stacks of {e(common)}." if common in p.stacks
                         and p.stacks[common][0] >= 2 else f", swapping after each {e(common)} (the debuff lasts "
                         f"about {p.stacks[common][1]:.0f} s; they never take a second stack)." if common in p.stacks
@@ -586,6 +586,11 @@ def render_sheet(p: TankPrep) -> str:
         deeper.append(f"<h2>The top raids' tanks</h2><p>{line}</p>{presence_table(p.presence, p.spec, 'Tank')}"
                       + comps_table(p.comps, p.kills).replace("Healers", "Tanks"))
         deaths = any(x.deaths_with is not None for x in p.presence)
+        # every sample of the sheet, once, as the healers' sheets (round 38: no map on the tank's)
+        deeper.append(f"<p class='small muted'>Where the numbers come from: your cooldowns' timings and the boss's "
+                      f"times: the {p.kills} top {e(p.spec)} kills (every cast read); the tanks' damage: "
+                      f"{p.damage_kills or 'up to 40'} of them; the tanks beside them and the compositions: the same "
+                      f"{p.kills}, deaths read on fewer.</p>")
         deeper.append("<p class='small muted'>" + ("" if deaths else "The deaths of each composition are not read yet. ")
                       + "A spec's longer kills or extra deaths are a reading, not a verdict: the raids that bring it "
                       "differ in other ways too, and a few kills move a mean of deaths.</p>")

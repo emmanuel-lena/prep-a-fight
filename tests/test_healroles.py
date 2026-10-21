@@ -260,7 +260,7 @@ def test_jobs_pool_every_corpus_kill_once_without_its_ranked_players(tmp_path):
                [("r1", "Priest", "Holy", 1), ("r2", "Priest", "Holy", None)])
     b = corpus("corpus-warrior-protection.sqlite", [("r1", "done"), ("r3", "done")],
                [("r1", "Warrior", "Protection", 9), ("r3", "Warrior", "Protection", 9)])
-    per_kill, durs, _cover, _casts = healroles.pooled_kills(3455, 4, [a, b])
+    per_kill, durs, _cover, _casts, _top = healroles.pooled_kills(3455, 4, [a, b])
     assert sorted(per_kill) == [("r1", 1), ("r2", 1), ("r3", 1)] and durs[("r3", 1)] == 240
     assert [h[2] for h in per_kill[("r1", 1)]] == [0, 2]  # each healer once, the ranked Holy Priest (actor 1) out
     assert [h[2] for h in per_kill[("r2", 1)]] == [1, 2]  # pending: its best Holy Priest (actor 0) stands it in
@@ -272,3 +272,15 @@ def test_a_moment_is_said_where_most_press_it():
     lists = [[70.0 + k % 5] for k in range(26)] + [[80.0 + k % 5] for k in range(22)] + [[] for _ in range(52)]
     times, _alt, _of = healroles.press_moments(lists, 1)
     assert 70 <= times[0] <= 74
+
+
+def test_a_job_is_checked_on_the_ranked_players():
+    # Vashnik (round 38): the average Holy Priest dispels 1.4 a minute against 0.8, the ranked ones as the others
+    durs = {(f"r{k}", 1): 240.0 for k in range(30)}
+    top = ([(f"r{k}", 1, 0, "Priest", "Holy", 100, 30, 8, 0.2, 4) for k in range(15)]
+           + [(f"r{k}", 1, 1, "Paladin", "Holy", 100, 30, 8, 0.2, 4) for k in range(15, 30)])
+    assert healroles._top_check(top, durs, "Holy Priest", "dispels") == (
+        "; not among the top players ranked by their healing: the top Holy Priests 1.0, the other specs' top "
+        "healers 1.0 (15 and 15 players)")
+    top = [(*h[:9], 8 if h[3] == "Priest" else 4) for h in top]  # 2.0 against 1.0: it holds, nothing said
+    assert healroles._top_check(top, durs, "Holy Priest", "dispels") == ""

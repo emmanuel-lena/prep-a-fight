@@ -544,7 +544,8 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
     cover = list(pool[2].values()) if pool else [  # the spikes' share of the fight, on the column's own kills
         x for (x,) in con.execute(f"SELECT k.spike_share FROM heal_kill k JOIN fight f USING(report, fight_id) "
                                   f"WHERE {where}", params) if x is not None]
-    found = paired_jobs(pool[0], pool[1]) if pool else paired_jobs(per_kill, durs, ranked)
+    found = (paired_jobs(pool[0], pool[1], top=pool[4] if len(pool) > 4 else None) if pool
+             else paired_jobs(per_kill, durs, ranked))
     for r in out:
         r.jobs = found.get(r.spec) or ["nothing stands out against the other healers"]
         r.spike_cover = st.mean(cover) if cover else 0.0
@@ -666,12 +667,13 @@ def _key(cls: str | None, spec: str | None) -> tuple[str, str]:
     return ((cls or "").replace(" ", "").lower(), (spec or "").replace(" ", "").lower())
 
 
-def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None) -> tuple[dict, dict, dict, dict]:
+def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None) -> tuple[dict, dict, dict, dict, list]:
     """Every healer of every kill of the boss read in any corpus (healer and tank corpora alike), each kill once, and
     each corpus' ranked player left out (its kill was picked for it): the sheets of a boss then say the same jobs,
     where one corpus' kills gave the Holy Priest's dispels on Vashnik as 1.8 against 0.9 on one sheet and 1.3 against
     0.7 on another. Returns (per kill, its healers' heal_stat rows), (per kill, its duration) and (per kill, the
-    share of it the raid's damage spikes take) and (per healer of a kill, its long cooldowns' casts)."""
+    share of it the raid's damage spikes take), (per healer of a kill, its long cooldowns' casts) and the ranked
+    players' own rows (a job is checked on them too)."""
     from paf.config import data_dir
 
     rows: dict[tuple[str, int], dict[int, tuple]] = defaultdict(dict)
@@ -717,14 +719,41 @@ def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None) 
                 got |= {k for k in casts}
         finally:
             con.close()
+    top = [h for k, hs in rows.items() for a, h in hs.items() if a in out[k]]  # the ranked players themselves
     per_kill = {k: [h for a, h in hs.items() if a not in out[k]] for k, hs in rows.items()}
     per_kill = {k: hs for k, hs in per_kill.items() if hs}
     kept = {(h[0], h[1], h[2]) for hs in per_kill.values() for h in hs}
     return (per_kill, durs, {k: x for k, x in cover.items() if k in per_kill},
-            {k: v for k, v in casts.items() if k in kept})
+            {k: v for k, v in casts.items() if k in kept}, top)
 
 
-def paired_jobs(per_kill: dict, durs: dict, own: tuple[str, str] | None = None) -> dict[str, list[str]]:
+TOP_PLAYERS = 10  # ranked players of a spec, at least, to check a job on them
+
+
+def _top_check(top: list, durs: dict, spec: str, m: str) -> str:
+    """A job read on every healer, checked on the ranked ones (the top players the sheet teaches from): said when it
+    does not hold there (Holy Priests dispel 1.4 a minute against 0.8 on average, yet the top ones 1.04 against
+    1.05 for the top Holy Paladins: round 38)."""
+    def val(h) -> float:
+        if m == "tank":
+            return h[7] / h[5] if h[5] else 0.0
+        if m == "spike":
+            return h[8] or 0.0
+        return (h[9] or 0) / ((durs.get((h[0], h[1])) or 60) / 60)
+    me = [val(h) for h in top if pretty(h[3], h[4]) == spec]
+    them = [val(h) for h in top if pretty(h[3], h[4]) != spec]
+    if len(me) < TOP_PLAYERS or len(them) < TOP_PLAYERS:
+        return ""
+    a, b = st.median(me), st.median(them)
+    if a >= JOB_RATIO * b and a - b >= JOB_GAP[m]:
+        return ""
+    fmt = (lambda x: f"{x:.1f}") if m == "dispels" else (lambda x: f"{x:.0%}")
+    return (f"; not among the top players ranked by their healing: the top {spec}s {fmt(a)}, the other specs' "
+            f"top healers {fmt(b)} ({len(me)} and {len(them)} players)")
+
+
+def paired_jobs(per_kill: dict, durs: dict, own: tuple[str, str] | None = None, top: list | None = None
+                ) -> dict[str, list[str]]:
     """What a healer spec does on this boss beyond the other healers of the same kills: per kill, its healers' mean
     minus the other healers' (tank share, share in the raid's damage spikes, dispels a minute), a one-sided test on
     those gaps, Benjamini-Hochberg over every spec and number, and an effect floor (JOB_RATIO, JOB_GAP). own: the
@@ -768,15 +797,16 @@ def paired_jobs(per_kill: dict, durs: dict, own: tuple[str, str] | None = None) 
         if a < JOB_RATIO * b or a - b < JOB_GAP[m]:
             continue
         n = len(ds)
+        held = _top_check(top, durs, spec, m) if top else ""
         if m == "tank":
             out[spec].append(f"heals the tanks more: {a:.0%} of its healing goes on them, against {b:.0%} for the "
-                             f"other healers of the same kills ({n} kills)")
+                             f"other healers of the same kills ({n} kills){held}")
         elif m == "spike":
             out[spec].append(f"answers the raid's damage spikes more: {a:.0%} of its healing lands in them, against "
-                             f"{b:.0%} for the other healers of the same kills ({n} kills)")
+                             f"{b:.0%} for the other healers of the same kills ({n} kills){held}")
         else:
             out[spec].append(f"dispels more: {a:.1f} times a minute, against {b:.1f} for the other healers of the "
-                             f"same kills ({n} kills)")
+                             f"same kills ({n} kills){held}")
     return dict(out)
 
 
