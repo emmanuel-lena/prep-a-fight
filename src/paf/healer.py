@@ -596,7 +596,7 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
                    f"<title>{e(c.name)} {_mmss(t)}</title></line>" for t in c.times if t <= span))
         if c.spell_id == SWAP_LANE else
         f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(_shown(c.name).split(',')[0][:22])}</text>"
-        + "".join(f"<rect x='{float(x(t)) - 3:.1f}' y='{H - B + 7 + 18 * i}' width='6' height='11' rx='1.5' "
+        + "".join(f"<rect x='{float(x(t)) - 4:.1f}' y='{H - B + 6 + 18 * i}' width='8' height='13' rx='2' "
                   f"class='cp{'' if t in tied else ' off'}'><title>{e(c.name)} {_mmss(t)}"
                   f"{'' if t in tied else ' (tied to no hit)'}</title></rect>"
                   for t in [*c.times, *c.alt] if t <= span
@@ -1102,7 +1102,7 @@ def nums_note(roles: list) -> str:
     spikes = f", {_pct(cover)} of the fight" if cover else ""
     return ("Each row is the median of every player of the spec in these kills, a second one included (the boss "
             "tab's dispels count the top one; externals and buffs: a mean, on others only). A job is a spec doing more than the other healers of the same "
-            "kills, its own best healer left out, beyond chance over every spec and number (Benjamini-Hochberg, 5%) and "
+            "kills, read on every kill of the boss collected for any spec (each kill's ranked player left out, its kill picked for it), beyond chance over every spec and number (Benjamini-Hochberg, 5%) and "
             "by a fifth at least: a habit of the spec may show on other bosses too. The shares come from different kills and do not add up; "
             f"a spike is 5 s at 1.5 times the kill's median{spikes}. Externals and overheal follow each kit.")
 

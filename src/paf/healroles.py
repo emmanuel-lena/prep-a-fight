@@ -419,8 +419,10 @@ JOB_GAP = {"tank": 0.015, "spike": 0.02, "dispels": 0.15}  # ... and at least th
 
 
 def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: dict[int, str] | None = None,
-          min_players: int = 8, ranked: tuple[str, str] | None = None) -> list[Role]:
-    """What each healer spec does on this boss, against the other healers of the same kills."""
+          min_players: int = 8, ranked: tuple[str, str] | None = None, pool: tuple[dict, dict] | None = None
+          ) -> list[Role]:
+    """What each healer spec does on this boss, against the other healers of the same kills. pool: every corpus'
+    kills of the boss (pooled_kills), for the jobs; else this corpus' kills, its ranked healer left out."""
     ensure_tables(con)
     where, params = heal_filter(encounter_id, difficulty)
     rows = healers_only(con.execute(f"SELECT h.* FROM heal_stat h JOIN fight f USING(report, fight_id) WHERE {where}",
@@ -498,7 +500,7 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
                         buff_spells=[(names or {}).get(ab, f"spell {ab}") for ab, _ in buff_casts[spec].most_common()]))
     cover = [x for (x,) in con.execute(f"SELECT k.spike_share FROM heal_kill k JOIN fight f USING(report, fight_id) "
                                        f"WHERE {where}", params) if x is not None]
-    found = paired_jobs(per_kill, durs, ranked)
+    found = paired_jobs(*pool) if pool else paired_jobs(per_kill, durs, ranked)
     for r in out:
         r.jobs = found.get(r.spec) or ["nothing stands out against the other healers"]
         r.spike_cover = st.mean(cover) if cover else 0.0
@@ -609,6 +611,46 @@ def press_moments(per_player: list[list[float]], keep: int, end: float | None = 
 def _key(cls: str | None, spec: str | None) -> tuple[str, str]:
     """A class and spec however written ("Death Knight", "DeathKnight", "priest")."""
     return ((cls or "").replace(" ", "").lower(), (spec or "").replace(" ", "").lower())
+
+
+def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None) -> tuple[dict, dict]:
+    """Every healer of every kill of the boss read in any corpus (healer and tank corpora alike), each kill once, and
+    each corpus' ranked player left out (its kill was picked for it): the sheets of a boss then say the same jobs,
+    where one corpus' kills gave the Holy Priest's dispels on Vashnik as 1.8 against 0.9 on one sheet and 1.3 against
+    0.7 on another. Returns (per kill, its healers' heal_stat rows) and (per kill, its duration)."""
+    from paf.config import data_dir
+
+    rows: dict[tuple[str, int], dict[int, tuple]] = defaultdict(dict)
+    out: dict[tuple[str, int], set[int]] = defaultdict(set)  # the ranked players, in any corpus
+    durs: dict[tuple[str, int], float] = {}
+    for path in paths if paths is not None else sorted(data_dir().glob("corpus-*.sqlite")):
+        con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        try:
+            if not con.execute("SELECT 1 FROM sqlite_master WHERE name='heal_stat'").fetchone():
+                continue
+            where, params = heal_filter(encounter_id, difficulty)
+            per: dict[tuple[str, int], list] = defaultdict(list)
+            for r in healers_only(con.execute(f"SELECT h.* FROM heal_stat h JOIN fight f USING(report, fight_id) "
+                                              f"WHERE {where}", params).fetchall(), total_at=5):
+                per[(r[0], r[1])].append(r)
+            for rep, fid, d in con.execute(f"SELECT report, fight_id, duration_s FROM fight f WHERE {where}", params):
+                durs[(rep, fid)] = d
+            for rep, fid, cls, spec, aid in con.execute(
+                    f"SELECT r.report, r.fight_id, r.class, r.spec, r.actor_id FROM ranked r "
+                    f"JOIN fight f USING(report, fight_id) WHERE {where}", params):
+                k = (rep, fid)
+                mine = [h for h in per.get(k, []) if _key(h[3], h[4]) == _key(cls, spec)]
+                if aid is not None:
+                    out[k].add(aid)
+                elif mine:  # not collected yet: its best healer of the ranked spec stands for it
+                    out[k].add(max(mine, key=lambda h: h[5] or 0)[2])
+            for k, hs in per.items():
+                for h in hs:
+                    rows[k][h[2]] = h
+        finally:
+            con.close()
+    per_kill = {k: [h for a, h in hs.items() if a not in out[k]] for k, hs in rows.items()}
+    return {k: hs for k, hs in per_kill.items() if hs}, durs
 
 
 def paired_jobs(per_kill: dict, durs: dict, own: tuple[str, str] | None = None) -> dict[str, list[str]]:

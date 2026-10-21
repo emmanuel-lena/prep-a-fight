@@ -233,3 +233,34 @@ def test_a_job_is_paired_within_the_kill_and_leaves_the_ranked_healer_out():
     assert found["Holy Priest"] == ["dispels more: 1.5 times a minute, against 0.8 for the other healers of the same "
                                     "kills (30 kills)"]
     assert healroles.paired_jobs(dict(list(per_kill.items())[:15]), durs, ("Paladin", "Holy")) == {}  # too few
+
+
+def test_jobs_pool_every_corpus_kill_once_without_its_ranked_players(tmp_path):
+    """The sheets of a boss say the same jobs: every corpus' kills of the boss, each once, its ranked players left
+    out (a collected kill names it; a pending one stands it in with its best healer of the ranked spec)."""
+    def corpus(name, kills, ranked):
+        con = sqlite3.connect(tmp_path / name)
+        con.executescript(SCHEMA)
+        healroles.ensure_tables(con)
+        for rep, status in kills:
+            con.execute("INSERT INTO fight(report, fight_id, encounter_id, difficulty, status, duration_s) "
+                        "VALUES (?,1,3455,4,?,240)", (rep, status))
+            con.executemany("INSERT INTO heal_stat VALUES (?,1,?,?,?,?,?,?,?,?)", [
+                (rep, 0, "Priest", "Holy", 300, 30, 8, 0.2, 6), (rep, 1, "Priest", "Holy", 100, 30, 8, 0.2, 5),
+                (rep, 2, "Shaman", "Restoration", 100, 30, 8, 0.2, 3)])
+        for rep, cls, spec, aid in ranked:
+            con.execute("INSERT INTO ranked(report, fight_id, class, spec, actor_id) VALUES (?,1,?,?,?)",
+                        (rep, cls, spec, aid))
+        con.commit()
+        con.close()
+        return tmp_path / name
+
+    a = corpus("corpus-priest-holy.sqlite", [("r1", "done"), ("r2", "pending")],
+               [("r1", "Priest", "Holy", 1), ("r2", "Priest", "Holy", None)])
+    b = corpus("corpus-warrior-protection.sqlite", [("r1", "done"), ("r3", "done")],
+               [("r1", "Warrior", "Protection", 9), ("r3", "Warrior", "Protection", 9)])
+    per_kill, durs = healroles.pooled_kills(3455, 4, [a, b])
+    assert sorted(per_kill) == [("r1", 1), ("r2", 1), ("r3", 1)] and durs[("r3", 1)] == 240
+    assert [h[2] for h in per_kill[("r1", 1)]] == [0, 2]  # each healer once, the ranked Holy Priest (actor 1) out
+    assert [h[2] for h in per_kill[("r2", 1)]] == [1, 2]  # pending: its best Holy Priest (actor 0) stands it in
+    assert [h[2] for h in per_kill[("r3", 1)]] == [0, 1, 2]  # a tank's kill: every healer kept
