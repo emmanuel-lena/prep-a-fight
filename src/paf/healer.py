@@ -1145,7 +1145,7 @@ NOT_ADVICE = " Their choices, not a recommendation: no sim weighs them."
 def split_html(split: list, players: int, spec: str, wide: bool = False) -> str:
     """The talents the top players split on, with how often each is picked: what the builds above hide. wide: none
     or one is taken by 35 to 65% of them (Holy Paladin, Holy Priest), so the talents they differ on most, 15 to 85%."""
-    return ((f"<h2>The talents the top {e(spec)}s differ on most</h2><p>At most one is taken by 35 to 65% of "
+    return ((f"<h2>The talents the top {e(spec)}s differ on most</h2><p>{'Only one is' if any(0.35 <= x <= 0.65 for _n, x in split) else 'None is'} taken by 35 to 65% of "
              f"them, so these are the ones between 15 and 85%: the share of the {players} players read who take each, closest "
              "to half first:</p>" if wide else
              f"<h2>The talents the top {e(spec)}s split on</h2><p>The share of the {players} players read "
@@ -1206,6 +1206,25 @@ def _minute(name: str) -> bool:
         return False
 
 
+def _in_hit(n: str, ts: list, rest: list, h: float) -> tuple | None:
+    """(button, time, share) of a spec's healers pressing it in a hit's answer window, as the fight tab counts a tied
+    press: over the window, not within 8 s of a moment's peak (the Evokers' Rewind for Nek'zali's 1:15: 26% in the
+    window, 20% around its 1:13 peak, so "none shared"; round 40). Kept when a quarter of those who press it are
+    there and fewer than BACK_SHARE[0] of those presses come as soon as it is back; without the presses, the moments."""
+    if len(rest) < 2:  # no presses carried: its moments
+        return next(((n, t, sp) for t, sp, back in ts if -ANSWER[0] <= t - h <= ANSWER[1] and not back), None)
+    ps, total, cd = rest[1]
+    a, b = h - ANSWER[0], h + ANSWER[1]
+    inside = [(x, max((y for y in p if y < x), default=None)) for p in ps for x in p if a <= x <= b]
+    players = sum(1 for p in ps if any(a <= x <= b for x in p))
+    if not total or players < 0.25 * len(ps):
+        return None
+    back = sum(1 for x, y in inside if y is not None and cd and x - y <= cd + BACK) / max(1, len(inside))
+    if back > BACK_SHARE[0]:
+        return None
+    return n, st.median(x for x, _y in inside), players / total
+
+
 def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
     """Under the table, what a number cannot say: what each other healer spec presses on each big hit (found), the
     same answer rule as the fight tab's (from 5 s before to 8 s after; a press back from cooldown is no answer); every
@@ -1221,8 +1240,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             continue
         per_hit = []
         for h in hits:
-            got = [(n, t, sp) for n, _k, ts, *_rest in r.cd_names if not _minute(n)
-                   for t, sp, back in ts if -ANSWER[0] <= t - h <= ANSWER[1] and not back]
+            got = [g for n, _k, ts, *rest in r.cd_names if not _minute(n)
+                   for g in [_in_hit(n, ts, rest, h)] if g]
             per_hit.append((h, sorted(got, key=lambda x: -x[2])[:2]))
         chips = "".join(f"<span class='chip'>the {_mmss(h)} hit: "
                         + ("; ".join(f"{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)}" for n, t, sp in got)
@@ -1234,9 +1253,9 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
         return ""
     return ("<h2>The other healers' cooldowns on the big hits</h2>"
             f"<ul class='hl2'>{out}</ul><p class='small muted'>From the same kills as the table, every player of each spec (that spec's "
-            "own sheet reads its top players, so its times can differ): a time is shown when a quarter "
-            "of the spec's healers who press the button share it, its share of all that spec's healers there; a press "
-            "back from cooldown is no answer, as on the fight tab.</p>")
+            "own sheet reads its top players, so its times can differ): a button is shown for a hit when a quarter "
+            "of the spec's healers who press it do so in the hit's window (5 s before to 8 s after), its share of all "
+            "that spec's healers there; presses mostly back from cooldown are no answer, as on the fight tab.</p>")
 
 
 def _job(r) -> str:
@@ -1633,6 +1652,9 @@ def render_sheet(h: HealerPrep) -> str:
         deeper_first.append(f"<h2>Healers in the top {e(h.spec)}s' kills</h2><p>{line} How often each other healer spec is there in the {n_kills} "
                       f"top kills read for their healing"
                       + (f", median {_mmss(h.own_median)}" if h.own_median else "")
+                      + (f", {'slower' if h.own_median > h.duration else 'faster'} than the {h.kills} top kills' "
+                         f"{_mmss(h.duration)}: picked by their healing, not their kill time"
+                         if h.own_median and abs(h.own_median - h.duration) >= 10 else "")
                       + f" (the timings need every cast, collected on {h.kills} of them), "
                       f"and the kills with it against those without it (a reading, not a verdict):</p>"
                       f"{presence_table(h.presence, h.spec)}")

@@ -400,7 +400,8 @@ class Role:
     dispels: float  # median dispels per minute
     raid_cds: float  # long cooldowns cast on themselves, the raid or an enemy, per kill
     externals: float  # protective long cooldowns cast on another player (paf.gamedata.external_kind), per kill
-    cd_names: list[tuple[str, float, list]] = field(default_factory=list)  # (spell, per kill, (moment, share) shared)
+    cd_names: list[tuple] = field(default_factory=list)  # (spell, per kill, (moment, share, back) shared, users,
+    # (its players' presses, the spec's players, its cooldown))
     jobs: list[str] = field(default_factory=list)  # what the numbers say this spec does on this boss
     se: dict[str, float] = field(default_factory=dict)  # standard error of each number (its healers' spread)
     buffs: float = 0.0  # damage buffs cast on another player (Power Infusion), per kill
@@ -530,7 +531,8 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
         if len(t["healing"]) < (POOL_PLAYERS if pool else min_players):  # the Disc Priest: 43 players in the
             continue  # pool, 3 in a Holy Priest's kills, was dropped from the table on 7 sheets of 8 (round 31)
         mid = st.median(durs.values()) if durs else None
-        cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n, _shared(ps, n, mid, _cd(ab)), len(ps) / n)
+        cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n, _shared(ps, n, mid, _cd(ab)), len(ps) / n,
+                (ps, n, _cd(ab)))  # its players' presses: the other healers' cards read each hit's own window
                for ab, ps in (cd_times[spec].items() if own else [])  # pressed by half of them at least (HTT: 3%)
                if len(ps) / n >= 0.5 and not _personal(ab, names) and not _untied(ab, ps, mid)
                and sum(map(len, ps)) / len(ps) < 3.5]  # a 1-minute button (Nature's Swiftness, 3.9) is no raid cooldown

@@ -269,7 +269,7 @@ def test_back_from_cooldown_is_read_per_player():
 def test_the_talents_they_differ_on_most_when_none_splits_them():
     # Holy Paladin: no talent taken by 35-65% of them, so the change tab names the ones they differ on most
     page = healer.split_html([("Tower of Radiance", 0.22)], 100, "Holy Paladin", wide=True)
-    assert "differ on most</h2>" in page and "At most one is taken by 35 to 65% of them" in page
+    assert "differ on most</h2>" in page and "is taken by 35 to 65% of them" in page
 
 
 def test_jobs_lead_says_either_only_when_your_spec_has_no_job():
@@ -343,3 +343,12 @@ def test_a_minute_button_in_a_bare_hit_is_named_with_its_reason():
     assert healer.landed_in(m, [cv]) == " (70% press Convoke the Spirits at 1:11, pressed about every minute)"
     inn = healer.Cooldown("Innervate", 2, 1.0, 2.0, [49.0], presses=[[75.0]] * 11 + [[49.0]] * 89, n_all=100)
     assert healer.landed_in(m, [inn]) == ""  # a mana button answers no hit anywhere: never named
+
+
+def test_the_other_healers_are_read_over_the_hits_window():
+    # Preservation Evoker, Nek'zali (round 40): Rewind in the 1:15 window (1:10-1:23) for 26%, 20% around its peak
+    ps = [[71.0]] * 20 + [[82.0]] * 6 + [[37.0]] * 30 + [[200.0]] * 24
+    got = healer._in_hit("Rewind", [], [0.8, (ps, 100, 240.0)], 75.0)
+    assert got[0] == "Rewind" and got[2] == 0.26
+    back = [[10.0, 75.0]] * 30 + [[200.0]] * 50  # every press back from a 60 s cooldown: no answer
+    assert healer._in_hit("X", [], [0.8, (back, 100, 60.0)], 75.0) is None
