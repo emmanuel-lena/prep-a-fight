@@ -856,17 +856,26 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None) -> str:
                     if hs is not None and not hs:
                         continue
                     near.append((sp if hs is None else hs, c, t, why))
-    if not near:  # no moment shown there: the most common press in its window all the same, under the quarter bar
-        from paf.defensives import is_defensive
+    from paf.defensives import is_defensive
 
-        few = [(hs, c) for c in cds if not (c.why or c.every or c.rhythm or _item(c.spell_id)  # a raid button
-                                            or _external(c.spell_id) == "damage" or is_defensive(c.spell_id, c.name)
-                                            or not (c.ramp or any([*c.near, *(c.alt_near or [])])))  # one that
-               # answers a hit somewhere, as the chart's (Innervate, a mana button: "only 11%" on Vashnik's 3:35)
-               for hs in [hit_share(c, m.t, m.t)] if hs and FEW_SHARE <= hs < 0.25]  # (Nek'zali's 0:35: 20% of the top
-        if few:  # Discs press Ultimate Penitence in it; the lead said "no cooldown" alone; round 36)
-            hs, c = max(few, key=lambda x: x[0])
-            return f" (only {_pct(hs)} press {e(_shown(c.name))} in it{_reach_note(c, m.t)})"
+    # a raid cooldown that answers a hit somewhere, as the chart's (Innervate, a mana button: "only 11%" on Vashnik's
+    # 3:35), read in the window under the quarter bar (Nek'zali's 0:35: 20% of the top Discs press Ultimate Penitence)
+    few = [(hs, c) for c in cds if not (c.why or c.every or _item(c.spell_id)
+                                        or _external(c.spell_id) == "damage" or is_defensive(c.spell_id, c.name)
+                                        or not (c.ramp or any([*c.near, *(c.alt_near or [])])))
+           for hs in [hit_share(c, m.t, m.t)] if hs and FEW_SHARE <= hs < 0.25]
+    best_near = max((x[0] for x in near), default=0.0)
+    rhythm_only = all(x[1].why == MINUTE or x[1].every for x in near)
+    # under the bar, a raid cooldown about as common wins over a button pressed about every minute (round 57:
+    # Nature's Swiftness 16% named over Spirit Link Totem's 17%, Convoke 19% over Tranquility's 21%)
+    if few and (not near or (best_near < 0.25 and rhythm_only and max(h for h, _c in few) >= best_near - 0.03)):
+        hs, c = max(few, key=lambda x: x[0])
+        return f" (only {_pct(hs)} press {e(_shown(c.name))} in it{_reach_note(c, m.t)})"
+    if not near:
+        on_cd = [(hs, c) for c in cds if c.every for hs in [hit_share(c, m.t, m.t)] if hs and hs >= FEW_SHARE]
+        if on_cd:  # a button pressed on cooldown lands there: said, or "no long cooldown" is false (round 57: Stasis)
+            hs, c = max(on_cd, key=lambda x: x[0])
+            return f" ({_pct(hs)} press {e(_shown(c.name))} in it, on cooldown{_reach_note(c, m.t)})"
         return " (no long cooldown of theirs pressed by a tenth of them in it)" if cds else ""  # (round 56: shorter
         # buttons, Divine Toll's 30 s, are not on the sheet's cards)
     # the closest of the presses a quarter make (Disc's 2:01 Evangelism, 9 s before 2:10, over its 1:41 one, 29 s)
@@ -1350,7 +1359,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                      for n, t, sp, rp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
                                         f"<small>(under a quarter of those who press it"
-                                        f": {int(pp * 100)}%)</small>"
+                                        f"{', the same share' if int(pp * 100) == round(sp * 100) else f': {int(pp * 100)}%'})</small>"
                                         for u in under if len(u) > 4 for n, t, sp, pp in [u[:4]])
                            or "none shared") + "</span>"
                         for h, got, under in per_hit)
