@@ -466,7 +466,8 @@ def render_sheet(p: TankPrep) -> str:
         for n, u, k, ts, _ev, _sps, *rest in p.short_defs:
             if rest:
                 pressed[n] = Cooldown(n, 0, u, k, ts, presses=[x for x in rest[0] if x],
-                                      n_all=len(rest[0]), lasts=rest[1])
+                                      n_all=len(rest[0]), lasts=rest[1],
+                                      press_lasts=[d for x, d in zip(rest[0], rest[1], strict=False) if x])
 
         def window(n: str, t: float, sp: float, hit: float) -> float:
             hs = hit_share(pressed[n], t, hit) if n in pressed else None
@@ -506,7 +507,9 @@ def render_sheet(p: TankPrep) -> str:
     if p.swaps:
         # a tank's share of the kill's swaps, at least half the shared moments (round 43: "about 4" beside 9 swaps)
         taunts = f"{max(p.taunts_per_kill, len(p.swaps) / 2):.1f}".removesuffix(".0")
-        lead.append(f"Each top tank taunts about {taunts} times a kill after the pull (swaps on adds count)"
+        swaps = f"{2 * max(p.taunts_per_kill, len(p.swaps) / 2):.0f}"  # both tanks' taunts: the swaps listed below
+        lead.append(f"The tanks swap about {swaps} times a kill after the pull, each top tank taunting about {taunts} "
+                    "times (swaps on adds count)"
                     + ((f", most often at about {p.stacks[common][0]} stacks of {e(common)}." if common in p.stacks
                         and p.stacks[common][0] >= 2 else f", swapping after each {e(common)} (the debuff lasts "
                         f"about {p.stacks[common][1]:.0f} s; they never take a second stack)." if common in p.stacks

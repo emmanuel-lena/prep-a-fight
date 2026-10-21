@@ -91,6 +91,7 @@ class Cooldown:
     back_half: list = field(default_factory=list)  # its times about half its players press as soon as it is back
     n_all: int = 0  # the top players read, those who never press it included
     lasts: list = field(default_factory=list)  # each top player's kill length: a late hit's share is of those reaching it
+    press_lasts: list = field(default_factory=list)  # the kill length of each of presses' players, in their order
     rhythms: list = field(default_factory=list)  # (share of the top players, their press times): two groups that
     # press it at different moments all kill long (Disc's Evangelism: 0:04, 1:42, 3:15 or 0:24, 2:07, 3:38)
 
@@ -481,6 +482,7 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         per_player = [sorted(t for i in ids for t in (p["casts"].get(i) or [])) or list(p["casts"].get(name) or [])
                       for p in tl.players]
         users = sum(1 for ts in per_player if ts) / max(1, len(tl.players))
+        pressed_lasts = [p.get("duration") or tl.duration for p, ts in zip(tl.players, per_player, strict=False) if ts]
         per_player = [ts for ts in per_player if ts]
         if not per_player or not tl.duration:
             continue
@@ -580,7 +582,8 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
                             back=sorted(x for x in back if x in times or x in alt),
                             rhythms=sorted(two, key=lambda r: r[1][0]) if two and not (every or why) else [],
                             presses=per_player, n_all=n_all, back_half=sorted(half),
-                            lasts=[p.get("duration") or tl.duration for p in tl.players]))
+                            lasts=[p.get("duration") or tl.duration for p in tl.players],
+                            press_lasts=pressed_lasts))
     return sorted(out, key=lambda c: -c.users)
 
 
@@ -746,10 +749,26 @@ def hit_share(c: Cooldown, t: float, hit: float) -> float | None:
     (within 8 s of the press) counted Revival up to 13 s after Vashnik's 0:40 hit: 49% against 35% (round 34)."""
     if not c.presses or not c.n_all:
         return None
-    # a ramp's own window ends where the hit's begins: no press counts both ways (round 52)
-    a, b = ((t - 8, min(t + 8, hit - ANSWER[0])) if c.ramp and hit - t >= RAMP[0]
-            else (hit - ANSWER[0], hit + ANSWER[1]))
-    return sum(1 for ts in c.presses if any(a <= x <= b for x in ts)) / reach(c, hit)
+    a, b = _window(c, t, hit)
+    end = hit + ANSWER[1]  # the presses of the kills the base counts only (round 54: 19 presses, 16 of the 58 kills)
+    lasts = c.press_lasts if len(c.press_lasts) == len(c.presses) else [end] * len(c.presses)
+    return sum(1 for ts, d in zip(c.presses, lasts, strict=False)
+               if (not c.lasts or d >= end) and any(a <= x <= b for x in ts)) / reach(c, hit)
+
+
+def _window(c: Cooldown, t: float, hit: float) -> tuple[float, float]:
+    """A press's window for a hit: the hit's answer window, or a ramp's own, ending where the hit's begins (round 52)."""
+    if c.ramp and hit - t >= RAMP[0]:
+        return t - 8, min(t + 8, hit - ANSWER[0])
+    return hit - ANSWER[0], hit + ANSWER[1]
+
+
+def _counted(c: Cooldown, t: float, hit: float) -> list[float]:
+    """The presses a hit's share counts: in the window, of the kills still going at its end."""
+    a, b = _window(c, t, hit)
+    end = hit + ANSWER[1]
+    lasts = c.press_lasts if len(c.press_lasts) == len(c.presses) else [end] * len(c.presses)
+    return [x for ts, d in zip(c.presses, lasts, strict=False) if not c.lasts or d >= end for x in ts if a <= x <= b]
 
 
 def reach(c: Cooldown, hit: float) -> int:
@@ -786,7 +805,9 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
         hit = (named or {}).get((c.name, a))
         if hit is not None and (hs := hit_share(c, a, hit)) is not None:
             where = "ahead of" if c.ramp and a < hit - ANSWER[0] else "in the window of"
-            return f" for {_pct(hs)} {where} the {_mmss(hit)} hit"
+            inside = _counted(c, a, hit)
+            return (f" for {_pct(sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
+                    + (f", about {_mmss(st.median(inside))}" if inside else ""))
         return f" for {_pct(sp)}" if sp else " for some"
     return ", or " + ", ".join(f"{_chip(a, n)}{share(a, sp, n)}"
                                + (back(a) if a in c.back and not c.why else "") for a, sp, n in near)
@@ -854,8 +875,7 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None) -> str:
     few = "only " if sp < 0.25 else ""  # under a quarter, as the bare hits' "only N%" (round 39)
     of = _reach_note(c, m.t) if c.presses else ""  # counted in the hit's window: said, as its chip counts its moment
     ramp = c.ramp and t < m.t - ANSWER[0]
-    a, b = (t - 8, min(t + 8, m.t - ANSWER[0])) if ramp else (m.t - ANSWER[0], m.t + ANSWER[1])
-    inside = [x for ts in c.presses for x in ts if a <= x <= b]
+    inside = _counted(c, t, m.t)
     when = _mmss(st.median(inside) if inside else t)  # the presses counted, not the moment's (round 53: "2:20" for a
     if ramp:                                          # window ending at 2:18, its presses at 2:14)
         return f" ({few}{_pct(sp)} ramp with {e(_shown(c.name))} ahead of it{of}, about {when}, {e(why)})"
@@ -927,7 +947,12 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
     hit = (named or {}).get((c.name, t))
     if hit is not None and (hs := hit_share(c, t, hit)) is not None:
         where = "ahead of" if c.ramp and t < hit - ANSWER[0] else "in the window of"  # a ramp: around its own time
-        return f"{_base(c, hs, hit)} {where} the {_mmss(hit)} hit"
+        inside = _counted(c, t, hit)  # its own moment, then the lead's count with its own time (round 54)
+        when = st.median(inside) if inside else t
+        if round(hs * 100) == round(sp * 100) and abs(when - t) < 1.5:  # one count, one time: said once
+            return f"{_base(c, hs, hit)} {where} the {_mmss(hit)} hit"
+        return (f"{_share(sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
+                f", about {_mmss(when)}")
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
         return _base(c, hs, _secs(n.partition(" ")[0]))
     return _share(sp)
@@ -937,7 +962,8 @@ def _base(c: Cooldown, hs: float, hit: float) -> str:
     """A hit's share on a chip, of what the lead counts it of: "33% of the 58 kills still going" when a late hit's
     kills are fewer (round 53: "33% of the top players" read as 33 of 100, for 19 of 58)."""
     n = reach(c, hit)
-    of = f"of the {n} kills still going" if c.lasts and n < 0.9 * len(c.lasts) else "of the top players"
+    of = ("of the top players, in the " + f"{n} kills still going" if c.lasts and n < 0.9 * len(c.lasts)
+          else "of the top players")  # a share of players (round 54: "24% of the 87 kills" read as 21 kills)
     return f" &middot; {_pct(hs)} {of}"
 
 

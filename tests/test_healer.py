@@ -403,7 +403,7 @@ def test_a_late_tied_chip_says_its_base_and_a_named_time_is_its_presses():
     # Protection Warrior, Nek'zali (round 53): "33% of the top players" for 19 of the 58 kills still going
     c = healer.Cooldown("Shield Wall", 1, 0.9, 2.0, [231.0], presses=[[234.0]] * 19 + [[34.0]] * 70, n_all=100,
                         lasts=[300.0] * 58 + [200.0] * 42)
-    assert healer._base(c, 19 / 58, 235.0) == " &middot; 33% of the 58 kills still going"
+    assert healer._base(c, 19 / 58, 235.0) == " &middot; 33% of the top players, in the 58 kills still going"
     m = healer.Moment(235.0, 1000.0, 1.5, "Hollowing Strikes")
     c.why, c.back, c.support = "", [231.0], [0.24]
     assert "about 3:54" in healer.landed_in(m, [c])  # the presses counted (3:54), not the moment (3:51)
