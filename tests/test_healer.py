@@ -380,3 +380,10 @@ def test_the_other_healers_read_a_ramp_ahead_of_the_hit(monkeypatch):
     ps = [[19.0]] * 30 + [[40.0]] * 10 + [[200.0]] * 60
     got = healer._in_hit("Evangelism", [], [1.0, (ps, 100, 90.0, 472433)], 40.0)
     assert got[1] == 19.0 and got[2] == 0.3 and got[4] is True
+
+
+def test_the_pull_opener_is_no_ramp_for_the_first_hit(monkeypatch):
+    # Discipline Priest, Nek'zali (round 45): Evangelism 0:00-0:09 read "0:08 (a ramp)" for the 0:35 hit
+    monkeypatch.setattr(healer, "_ramp_kind", lambda sid: True)
+    ps = [[float(k % 10)] for k in range(60)] + [[200.0]] * 40
+    assert healer._in_hit("Evangelism", [], [1.0, (ps, 100, 90.0, 1)], 35.0, bar=False) is None

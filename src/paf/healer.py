@@ -786,6 +786,7 @@ def back_share(per_player: list[list[float]], t: float, cd: float) -> float:
 
 
 FEW_SHARE = 0.1  # a press in a hit no cooldown is kept for, said under the quarter bar from this share
+PULL = 12.0  # seconds: a press before this is the pull's opener, never a ramp for the first hit (round 45)
 MINUTE = "about every minute"  # the reason a button pressed four times a kill or more is tied to no hit
 
 
@@ -804,8 +805,9 @@ def landed_in(m: Moment, cds: list[Cooldown]) -> str:
             if -ANSWER[0] <= t - m.t <= ANSWER[1] or ramp:  # 2:01 Evangelism, 9 s before 2:10; round 36)
                 why = ("pressed about every minute" if c.why == MINUTE else c.why or ("on cooldown" if c.every else "back from cooldown"
                                  + (" for about half" if t in c.back_half else "") if t in c.back else ""))
-                if why:
-                    near.append((sp, c, t, why))
+                if why:  # its share in the hit's window, as a tied press's (round 45: Convoke's 70% was its cluster's)
+                    hs = hit_share(c, t, m.t)
+                    near.append((sp if hs is None else hs, c, t, why))
     if not near:  # no moment shown there: the most common press in its window all the same, under the quarter bar
         from paf.defensives import is_defensive
 
@@ -1139,7 +1141,8 @@ def build_lead(builds: list, spec: str, players: int, split: list | None = None,
     top = builds[0]
     total = sum(b[0] for b in builds)
     if split and top[0] < players / 5:  # no build a fifth of them play: the answer is in the split talents
-        return (f"<p class='lead'>No build is played by more than {top[0]} of the {players} top {e(spec)}s read: "
+        return (f"<p class='lead'>The most played build, below, is played by only {top[0]} of the {players} top "
+                f"{e(spec)}s read: "
                 + _many(split, wide) + f".{NOT_ADVICE}</p>")
     return (f"<p class='lead'>The most played build of the top {e(spec)}s"
             + ("" if len(builds) == 1 else f", {e(top[1])},") + f" is played by {top[0]} of the "
@@ -1225,6 +1228,8 @@ def _in_hit(n: str, ts: list, rest: list, h: float, bar: bool = True) -> tuple |
     ps, total, cd, *sid = rest[1]
     ramp = bool(sid) and _ramp_kind(sid[0])  # a ramp lands its hit 8 to 30 s ahead, as the fight tab reads it
     a, b = (h - RAMP[1], h - RAMP[0]) if ramp else (h - ANSWER[0], h + ANSWER[1])  # (Disc's Evangelism: round 44)
+    if ramp:  # the pull's opener is no ramp for the first hit (Evangelism 0:00-0:09 read "0:08 (a ramp)" for 0:35)
+        a = max(a, PULL)
     inside = [(x, max((y for y in p if y < x), default=None)) for p in ps for x in p if a <= x <= b]
     players = sum(1 for p in ps if any(a <= x <= b for x in p))
     if not total or not players or (bar and players < 0.25 * len(ps)):
@@ -1261,7 +1266,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                      for n, t, sp, rp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
                                         f"<small>(under a quarter of those who press it"
-                                        f"{'' if abs(int(pp * 100) - round(sp * 100)) <= 1 else f': {int(pp * 100)}%'})</small>"
+                                        f": {int(pp * 100)}%)</small>"
                                         for u in under if len(u) > 4 for n, t, sp, pp in [u[:4]])
                            or "none shared") + "</span>"
                         for h, got, under in per_hit)
@@ -1329,7 +1334,8 @@ def nums_note(roles: list, own: str = "") -> str:
              "job may be a habit of the spec rather than of this boss. "
              f"A spike is 5 s at 1.5 times the kill's median damage{spikes}, counted kill by kill: the fight tab's "
              "median curve smooths most of them away. The shares come from different kills and "
-             "do not add up; externals and overheal follow each kit.")
+             "do not add up; externals and overheal follow each kit. A spec's players are every healer of it in these "
+             "kills but each kill's ranked one, so a spec whose own sheet collected few other kills reads thin.")
     method = ("Externals and buffs: a mean over every player of the spec (not only the top ones the fight tab "
               "reads), on others only. Jobs: paired within each kill, Benjamini-Hochberg at 5% over every spec and "
               "number. The boss tab's dispels count the top player only.")
@@ -1502,18 +1508,18 @@ def render_sheet(h: HealerPrep) -> str:
             if len(key) == 1:  # two cooldowns as common for one hit
                 return key[0], (f"for the {_mmss(key[0])} hit, " + _and(
                     [f"{_pct(sp)} press {e(_shown(n))} (about {_mmss(t)}{ramp_of(c, t, key[0])}"
-                     f"{_also(c, p, t, sp).replace('; another', ', another')})" for n, t, sp, p, c in ps]))
+                     f"{_also(c, p, t, sp, key[0]).replace('; another', ', another')})" for n, t, sp, p, c in ps]))
             n, press = key
             if len(ps) == 1:
                 hit, t, sp, c = ps[0]
                 return hit, (f"for the {_mmss(hit)} hit, {_pct(sp)} press {e(_shown(n))} (about {_mmss(t)}"
                              f"{ramp_of(c, t, hit)})" + (_other([(hit, t, sp, c)]) if ramp_of(c, t, hit) else
-                                                         _also(c, press, t, sp)))
+                                                         _also(c, press, t, sp, hit)))
             return ps[0][0], (f"{which(n, press, ps[0][3])} goes on " + _and(  # the most shared hit first
                 [f"the {_mmss(hit)} hit ({_pct(sp)}, about {_mmss(t)})"
                  for hit, t, sp, _c in sorted(ps, key=lambda p: -p[2])], "or"))
 
-        def _also(c, press: float, t: float, sp: float) -> str:
+        def _also(c, press: float, t: float, sp: float, hit: float) -> str:
             """Another habit of the same press about as shared, tied to no hit: said, or the lead hides a third of
             them (Avenging Wrath "33% about 0:44", another 33% at 0:23; round 41)."""
             alts = [(a, x) for a, x, of in zip(c.alt, c.alt_support or [], c.alt_of or c.alt, strict=False)
@@ -1521,8 +1527,9 @@ def render_sheet(h: HealerPrep) -> str:
             if not alts:
                 return ""
             a, x = max(alts, key=lambda y: y[1])
-            gap = int(abs(_secs(_mmss(t)) - _secs(_mmss(a))))  # from the times shown (0:44 and 0:23: 21 s)
-            return f"; another {_pct(x)} press it about {_mmss(a)}, {gap} s {'earlier' if a < t else 'later'}"
+            gap = int(abs(_secs(_mmss(hit)) - _secs(_mmss(a))))  # from the hit, as the times shown (round 45)
+            return (f"; another {_pct(x)} press it about {_mmss(a)}, {gap} s {'before' if a < hit else 'after'} the "
+                    "hit")
         # a ramp button answering several hits is one clause (Evangelism thrice in a row read as a list)
         ramps: dict[str, list] = {}
         for k, ps in by_press.items():
