@@ -281,9 +281,10 @@ def test_jobs_lead_says_either_only_when_your_spec_has_no_job():
 
 
 def test_two_rhythms_are_said_apart():
-    # Disc, Vashnik heroic (round 29): 25 players press Evangelism at 0:04, 1:42, 3:15, 23 at 0:24, 2:07, 3:38
-    per_player = ([[4.0, 102.0, 195.0]] * 20 + [[4.0, 102.0, 195.0, 300.0]] * 5 + [[24.0, 127.0, 218.0]] * 20
-                  + [[24.0, 127.0]] * 3 + [[60.0]] * 2)  # a fourth press, a missed third: still the rhythm
-    got = healer.rhythms(per_player, [4.0, 127.0, 218.0], [24.0, 102.0, 195.0], 50)
-    assert got == [(0.5, [4.0, 102.0, 195.0]), (0.46, [24.0, 127.0, 218.0])]
-    assert healer.rhythms(per_player[:30], [4.0, 127.0, 218.0], [24.0, 102.0, 195.0], 50) == []  # 5 of 50: no
+    # Disc, Vashnik heroic (round 29): 31 players press Evangelism at 0:04, 1:42, 3:15, 30 at 0:24, 2:01, 3:35, their
+    # second press spread from 1:47 to 2:15
+    per_player = ([[4.0, 95.0 + k % 3 * 7, 195.0] for k in range(31)] + [[24.0, 108.0 + k % 4 * 9, 215.0] for k in range(30)]
+                  + [[60.0]] * 39)
+    got = healer.rhythms(per_player, [4.0, 127.0, 218.0], [24.0, 102.0, 195.0], 100)
+    assert [(sp, [round(t) for t in ts]) for sp, ts in got] == [(0.31, [4, 102, 195]), (0.3, [24, 117, 215])]
+    assert healer.rhythms(per_player[:40], [4.0, 127.0, 218.0], [24.0, 102.0, 195.0], 100) == []  # 9 of 100: no

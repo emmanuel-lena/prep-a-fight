@@ -515,7 +515,7 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         out.append(Cooldown(name, sid, users, per_kill, times, near, alt, every, support, alt_support, alt_near,
                             alt_of, why, rhythm if len(times) > 1 else 0.0, cd=cd, ramp=ramp,
                             back=sorted(x for x in back if x in times or x in alt),
-                            rhythms=rhythms(per_player, times, alt, n_all) if alt and not every else []))
+                            rhythms=rhythms(per_player, times, alt, n_all) if alt and not (every or why) else []))
     return sorted(out, key=lambda c: -c.users)
 
 
@@ -523,37 +523,34 @@ RHYTHM_SHARE = 0.2  # of the top players, each of two rhythms at least
 
 
 def rhythms(per_player: list[list[float]], times: list[float], alt: list[float], n_all: int) -> list:
-    """Two groups pressing a button at different moments the whole kill long: each player's presses matched to the
-    nearest moment shown (within 8 s), grouped by their first two; the two largest groups, kept when each is
-    RHYTHM_SHARE of the top players and they share no moment, each said by the moments most of its players press
-    (Disc's Evangelism on Vashnik: 0:04, 1:42, 3:15 or 0:24, 2:07, 3:38; the chips mixed them with "or" and the lead
-    read 1:42 as the next press after 2:07). Full sequences are too strict: a fourth press or a late third one
-    left 14 and 12 of 100 players in them."""
+    """Two groups pressing a button at different moments the whole kill long: the players grouped by the moment of
+    their first press (within 8 s), the two largest groups, each RHYTHM_SHARE of the top players at least, each
+    said by the median time of each press most of its players make, kept when the two differ by more than 8 s at
+    every press (Disc's Evangelism on Vashnik: 31 players at 0:04, 1:42, 3:15, 30 at 0:24, 2:01, 3:35; the chips
+    mixed them with "or" and the lead read 1:42 as the next press after 2:07). Matching every press to a moment
+    was too strict: the second press of the 0:24 group spreads from 1:47 to 2:15."""
     marks = sorted({*times, *alt})
-    groups: dict[tuple, list[list[float]]] = {}
+    groups: dict[float, list[list[float]]] = {}
     for ts in per_player:
-        seq = []
-        for x in ts:
-            m = min(marks, key=lambda m: abs(m - x), default=None)
-            if m is None or abs(m - x) > 8:
-                break
-            seq.append(m)
-        if len(seq) >= 2:
-            groups.setdefault(tuple(seq[:2]), []).append(seq)
-    two = sorted(groups.items(), key=lambda kv: -len(kv[1]))[:2]
-    if len(two) < 2 or len(two[1][1]) < RHYTHM_SHARE * n_all:
+        m = min(marks, key=lambda m: abs(m - ts[0]), default=None) if ts else None
+        if m is not None and abs(m - ts[0]) <= 8 and len(ts) >= 2:
+            groups.setdefault(m, []).append(ts)
+    two = sorted(groups.values(), key=len, reverse=True)[:2]
+    if len(two) < 2 or len(two[1]) < RHYTHM_SHARE * n_all:
         return []
     out = []
-    for _key, seqs in two:
+    for g in two:
         moments = []
-        for i in range(max(map(len, seqs))):
-            at = Counter(q[i] for q in seqs if len(q) > i)
-            m, k = at.most_common(1)[0]
-            if k < len(seqs) / 2:
+        for i in range(max(map(len, g))):
+            at = [ts[i] for ts in g if len(ts) > i]
+            if len(at) < len(g) / 2:
                 break
-            moments.append(m)
-        out.append((len(seqs) / n_all, moments))
-    return [] if set(out[0][1]) & set(out[1][1]) else out
+            moments.append(st.median(at))
+        out.append((len(g) / n_all, moments))
+    a, b = out[0][1], out[1][1]
+    if len(a) < 2 or len(b) < 2 or any(abs(x - y) <= 8 for x, y in zip(a, b, strict=False)):
+        return []
+    return sorted(out, key=lambda r: r[1][0])
 
 
 def trinkets(con, encounter_id: int, difficulty: int, top: int = 100) -> list[tuple[str, int, float]]:
