@@ -187,6 +187,7 @@ def test_every_healer_spec_in_one_table():
     assert "Restoration Shaman <small>(you)</small>" in table and "&ndash;" in table
     more = healer.roles_more([shaman, disc], "Restoration Shaman")
     assert "removes Essence Rend" not in more and "Ascendance" not in more  # the lead's jobs; your times: fight tab
+    assert "Discipline Priest" in more  # every other spec said, "none shared" too
 
 
 def test_the_other_healers_cooldowns_on_the_hits_keep_a_button_pressed_on_cooldown():
@@ -196,8 +197,8 @@ def test_the_other_healers_cooldowns_on_the_hits_keep_a_button_pressed_on_cooldo
         ("Tranquility", 2.0, [(43.0, 0.42, False), (225.0, 0.24, True)], 0.9)])
     hits = [healer.Moment(40.0, 1000.0, 5.0, "Caustic Surge"), healer.Moment(220.0, 1000.0, 5.0, "Toxic Vapor")]
     more = healer.roles_more([druid], "Holy Priest", hits)
-    assert "Tranquility 0:43 &middot; 42% of them</span>" in more
-    assert "Tranquility 3:45 &middot; 24% of them &middot; back from cooldown" in more
+    assert "the 0:40 hit: Tranquility 0:43 &middot; 42%</span>" in more
+    assert "the 3:40 hit: none shared</span>" in more  # back from cooldown: no answer, as on the fight tab
 
 
 def test_a_press_back_from_cooldown_in_a_hit_is_said_and_drawn_as_none():
@@ -250,8 +251,7 @@ def test_a_ramp_answers_the_hit_after_it(monkeypatch):
                           [])
     sheet = healer.render_sheet(h)
     assert "for the 0:40 hit, 100% press Evangelism (about 0:24, a ramp ahead of it)" in sheet
-    assert ("Evangelism, pressed again as soon as it is back, lands 28 s ahead of the 2:10 hit (about 1:42, for "
-            "100%) and 20 s ahead of the 3:35 hit (about 3:15, for 100%)") in sheet
+    assert "pressed again as soon as it is back" not in sheet  # its rhythm line says it (round 30)
     assert "0:24 &middot; 16 s before the 0:40 hit" in sheet
     assert "1:42 &middot; 100% of the top players &middot; back from cooldown" in sheet
 
@@ -286,5 +286,6 @@ def test_two_rhythms_are_said_apart():
     per_player = ([[4.0, 95.0 + k % 3 * 7, 195.0] for k in range(31)]
                   + [[24.0, 108.0 + k % 4 * 9, 215.0] for k in range(30)] + [[60.0]] * 39)
     got = healer.rhythms(per_player, [4.0, 127.0, 218.0], [24.0, 102.0, 195.0], 100)
-    assert [(sp, [round(t) for t in ts]) for sp, ts in got] == [(0.31, [4, 102, 195]), (0.3, [24, 117, 215])]
+    # 3:35 said at the chip's 3:38
+    assert [(sp, [round(t) for t in ts]) for sp, ts in got] == [(0.31, [4, 102, 195]), (0.3, [24, 117, 218])]
     assert healer.rhythms(per_player[:40], [4.0, 127.0, 218.0], [24.0, 102.0, 195.0], 100) == []  # 9 of 100: no

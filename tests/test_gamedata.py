@@ -108,3 +108,14 @@ def test_a_ramp_button_changes_spells_and_heals_nothing(monkeypatch):
         assert gamedata.is_ramp_kind(472433) and not gamedata.is_ramp_kind(443028)
     finally:
         gamedata.same_name_spells.cache_clear()
+
+
+def test_a_magic_only_cut_and_a_physical_hit(monkeypatch):
+    # Spell Reflection (23920) triggers 385391: -20% magic damage taken (mask 126); Shield Wall -40% of every school
+    rows = {23920: [{"Effect": "6", "EffectAura": "28", "EffectBasePointsF": "100"},
+                    {"Effect": "64", "EffectTriggerSpell": "385391"}],
+            385391: [{"Effect": "6", "EffectAura": "87", "EffectBasePointsF": "-20", "EffectMiscValue_0": "126"}],
+            871: [{"Effect": "6", "EffectAura": "87", "EffectBasePointsF": "-40", "EffectMiscValue_0": "127"}]}
+    monkeypatch.setattr(gamedata, "_filtered_rows", lambda _t, _c, sid, locale="": rows.get(sid, []))
+    assert gamedata.magic_only(23920) and not gamedata.magic_only(871)
+    assert gamedata.physical_only("Melee")

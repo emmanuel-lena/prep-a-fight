@@ -163,7 +163,8 @@ def test_power_infusion_is_no_job_of_the_boss():
     assert jobs_lead([priest, shaman], "Holy Priest") == (
         "<p class='lead'>Your spec here: nothing stands out against the other healers of the same kills. "
         "The others: the Restoration Shaman answers the raid&#x27;s damage spikes: 26% of its healing lands in them "
-        "(the other healers 18%).</p>")
+        "(the other healers 18%). A job is read kill by kill, against the other healers of that kill; the table "
+        "below shows each spec&#x27;s median player, so its numbers differ.</p>")
 
 
 def test_a_cooldown_pressed_as_soon_as_it_is_back_answers_no_hit():

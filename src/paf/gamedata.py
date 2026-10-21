@@ -429,3 +429,37 @@ def boss_display_ids() -> dict[int, int]:
         if enc and disp and (enc not in out or order < out[enc][1]):
             out[enc] = (disp, order)
     return {k: v[0] for k, v in out.items()}
+
+
+PHYSICAL = 1  # the physical bit of a school mask
+
+
+@cache
+def _school_masks() -> dict[int, int]:
+    out: dict[int, int] = {}
+    for r in table_rows("SpellMisc"):
+        if r.get("SpellID", "").isdigit() and r.get("DifficultyID") in (None, "", "0"):
+            out[int(r["SpellID"])] = int(r.get("SchoolMask") or 0)
+    return out
+
+
+def physical_only(name: str) -> bool:
+    """An ability whose every spell of that name hits physical only (a boss's "Melee" swing; Rending Bite)."""
+    if name == "Melee":
+        return True
+    masks = [_school_masks().get(i, 0) for i in same_name_spells().get(name, [])]
+    return bool(masks) and all(m == PHYSICAL for m in masks)
+
+
+def magic_only(spell_id: int, depth: int = 2) -> bool:
+    """A defensive whose damage reduction leaves physical damage out: Spell Reflection's buff (385391) cuts magic
+    damage taken by 20% (school mask 126), Shield Wall all of it (127). Read on the spell and the spells it triggers."""
+    rows = _filtered_rows("SpellEffect", "SpellID", spell_id)
+    cuts = [int(r.get("EffectMiscValue_0") or 0) for r in rows
+            if r.get("EffectAura") == str(AURA_MOD_DAMAGE_PERCENT_TAKEN) and float(r.get("EffectBasePointsF") or 0) < 0]
+    if cuts:
+        return all(m and not m & PHYSICAL for m in cuts)
+    if depth:
+        return any(magic_only(int(r["EffectTriggerSpell"]), depth - 1) for r in rows
+                   if r.get("Effect") == "64" and int(r.get("EffectTriggerSpell") or 0))
+    return False

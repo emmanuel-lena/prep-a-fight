@@ -108,6 +108,7 @@ class HealerPrep:
     presence: list = field(default_factory=list)  # paf.healroles.Presence of every healer spec
     roles: list = field(default_factory=list)  # paf.healroles.Role, every healer spec measured
     role_kills: int = 0  # kills the roles were measured on
+    own_kills: int = 0  # the top kills whose healing tables are read (150): more than the timings' (100, every cast)
     own_sample: str = ""  # the kills the externals and cooldowns are read on: "the 150 kills of the top Holy Priests"
     role_sample: str = ""  # which kills: "the top Restoration Shamans' kills (ranked by healing), median 4:50, 2 deaths"
     class_name: str = ""
@@ -545,7 +546,9 @@ def rhythms(per_player: list[list[float]], times: list[float], alt: list[float],
             at = [ts[i] for ts in g if len(ts) > i]
             if len(at) < len(g) / 2:
                 break
-            moments.append(st.median(at))
+            mid = st.median(at)  # said at the chips' moment when one is near, so both give one time (round 30)
+            near = min(marks, key=lambda m: abs(m - mid))
+            moments.append(near if abs(near - mid) <= 8 else mid)
         out.append((len(g) / n_all, moments))
     a, b = out[0][1], out[1][1]
     if len(a) < 2 or len(b) < 2 or any(abs(x - y) <= 8 for x, y in zip(a, b, strict=False)):
@@ -770,8 +773,9 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None) -> str:
                                                                            c.support or [0.0] * len(c.times),
                                                                            strict=False)))
                                 or "<small>timing varies: no shared moment</small>")
-        + ("<small class='alt'>two rhythms: " + "; ".join(
-            f"{_pct(sp)} press it at {_and([_mmss(t) for t in ts])}" for sp, ts in c.rhythms) + "</small>"
+        + ("<small class='alt'>two rhythms, by their first press: " + "; ".join(
+            f"{_pct(sp)} start at {_mmss(ts[0])}, then {_and([_mmss(t) for t in ts[1:]])}" for sp, ts in c.rhythms)
+           + "</small>"
            if c.rhythms else "")
         + (f"<small class='alt'>on cooldown, about every {c.every:.0f} s</small>" if c.every else
            f"<small class='alt'>{_more(c)} more at varying times</small>" if c.times and _more(c) else "")
@@ -1084,9 +1088,8 @@ def roles_table(roles: list, mine: str = "") -> str:
         + (f"<td class='n'>{f'{r.buffs:.1f} <small>{e(_and(r.buff_spells))}</small>' if r.buffs else '&ndash;'}</td>"
            if buffs else "")
         + f"<td class='n'>{r.players}</td></tr>" for r in roles)
-    return (f"<table class='hcomp'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"
-            + ("<p class='small muted'>Your spec's share of the healing is high by design: these kills were picked "
-               "for its top healers.</p>" if any(r.spec == mine for r in roles) else ""))
+    return f"<table class='hcomp'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"  # each kill's ranked
+    # player left out (paf.healroles.pooled_kills): no row is high by design any more (round 30)
 
 
 def _minute(name: str) -> bool:
@@ -1103,22 +1106,29 @@ def _minute(name: str) -> bool:
 
 
 def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
-    """Under the table, what a number cannot say: each other spec's cooldowns pressed for the big hits (found): who
-    covers which hit, not its Avenging Wrath at the pull. Its jobs are the lead's, said once there."""
-    def chip(n: str, ts: list, users: float | None) -> str:  # the press share first: "14%" of all the players
-        return "".join(f"<span class='chip'>{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)} of them"
-                       f"{' &middot; back from cooldown' if back else ''}</span>" for t, sp, back in ts)
+    """Under the table, what a number cannot say: what each other healer spec presses on each big hit (found), the
+    same answer rule as the fight tab's (from 5 s before to 8 s after; a press back from cooldown is no answer); every
+    spec and every hit said, "none" too (round 30: specs and hits left out without a word)."""
+    hits = sorted(m.t for m in found or [])
     out = ""
     for r in roles:
-        def hit(t: float) -> bool:
-            return found is None or any(-ANSWER[0] <= t - m.t <= ANSWER[1] for m in found)
-        cds = "".join([chip(n, [x for x in ts if hit(x[0])], (rest or [None])[0]) for n, _k, ts, *rest in r.cd_names
-                       if any(hit(t) for t, *_x in ts) and not _minute(n)][:5]) if r.spec != mine else ""
-        if cds:
-            out += f"<li><b>{e(r.spec)}</b><span class='when'>{cds}</span></li>"
+        if r.spec == mine:
+            continue
+        per_hit = []
+        for h in hits:
+            got = [(n, t, sp) for n, _k, ts, *_rest in r.cd_names if not _minute(n)
+                   for t, sp, back in ts if -ANSWER[0] <= t - h <= ANSWER[1] and not back]
+            per_hit.append((h, sorted(got, key=lambda x: -x[2])[:2]))
+        chips = "".join(f"<span class='chip'>the {_mmss(h)} hit: "
+                        + ("; ".join(f"{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)}" for n, t, sp in got)
+                           if got else "none shared") + "</span>" for h, got in per_hit)
+        out += f"<li><b>{e(r.spec)}</b><span class='when'>{chips}</span></li>"
+    if not out:
+        return ""
     return ("<h2>The other healers' cooldowns on the big hits</h2>"
-            + (f"<ul class='hl2'>{out}</ul><p class='small muted'>Each share is of that spec's healers in these "
-               "kills.</p>" if out else "<p>None of the other healer specs here shares a cooldown on them.</p>"))
+            f"<ul class='hl2'>{out}</ul><p class='small muted'>From this sheet's kills: a time is shown when a quarter "
+            "of the spec's healers who press the button share it, its share of all that spec's healers there; a press "
+            "back from cooldown is no answer, as on the fight tab.</p>")
 
 
 def _job(r) -> str:
@@ -1143,10 +1153,13 @@ def jobs_lead(roles: list, mine: str = "") -> str:
         head = (f"Your spec here: the {you.spec} {_job(you)}. " if _job(you) else
                 "Your spec here: nothing stands out against the other healers of the same kills. ")
     lines = [f"the {r.spec} {_job(r)}" for r in roles if r.spec != mine and _job(r)]
+    # a job's numbers are kill by kill, the table's the median player: said, so they read as two views (round 30)
+    how = (" A job is read kill by kill, against the other healers of that kill; the table below shows each spec's "
+           "median player, so its numbers differ.") if lines or (you and _job(you)) else ""
     if not lines:
         rest = "No other healer spec stands out either." if not you or not _job(you) else "No other healer spec stands out."
-        return f"<p class='lead'>{e(head)}{rest}</p>"
-    return f"<p class='lead'>{e(head)}The others: " + "; ".join(e(x) for x in lines) + ".</p>"
+        return f"<p class='lead'>{e(head)}{rest}{e(how)}</p>"
+    return f"<p class='lead'>{e(head)}The others: " + "; ".join(e(x) for x in lines) + f".{e(how)}</p>"
 
 
 def nums_note(roles: list, own: str = "") -> str:
@@ -1229,7 +1242,7 @@ def comps_table(comps: list, n_kills: int) -> str:
             f"<p class='small muted'>Of {n_kills} top kills read. Exact compositions played at least {FEW_KILLS} times; the "
             f"other {n_kills - sum(c.kills for c in comps)} kills play rarer ones."
             + (" Deaths, per 20 players (heroic raids are 10 to 30), are a mean over the kills whose deaths were "
-               f"read, shown from {FEW_KILLS} of them." if deaths else
+               f"read, shown once {FEW_KILLS} kills of a composition have them." if deaths else
                f" Deaths: too few of these kills had them read (shown from {FEW_KILLS}).") + "</p>")
 
 
@@ -1263,8 +1276,8 @@ def render_sheet(h: HealerPrep) -> str:
                      + (f" ({'each time ' if len(ms) > 1 else ''}{e(name)})" if name else "") for name, ms in groups.items()])
         hits += f": {ratios} the usual damage"
         if any(round(m.ratio, 1) < SPIKE for m in shown):  # said, not left to a reader of the 1.5x rule (round 29)
-            hits += (" (no hit reaches 1.5&times; here: these are the highest waves)"
-                     if all(round(m.ratio, 1) < SPIKE for m in shown) else
+            hits += (" (no hit reaches 1.5&times; here: these are the highest waves)"  # the rule moments() applied,
+                     if max(m.ratio for m in h.moments) < SPIKE else  # not the rounded figures (1.45 shows 1.5)
                      " (a hit within a tenth of 1.5&times; counts too)")
         # a cooldown said for a hit only when the top players' usual press answers it (paf.healer.ANSWER), at the
         # press's own time
@@ -1337,17 +1350,7 @@ def render_sheet(h: HealerPrep) -> str:
             + [(ps[0][0], f"{e(_shown(n))} is their ramp ahead of the {_and([_mmss(p[0]) for p in ps])} hits: "
                           + ", ".join(f"{_pct(sp)} about {_mmss(t)}" for _hit, t, sp, _c in ps))
                for n, ps in ramps.items()])]
-        # a ramp's later presses made as soon as it is back still land ahead of hits (Disc's Evangelism 1:42 and
-        # 3:15 on its 90 s cooldown): said as such, no answer, so a timer the boss and the button share is plain
-        for c in heals:
-            later = [(t, m) for t in sorted({*c.times, *c.alt}) if c.ramp and t in c.back
-                     for m in [min((x for x in shown if x.t > t), key=lambda x: x.t - t, default=None)]
-                     if m is not None and RAMP[0] <= m.t - t <= RAMP[1]]
-            sp = {**dict(zip(c.alt, c.alt_support or [], strict=False)), **dict(zip(c.times, c.support or [], strict=False))}
-            if later:  # whose press it is: theirs back from cooldown, never "their next" (1:42 came before 2:07)
-                answers.append(f"{e(_shown(c.name))}, pressed again as soon as it is back, lands " + _and(
-                    [f"{int(m.t - t)} s ahead of the {_mmss(m.t)} hit (about {_mmss(t)}, for {_pct(sp.get(t, 0))})"
-                     for t, m in later]))
+        # a ramp's later presses made as soon as it is back: said by its rhythm line and the bare hits' landed_in
         end = len(h.curve) * STEP
         long = "".join(f" {'From ' + _mmss(a) + ' to the end' if b >= end - STEP else _mmss(a) + ' to ' + _mmss(b)}, "
                        f"the raid takes about {r:.1f}&times; the usual damage without a break."
@@ -1372,7 +1375,8 @@ def render_sheet(h: HealerPrep) -> str:
                     "cooldowns", heals, set(lead_names), answered)
     fight = ([lead] if lead else []) + [
         f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Raid "
-        f"damage taken per second, median of {h.raid_kills or 'the top'} kills; "
+        f"damage taken per second, median of {h.raid_kills or 'the'} of the top {e(h.spec)}s' kills (another spec's "
+        f"sheet reads its own, so its moments can shift a few seconds); "
         + ("under it, the cooldowns the lead names (an outline: another press of the same button). " if lead_names
            else "no cooldown is kept for these hits, so none is drawn. ")
         + "A dot is a big moment, "
@@ -1422,7 +1426,7 @@ def render_sheet(h: HealerPrep) -> str:
                                  + (f"about {_and([_mmss(t) for t in c.times])}" if c.times else "no shared moment")
                                  + ")" for c in utility)
                      + ".</p>")
-    n_kills = h.role_kills or h.kills
+    n_kills = h.own_kills or h.kills  # the healers in this spec's top kills; the pooled numbers say their own
     change = [build_lead(h.builds, h.spec, h.split_players or h.kills, h.split, h.split_wide)]
     change.append(talents_html(h.builds, h.split_players or h.kills, f"{h.spec}s", h.hero))
     if h.split:
@@ -1485,7 +1489,8 @@ def render_sheet(h: HealerPrep) -> str:
         else:
             line = f"Few top raids bring a {e(h.spec)} on this boss."
         deeper_first.append(f"<h2>Healers in the top {e(h.spec)}s' kills</h2><p>{line} How often each other healer spec is there in the {n_kills} "
-                      f"kills read, and the kills with it against those without it (a reading, not a verdict):</p>"
+                      f"top kills read for their healing (the timings need every cast, collected on {h.kills} of them), "
+                      f"and the kills with it against those without it (a reading, not a verdict):</p>"
                       f"{presence_table(h.presence, h.spec)}")
     deeper = deeper_first + [f"<h2>What each healer spec brings here</h2><p class='small muted'>Measured on {h.role_kills} "
               f"{e(h.role_sample or 'top kills')}.{_pace(h)} {nums_note(h.roles, h.own_sample)}</p>{others or '<p>Not measured yet.</p>'}"
@@ -1493,8 +1498,9 @@ def render_sheet(h: HealerPrep) -> str:
               (f"<h2>The healer compositions played most</h2>{comps_table(h.comps, n_kills)}"
                if comps_table(h.comps, n_kills) else "")]
     # every sample said once, at the top: the timings and talents, the healers' comparison; read, not simmed
-    byline = (f"{e(h.character or h.spec)} &middot; {e(h.spec)} &middot; from {h.kills} top kills (median "
-              f"{_mmss(h.duration)})" + (f", healers compared on {h.role_kills}" if h.role_kills else "")
+    byline = (f"{e(h.character or h.spec)} &middot; {e(h.spec)} &middot; timings from {h.kills} top kills (median "
+              f"{_mmss(h.duration)})" + (f", healers from {h.own_kills}" if h.own_kills else "")
+              + (f", compared on {h.role_kills:,} kills of the boss" if h.role_kills else "")
               + " &middot; no healing sim")
     return sheet_page(h.boss, h.difficulty, byline, h.class_name,
                       {"fight": fight, "change": change, "boss": boss, "deeper": deeper}, theme.style("healer"),

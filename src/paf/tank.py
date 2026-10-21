@@ -449,9 +449,16 @@ def render_sheet(p: TankPrep) -> str:
                      [sp for sp, n in zip(c.support or [0.0] * len(c.times), c.near, strict=False) if n])  # cooldown
                     for c in defs if not c.every]  # is no answer (Shield Wall's 3:51)
                    + [(n, ts, sps) for n, _u, _k, ts, _ev, sps in p.short_defs])
+        from paf.gamedata import magic_only, physical_only, same_name_spells
+
+        ids = {c.name: [c.spell_id] for c in defs}
+        magic = {n: any(magic_only(i) for i in ids.get(n) or same_name_spells().get(n, [])) for n, _ts, _sps in answers}
+
         def answer(m: Moment) -> tuple | None:  # the most shared press for a hit (Spell Reflection, 41% at 0:33,
-            return max(((n, t, sp) for n, ts, sps in answers for t, sp in zip(ts, sps, strict=False)  # before
-                        if -ANSWER[0] <= t - m.t <= ANSWER[1] and sp), key=lambda x: x[2], default=None)  # Shield Wall)
+            phys = bool(moment_names(m)) and all(physical_only(x) for x in moment_names(m))  # before Shield Wall);
+            return max(((n, t, sp) for n, ts, sps in answers for t, sp in zip(ts, sps, strict=False)  # never a magic
+                        if -ANSWER[0] <= t - m.t <= ANSWER[1] and sp and not (phys and magic[n])),  # cut on a melee
+                       key=lambda x: x[2], default=None)  # hit (Spell Reflection on Vashnik's 2:55, round 30)
         big = answer(m)  # the biggest moment and its answer first, then the other hits in time order
         lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({m.ratio:.1f}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
