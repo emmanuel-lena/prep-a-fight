@@ -421,7 +421,7 @@ JOB_GAP = {"tank": 0.015, "spike": 0.02, "dispels": 0.15}  # ... and at least th
 
 
 def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: dict[int, str] | None = None,
-          min_players: int = 15, ranked: tuple[str, str] | None = None, pool: tuple[dict, dict, dict] | None = None
+          min_players: int = 15, ranked: tuple[str, str] | None = None, pool: tuple | None = None
           ) -> list[Role]:
     """What each healer spec does on this boss, against the other healers of the same kills. pool: every corpus'
     kills of the boss (pooled_kills), for the jobs; else this corpus' kills, its ranked healer left out."""
@@ -439,6 +439,9 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
             f"SELECT c.report, c.fight_id, c.actor_id, c.ability_id, c.t, c.on_other FROM heal_cast c "
             f"JOIN fight f USING(report, fight_id) WHERE {where}", params):
         casts[(rep, fid, aid)].append((ab, t, other))
+    if pool and len(pool) > 3:  # every corpus' kills for every number: the other healers' answers the same on each
+        per_kill, durs, casts = defaultdict(list, pool[0]), pool[1], pool[3]  # sheet (Celestial Conduit "back from
+        rows = [h for hs in pool[0].values() for h in hs]  # cooldown" on the Monk's sheet, an answer on two others)
     spec_of = {(r[0], r[1], r[2]): pretty(r[3], r[4]) for r in rows}
     users: dict[int, set[str]] = defaultdict(set)
     for key, cs in casts.items():
@@ -482,6 +485,24 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
                 own[ab].append(t)
             for ab, ts in own.items():
                 cd_times[spec][ab].append(ts)
+    # the two sides of a talent choice are one button, as on the fight tab (Revival / Restoral: split, each share
+    # fell under the quarter bar on other healers' sheets; round 33)
+    from paf.healer import _node_key
+
+    nm = dict(names or {})  # a copy: the caller's names stay its own
+    for by_ab in list(cd_times.values()):
+        merged: dict[str, list[int]] = defaultdict(list)
+        for ab in by_ab:
+            merged[_node_key(ab, nm.get(ab, f"spell {ab}"))].append(ab)
+        for abs_ in merged.values():
+            if len(abs_) > 1:
+                main = max(abs_, key=lambda a: len(by_ab[a]))
+                nm[main] = " / ".join(dict.fromkeys(nm.get(a, f"spell {a}") for a in
+                                                    sorted(abs_, key=lambda a: -len(by_ab[a]))))
+                for a in abs_:
+                    if a != main:
+                        by_ab[main].extend(by_ab.pop(a))
+    names = nm
     shown: dict[str, dict[str, list[float]]] = stats  # the table's shares: every corpus' kills when pooled
     if pool:
         shown = defaultdict(lambda: defaultdict(list))
@@ -641,18 +662,20 @@ def _key(cls: str | None, spec: str | None) -> tuple[str, str]:
     return ((cls or "").replace(" ", "").lower(), (spec or "").replace(" ", "").lower())
 
 
-def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None) -> tuple[dict, dict, dict]:
+def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None) -> tuple[dict, dict, dict, dict]:
     """Every healer of every kill of the boss read in any corpus (healer and tank corpora alike), each kill once, and
     each corpus' ranked player left out (its kill was picked for it): the sheets of a boss then say the same jobs,
     where one corpus' kills gave the Holy Priest's dispels on Vashnik as 1.8 against 0.9 on one sheet and 1.3 against
     0.7 on another. Returns (per kill, its healers' heal_stat rows), (per kill, its duration) and (per kill, the
-    share of it the raid's damage spikes take)."""
+    share of it the raid's damage spikes take) and (per healer of a kill, its long cooldowns' casts)."""
     from paf.config import data_dir
 
     rows: dict[tuple[str, int], dict[int, tuple]] = defaultdict(dict)
     out: dict[tuple[str, int], set[int]] = defaultdict(set)  # the ranked players, in any corpus
     durs: dict[tuple[str, int], float] = {}
     cover: dict[tuple[str, int], float] = {}  # the raid's damage spikes' share of each kill (heal_kill)
+    casts: dict[tuple[str, int, int], list] = defaultdict(list)  # each healer's long cooldowns, read once
+    got: set[tuple[str, int, int]] = set()
     for path in paths if paths is not None else sorted(data_dir().glob("corpus-*.sqlite")):
         con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
         try:
@@ -681,11 +704,20 @@ def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None) 
             for k, hs in per.items():
                 for h in hs:
                     rows[k][h[2]] = h
+            if con.execute("SELECT 1 FROM sqlite_master WHERE name='heal_cast'").fetchone():
+                for rep, fid, aid, ab, t, other in con.execute(
+                        f"SELECT c.report, c.fight_id, c.actor_id, c.ability_id, c.t, c.on_other FROM heal_cast c "
+                        f"JOIN fight f USING(report, fight_id) WHERE {where}", params):
+                    if (rep, fid, aid) not in got:
+                        casts[(rep, fid, aid)].append((ab, t, other))
+                got |= {k for k in casts}
         finally:
             con.close()
     per_kill = {k: [h for a, h in hs.items() if a not in out[k]] for k, hs in rows.items()}
     per_kill = {k: hs for k, hs in per_kill.items() if hs}
-    return per_kill, durs, {k: x for k, x in cover.items() if k in per_kill}
+    kept = {(h[0], h[1], h[2]) for hs in per_kill.values() for h in hs}
+    return (per_kill, durs, {k: x for k, x in cover.items() if k in per_kill},
+            {k: v for k, v in casts.items() if k in kept})
 
 
 def paired_jobs(per_kill: dict, durs: dict, own: tuple[str, str] | None = None) -> dict[str, list[str]]:

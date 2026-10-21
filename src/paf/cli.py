@@ -929,8 +929,8 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     if not tl.kills:
         print(f"No kill of {enc.name} {diff_name} for {spec} {cls} yet.")
         return 1
-    curve = healer.raid_curve(con, enc.id, diff, tl.duration)
-    sections = bossguide.load(enc.id, diff_name)
+    curve = healer.raid_curve(con, enc.id, diff, tl.duration, pool=True)  # one boss: its hits the same on every
+    sections = bossguide.load(enc.id, diff_name)                            # healer sheet
     roles = bossguide.ability_roles(sections)
     from paf.mechanics import walk
 
@@ -942,7 +942,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     skip = {n for n in tank_only if not re.search(r"\bplayers\b|\braid\b", text.get(n, ""), re.I)}
     raid = {n for n, t in text.items() if re.search(r"\ball players\b|\bthe raid\b", t, re.I)}
     found = healer.moments(curve, tl.boss_casts, skip=skip, raid=raid)
-    by = healer.raid_by_ability(con, enc.id, diff, tl.duration)
+    by = healer.raid_by_ability(con, enc.id, diff, tl.duration, pool=True)
     if by:  # measured: what hits the raid there
         healer.name_by_damage(found, by)
     for m in found:
@@ -960,8 +960,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         [(n, t) for n, t, _ in tl.phases], class_name=cls, character=getattr(profile, "name", "") or "")
     h.abilities = _role_journal(enc.id, diff_name, "healer", tl, healer.moment_notes(found))
     h.named_by_damage = bool(by)
-    h.raid_kills = con.execute("SELECT COUNT(*) FROM raid_damage d JOIN fight f USING(report, fight_id) "
-                               "WHERE f.encounter_id=? AND f.difficulty=?", (enc.id, diff)).fetchone()[0]
+    h.raid_kills = healer.raid_kills(con, enc.id, diff, pool=True)
     h.hero = healer.hero_split(con, enc.id, diff, spec)
     ext = [x for x in [*h.cooldowns, *h.rare] if healer._external(x.spell_id)]  # Life Cocoon: some on the Monk
     shares = healer.on_others(con, enc.id, diff, spec, [x.spell_id for x in ext])

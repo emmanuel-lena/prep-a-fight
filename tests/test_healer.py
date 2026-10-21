@@ -183,7 +183,7 @@ def test_every_healer_spec_in_one_table():
                              dispels=1.1, externals=0.0, buffs=0.0, buff_spells=[], players=38,
                              jobs=["removes Essence Rend"], cd_names=[("Ascendance", 1, [(35.0, 0.38, False)], 0.9)])
     table = healer.roles_table([shaman, disc], "Restoration Shaman")
-    assert "<th>Buffs given a kill <small>(this sheet's kills)</small></th>" in table
+    assert "<th>Buffs given a kill</th>" in table
     assert "1.4 <small>Power Infusion</small>" in table
     assert "Restoration Shaman <small>(you)</small>" in table and "&ndash;" in table
     more = healer.roles_more([shaman, disc], "Restoration Shaman")
@@ -299,3 +299,17 @@ def test_a_button_with_two_rhythms_takes_their_moments():
     c = healer.cooldowns(tl, [], {1: (90.0, 1)})[0]
     assert [round(t) for t in c.times] == [23, 121, 215] and [round(t) for t in c.alt] == [4, 102, 195]
     assert [round(t) for t in c.alt_of] == [23, 121, 215] and len(c.rhythms) == 2
+
+
+def test_a_ramp_of_one_rhythm_says_the_other(monkeypatch):
+    # Disc, Vashnik (round 33): a third ramps at 0:23 and 2:05 for the 0:40 and 2:10 hits, a third from the pull
+    monkeypatch.setattr(healer, "_ramp_kind", lambda _sid: True)
+    ab = SimpleNamespace(id=1, name="Evangelism", users=0.7, per_kill=3.0)
+    per_player = ([[4.0, 102.0, 195.0]] * 32 + [[23.0, 125.0, 218.0]] * 38 + [[]] * 30)
+    tl = SimpleNamespace(abilities=[ab], duration=270.0, players=[{"casts": {1: ts}} for ts in per_player])
+    found = [healer.Moment(40.0, 1000.0, 5.0, "Caustic Surge"), healer.Moment(140.0, 1000.0, 5.0, "Caustic Surge")]
+    cd = healer.cooldowns(tl, found, {1: (90.0, 1)})[0]
+    h = healer.HealerPrep("Boss", "heroic", "Discipline Priest", 100, 270.0, [100.0] * 54, found, [cd], [], [], [], [])
+    sheet = healer.render_sheet(h)
+    assert "Evangelism is their ramp ahead of the 0:40 and 2:20 hits" in sheet
+    assert "the other 32% press it from the pull on its cooldown, about 0:04, 1:42 and 3:15" in sheet

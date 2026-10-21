@@ -16,6 +16,7 @@ from __future__ import annotations
 import functools
 import json
 import re
+import sqlite3
 import statistics as st
 from collections import Counter
 from dataclasses import dataclass, field
@@ -175,16 +176,44 @@ def fetch_raid_damage(client, con, encounter_id: int, difficulty: int, limit: in
     return len(todo)
 
 
-def raid_by_ability(con, encounter_id: int, difficulty: int, duration: float) -> dict[str, list[float]]:
-    """The raid's damage taken per ability, per STEP, summed over the kills read (shares compare, not levels)."""
+def _raid_rows(con, table: str, encounter_id: int, difficulty: int, pool: bool) -> list[tuple[float, str]]:
+    """(step, series) of each kill's raid damage: this corpus', or with pool every corpus' kills of the boss, each
+    kill once (the boss is the same on every sheet: Nek'zali's second rite read 1:15 on four sheets, 1:20 on the
+    others, and the other healers' answers to it changed with the sheet; round 33)."""
+    from paf.config import data_dir
     from paf.corpus.analyze import kills_filter
 
-    ensure_table(con)
     where, params = kills_filter(encounter_id, difficulty)
+    sql = f"SELECT d.report, d.fight_id, d.step, d.series FROM {table} d JOIN fight f USING(report, fight_id) WHERE {where}"
+    if not pool:
+        ensure_table(con)
+        return [(st_, se) for _r, _f, st_, se in con.execute(sql, params)]
+    seen, out = set(), []
+    for path in sorted(data_dir().glob("corpus-*.sqlite")):
+        c = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        try:
+            if not c.execute("SELECT 1 FROM sqlite_master WHERE name=?", (table,)).fetchone():
+                continue
+            for rep, fid, st_, se in c.execute(sql, params):
+                if (rep, fid) not in seen:
+                    seen.add((rep, fid))
+                    out.append((st_, se))
+        finally:
+            c.close()
+    return out
+
+
+def raid_kills(con, encounter_id: int, difficulty: int, pool: bool = False) -> int:
+    """The kills the raid damage curve is read on."""
+    return len(_raid_rows(con, "raid_damage", encounter_id, difficulty, pool))
+
+
+def raid_by_ability(con, encounter_id: int, difficulty: int, duration: float, pool: bool = False
+                    ) -> dict[str, list[float]]:
+    """The raid's damage taken per ability, per STEP, summed over the kills read (shares compare, not levels)."""
     n = int(duration // STEP) + 1
     out: dict[str, list[float]] = {}
-    for step, series in con.execute(f"SELECT x.step, x.series FROM raid_damage_ability x JOIN fight f "
-                                    f"USING(report, fight_id) WHERE {where}", params):
+    for step, series in _raid_rows(con, "raid_damage_ability", encounter_id, difficulty, pool):
         for name, values in json.loads(series).items():
             row = out.setdefault(name, [0.0] * n)
             for i, v in enumerate(values):
@@ -254,16 +283,11 @@ def name_by_damage(found: list[Moment], by: dict[str, list[float]], width: int =
             m.boss_spell = f"mostly {first} and {second}"
 
 
-def raid_curve(con, encounter_id: int, difficulty: int, duration: float) -> list[float]:
-    """Median raid damage taken per second, per STEP seconds, over the kills that have it."""
-    from paf.corpus.analyze import kills_filter
-
-    ensure_table(con)
-    where, params = kills_filter(encounter_id, difficulty)
+def raid_curve(con, encounter_id: int, difficulty: int, duration: float, pool: bool = False) -> list[float]:
+    """Median raid damage taken per second, per STEP seconds, over the kills that have it (pool: every corpus')."""
     n = int(duration // STEP) + 1
     per_bucket: list[list[float]] = [[] for _ in range(n)]
-    for step, series in con.execute(f"SELECT d.step, d.series FROM raid_damage d JOIN fight f "
-                                    f"USING(report, fight_id) WHERE {where}", params):
+    for step, series in _raid_rows(con, "raid_damage", encounter_id, difficulty, pool):
         data = json.loads(series)
         total: list[float] = []
         for values in data.values():
@@ -1096,9 +1120,9 @@ def roles_table(roles: list, mine: str = "") -> str:
     cover = next((r.spike_cover for r in roles if getattr(r, "spike_cover", 0)), 0.0)
     head = ("<th>Healer</th><th>Healing share</th><th>On tanks</th>"
             f"<th>In spikes{f' ({_pct(cover)} of the fight)' if cover else ''}</th>"
-            "<th>Overheal</th><th>Dispels a minute</th><th>Externals given a kill <small>(this sheet's kills)</small></th>"
-            + ("<th>Buffs given a kill <small>(this sheet's kills)</small></th>" if buffs else "")
-            + "<th>Players <small>(every kill)</small></th>")
+            "<th>Overheal</th><th>Dispels a minute</th><th>Externals given a kill</th>"
+            + ("<th>Buffs given a kill</th>" if buffs else "")
+            + "<th>Players</th>")
     rows = "".join(
         f"<tr class='{'mine' if r.spec == mine else ''}'><td>{e(r.spec)}{' <small>(you)</small>' if r.spec == mine else ''}"
         f"</td><td class='n'>{_pct(r.healing)}</td><td class='n'>{_pct(r.tank)}</td><td class='n'>{_pct(r.spike)}</td>"
@@ -1151,7 +1175,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
     if not out:
         return ""
     return ("<h2>The other healers' cooldowns on the big hits</h2>"
-            f"<ul class='hl2'>{out}</ul><p class='small muted'>From this sheet's kills: a time is shown when a quarter "
+            f"<ul class='hl2'>{out}</ul><p class='small muted'>From the same kills as the table: a time is shown when a quarter "
             "of the spec's healers who press the button share it, its share of all that spec's healers there; a press "
             "back from cooldown is no answer, as on the fight tab.</p>")
 
@@ -1198,8 +1222,7 @@ def nums_note(roles: list, own: str = "") -> str:
              f"A spike is 5 s at 1.5 times the kill's median damage{spikes}, counted kill by kill: the fight tab's "
              "median curve smooths most of them away. The shares come from different kills and "
              "do not add up; externals and overheal follow each kit.")
-    method = ("Externals, buffs and the cooldowns below: a mean over " + (f"{own}" if own else "this sheet's kills")
-              + ", on others only. Jobs: paired within each kill, Benjamini-Hochberg at 5% over every spec and "
+    method = ("Externals and buffs: a mean, on others only, from the same kills. Jobs: paired within each kill, Benjamini-Hochberg at 5% over every spec and "
               "number. The boss tab's dispels count the top player only.")
     return f"{e(plain)}</p><p class='small muted'>{e(method)}"
 
@@ -1353,6 +1376,16 @@ def render_sheet(h: HealerPrep) -> str:
         def ramp_of(c, t: float, hit: float) -> str:  # Evangelism 16 s ahead: the ramp is the answer
             return ", a ramp ahead of it" if c.ramp and hit - t >= RAMP[0] else ""
 
+        def _other(ps: list) -> str:
+            """A ramp played by one of two rhythms: the other said, so the ramp does not read as everyone's (Disc's
+            Evangelism on Vashnik: a third ramps at 0:23 and 2:01, a third presses it from the pull; round 33)."""
+            c = ps[0][3]
+            ramp_ts = {round(t) for _h, t, _sp, _c in ps}
+            rest = [(sp, ts) for sp, ts in c.rhythms if not ramp_ts & {round(t) for t in ts}]
+            return "".join(f"; the other {_pct(sp)} press it from the pull on its cooldown, about "
+                           f"{_and([_mmss(t) for t in ts])}" if ts and ts[0] <= 10 else
+                           f"; the other {_pct(sp)} press it about {_and([_mmss(t) for t in ts])}" for sp, ts in rest[:1])
+
         def clause(key: tuple, ps: list) -> tuple[float, str]:
             if len(key) == 1:  # two cooldowns as common for one hit
                 return key[0], (f"for the {_mmss(key[0])} hit, " + _and(
@@ -1374,7 +1407,7 @@ def render_sheet(h: HealerPrep) -> str:
         answers = [x for _t, x in sorted(
             [clause(k, ps) for k, ps in by_press.items() if k not in merged]
             + [(ps[0][0], f"{e(_shown(n))} is their ramp ahead of the {_and([_mmss(p[0]) for p in ps])} hits: "
-                          + ", ".join(f"{_pct(sp)} about {_mmss(t)}" for _hit, t, sp, _c in ps))
+                          + ", ".join(f"{_pct(sp)} about {_mmss(t)}" for _hit, t, sp, _c in ps) + _other(ps))
                for n, ps in ramps.items()])]
         # a ramp's later presses made as soon as it is back: said by its rhythm line and the bare hits' landed_in
         end = len(h.curve) * STEP
@@ -1401,9 +1434,8 @@ def render_sheet(h: HealerPrep) -> str:
                     "cooldowns", heals, set(lead_names), answered)
     fight = ([lead] if lead else []) + [
         f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Raid "
-        f"damage taken per second, median of {h.raid_kills or 'the'} of the top {e(h.spec)}s' kills (the raid's damage "
-        f"is read on {h.raid_kills or 'some'} of them; another spec's sheet reads its own, so its moments can shift a "
-        f"few seconds); "
+        f"damage taken per second, median of {h.raid_kills or 'the'} top kills of this boss read for any spec's sheet "
+        f"(each the same boss: every healer sheet shows the same hits); "
         + ("under it, the cooldowns the lead ties to a hit (an outline: another press of the same button). " if lead_names
            else "no cooldown is kept for these hits, so none is drawn. ")
         + "A dot is a big moment, "
