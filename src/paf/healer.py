@@ -1257,7 +1257,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             per_hit.append((h, sorted(got, key=lambda x: -x[2])[:2], under))  # shared" read as "nothing pressed")
         chips = "".join(f"<span class='chip'>the {_mmss(h)} hit: "
                         + ("; ".join(f"{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)}" for n, t, sp in got) if got
-                           else "".join(f"{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)} <small>({_pct(pp)} of those who "
+                           else "".join(f"{e(_shown(n))} {_mmss(t)} &middot; {_pct(sp)} <small>({int(pp * 100)}% of those who "
                                         f"press it: under a quarter)</small>" for n, t, sp, pp in (u for u in under if len(u) > 3))
                            or "none shared") + "</span>"
                         for h, got, under in per_hit)
