@@ -1280,7 +1280,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                      for n, t, sp, rp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
                                         f"<small>(under a quarter of those who press it"
-                                        f": {int(pp * 100)}%)</small>"
+                                        f"{f': {int(pp * 100)}%' if abs(int(pp * 100) - round(sp * 100)) >= 3 else ''})</small>"
                                         for u in under if len(u) > 4 for n, t, sp, pp in [u[:4]])
                            or "none shared") + "</span>"
                         for h, got, under in per_hit)
@@ -1292,7 +1292,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
     return ("<h2>The other healers' cooldowns on the big hits</h2>"
             f"<ul class='hl2'>{out}</ul><p class='small muted'>From the same kills as the table, every player of each spec (that spec's "
             "own sheet reads its top players, so its times can differ): a button is shown for a hit when a quarter "
-            "of the spec's healers who press it do so in the hit's window (5 s before to 8 s after), its share of all "
+            "of the spec's healers who press it do so in the hit's window (5 s before to 8 s after; a ramp button, as "
+            "Evangelism, 8 to 30 s ahead, never the pull's opener before 0:12), its share of all "
             "that spec's healers there; else its most pressed button, if a tenth of the spec's healers press it there, "
             "marked \"under a quarter\" with the share of those who press it; \"none shared\": no button reaches that. "
             "Presses mostly back from cooldown are no answer, as on the fight tab.</p>")
@@ -1406,6 +1407,7 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
             + f"<table class='hcomp'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"
             "<p class='small muted'>A difference with and without a spec is marked when it is beyond the noise "
             "(three standard errors: still clear when every spec and number of the table is tested at once); "
+            "deaths are per 20 players (heroic raids are 10 to 30), a mean over the kills whose deaths were read; "
             "unmarked, it is within it. A mark is a reading of these kills, not a reason to bring a spec.</p>")
 
 
@@ -1608,7 +1610,8 @@ def render_sheet(h: HealerPrep) -> str:
     # the rule, once, under the long cooldowns and their "fewer than half" line (Zephyr's read as part of it)
     fight.append("<p class='small muted'>Only the lead ties a press to a hit; a button on cooldown, cast on another "
                  "player, used while moving or a trinket says why it is not. A time is shown when a quarter of those who "
-                 "press the button share it; its share is of all the top players (for a press the lead names for a hit: those "
+                 "press the button share it; its share is of all the top players (for a press the lead names for a hit, tied "
+                 "to it or the closest to a hit kept for none: those "
                  "pressing in that hit's window); \"or\": the time other top players press the same press instead. "
                  "\"Back from cooldown\": most of its players press it as soon as it "
                  "came back from their last use, so it was not saved for what it lands on (\"for about half\": 40 to "
