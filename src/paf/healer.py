@@ -1827,7 +1827,7 @@ def render_sheet(h: HealerPrep) -> str:
                  "other top players press the same press instead. "
                  "\"Back from cooldown\": most of its players press it as soon as it "
                  "came back from their last use, so it was not saved for what it lands on (\"for about half\": 40 to "
-                 "60% of them).</p>")
+                 "60% of them); either keeps it from counting for the hit.</p>")
     exts = [c for c in heals if _external(c.spell_id) == "protective"]
 
     def fewer(cs: list) -> str:

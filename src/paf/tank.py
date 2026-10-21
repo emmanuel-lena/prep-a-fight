@@ -547,7 +547,8 @@ def render_sheet(p: TankPrep) -> str:
     if not p.moments:
         answered = set()
     svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight, their defensives and "
-                    "the swaps", [*defs, *shorts, *lane], {"Tank swaps", *(n for n, _t in answered)}, answered)
+                    "the swaps", [*defs, *shorts, *lane], {"Tank swaps", *(n for n, _t in answered)}, answered,
+                    moved_t)  # its marks at the lead's times (round 71)
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + [
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the top tanks "
         f"take per second, median of {p.damage_kills or 'the'} kills (the tanks' damage is read on up to 40 of the top kills); under it, the defensives the lead ties to a hit (an "
@@ -562,7 +563,7 @@ def render_sheet(p: TankPrep) -> str:
         "after it starts); a time with no hit named lands on none, or the lead keeps another button for it; "
         "\"or\": the time other top players press the same press instead. \"Back from cooldown\": "
         "most of its players press it as soon as it came back from their last use, so it was not saved for what it "
-        "lands on (\"for about half\": 40 to 60% of them).</p>"
+        "lands on (\"for about half\": 40 to 60% of them); either keeps it from counting for the hit.</p>"
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
            f"</p>" if p.rare else ""),
         f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"
