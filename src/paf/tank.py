@@ -488,9 +488,16 @@ def render_sheet(p: TankPrep) -> str:
         said = [f"for the {_mmss(x.t)} hit, {a[2]:.0%} press {e(a[0])} (about {_mmss(a[1])})" for x, a in pairs if a]
         answered = {(a[0], a[1]) for a in [big, *(a for _x, a in pairs)] if a}  # the chart draws these full
         tied.update({(a[0], a[1]): a[2] for a in [big, *(a for _x, a in pairs)] if a})
-        bare = [f"the {_mmss(x.t)} hit{landed_in(x, defs, named, 'long defensive')}" for x, a in pairs if not a]
+        notes = [(x, landed_in(x, defs, named, 'long defensive')) for x, a in pairs if not a]
+        none = " (no long defensive of theirs pressed by a tenth of them in it)"
+        quiet = [x for x, n in notes if n == none]  # the same aside once, for every such hit (round 62)
+        bare = [f"the {_mmss(x.t)} hit{n}" for x, n in notes if n != none]
         if said:
             lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 0:35 hit, 41% press Spell Reflection"
+        if quiet:
+            lead.append(f"No long defensive of theirs is pressed by a tenth of them in the "
+                        f"{_and([_mmss(x.t) for x in quiet])} hit{'s' if len(quiet) > 1 else ''}"
+                        + (" either." if not big and none in lead[0] else "."))
         if bare:
             lead.append(f"No defensive is kept for {', nor '.join(bare)}"  # each hit its own aside (round 42)
                         + (" either." if not big and len(bare) == 1 else "."))  # "nor ... either": once is enough

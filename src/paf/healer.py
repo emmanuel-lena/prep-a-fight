@@ -783,6 +783,20 @@ def _counted(c: Cooldown, t: float, hit: float) -> list[float]:
     return [x for ts, d in zip(c.presses, lasts, strict=False) if not c.lasts or d >= end for x in ts if a <= x <= b]
 
 
+def _back_in(c: Cooldown, t: float, hit: float) -> float | None:
+    """Of the presses a hit's share counts, the share made within its cooldown + BACK of the player's own previous
+    one: "back from cooldown" said of the same presses as the share (round 62: Celestial Conduit's window, 72% back,
+    read "for about half" from the 2:09 moment's presses)."""
+    if not c.cd or not c.presses:
+        return None
+    a, b = _window(c, t, hit)
+    end = hit + ANSWER[1]
+    lasts = c.press_lasts if len(c.press_lasts) == len(c.presses) else [end] * len(c.presses)
+    pairs = [(x, max((y for y in ts if y < x), default=None)) for ts, d in zip(c.presses, lasts, strict=False)
+             if not c.lasts or d >= end for x in ts if a <= x <= b]
+    return (sum(1 for x, y in pairs if y is not None and x - y <= c.cd + BACK) / len(pairs)) if pairs else None
+
+
 def reach(c: Cooldown, hit: float) -> int:
     """The top players whose kill reaches a hit: a late hit's share is of them (round 47: 42 of the 100 top Prot
     kills end before Nek'zali's 3:55, its "only 19%" was 33% of those still fighting)."""
@@ -914,6 +928,10 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
     of = _reach_note(c, m.t) if c.presses else ""  # counted in the hit's window: said, as its chip counts its moment
     ramp = c.ramp and t < m.t - ANSWER[0]
     inside = _counted(c, t, m.t)
+    back = _back_in(c, t, m.t)  # judged on the counted presses, as the share (round 62)
+    if back is not None and why.startswith("back from cooldown"):
+        why = ("back from cooldown" if back > BACK_SHARE[1] else "back from cooldown for about half"
+               if back > BACK_SHARE[0] else why)
     when = _mmss(st.median(inside) if inside else t)  # the presses counted, not the moment's (round 53: "2:20" for a
     if ramp:                                          # window ending at 2:18, its presses at 2:14)
         return f" ({few}{_pct(sp)} ramp with {e(_shown(c.name))} ahead of it{of}, about {when}, {e(why)})"
