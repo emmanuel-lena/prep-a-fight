@@ -827,16 +827,19 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
     near = [(a, _tied_share(c, a, n, sp) if sp else sp, n) for a, sp, n in near]  # a tied habit: its hit's window
     def back(a: float) -> str:  # tagged as the main time is (Evangelism's 1:42 habit, round 29)
         return f" &middot; back from cooldown{' for about half' if a in c.back_half else ''}"
-    def share(a: float, sp: float, n: str) -> str:  # a habit the lead names for a hit: its count, said (round 51)
-        hit = (named or {}).get((c.name, a))
-        if hit is not None and (hs := hit_share(c, a, hit)) is not None:
-            where = "ahead of" if c.ramp and a < hit - ANSWER[0] else "in the window of"
-            inside = _counted(c, a, hit)
-            return (f" for {_pct(sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
-                    + (f", about {_mmss(st.median(inside))}" if inside else ""))
-        return f" for {_pct(sp)}" if sp else " for some"
-    return ", or " + ", ".join(f"{_chip(a, n)}{share(a, sp, n)}"
-                               + (back(a) if a in c.back and not c.why else "") for a, sp, n in near)
+    def window(a: float) -> str:  # a habit the lead names for a hit: its count, after the habit's own tag, with
+        hit = (named or {}).get((c.name, a))  # its own back-from-cooldown reading (rounds 51, 63)
+        if hit is None or (hs := hit_share(c, a, hit)) is None:
+            return ""
+        where = "ahead of" if c.ramp and a < hit - ANSWER[0] else "in the window of"
+        inside = _counted(c, a, hit)
+        b = _back_in(c, a, hit)
+        tag = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"
+               + (" for about half" if b <= BACK_SHARE[1] else ""))
+        return (f" &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
+                + (f", about {_mmss(st.median(inside))}" if inside else "") + tag)
+    return ", or " + ", ".join(f"{_chip(a, n)}" + (f" for {_pct(sp)}" if sp else " for some")
+                               + (back(a) if a in c.back and not c.why else "") + window(a) for a, sp, n in near)
 
 
 BACK = 8.0  # seconds past its cooldown a press still counts as pressed as soon as it is back
@@ -1008,11 +1011,14 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
         where = "ahead of" if c.ramp and t < hit - ANSWER[0] else "in the window of"  # a ramp: around its own time
         inside = _counted(c, t, hit)  # its own moment, then the lead's count with its own time (round 54)
         when = st.median(inside) if inside else t
+        b = _back_in(c, t, hit)  # the window's own back-from-cooldown reading (round 63)
+        tag = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"
+               + (" for about half" if b <= BACK_SHARE[1] else ""))
         if _pct(hs) == _pct(sp):  # one count: said once, its time only when 5 s or more off (round 60)
             return (f"{_base(c, hs, hit)} {where} the {_mmss(hit)} hit"
-                    + (f", about {_mmss(when)}" if abs(when - t) >= 5 else ""))
+                    + (f", about {_mmss(when)}" if abs(when - t) >= 5 else ""))  # its chip's tag says it
         return (f"{_share(sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
-                + (f", about {_mmss(when)}" if abs(when - t) >= 5 else ""))  # a time 5 s off or more (round 59)
+                + (f", about {_mmss(when)}" if abs(when - t) >= 5 else "") + tag)  # a time 5 s off or more (r. 59)
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
         return _base(c, hs, _secs(n.partition(" ")[0]))
     return _share(sp)
@@ -1029,6 +1035,13 @@ def _pull_chip(c: Cooldown) -> str:
         return ""
     return (f"<span class='chip'>{_mmss(st.median(first))} &middot; {_pct(len(first) / c.n_all)} of the top "
             "players, at the pull</span>")
+
+
+def _tw(c: Cooldown, t: float, hit: float) -> str:
+    """A tied press's time: its counted presses' median, as the share's (round 63: "about 1:11" for presses at
+    1:13), else its moment's."""
+    inside = _counted(c, t, hit) if c.presses else []
+    return _mmss(st.median(inside) if inside else t)
 
 
 def _split(chip: str) -> tuple[str, str]:
@@ -1679,20 +1692,20 @@ def render_sheet(h: HealerPrep) -> str:
         def clause(key: tuple, ps: list) -> tuple[float, str]:
             if len(key) == 1:  # two cooldowns as common for one hit
                 return key[0], (f"for the {_mmss(key[0])} hit, " + _and(
-                    [f"{_pct(sp)} press {e(_shown(n))} (about {_mmss(t)}{ramp_of(c, t, key[0])}"
+                    [f"{_pct(sp)} press {e(_shown(n))} (about {_tw(c, t, key[0])}{ramp_of(c, t, key[0])}"
                      f"{_also(c, p, t, sp, key[0]).replace('; another', ', another')})" for n, t, sp, p, c in ps]))
             n, press = key
             if len(ps) == 1:
                 hit, t, sp, c = ps[0]
-                return hit, (f"for the {_mmss(hit)} hit, {_pct(sp)} press {e(_shown(n))} (about {_mmss(t)}"
+                return hit, (f"for the {_mmss(hit)} hit, {_pct(sp)} press {e(_shown(n))} (about {_tw(c, t, hit)}"
                              f"{ramp_of(c, t, hit)})" + (_other([(hit, t, sp, c)]) if ramp_of(c, t, hit) else
                                                          _also(c, press, t, sp, hit)))
             c0 = ps[0][3]
             first = which(n, press, c0).startswith("their first") or round(c0.per_kill) <= 1
             pull = (sum(1 for ts in c0.presses if ts and ts[0] <= PULL) / c0.n_all) if first and c0.n_all else 0.0
             return ps[0][0], (f"{which(n, press, c0)} goes on " + _and(  # the most shared hit first
-                [f"the {_mmss(hit)} hit ({_pct(sp)}, about {_mmss(t)})"
-                 for hit, t, sp, _c in sorted(ps, key=lambda p: -p[2])], "or")
+                [f"the {_mmss(hit)} hit ({_pct(sp)}, about {_tw(c_, t, hit)})"
+                 for hit, t, sp, c_ in sorted(ps, key=lambda p: -p[2])], "or")
                 + (f"; {_pct(pull)} open with it at the pull" if pull >= 0.2 else ""))  # round 53: 22% Hymns
 
         def _also(c, press: float, t: float, sp: float, hit: float) -> str:
@@ -1718,7 +1731,7 @@ def render_sheet(h: HealerPrep) -> str:
         answers = [x for _t, x in sorted(
             [clause(k, ps) for k, ps in by_press.items() if k not in merged]
             + [(ps[0][0], f"{e(_shown(n))} is their ramp ahead of the {_and([_mmss(p[0]) for p in ps])} hits: "
-                          + ", ".join(f"{_pct(sp)} about {_mmss(t)}" for _hit, t, sp, _c in ps) + _other(ps))
+                          + ", ".join(f"{_pct(sp)} about {_tw(c_, t, hit)}" for hit, t, sp, c_ in ps) + _other(ps))
                for n, ps in ramps.items()])]
         # a ramp's later presses made as soon as it is back: said by its rhythm line and the bare hits' landed_in
         end = len(h.curve) * STEP
