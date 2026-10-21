@@ -1002,8 +1002,8 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
                                         + _split(_named(c, t, named, tie(c, t, n), sp))[0]
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
                                            if t in c.back and not (c.why or c.every) else "")  # its line says it
-                                        + f"{_or(c, t, answered, named, moved)}"  # the "or" by its own press (r. 58),
-                                        + _split(_named(c, t, named, tie(c, t, n), sp))[1] + "</span>"  # the window last
+                                        + _split(_named(c, t, named, tie(c, t, n), sp))[1]  # each time its own
+                                        + f"{_or(c, t, answered, named, moved)}</span>"  # window, then the "or" (r. 68)
                                         for k, (t, n, sp) in enumerate(zip(c.times, c.near,
                                                                            c.support or [0.0] * len(c.times),
                                                                            strict=False)))

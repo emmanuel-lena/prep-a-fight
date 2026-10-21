@@ -505,8 +505,10 @@ def render_sheet(p: TankPrep) -> str:
         hits = f"the window of the {_and([_mmss(x.t) for x in quiet])} hit{'s' if len(quiet) > 1 else ''}"
         if quiet and first_none:  # "nor": the biggest moment said the same, in one sentence (round 65)
             lead[0] = lead[0].rstrip(".") + f", nor in {hits}."
-        elif quiet:
-            lead.append(f"No long defensive of theirs is pressed by a tenth of them in {hits}.")
+        elif quiet:  # the pattern of every other hit (round 68)
+            lead.append(f"No defensive is kept for the {_and([_mmss(x.t) for x in quiet])} "
+                        f"hit{'s' if len(quiet) > 1 else ''} (no long defensive of theirs pressed by a tenth of them "
+                        "in it).")
         if bare:
             lead.append(f"No defensive is kept for {', nor '.join(bare)}.")  # each hit its own aside (round 42)
         # a hit that comes with a swap (Vashnik's 1:35 and 2:55, after Dripping Fangs): the time is the link
@@ -549,7 +551,8 @@ def render_sheet(p: TankPrep) -> str:
         "<p class='small muted'>Only the lead ties a press to a hit; a button on cooldown, a potion or a trinket says "
         "why it is not. A time is shown when a quarter of those who press the button share it; its share is of all "
         "the top players pressing within 8 s of it (for a press the lead names for a hit: those pressing in that hit's window, 5 s before to 8 s "
-        "after it starts); \"or\": the time other top players press the same press instead. \"Back from cooldown\": "
+        "after it starts); a time with no hit named lands on none, or the lead keeps another button for it; "
+        "\"or\": the time other top players press the same press instead. \"Back from cooldown\": "
         "most of its players press it as soon as it came back from their last use, so it was not saved for what it "
         "lands on (\"for about half\": 40 to 60% of them).</p>"
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
