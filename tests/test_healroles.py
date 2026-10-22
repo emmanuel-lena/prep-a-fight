@@ -260,7 +260,7 @@ def test_jobs_pool_every_corpus_kill_once_without_its_ranked_players(tmp_path):
                [("r1", "Priest", "Holy", 1), ("r2", "Priest", "Holy", None)])
     b = corpus("corpus-warrior-protection.sqlite", [("r1", "done"), ("r3", "done")],
                [("r1", "Warrior", "Protection", 9), ("r3", "Warrior", "Protection", 9)])
-    per_kill, durs, _cover, _casts, _top, _whole = healroles.pooled_kills(3455, 4, [a, b])
+    per_kill, durs, _cover, _casts, _top, _whole, _staged = healroles.pooled_kills(3455, 4, [a, b])
     assert sorted(per_kill) == [("r1", 1), ("r2", 1), ("r3", 1)] and durs[("r3", 1)] == 240
     assert [h[2] for h in per_kill[("r1", 1)]] == [0, 2]  # each healer once, the ranked Holy Priest (actor 1) out
     assert [h[2] for h in per_kill[("r2", 1)]] == [1, 2]  # pending: its best Holy Priest (actor 0) stands it in

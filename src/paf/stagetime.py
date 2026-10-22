@@ -94,6 +94,8 @@ def warp(tl, clk: Clock):
             continue
         q = dict(p)
         q["casts"] = {a: [x for t in ts if (x := clk.at(k, t)) is not None] for a, ts in p["casts"].items()}
+        q["pull"] = {a: [t for t in ts if clk.at(k, t) is not None] for a, ts in p["casts"].items()}  # its pull times,
+        # one to one: a gap between two presses is read on them (a cooldown is pull time)
         end = clk.at(k, p.get("duration") or tl.duration)
         q["duration"] = end if end is not None else max(clk.med.values(), default=p.get("duration") or tl.duration)
         players.append(q)

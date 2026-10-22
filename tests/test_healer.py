@@ -335,9 +335,8 @@ def test_a_hit_kept_for_none_names_a_few_presses_in_it():
     ns = healer.Cooldown("Nature's Swiftness", 2, 0.9, 4.0, [35.0], every=60.0,
                          presses=[[36.0]] * 15 + [[90.0]] * 75, n_all=100)
     assert healer.landed_in(m, [up, ns]) == " (only 20% press Ultimate Penitence in its window, about 0:36)"
-    up.presses = [[36.0]] * 30 + [[75.0]] * 30  # a quarter or more: no "only"
-    assert healer.landed_in(m, [up, ns]) == (" (only 15% press Nature&#x27;s Swiftness in its window, about 0:36, "
-                                             "on cooldown)")
+    up.presses = [[36.0]] * 30 + [[75.0]] * 30  # a quarter or more, no chip near: named, no "only" (round 101:
+    assert healer.landed_in(m, [up, ns]) == " (30% press Ultimate Penitence in its window, about 0:36)"  # not none)
 
 
 def test_a_minute_button_in_a_bare_hit_is_named_with_its_reason():
@@ -673,3 +672,11 @@ def test_the_pull_group_a_card_shows_is_drawn():
     found = [healer.Moment(35.0, 1000.0, 1.6, "Soulcoil Rite")]
     svg = healer.curve_svg([100.0] * 60, found, [], "x", [c], {"Divine Hymn"}, {("Divine Hymn", 36.0)})
     assert "Divine Hymn 0:05 (tied to no hit: at the pull)" in svg
+
+
+def test_back_from_cooldown_reads_its_gap_in_pull_time():
+    # Preservation Evoker, Nek'zali (round 101): a Rewind gap read 178 s in stage time for 245 s in the kill
+    stage = [[70.0, 248.0]]
+    pull = [[70.0, 315.0]]
+    assert healer.back_share(stage, 248.0, 180.0) == 1.0  # in stage time: back as soon as it came back
+    assert healer.back_share(stage, 248.0, 180.0, pull) == 0.0  # in pull time: held 65 s past it

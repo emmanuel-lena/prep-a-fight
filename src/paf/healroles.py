@@ -466,6 +466,8 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
     stats: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
     cd_times: dict[str, dict[int, list[list[float]]]] = defaultdict(lambda: defaultdict(list))  # per player-kill
     whole_of = pool[5] if pool and len(pool) > 5 else {}  # each kill's whole healing, its ranked player's included
+    staged = pool[6] if pool and len(pool) > 6 else None  # a staged boss: the kills whose presses are timed
+    timed: Counter = Counter()
     for k, hs in per_kill.items():
         total = whole_of.get(k) or sum(h[5] for h in hs) or 1
         minutes = (durs.get(k) or 1) / 60
@@ -482,9 +484,13 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
             s["ext"].append(sum(1 for a, _t, o in mine if o and kind[a] == "protective"))
             s["buff"].append(sum(1 for a, _t, o in mine if o and kind[a] == "damage"))
             buff_casts[spec].update(a for a, _t, o in mine if o and kind[a] == "damage")
+            if staged is not None and k not in staged:  # its times on another clock: its presses not timed
+                continue
+            timed[spec] += 1  # the players whose presses are timed: the cooldowns' base
             own: dict[int, list[float]] = defaultdict(list)
             for ab, t, _o in mine:
-                own[ab].append(t)
+                if t is not None:
+                    own[ab].append(t)
             for ab, ts in own.items():
                 cd_times[spec][ab].append(ts)
     # the two sides of a talent choice are one button, as on the fight tab (Revival / Restoral: split, each share
@@ -531,10 +537,11 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
         if len(t["healing"]) < (POOL_PLAYERS if pool else min_players):  # the Disc Priest: 43 players in the
             continue  # pool, 3 in a Holy Priest's kills, was dropped from the table on 7 sheets of 8 (round 31)
         mid = st.median(durs.values()) if durs else None
-        cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / n, _shared(ps, n, mid, _cd(ab)), len(ps) / n,
-                (ps, n, _cd(ab), ab))  # its players' presses: the other healers' cards read each hit's own window
-               for ab, ps in (cd_times[spec].items() if own else [])  # pressed by half of them at least (HTT: 3%)
-               if len(ps) / n >= 0.5 and not _personal(ab, names) and not _untied(ab, ps, mid)
+        nc = max(1, timed[spec]) if staged is not None else n  # the players whose presses are timed (round 101)
+        cds = [((names or {}).get(ab, f"spell {ab}"), sum(map(len, ps)) / nc, _shared(ps, nc, mid, _cd(ab)),
+                len(ps) / nc, (ps, nc, _cd(ab), ab))  # its players' presses: the other healers' cards read each hit's
+               for ab, ps in (cd_times[spec].items() if own else [])  # own window; pressed by half of them at least
+               if len(ps) / nc >= 0.5 and not _personal(ab, names) and not _untied(ab, ps, mid)  # (HTT: 3%)
                and sum(map(len, ps)) / len(ps) < 3.5]  # a 1-minute button (Nature's Swiftness, 3.9) is no raid cooldown
         se = {k: (st.stdev(v) / len(v) ** 0.5 if len(v) > 1 else 0.0) for k, v in [*s.items(), *t.items()]}
         out.append(Role(spec, len(t["healing"]), st.median(t["healing"]), st.median(t["tank"]), st.median(t["spike"]),
@@ -543,7 +550,7 @@ def roles(con: sqlite3.Connection, encounter_id: int, difficulty: int, names: di
                         sorted(cds, key=lambda c: -c[1]),
                         se={"tank": se["tank"], "spike": se["spike"], "overheal": se["overheal"],
                             "dispels": se["dispels"], "raid_cds": se["raid"], "externals": se["ext"]},
-                        buffs=st.mean(s["buff"]) if own else -1.0, own_players=n,
+                        buffs=st.mean(s["buff"]) if own else -1.0, own_players=nc,
                         buff_spells=[(names or {}).get(ab, f"spell {ab}") for ab, _ in buff_casts[spec].most_common()]))
     cover = list(pool[2].values()) if pool else [  # the spikes' share of the fight, on the column's own kills
         x for (x,) in con.execute(f"SELECT k.spike_share FROM heal_kill k JOIN fight f USING(report, fight_id) "
@@ -731,17 +738,19 @@ def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None
             con.close()
     from paf.stagetime import clock
 
-    clk = clock(encounter_id, difficulty, paths)  # the casts in stage time, as the curve and the hits (round 100)
-    if clk:
-        casts = defaultdict(list, {k: [(ab, x, o) for ab, t, o in v if (x := clk.at((k[0], k[1]), t)) is not None]
-                                   for k, v in casts.items()})
+    clk = clock(encounter_id, difficulty, paths)  # the casts in stage time, as the curve and the hits (round 100);
+    staged = None                                  # on a staged boss, the kills whose stages are read: a kill without
+    if clk:                                        # them is on another clock, its casts' times left out (round 101:
+        staged = {k for k in rows if clk.known(k)}  # 354 of 1,115 kills, the Stage Two shares a third too low)
+        casts = defaultdict(list, {k: [(ab, clk.at((k[0], k[1]), t) if (k[0], k[1]) in staged else None, o)
+                                       for ab, t, o in v] for k, v in casts.items()})
     top = [h for k, hs in rows.items() for a, h in hs.items() if a in out[k]]  # the ranked players themselves
     whole = {k: sum(h[5] or 0 for h in hs.values()) for k, hs in rows.items()}  # each kill's healing, all of it
     per_kill = {k: [h for a, h in hs.items() if a not in out[k]] for k, hs in rows.items()}
     per_kill = {k: hs for k, hs in per_kill.items() if hs}
     kept = {(h[0], h[1], h[2]) for hs in per_kill.values() for h in hs}
     return (per_kill, durs, {k: x for k, x in cover.items() if k in per_kill},
-            {k: v for k, v in casts.items() if k in kept}, top, whole)
+            {k: v for k, v in casts.items() if k in kept}, top, whole, staged)
 
 
 TOP_PLAYERS = 10  # ranked players of a spec, at least, to check a job on them

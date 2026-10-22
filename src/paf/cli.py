@@ -799,7 +799,9 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
 
     def moments_of(a) -> list[float]:  # a short defensive is a timed answer too (Spell Reflection at 0:35); one
         casts = [p["casts"].get(a.name) or p["casts"].get(a.id) or [] for p in tls.players]  # on cooldown is not
-        every = on_cadence(casts, a.per_kill, tls.duration)  # (Demoralizing Shout every 30 s): no moments
+        pulls = [(p.get("pull") or p["casts"]).get(a.name) or (p.get("pull") or p["casts"]).get(a.id) or []
+                 for p in tls.players]  # its cadence in pull time, a cooldown's clock (round 101)
+        every = on_cadence(pulls, a.per_kill, tls.duration)  # (Demoralizing Shout every 30 s): no moments
         lasts = [p.get("duration") or tls.duration for p in tls.players]  # a hit's share: of the kills reaching it
         if every:
             return [], every, [], casts, lasts
@@ -978,7 +980,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     for c in h.cooldowns:
         if c.release is not None:
             c.stored = healer.stored_spells(con, enc.id, diff, c.name)
-    h.abilities = _role_journal(enc.id, diff_name, "healer", tl, healer.moment_notes(found))
+    h.abilities = _role_journal(enc.id, diff_name, "healer", tl, healer.moment_notes(found, staged=bool(clk)))
     h.named_by_damage = bool(by)
     h.raid_kills = healer.raid_kills(con, enc.id, diff, pool=True)
     h.hero = healer.hero_split(con, enc.id, diff, spec)

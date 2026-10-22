@@ -95,6 +95,7 @@ class Cooldown:
     rhythms: list = field(default_factory=list)  # (share of the top players, their press times): two groups that
     # press it at different moments all kill long (Disc's Evangelism: 0:04, 1:42, 3:15 or 0:24, 2:07, 3:38)
     # a button pressed in two steps (Stasis: store, then release, which is when it heals; the owner, round 79)
+    pulls: list = field(default_factory=list)  # each press's pull time, parallel to presses (stage time: a gap)
     release: Cooldown | None = None  # its release presses, as a cooldown's (its moments, shares and hits)
     release_gap: float = 0.0  # median seconds from a store to its release
     stored: list = field(default_factory=list)  # (spell, share of the stores holding it, share holding it twice)
@@ -287,14 +288,16 @@ def moment_names(m: Moment) -> list[str]:
     return [x for x in m.boss_spell.removeprefix("mostly ").removeprefix("after ").split(" and ") if x]
 
 
-def moment_notes(found: list[Moment]) -> dict[str, str]:
+def moment_notes(found: list[Moment], staged: bool = False) -> dict[str, str]:
     """The boss tab's measured line under each ability the raid's big moments are named after (Soulcoil Rite: no
     cast to time it, yet the fight tab names it twice)."""
     at: dict[str, list[float]] = {}
     for m in found:
         for n in moment_names(m):
             at.setdefault(n, []).append(m.t)
-    return {n: "big raid damage at " + _and([_mmss(t) for t in ts]) + " (measured)" for n, ts in at.items()}
+    clock = " (measured, in stage time as the fight tab)" if staged else " (measured)"  # the boss tab's own times
+    return {n: "big raid damage at " + _and([_mmss(t) for t in ts]) + clock for n, ts in at.items()}  # are pull time
+    # (round 101: "around 0:34, 1:10, 3:55 · big raid damage at 0:35, 3:50 and 4:15" on two clocks, unsaid)
 
 
 def name_by_damage(found: list[Moment], by: dict[str, list[float]], width: int = 2) -> None:
@@ -520,8 +523,13 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         ids = [a.id for a in abs_]
         per_player = [sorted(t for i in ids for t in (p["casts"].get(i) or [])) or list(p["casts"].get(name) or [])
                       for p in tl.players]
+        # each press's pull time beside its stage time (paf.stagetime.warp): a gap between two presses is the
+        # game's cooldown, read in pull time (round 101: a Rewind gap read 178 s for 245 s across Stage Two)
+        pulls = [sorted(t for i in ids for t in ((p.get("pull") or p["casts"]).get(i) or []))
+                 or list((p.get("pull") or p["casts"]).get(name) or []) for p in tl.players]
         users = sum(1 for ts in per_player if ts) / max(1, len(tl.players))
         pressed_lasts = [p.get("duration") or tl.duration for p, ts in zip(tl.players, per_player, strict=False) if ts]
+        pulls = [q for ts, q in zip(per_player, pulls, strict=False) if ts]
         per_player = [ts for ts in per_player if ts]
         if not per_player or not tl.duration:
             continue
@@ -554,7 +562,7 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
                     times[j], alt[k] = x, of
                     alt_of = [x if o == of else o for o in alt_of]
             times = sorted(times)
-        every = on_cadence(per_player, per_kill, tl.duration)
+        every = on_cadence(pulls, per_kill, tl.duration)
         cd = max((base or {}).get(i, (0.0, 1))[0] for i in ids)
         if every and (any(abs((y - x) - every) > 0.15 * every for x, y in pairwise(times))
                       or (cd and every > 1.15 * cd)):  # held past its cooldown (the Vessel every 118 s, cooldown 90)
@@ -565,7 +573,7 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
                 every = max(every, cd)                             # Anger Management)
         # pressed again as soon as it is back after a first press of its own (Avenging Wrath at 0:42 then every
         # 123 s, its cooldown 120): the first may answer a hit, the next ones are its rhythm
-        gaps = [y - x for ts in per_player for x, y in pairwise(ts)]
+        gaps = [y - x for ts in pulls for x, y in pairwise(ts)]
         rhythm = st.median(gaps) if gaps and not every and cd and st.median(gaps) <= 1.15 * cd else 0.0
         if _item(sid):  # a trinket or a potion: one wording on every sheet, its rhythm said with it
             every = 0.0
@@ -584,7 +592,7 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
             if why:
                 times = sorted([*times, *(alt[i] for i in far if all(abs(alt[i] - t) > 8 for t in times))])
             alt, alt_of = [x for i, x in enumerate(alt) if i not in far], [x for i, x in enumerate(alt_of) if i not in far]
-        shares = {x: back_share(per_player, x, cd) for x in [*times, *alt]}
+        shares = {x: back_share(per_player, x, cd, pulls) for x in [*times, *alt]}
         back = {x for x, b in shares.items() if b > BACK_SHARE[0]}  # pressed as soon as it is back; about half
         half = {x for x, b in shares.items() if BACK_SHARE[0] < b <= BACK_SHARE[1]}  # of them: no tie either
         tied = not (every or why)  # on cooldown, a 1-minute button, a
@@ -640,7 +648,7 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
                             alt_of, why, rhythm if len(times) > 1 else 0.0, cd=cd, ramp=ramp,
                             back=sorted(x for x in back if x in times or x in alt),
                             rhythms=sorted(two, key=lambda r: r[1][0]) if two and not (every or why) else [],
-                            presses=per_player, n_all=n_all, back_half=sorted(half),
+                            presses=per_player, pulls=pulls, n_all=n_all, back_half=sorted(half),
                             lasts=[p.get("duration") or tl.duration for p in tl.players],
                             press_lasts=pressed_lasts))
     return sorted(out, key=lambda c: -c.users)
@@ -900,9 +908,10 @@ def _back_in(c: Cooldown, t: float, hit: float) -> float | None:
     a, b = _window(c, t, hit)
     end = hit + ANSWER[1]
     lasts = c.press_lasts if len(c.press_lasts) == len(c.presses) else [end] * len(c.presses)
-    pairs = [(x, max((y for y in ts if y < x), default=None)) for ts, d in zip(c.presses, lasts, strict=False)
-             if not c.lasts or d >= end for x in ts if a <= x <= b]
-    return (sum(1 for x, y in pairs if y is not None and x - y <= c.cd + BACK) / len(pairs)) if pairs else None
+    pulls = c.pulls if len(c.pulls) == len(c.presses) else [None] * len(c.presses)
+    gaps = [_gap(ts, pl, j) for ts, pl, d in zip(c.presses, pulls, lasts, strict=False)
+            if not c.lasts or d >= end for j, x in enumerate(ts) if a <= x <= b]
+    return (sum(1 for g in gaps if g is not None and g <= c.cd + BACK) / len(gaps)) if gaps else None
 
 
 def reach(c: Cooldown, hit: float) -> int:
@@ -977,12 +986,22 @@ BACK = 8.0  # seconds past its cooldown a press still counts as pressed as soon 
 BACK_SHARE = (0.4, 0.6)
 
 
-def back_share(per_player: list[list[float]], t: float, cd: float) -> float:
+def back_share(per_player: list[list[float]], t: float, cd: float, pulls: list | None = None) -> float:
     """Of the players pressing a button about t (within 8 s), the share whose own press before it is within its
     cooldown plus BACK: they press it as soon as it is back. Read per player, never between moments (Evangelism's
     0:04 and 2:07 moments are 123 s apart, yet its players press it 90-102 s after their own last one)."""
-    near = [(x, max((y for y in ts if y < x), default=None)) for ts in per_player for x in ts if abs(x - t) <= 8]
-    return (sum(1 for x, y in near if y is not None and x - y <= cd + BACK) / len(near)) if near and cd else 0.0
+    gaps = [_gap(ts, pulls[i] if pulls and len(pulls) == len(per_player) else None, j)
+            for i, ts in enumerate(per_player) for j, x in enumerate(ts) if abs(x - t) <= 8]
+    return (sum(1 for g in gaps if g is not None and g <= cd + BACK) / len(gaps)) if gaps and cd else 0.0
+
+
+def _gap(ts: list[float], pull: list[float] | None, j: int) -> float | None:
+    """A press's gap from the player's own previous one, in pull time when its pull times are known (they follow
+    its stage times one to one, in the same order)."""
+    if j == 0:
+        return None
+    src = pull if pull is not None and len(pull) == len(ts) else ts
+    return src[j] - src[j - 1]
 
 
 GROUP_GAP = 10.0  # seconds between two groups of presses in one window said apart ("1:41 or 2:01")
@@ -1025,7 +1044,7 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
     few = [(hs, c) for c in cds if not (c.why or c.every or _item(c.spell_id)
                                         or _external(c.spell_id) == "damage" or is_defensive(c.spell_id, c.name)
                                         or not (c.ramp or any([*c.near, *(c.alt_near or [])]) or _raid(c.spell_id)))
-           for hs in [hit_share(c, m.t, m.t)] if hs and FEW_SHARE <= hs < 0.25]  # (a raid kind by the game data
+           for hs in [hit_share(c, m.t, m.t)] if hs and FEW_SHARE <= hs]  # (a raid kind by the game data
     # counts too: Spirit Link Totem, 17% in Vashnik's 2:10, timing varies elsewhere; round 58)
 
     def said(c: Cooldown, hs: float, reason: str) -> str:  # one wording for every hit kept for none (round 58),
@@ -1049,11 +1068,16 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
     rhythm_only = all(x[1].why == MINUTE or x[1].every for x in near)
     # under the bar, a raid cooldown about as common wins over a button pressed about every minute (round 57:
     # Nature's Swiftness 16% named over Spirit Link Totem's 17%, Convoke 19% over Tranquility's 21%)
-    if few and (not near or (best_near < 0.25 and rhythm_only and max(h for h, _c in few) >= best_near - 0.03)):
+    # and a raid cooldown pressed as much as the near presses when none of them is one (round 101: Obsidian Scales
+    # 16% named for Nek'zali's 3:50 over Rewind's 20%; Tranquility 26%, no chip near 4:15, read as "none")
+    no_raid = not any(_raid(x[1].spell_id) or x[1].ramp for x in near)
+    if few and (not near or (best_near < 0.25 and rhythm_only and max(h for h, _c in few) >= best_near - 0.03)
+                or (no_raid and max(h for h, _c in few) >= best_near)):
         hs, c = max(few, key=lambda x: x[0])
         return said(c, hs, "")
     if not near:
-        on_cd = [(hs, c) for c in cds if c.every for hs in [hit_share(c, m.t, m.t)] if hs and hs >= FEW_SHARE]
+        on_cd = [(hs, c) for c in cds if c.every and _external(c.spell_id) != "damage" and not _item(c.spell_id)
+                 for hs in [hit_share(c, m.t, m.t)] if hs and hs >= FEW_SHARE]  # (round 101: Power Infusion named)
         if on_cd:  # a button pressed on cooldown lands there: said, or "no long cooldown" is false (round 57: Stasis)
             hs, c = max(on_cd, key=lambda x: x[0])
             return said(c, hs, "on cooldown")
@@ -2131,7 +2155,8 @@ def render_sheet(h: HealerPrep) -> str:
         if any(m.ratio < SPIKE for m in shown):  # said, not left to a reader of the 1.5x rule (round 29)
             hits += (" (no hit reaches 1.5&times; here: these are the highest waves)"  # the rule moments() applied,
                      if max(m.ratio for m in h.moments) < SPIKE else  # not the rounded figures (1.45 shows 1.5)
-                     f" (a hit at {SPIKE * 0.9:.2f}&times; or more counts too)")
+                     f" (a hit at {_x(max(SPIKE * 0.9, RELATIVE * max(m.ratio for m in h.moments)))}&times; or more"
+                     " counts too, 0.85 of the highest)")  # the bar applied (round 101: 1.35x said, 1.42x applied)
         # a cooldown said for a hit only when the top players' usual press answers it (paf.healer.ANSWER), at the
         # press's own time
         bare = []
@@ -2239,13 +2264,14 @@ def render_sheet(h: HealerPrep) -> str:
         def clause(key: tuple, ps: list) -> tuple[float, str]:
             if len(key) == 1:  # two cooldowns as common for one hit
                 return key[0], (f"for the {_mmss(key[0])} hit, " + _and(
-                    [f"{_pct(sp)} press {e(_shown(n))} (about {_tw(c, t, key[0])}{ramp_of(c, t, key[0])}"
+                    [f"{_pct(sp)} press {e(_shown(n))}{_reach_note(c, key[0])} (about {_tw(c, t, key[0])}"
+                     f"{ramp_of(c, t, key[0])}"
                      f"{_also(c, p, t, sp, key[0]).replace('; another', ', another')})" for n, t, sp, p, c in ps]))
             n, press = key
             if len(ps) == 1:
                 hit, t, sp, c = ps[0]
                 return hit, (f"for the {_mmss(hit)} hit, {'another ' if _other_players(n, hit, t, c) else ''}"
-                             f"{_pct(sp)} press {e(_shown(n))} (about {_tw(c, t, hit)}"
+                             f"{_pct(sp)} press {e(_shown(n))}{_reach_note(c, hit)} (about {_tw(c, t, hit)}"
                              f"{ramp_of(c, t, hit)})" + (_other([(hit, t, sp, c)]) if ramp_of(c, t, hit) else
                                                          _also(c, press, t, sp, hit)))
             c0 = ps[0][3]
@@ -2265,6 +2291,9 @@ def render_sheet(h: HealerPrep) -> str:
             if not alts:
                 return ""
             a, x = max(alts, key=lambda y: y[1])
+            other = next((m2 for m2 in shown if m2.t != hit and -ANSWER[0] <= a - m2.t <= ANSWER[1]), None)
+            if other is not None:  # in another hit's window: said so, not by its gap (round 101: Conduit's 3:52, on
+                return f"; another {_pct(x)} press it about {_mmss(a)}, in the {_mmss(other.t)} hit's window"  # 3:50)
             gap = int(abs(_secs(_mmss(hit)) - _secs(_mmss(a))))  # from the hit, as the times shown (round 45)
             out = not (c.ramp or -ANSWER[0] <= a - hit <= ANSWER[1])  # outside its window: no answer, said so (round
             return (f"; another {_pct(x)} press it about {_mmss(a)}, {gap} s {'before' if a < hit else 'after'} the "  # 61)
