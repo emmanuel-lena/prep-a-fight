@@ -536,6 +536,10 @@ def render_sheet(p: TankPrep) -> str:
             lead[0] = lead[0].rstrip(".") + f", nor for {hits}."  # (round 77: "nor in the window of", no subject)
         elif quiet:  # the pattern of every other hit, in one sentence with them (round 68)
             bare = [f"the {at(x)} hit{none}" for x in quiet] + bare
+        up = [(n, u) for n, u in p.mitigation if u >= 0.5][:2]  # what they do have, measured: their active
+        if first_none and up:  # mitigation's uptime (round 86: the biggest hit's answer was a negative alone)
+            lead[0] = lead[0].rstrip(".") + ("; their active mitigation is up most of the kill: "
+                                             + _and([f"{e(n)} {u:.0%}" for n, u in up]) + ".")
         if bare:
             lead.append(f"No defensive is kept for {', nor '.join(bare)}.")  # each hit its own aside (round 42)
         # a hit that comes with a swap (Vashnik's 1:35 and 2:55, after Dripping Fangs): the time is the link

@@ -272,7 +272,7 @@ def test_back_from_cooldown_is_read_per_player():
 def test_the_talents_they_differ_on_most_when_none_splits_them():
     # Holy Paladin: no talent taken by 35-65% of them, so the change tab names the ones they differ on most
     page = healer.split_html([("Tower of Radiance", 0.22)], 100, "Holy Paladin", wide=True)
-    assert "differ on most</h2>" in page and "is taken by 35 to 65% of them" in page
+    assert "differ on most</h2>" in page and "No talent splits them near half; these are the ones 15 to 85%" in page
 
 
 def test_jobs_lead_says_either_only_when_your_spec_has_no_job():
@@ -503,7 +503,8 @@ def test_a_two_step_button_says_its_release_and_what_it_stores():
                                                                    ("Hover", 0.25, 0.0)]
     c.stored = healer.stored_spells(con, 9, 4, "Stasis (Store)")
     out = healer.cooldowns_html([c])
-    assert "released:</small><span class='chip'>1:56 &middot; 50% of the top players &middot; stored 16 s before" in out
+    assert ("released:</small><span class='chip'>1:56 &middot; 50% of the top players &middot; from a store about "
+            "1:40, 16 s before") in out
     # a store never released before the next store is not paired with the next one's release (round 83)
     tl.players = [{"casts": {1: [100.0, 200.0], 2: [216.0]}, "duration": 270.0}] * 4
     healer.two_step(tl, [c], [m])
@@ -516,7 +517,7 @@ def test_two_groups_of_presses_in_a_window_are_said_apart():
     assert healer._about([101.0] * 20 + [121.0] * 21) == "1:41 or 2:01"
     assert healer._about([101.0, 103.0, 104.0, 106.0, 108.0]) == "1:44"
     spread = [100.0, 101, 101, 104, 105, 105, 108, 108, 109, 114, 115, 118, 119, 120, 121, 121]  # the real 1:40-2:01
-    assert healer._about(spread) == "1:44 to 1:58"
+    assert healer._about(spread) == "1:44 to 1:59"
     assert healer._center([101.0] * 20 + [121.0] * 21) == 121.0
 
 

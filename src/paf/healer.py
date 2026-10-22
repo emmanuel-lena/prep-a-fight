@@ -676,7 +676,10 @@ def trinkets(con, encounter_id: int, difficulty: int, top: int = 100) -> list[tu
 
 
 def _mmss(t: float) -> str:
-    return f"{int(t // 60)}:{int(t % 60):02d}"
+    """Rounded to the second (round 86: truncated, Tranquility's 35.9 s read "as the 0:35 hit starts" and Rewind's
+    36.7 s "1 s after")."""
+    s = int(round(t))
+    return f"{s // 60}:{s % 60:02d}"
 
 
 CSS = "<style>" + theme.style("healer") + "</style>"
@@ -1267,7 +1270,13 @@ def _released(c: Cooldown) -> str:
     def held(t: float, h: float) -> str:  # each release's own gap from its store (round 84: the pull's held ~20
         near = (_counted(r, t, h) if h >= 0 else []) or [x for ts in r.presses for x in ts if abs(x - t) <= 8]
         gap = _gap_of(c, near)  # s, the others ~14 s); a hit's: its window's releases, as the lead (round 85)
-        return f" &middot; stored {gap:.0f} s before" if gap else ""
+        if not gap:
+            return ""
+        got = set(near)  # the store it comes from, named: its chip's time when one is near, else its own (round 86:
+        at = st.median(u - g for u, g in c.release_pairs if u in got)  # "3:49 · stored 20 s before" from 3:29,
+        chip = min([*c.times, *c.alt], key=lambda x: abs(x - at), default=None)  # no chip there)
+        where = f"the {_mmss(chip)}" if chip is not None and abs(chip - at) <= 8 else f"a store about {_mmss(at)}"
+        return f" &middot; from {where}{' store' if where.startswith('the') else ''}, {gap:.0f} s before"
     chips = "".join(f"<span class='chip'>{_mmss(t)} &middot; {_pct(sp)} of the top players{held(t, h)}"
                     + (f" &middot; in the window of the {_mmss(h)} hit:{_base(r, hs, h).replace(' &middot;', '')}"
                        + (f", about {_about(inside)}"  # the lead's time (its counted releases')
@@ -1589,9 +1598,8 @@ NOT_ADVICE = " Their choices, not a recommendation: no sim weighs them."
 def split_html(split: list, players: int, spec: str, wide: bool = False) -> str:
     """The talents the top players split on, with how often each is picked: what the builds above hide. wide: none
     or one is taken by 35 to 65% of them (Holy Paladin, Holy Priest), so the talents they differ on most, 15 to 85%."""
-    return ((f"<h2>The talents the top {e(spec)}s differ on most</h2><p>{'Only one is' if any(0.35 <= x <= 0.65 for _n, x in split) else 'None is'} taken by 35 to 65% of "
-             f"them, so these are the ones between 15 and 85%: the share of the {players} players read who take each, closest "
-             "to half first:</p>" if wide else
+    return ((f"<h2>The talents the top {e(spec)}s differ on most</h2><p>{'Almost no talent' if any(0.35 <= x <= 0.65 for _n, x in split) else 'No talent'} splits them near "
+             f"half; these are the ones 15 to 85% of the {players} players read take, closest to half first:</p>" if wide else
              f"<h2>The talents the top {e(spec)}s split on</h2><p>The share of the {players} players read "
              "who take each, closest to half first:</p>") + "<ul class='hl2 split'>"
             + "".join(f"<li><b>{e(n)}</b><small>{s:.0%}</small></li>" if s >= 0 else
@@ -1879,7 +1887,9 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
             "<p class='small muted'>A difference with and without a spec is marked when it is beyond the noise "
             "(three standard errors: still clear when every spec and number of the table is tested at once); "
             "deaths are per 20 players (heroic raids are 10 to 30), a mean over the kills whose deaths were read; "
-            "unmarked, it is within it. A mark is a reading of these kills, not a reason to bring a spec.</p>")
+            "unmarked, it is within it. A mark is a reading of these kills, not a reason to bring a spec. "
+            f"\"A wide reading\": {FEW_KILLS} to {WIDE_KILLS - 1} kills, its gaps never marked; \"too few kills\": "
+            f"under {FEW_KILLS}, no number.</p>")  # both defined (round 86)
 
 
 def comps_table(comps: list, n_kills: int) -> str:
