@@ -802,7 +802,7 @@ def _also_pressers(c: Cooldown, t: float, named: dict | None, n: str, sp: float)
     shown = _named(c, t, named, n, sp)
     if "of those who press it" in shown:
         return ""
-    if _split(shown)[0] in (_share(sp), _share(sp) + _still(c, t)):  # its own share, before a window clause (r. 90:
+    if _split(shown)[0] in (_share(sp), _share(sp) + _still(c, t, sp)):  # its own share, before a window clause (r. 90:
         return _pressers(c, sp)                                   # Shield Wall "3:52 · 24% · in the window…")
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None and shown == _base(
             c, hs, _secs(n.partition(" ")[0])):
@@ -943,7 +943,7 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
         return (f" &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
                 + (f", about {_about(inside)}" if inside else "") + tag)
     sp_of = {a: sp for a, sp, _n in near}
-    return ", or " + ", ".join(f"{_chip((moved or {}).get((c.name, a), a), n)}" + (f" for {_pct(sp)}{_still(c, a)}{_pressers(c, sp)}"
+    return ", or " + ", ".join(f"{_chip((moved or {}).get((c.name, a), a), n)}" + (f" for {_pct(sp)}{_still(c, a, sp)}{_pressers(c, sp)}"
                                                                                    if sp else " for some")
                                + ("" if window(a, n) and "back from cooldown" in window(a, n) else
                                   back(a) if a in c.back and not c.why else "")  # the window's reading alone (r. 72)
@@ -1176,17 +1176,22 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
         if _pct(hs) == _pct(sp):  # one count: said once, at the lead's time, the chip's own (round 78: "2:59 ·
             return f"{_base(c, hs, hit)}{_pressers(c, sp)} &middot; {where} the {_mmss(hit)} hit: the same players"  # 15% … about
             # 2:57", two times); under a quarter, of those who press it too (round 84)
-        return (f"{_share(sp)}{_still(c, t)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
+        return (f"{_share(sp)}{_still(c, t, sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
                 + (f", about {_about(inside)}" if inside and _about(inside) != _mmss(t) else "") + tag)  # the lead's time (round 67)
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
         return _base(c, hs, _secs(n.partition(" ")[0]))
-    return _share(sp) + _still(c, t)
+    return _share(sp) + _still(c, t, sp)
 
 
-def _still(c: Cooldown, t: float) -> str:
-    """A time's share past the first kill's end is of the kills still going then, said (round 98)."""
+def _still(c: Cooldown, t: float, sp: float | None = None) -> str:
+    """A time's share past the first kill's end is of the kills still going then, said (round 98) when it reads
+    otherwise than over every kill (round 99: "in the 99 kills still going" beside every late chip)."""
     n = sum(1 for d in c.lasts if d >= t) if c.lasts else 0
-    return f", in the {n} kills still going" if c.lasts and 0 < n < len(c.lasts) else ""
+    if not c.lasts or not 0 < n < len(c.lasts):
+        return ""
+    if sp is not None and _pct(sp) == _pct(sp * n / len(c.lasts)):
+        return ""
+    return f", in the {n} kills still going"
 
 
 def _pull_chip(c: Cooldown) -> str:

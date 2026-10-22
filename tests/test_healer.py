@@ -662,3 +662,5 @@ def test_a_late_time_share_says_the_kills_still_going():
     c = healer.Cooldown("Shield Wall", 1, 0.77, 2.0, [232.0], [""], lasts=[300.0] * 58 + [200.0] * 42)
     assert healer._still(c, 232.0) == ", in the 58 kills still going"
     assert healer._still(c, 100.0) == ""
+    c.lasts = [300.0] * 99 + [200.0]  # one kill ended: the share reads the same over all, nothing said (round 99)
+    assert healer._still(c, 232.0, 0.25) == "" and healer._still(c, 232.0) == ", in the 99 kills still going"
