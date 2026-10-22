@@ -111,10 +111,17 @@ def build_timeline(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
     for per in casts.values():
         for a, ts in per.items():
             counts[a].append(len(ts))
+    # a spell's share of the players over all its ids: a talented id (Lay on Hands 471195 beside 633, 12% of the top
+    # Holy Paladins) was dropped under the bar on its own, its players missing from the spell's row (round 108)
+    by_name: dict[str, set] = defaultdict(set)
+    for k, per in casts.items():
+        for a in per:
+            by_name[names.get(a) or f"spell {a}"].add(k)
     abilities = []
     for a, v in counts.items():
         med = st.median(v)
-        if len(v) / n >= min_users and med / max(duration / 60, 1) <= MAX_CASTS_PER_MIN:
+        shared = len(by_name[names.get(a) or f"spell {a}"]) / n
+        if shared >= min_users and med / max(duration / 60, 1) <= MAX_CASTS_PER_MIN:
             abilities.append(Ability(a, names.get(a) or f"spell {a}", len(v) / n, med))
     for ab in abilities:
         ab.utility = any(h in ab.name.lower() for h in UTILITY_HINTS)

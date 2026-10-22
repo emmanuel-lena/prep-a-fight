@@ -697,3 +697,11 @@ def test_a_hit_window_a_quarter_press_in_gets_a_time():
     found = [healer.Moment(t, 1000.0, 1.5, "x") for t in (35.0, 230.0, 255.0)]
     c = healer.cooldowns(tl, found, {1: (180.0, 1)})[0]
     assert any(n.startswith("4:15") for n in [*c.near, *c.alt_near])  # a time tied to it, main or habit
+
+
+def test_the_pressers_share_uses_the_keep_tests_base():
+    # Holy Paladin, Nek'zali (round 108): "or 3:49 for 18% (24% of those who press it)" shown past the quarter bar
+    c = healer.Cooldown("Divine Protection", 1, 0.74, 2.0, [229.0], [""], presses=[[229.0]] * 74,
+                        press_lasts=[300.0] * 70 + [200.0] * 4, lasts=[300.0] * 90 + [200.0] * 10)
+    assert healer._pressers(c, 0.18) == " (24% of those who press it)"  # over every kill
+    assert healer._pressers(c, 0.18, 229.0) == " (23% of those who press it)"  # of the kills still going: 70 of 90
