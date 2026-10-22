@@ -1366,9 +1366,9 @@ def _held(c: Cooldown) -> list[float]:
 def _why_not(c: Cooldown, t: float) -> str:
     """An untied mark's reason on hover, as its card gives it (round 75: an outline on a hit's dot read "tied to no
     hit" with no word why)."""
-    reason = (c.why or ("on cooldown" if c.every else "back from cooldown"  # as its chip says it (round 83)
-                        + (" for about half" if t in c.back_half else "") if t in c.back else
-                        "at the pull" if t <= PULL else ""))
+    reason = (c.why or ("at the pull" if t <= PULL else "on cooldown" if c.every else "back from cooldown"  # the
+                        + (" for about half" if t in c.back_half else "") if t in c.back else ""))  # pull's first:
+    # "at the pull", never "on cooldown" (round 92: Avenging Wrath 0:04); "back from cooldown" as its chip (round 83)
     return f": {reason}" if reason else ""
 
 
@@ -1798,8 +1798,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                         if _pct(pp) != _pct(sp) else "")  # bar reads, rounded as the share (r. 76-77)
                                      for n, t, sp, rp, pp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
-                                        + (f"<small>({'all' if sp >= pp - 1e-9 else 'nearly all'} of them press it in "
-                                           "the kill)</small>"  # round 79: "24% of
+                                        + (f"<small>(under a quarter: {'all' if sp >= pp - 1e-9 else 'nearly all'} of "
+                                           "them press it in the kill)</small>"  # round 79: "24% of
                                            if f"{int(pp * 100)}%" == _pct(sp) else  # them too" read as nonsense
                                            f"<small>(under a quarter of those who press it: {int(pp * 100)}%)</small>")
                                         for u in under if len(u) > 4 and u[0] != "back" for n, t, sp, pp in [u[:4]])
@@ -2204,7 +2204,8 @@ def render_sheet(h: HealerPrep) -> str:
     # one definition a line, the term first (round 76: 120 words in one paragraph read as no reference)
     fight.append("<p class='small muted'><b>Tied to a hit:</b> only the lead ties a press to a hit; a button on "
                  "cooldown, cast on another player, used while moving or a trinket says why it is not; a time with no "
-                 "hit named lands on none, or says it is not kept for the hit in whose window it sits.<br><b>A time shown:</b> a quarter of those who press the button share "
+                 "hit named lands on none, or says it is not kept for the hit in whose window it sits (a second button is kept "
+                 "for a hit only when its share is within the noise of the first's).<br><b>A time shown:</b> a quarter of those who press the button share "
                  "it (a first press at the pull: a fifth of the top players).<br><b>A time's share:</b> the top players pressing within 8 s of it (under a quarter of them, also "
                  "of those who press the button).<br><b>A hit's share:</b> for a press the lead names for a hit, the "
                  "top players pressing in that hit's window, 5 s before to 8 s after it starts (a ramp: 8 to 30 s "
@@ -2230,6 +2231,9 @@ def render_sheet(h: HealerPrep) -> str:
         fight.append(f"<h2>Your externals</h2><p class='small muted'>Fewer than half of the top {e(h.spec)}s cast one here: "
                      + ", ".join(f"{e(c.name)} ({c.users:.0%}, {_and([_mmss(t) for t in c.times]) or 'no shared moment'})"
                                  for c in rare_ext) + f".{buff_note}</p>")
+    else:  # none, said (round 92: the Shaman's sheet had no line, the Dig deeper table a "–")
+        fight.append(f"<h2>Your externals</h2><p class='small muted'>The top {e(h.spec)}s cast no long protective "
+                     f"cooldown on another player here.{buff_note}</p>")
     if defs or rare_def:
         fight.append(f"<h2>Your defensives</h2><ul class='hl2'>{cooldowns_html(defs, answered, named)}</ul>{fewer(rare_def)}")
     if items:

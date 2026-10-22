@@ -636,8 +636,12 @@ def render_sheet(p: TankPrep) -> str:
     # the tank's answer here: the swap (the fight tab's lead, its last sentence), else the journal's ask
     # the boss tab's answer: the mechanic the swaps follow (the fight tab says the swaps), else the journal's ask
     # the boss tab says what hits them (the fight tab, when): measured, then the journal below
+    # the three most, and any tied with the third at its shown share (round 92: Dripping Fangs 8% left out beside
+    # Caustic Surge 8%, the mechanic the swaps follow)
+    top3 = [(n, s_) for i, (n, s_) in enumerate(p.hitters) if i < 3 or (len(p.hitters) > 2
+                                                                    and f"{s_:.0%}" == f"{p.hitters[2][1]:.0%}")]
     top_hit = (f"<p class='lead'>What hits the top tanks the most: "
-               f"{_and([f'{e(n)} ({s:.0%})' for n, s in p.hitters[:3]])} of their damage taken.</p>"
+               f"{_and([f'{e(n)} ({s:.0%})' for n, s in top3])} of their damage taken.</p>"
                if p.hitters else journal_lead(p.journal, "tanks"))
     boss = [top_hit, f"<h2>The abilities that hit the top tanks the most</h2><ul class='hl2'>{hit or '<li>Not measured yet.</li>'}</ul>"]
     boss += [f"<p class='small muted'>Taunts stop working with {e(n)} (the Encounter Journal), never reached in the "
@@ -659,7 +663,8 @@ def render_sheet(p: TankPrep) -> str:
                                    for x in sorted(mates, key=lambda x: -x.share)[:3])
                          if mates else "no other tank spec often") + "."
                       + "".join(f" Kills with a {e(x.spec)} beside them are "
-                                f"{abs(int(x.duration_with) - int(x.duration_without))} s "
+                                f"{abs(round(x.duration_with) - round(x.duration_without))} s "  # as the table's rounded
+                                # times (round 92: 29 s beside 4:06 and 4:34)
                                 f"{'shorter' if x.duration_with < x.duration_without else 'longer'}, beyond the noise (a "
                                 f"reading, not a verdict: the raids that bring one differ in other ways too)."
                                 for x in mates if x.kills >= 15 and x.duration_without and not x.duration_close)

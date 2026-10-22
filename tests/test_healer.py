@@ -607,3 +607,9 @@ def test_a_held_habit_of_a_button_on_cooldown_says_it_is_not_kept():
                         alt_of=[5.0], alt_near=["0:35 Soulcoil Rite"], every=97.0,
                         presses=[[37.0]] * 25 + [[5.0]] * 75, n_all=100)
     assert "or 0:37 for 25% &middot; not kept for the 0:35 hit: 25% in its window" in healer.cooldowns_html([c], set())
+
+
+def test_a_first_press_at_the_pull_says_so_on_hover():
+    # Holy Paladin, Nek'zali (round 92): "Avenging Wrath 0:04 (tied to no hit: on cooldown)"
+    c = healer.Cooldown("Avenging Wrath", 1, 1.0, 3.0, [4.0, 126.0], ["", ""], every=122.0)
+    assert healer._why_not(c, 4.0) == ": at the pull" and healer._why_not(c, 126.0) == ": on cooldown"
