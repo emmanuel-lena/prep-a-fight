@@ -468,7 +468,7 @@ def render_sheet(p: TankPrep) -> str:
 
         # each button's presses, for its share in a hit's window (round 48: Spell Reflection "41%" was its moment's,
         # 38% in the 0:35 window, as the healers' leads count)
-        from paf.healer import _tw, hit_share
+        from paf.healer import FEW_SHARE, _tw, hit_share
 
         pressed = {c.name: c for c in defs}
         for n, u, k, ts, _ev, _sps, *rest in p.short_defs:
@@ -489,21 +489,38 @@ def render_sheet(p: TankPrep) -> str:
         def when(a: tuple, hit: Moment) -> str:  # its counted presses' time, as the healers' (round 70: "about
             return _tw(pressed[a[0]], a[1], hit.t) if a[0] in pressed else _mmss(a[1])  # 0:32" for presses at 0:33)
 
+        long_names = {c.name for c in defs}
+        extra: list[tuple] = []  # the long defensives said beside a short one: tied as the lead's answers
+
+        def long_too(a: tuple | None, x: Moment) -> str:  # a short defensive answers: the long one most pressed in
+            if a is None or a[0] in long_names:            # the window said too, a tenth at least and not back
+                return ""                                  # from cooldown (the owner, round 79: Shield Wall 24%
+            best = max(((c.name, t, hs) for c in defs      # beside Spell Reflection on Nek'zali's 0:35)
+                        for t in [*c.times, *c.alt] if -ANSWER[0] <= t - x.t <= ANSWER[1] and t not in c.back
+                        and not (c.why or c.every) for hs in [window(c.name, t, 0.0, x.t)] if hs >= FEW_SHARE),
+                       key=lambda y: y[2], default=None)
+            if best is None:
+                return ""
+            extra.append((*best, x))  # with its hit, for its chip's time
+            return f"; {best[2]:.0%} press {e(best[0])}, a long defensive (about {when(best, x)})"
+
         big = answer(m)  # the biggest moment and its answer first, then the other hits in time order
         lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({_x(m.ratio)}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
-                    + (f"; {big[2]:.0%} of the top {e(p.spec)}s press {e(big[0])} for it (about {when(big, m)})."
-                       if big else _none_for(landed_in(m, defs, named, 'long defensive'))))
+                    + (f"; {big[2]:.0%} of the top {e(p.spec)}s press {e(big[0])} for it (about {when(big, m)})"
+                       f"{long_too(big, m)}." if big else _none_for(landed_in(m, defs, named, 'long defensive'))))
         # the other dots in time order: their most shared press, or one clause for those with none
         pairs = [(x, answer(x)) for x in sorted(p.moments, key=lambda x: x.t) if x is not m]
         def at(x: Moment) -> str:  # each hit with its size, as the biggest moment (round 76: "the 1:35 hit" never
             return f"{_mmss(x.t)} ({_x(x.ratio)}&times;)"  # sized, 1.46x, out of time order after the biggest)
-        said = [f"for the {at(x)} hit, {a[2]:.0%} press {e(a[0])} (about {when(a, x)})" for x, a in pairs if a]
-        answered = {(a[0], a[1]) for a in [big, *(a for _x, a in pairs)] if a}  # the chart draws these full
-        tied.update({(a[0], a[1]): a[2] for a in [big, *(a for _x, a in pairs)] if a})
+        said = [f"for the {at(x)} hit, {a[2]:.0%} press {e(a[0])} (about {when(a, x)}){long_too(a, x)}"
+                for x, a in pairs if a]
+        answered = {(a[0], a[1]) for a in [big, *(a for _x, a in pairs), *extra] if a}  # the chart draws these full
+        tied.update({(a[0], a[1]): a[2] for a in [big, *(a for _x, a in pairs), *extra] if a})
         from paf.healer import _counted
 
-        for a, x in [(big, m), *((a, x) for x, a in pairs)]:  # its chip at its counted presses' time (round 70)
+        for a, x in [(big, m), *((a, x) for x, a in pairs), *((a, a[3]) for a in extra)]:  # its chip at its counted
+            # presses' time (round 70)
             inside = _counted(pressed[a[0]], a[1], x.t) if a and a[0] in pressed else []
             if inside and _mmss(st.median(inside)) != _mmss(a[1]):
                 moved_t[(a[0], a[1])] = st.median(inside)

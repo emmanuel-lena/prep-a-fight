@@ -470,3 +470,38 @@ def test_a_cadence_names_its_group_beside_a_held_habit():
             in out)
     c.alt_near = [""]
     assert "on cooldown, about every 122 s<" in healer.cooldowns_html([c])
+
+
+def test_a_two_step_button_says_its_release_and_what_it_stores():
+    # Preservation Evoker, Vashnik (round 79, the owner): Stasis stored at 3:20, released at 3:36 in the 3:35 window
+    import sqlite3
+
+    from paf.corpus.db import SCHEMA
+
+    store = SimpleNamespace(id=1, name="Stasis (Store)", users=1.0, per_kill=1.0)
+    rel = SimpleNamespace(id=2, name="Stasis (Release)", users=0.9, per_kill=1.0)
+    players = ([{"casts": {1: [200.0], 2: [216.0]}, "duration": 270.0}] * 50
+               + [{"casts": {1: [100.0], 2: [116.0]}, "duration": 270.0}] * 50)
+    tl = SimpleNamespace(abilities=[store, rel], duration=270.0, players=players)
+    c = healer.Cooldown("Stasis (Store)", 1, 1.0, 1.0, [200.0], [""], presses=[[200.0]] * 50, n_all=100)
+    m = healer.Moment(215.0, 1000.0, 1.4, "Caustic Surge")
+    healer.two_step(tl, [c], [m])
+    assert c.release_gap == 16.0 and round(healer.hit_share(c.release, 215.0, 215.0), 2) == 0.5
+    con = sqlite3.connect(":memory:")
+    con.executescript(SCHEMA)
+    con.executemany("INSERT INTO ability VALUES(?, ?)", [(1, "Stasis (Store)"), (2, "Stasis (Release)"),
+                                                          (3, "Dream Breath"), (4, "Temporal Anomaly"), (5, "Hover")])
+    for k in range(4):
+        con.execute("INSERT INTO fight(report, fight_id, encounter_id, difficulty, duration_s, status) "
+                    "VALUES(?, 1, 9, 4, 270, 'done')", (f"r{k}",))
+        con.execute("INSERT INTO ranked(report, fight_id, actor_id, rank_pos) VALUES(?, 1, 5, 1)", (f"r{k}",))
+        for t, ab in [(10, 1), (11, 3), (12, 3 if k else 5), (13, 4), (14, 2)]:
+            con.execute("INSERT INTO player_cast(report, fight_id, actor_id, ability_id, type, t) "
+                        "VALUES(?, 1, 5, ?, 'cast', ?)", (f"r{k}", ab, float(t)))
+    assert healer.stored_spells(con, 9, 4, "Stasis (Store)") == [("Dream Breath", 1.0, 0.75),
+                                                                   ("Temporal Anomaly", 1.0, 0.0),
+                                                                   ("Hover", 0.25, 0.0)]
+    c.stored = healer.stored_spells(con, 9, 4, "Stasis (Store)")
+    out = healer.cooldowns_html([c])
+    assert "released a median 16 s after it is stored: " in out
+    assert "Dream Breath (in 100% of the stores, twice in 75%)" in out

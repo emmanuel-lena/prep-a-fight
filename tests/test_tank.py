@@ -79,3 +79,18 @@ def test_the_journal_says_when_taunts_stop_working(monkeypatch):
     monkeypatch.setattr(bossguide, "describe", lambda sid: text)
     monkeypatch.setattr("paf.mechanics.walk", lambda sections: [(0, s) for s in sections])
     assert tank.taunt_immunity([rage], "heroic") == [("Uncoiled Rage", text)]
+
+
+def test_a_long_defensive_is_said_beside_a_short_one():
+    # Protection Warrior, Nek'zali (round 79, the owner): 38% Spell Reflection for 0:35, Shield Wall's 23% unsaid
+    con = corpus()
+    curve, by, hitters = tank.tank_curves(con, 9, 4, 60.0)
+    found = tank.tank_busters(curve, by)
+    sw = healer.Cooldown("Shield Wall", 871, 0.9, 1.0, [29.0], ["0:30 Crush"], support=[0.23],
+                         presses=[[29.0]] * 23 + [[50.0]] * 67, n_all=100, lasts=[60.0] * 100)
+    sr = [[28.0]] * 38 + [[50.0]] * 52 + [[]] * 10
+    p = tank.TankPrep("Boss", "heroic", "Protection Warrior", 4, 60.0, curve, found, hitters, [sw], [], 0,
+                      [("Shield Block", 0.6)], [], [], [],
+                      short_defs=[("Spell Reflection", 0.9, 1.0, [28.0], [], [0.38], sr, [60.0] * 100)])
+    sheet = tank.render_sheet(p)
+    assert "press Spell Reflection for it (about 0:28); 23% press Shield Wall, a long defensive (about 0:29)" in sheet

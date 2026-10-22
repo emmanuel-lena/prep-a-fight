@@ -94,6 +94,10 @@ class Cooldown:
     press_lasts: list = field(default_factory=list)  # the kill length of each of presses' players, in their order
     rhythms: list = field(default_factory=list)  # (share of the top players, their press times): two groups that
     # press it at different moments all kill long (Disc's Evangelism: 0:04, 1:42, 3:15 or 0:24, 2:07, 3:38)
+    # a button pressed in two steps (Stasis: store, then release, which is when it heals; the owner, round 79)
+    release: Cooldown | None = None  # its release presses, as a cooldown's (its moments, shares and hits)
+    release_gap: float = 0.0  # median seconds from a store to its release
+    stored: list = field(default_factory=list)  # (spell, share of the stores holding it, share holding it twice)
 
 
 @dataclass
@@ -1046,6 +1050,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
            f"for {_and([_mmss((moved or {}).get((c.name, a), a)) for a in _held(c)])} press it again at varying "
            "times</small>" if c.every else
            f"<small class='alt'>{_more(c)} more at varying times</small>" if c.times and _more(c) else "")
+        + _released(c)
         + (f"<small class='alt'>{'mostly ' if c.why.startswith('cast on another') and 0 <= c.on_others < 0.95 else ''}"
            f"{e(c.why)}: not tied to a hit</small>" if c.why and c.times else "")
         + "</span></li>"
@@ -1092,6 +1097,96 @@ def _tw(c: Cooldown, t: float, hit: float) -> str:
     1:13), else its moment's."""
     inside = _counted(c, t, hit) if c.presses else []
     return _mmss(st.median(inside) if inside else t)
+
+
+STORE, RELEASE = " (Store)", " (Release)"  # a two-step button's two casts in the logs (Stasis)
+STORED = 3  # the spells a store holds: "your next 3 helpful spells" (Stasis' tooltip)
+STORED_SHARE = 0.25  # a spell said as stored when a quarter of the stores hold it (Hover, 4-10%, a move between)
+
+
+def two_step(tl, cds: list[Cooldown], found: list[Moment]) -> None:
+    """A button pressed in two steps (Stasis: "(Store)", then "(Release)", which casts what it stored): its release
+    moments and shares, read as a cooldown's (window, kills still going), and how long after the store; what it
+    stores: stored_spells."""
+    from paf.healroles import press_moments
+
+    for c in cds:
+        if not c.name.endswith(STORE):
+            continue
+        rel = {a.id for a in tl.abilities if a.name == c.name[:-len(STORE)] + RELEASE}
+        store = {a.id for a in tl.abilities if a.name == c.name}
+        if not rel:
+            continue
+        per = [sorted(t for i in rel for t in (p["casts"].get(i) or [])) for p in tl.players]
+        lasts = [p.get("duration") or tl.duration for p in tl.players]
+        presses = [ts for ts in per if ts]
+        if not presses:
+            continue
+        k = max(1, round(st.median(len(ts) for ts in presses)))
+        times, _alt, _of = press_moments(presses, k, tl.duration)
+        n_all = max(1, len(tl.players))
+        support = [sum(1 for ts in presses if any(abs(x - t) <= 8 for x in ts)) / n_all for t in times]
+        keep = [i for i, sp in enumerate(support) if sp >= 0.25 * len(presses) / n_all]
+        r = Cooldown(c.name[:-len(STORE)] + RELEASE, min(rel), len(presses) / n_all, st.median(len(ts) for ts in presses),
+                     [times[i] for i in keep], support=[support[i] for i in keep], presses=presses, n_all=n_all,
+                     lasts=lasts, press_lasts=[d for ts, d in zip(per, lasts, strict=False) if ts])
+        r.near = [next((_mmss(m.t) for m in found if -ANSWER[0] <= t - m.t <= ANSWER[1]), "") for t in r.times]
+        r.alt_of = [next((m.t for m in found if -ANSWER[0] <= t - m.t <= ANSWER[1]), -1.0) for t in r.times]  # its hit
+        gaps = []
+        for p in tl.players:
+            st_ts = sorted(t for i in store for t in (p["casts"].get(i) or []))
+            rl_ts = sorted(t for i in rel for t in (p["casts"].get(i) or []))
+            gaps += [g for t in st_ts if (g := next((u - t for u in rl_ts if u > t), None)) is not None]
+        c.release, c.release_gap = r, (st.median(gaps) if gaps else 0.0)
+
+
+def stored_spells(con, encounter_id: int, difficulty: int, store: str) -> list[tuple[str, float, float]]:
+    """The spells a two-step button's store holds: the first STORED cast after each store by the ranked player of
+    each timed kill, from every cast of the log (the timeline keeps its cooldowns only: Temporal Anomaly missing,
+    Naturalize in its place). (spell, share of the stores holding it, share holding it twice), from a quarter."""
+    rows = con.execute(
+        "SELECT p.report, p.fight_id, a.name, p.t FROM player_cast p JOIN fight f USING(report, fight_id) "
+        "JOIN ranked r ON r.report = p.report AND r.fight_id = p.fight_id AND r.actor_id = p.actor_id "
+        "LEFT JOIN ability a ON a.id = p.ability_id WHERE f.encounter_id = ? AND f.difficulty = ? "
+        "AND f.status = 'done' AND p.type = 'cast' ORDER BY p.report, p.fight_id, p.t",
+        (encounter_id, difficulty)).fetchall()
+    base = store[:-len(STORE)]
+    skip = {store, base, base + RELEASE}
+    kills: dict[tuple, list] = {}
+    for rep, fid, name, _t in rows:
+        kills.setdefault((rep, fid), []).append(name or "")
+    held: dict[str, int] = {}
+    twice: dict[str, int] = {}
+    n = 0
+    for names in kills.values():
+        for j, name in enumerate(names):
+            if name != store:
+                continue
+            n += 1
+            nxt = [x for x in names[j + 1:] if x not in skip][:STORED]
+            for x in set(nxt) - {""}:
+                held[x] = held.get(x, 0) + 1
+                twice[x] = twice.get(x, 0) + (nxt.count(x) > 1)
+    return sorted(((x, v / n, twice[x] / n) for x, v in held.items() if v / n >= STORED_SHARE),
+                  key=lambda y: (-y[1], -y[2], y[0]))
+
+
+def _released(c: Cooldown) -> str:
+    """A two-step button's release and what it holds, on its card (Stasis: the store's chips above)."""
+    r = c.release
+    if r is None:
+        return ""
+    chips = ", ".join(f"{_mmss(t)} &middot; {_pct(sp)}"
+                      + (f" (in the window of the {_mmss(h)} hit: {_pct(hs)}{_reach_note(r, h)})"
+                         if h >= 0 and (hs := hit_share(r, t, h)) is not None else "")
+                      for t, sp, h in zip(r.times, r.support, r.alt_of or [-1.0] * len(r.times), strict=False))
+    out = (f"<small class='alt'>released{f' a median {c.release_gap:.0f} s after it is stored' if c.release_gap else ''}"
+           f"{': ' + chips if chips else ', at varying times'}</small>")
+    if c.stored:
+        out += (f"<small class='alt'>what they store (the first {STORED} spells cast after storing): " + ", ".join(
+            f"{e(nm)} (in {_pct(sh)} of the stores" + (f", twice in {_pct(tw)}" if tw >= 0.1 else "") + ")"
+            for nm, sh, tw in c.stored) + "</small>")
+    return out
 
 
 def _held(c: Cooldown) -> list[float]:
@@ -1826,8 +1921,23 @@ def render_sheet(h: HealerPrep) -> str:
         ramps = {n: sorted(kps, key=lambda x: x[1]) for n, kps in ramps.items() if len(kps) > 1}
         merged = {k for kps in ramps.values() for k, _p in kps}
         ramps = {n: [p for _k, p in kps] for n, kps in ramps.items()}
+        # a two-step button's release in a hit no cooldown is kept for: its heal lands there (Stasis, 48% released
+        # in Vashnik's 3:35 window; the owner, round 79)
+        released = []
+        for b in list(bare):
+            m = next(x for x in shown if _mmss(x.t) == b)
+            for c in h.cooldowns:
+                hs = hit_share(c.release, m.t, m.t) if c.release is not None else None
+                if hs is not None and hs >= 0.25:
+                    inside = _counted(c.release, m.t, m.t)
+                    released.append((m.t, f"for the {b} hit, {_pct(hs)} release their {e(_shown(c.name))}"
+                                          f"{_reach_note(c.release, m.t)} (about {_mmss(st.median(inside))}"
+                                          + (f", stored a median {c.release_gap:.0f} s before" if c.release_gap else "")
+                                          + ")"))
+                    bare.remove(b)
+                    break
         answers = [x for _t, x in sorted(
-            [clause(k, ps) for k, ps in by_press.items() if k not in merged]
+            released + [clause(k, ps) for k, ps in by_press.items() if k not in merged]
             + [(ps[0][0], f"{e(_shown(n))} is their ramp ahead of the {_and([_mmss(p[0]) for p in ps])} hits: "
                           + ", ".join(f"{_pct(sp)} about {_tw(c_, t, hit)}" for hit, t, sp, c_ in ps) + _other(ps))
                for n, ps in ramps.items()])]

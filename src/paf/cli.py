@@ -960,6 +960,10 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         healer.cooldowns(tl, found), healer.build_rows(builds),
         healer.trinkets(con, enc.id, diff), bossguide.role_bullets(bossguide.load(enc.id, diff_name), "healer"),
         [(n, t) for n, t, _ in tl.phases], class_name=cls, character=getattr(profile, "name", "") or "")
+    healer.two_step(tl, h.cooldowns, found)  # Stasis: its release and what it stores
+    for c in h.cooldowns:
+        if c.release is not None:
+            c.stored = healer.stored_spells(con, enc.id, diff, c.name)
     h.abilities = _role_journal(enc.id, diff_name, "healer", tl, healer.moment_notes(found))
     h.named_by_damage = bool(by)
     h.raid_kills = healer.raid_kills(con, enc.id, diff, pool=True)
