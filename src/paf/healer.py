@@ -1127,7 +1127,8 @@ def two_step(tl, cds: list[Cooldown], found: list[Moment]) -> None:
         n_all = max(1, len(tl.players))
         support = [sum(1 for ts in presses if any(abs(x - t) <= 8 for x in ts)) / n_all for t in times]
         keep = [i for i, sp in enumerate(support) if sp >= 0.25 * len(presses) / n_all]
-        r = Cooldown(c.name[:-len(STORE)] + RELEASE, min(rel), len(presses) / n_all, st.median(len(ts) for ts in presses),
+        r = Cooldown(c.name[:-len(STORE)] + " release", min(rel),  # its chart lane's name
+                     len(presses) / n_all, st.median(len(ts) for ts in presses),
                      [times[i] for i in keep], support=[support[i] for i in keep], presses=presses, n_all=n_all,
                      lasts=lasts, press_lasts=[d for ts, d in zip(per, lasts, strict=False) if ts])
         r.near = [next((_mmss(m.t) for m in found if -ANSWER[0] <= t - m.t <= ANSWER[1]), "") for t in r.times]
@@ -1177,7 +1178,9 @@ def _released(c: Cooldown) -> str:
     if r is None:
         return ""
     chips = ", ".join(f"{_mmss(t)} &middot; {_pct(sp)}"
-                      + (f" (in the window of the {_mmss(h)} hit: {_pct(hs)}{_reach_note(r, h)})"
+                      + (f" (in the window of the {_mmss(h)} hit: {_pct(hs)}{_reach_note(r, h)}"
+                         + (f", about {_mmss(st.median(inside))}"  # the lead's time (its counted releases')
+                            if (inside := _counted(r, t, h)) and _mmss(st.median(inside)) != _mmss(t) else "") + ")"
                          if h >= 0 and (hs := hit_share(r, t, h)) is not None else "")
                       for t, sp, h in zip(r.times, r.support, r.alt_of or [-1.0] * len(r.times), strict=False))
     out = (f"<small class='alt'>released{f' a median {c.release_gap:.0f} s after it is stored' if c.release_gap else ''}"
@@ -1797,7 +1800,7 @@ def render_sheet(h: HealerPrep) -> str:
     own = [c for c in own if c not in utility]
     heals = [c for c in own if not is_defensive(c.spell_id, c.name) and c not in items]
     defs = [c for c in own if c not in heals and c not in items]
-    lead, lead_names, answered = "", [], set()
+    lead, lead_names, answered, rel_marks = "", [], set(), []
     named: dict = {}  # the press the lead names for each hit kept for none: its chip counts that window too
     moved: dict = {}  # a tied press whose counted presses sit 5 s or more from its moment: drawn and said there
     if h.moments:
@@ -1923,13 +1926,16 @@ def render_sheet(h: HealerPrep) -> str:
         ramps = {n: [p for _k, p in kps] for n, kps in ramps.items()}
         # a two-step button's release in a hit no cooldown is kept for: its heal lands there (Stasis, 48% released
         # in Vashnik's 3:35 window; the owner, round 79)
-        released = []
+        released, rel_marks = [], []
         for b in list(bare):
             m = next(x for x in shown if _mmss(x.t) == b)
             for c in h.cooldowns:
                 hs = hit_share(c.release, m.t, m.t) if c.release is not None else None
                 if hs is not None and hs >= 0.25:
                     inside = _counted(c.release, m.t, m.t)
+                    t_rel = min(c.release.times, key=lambda t: abs(t - m.t), default=None)  # its chart mark, tied
+                    if t_rel is not None and abs(t_rel - m.t) <= ANSWER[1] + SLACK:  # as the lead says (the chart
+                        rel_marks.append((c.release, t_rel, st.median(inside)))  # follows the lead)
                     released.append((m.t, f"for the {b} hit, {_pct(hs)} release their {e(_shown(c.name))}"
                                           f"{_reach_note(c.release, m.t)} (about {_mmss(st.median(inside))}"
                                           + (f", stored a median {c.release_gap:.0f} s before" if c.release_gap else "")
@@ -1962,8 +1968,15 @@ def render_sheet(h: HealerPrep) -> str:
         lead = (f"<p class='lead'>Big raid damage at {hits}.{long}{from_dispel}"
                 + (f" Among the top {e(h.spec)}s, {'; '.join(answers)}." if answers else "")
                 + (f" No cooldown is kept for {bare_said}." if bare else "") + "</p>")
+    drawn = list(heals)  # the chart's lanes: the cards' cooldowns, and a two-step button's release the lead ties
+    for r, t, at in rel_marks:  # (its own lane, a full mark; on the store's card, not a card of its own)
+        drawn = [*drawn, r] if r not in drawn else drawn
+        lead_names = [*lead_names, r.name, r.name[:-len(" release")] + STORE]  # its store's card up with the lead's
+        answered.add((r.name, t))
+        if _mmss(at) != _mmss(t):
+            moved[(r.name, t)] = at
     svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight, and the top players' healing "
-                    "cooldowns", heals, set(lead_names), answered, moved)
+                    "cooldowns", drawn, set(lead_names), answered, moved)
     fight = ([lead] if lead else []) + [
         f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Raid "
         f"damage taken per second, median of the {h.raid_kills or 'top'} kills of this boss whose raid damage is recorded "
