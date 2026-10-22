@@ -925,7 +925,8 @@ def _rest(c: Cooldown, named: dict | None = None) -> float:
         free = [t for t, n in zip(c.times, c.near or [""] * len(c.times), strict=False) if not n] + list(c.alt)
         shown = sum(1 for ts in c.presses if any(abs(x - t) <= 8 for x in ts for t in free)  # 15% read
                     or any(h - ANSWER[0] <= x <= h + ANSWER[1] for x in ts for h in hits))  # "the other 36%")
-        return max(0.0, (len(c.presses) - shown) / c.n_all)
+        return max(0.0, c.users - shown / c.n_all)  # of every player pressing it, as "pressed by" (round 110: a
+        # press past a stage's end, left out of the times, read 52% - 15% as "the other 34%")
     lines = [v[0] for k, v in (named or {}).items() if k[0] == c.name and isinstance(k[1], tuple)]  # its card's own
     return max(0.0, c.users - sum([*(c.support or []), *(c.alt_support or []), *lines]))  # lines too (round 89)
 
