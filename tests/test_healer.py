@@ -705,3 +705,10 @@ def test_the_pressers_share_uses_the_keep_tests_base():
                         press_lasts=[300.0] * 70 + [200.0] * 4, lasts=[300.0] * 90 + [200.0] * 10)
     assert healer._pressers(c, 0.18) == " (24% of those who press it)"  # over every kill
     assert healer._pressers(c, 0.18, 229.0) == " (23% of those who press it)"  # of the kills still going: 70 of 90
+
+
+def test_the_other_share_counts_players_not_shares():
+    # Protection Warrior, Nek'zali (round 109): 52% press Rallying Cry, its chip 15%, "the other 36%"
+    c = healer.Cooldown("Rallying Cry", 1, 0.52, 1.0, [230.0], [""], support=[0.15], n_all=100,
+                        presses=[[230.0]] * 15 + [[120.0]] * 37)
+    assert round(healer._rest(c), 2) == 0.37

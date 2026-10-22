@@ -623,8 +623,10 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         # a hit's window a quarter of those who press it press it in, of the kills reaching its end, with no time of
         # the card there: the window's presses are a time of its own, as the rule says (round 106: Tranquility 26% at
         # Nek'zali's 4:15 refused, its presses spread 4:12-4:23, while Aura Mastery 23% was kept by its time)
-        if tied:
-            for m in found:
+        from paf.defensives import is_defensive
+
+        if tied and not is_defensive(sid, name):  # a personal defensive is never kept for a raid hit: no time added
+            for m in found:  # for one (round 109: Astral Shift's 4:18, admitted by the window, then "not kept")
                 a_, b_ = m.t - ANSWER[0], m.t + ANSWER[1]
                 if any(a_ - SLACK <= t <= b_ + SLACK for t in [*times, *alt]):
                     continue
@@ -881,8 +883,8 @@ def _also_pressers(c: Cooldown, t: float, named: dict | None, n: str, sp: float)
         return _pressers(c, sp, t)                                # Shield Wall "3:52 · 24% · in the window…")
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None and shown == _base(
             c, hs, _secs(n.partition(" ")[0])):
-        return _pressers(c, hs)
-    return ""
+        return _pressers(c, hs, _secs(n.partition(" ")[0]) + ANSWER[1])  # the window's base: its kills reaching the
+    return ""  # window's end (round 109: "24% of those who press it" on a chip the window admitted at 25%)
 
 
 def _users_at(c: Cooldown, t: float | None) -> float:
@@ -913,9 +915,13 @@ def _rest(c: Cooldown, named: dict | None = None) -> float:
     are of different players."""
     if round(c.per_kill) != 1 or c.every or c.why:
         return 0.0
+    if c.presses and c.n_all:  # the players its card shows, counted: shares on different bases did not add up
+        hits = [k[1][1] for k in (named or {}) if k[0] == c.name and isinstance(k[1], tuple)]  # (round 109: 52% -
+        shown = sum(1 for ts in c.presses if any(abs(x - t) <= 8 for x in ts for t in [*c.times, *c.alt])  # 15% read
+                    or any(h - ANSWER[0] <= x <= h + ANSWER[1] for x in ts for h in hits))  # "the other 36%")
+        return max(0.0, (len(c.presses) - shown) / c.n_all)
     lines = [v[0] for k, v in (named or {}).items() if k[0] == c.name and isinstance(k[1], tuple)]  # its card's own
-    return max(0.0, c.users - sum([*(c.support or []), *(c.alt_support or []), *lines]))  # lines too (round 89: the
-    # 20% named in the 0:35 window counted again in "the other 69%")
+    return max(0.0, c.users - sum([*(c.support or []), *(c.alt_support or []), *lines]))  # lines too (round 89)
 
 
 def _more(c: Cooldown, named: dict | None = None) -> str:
@@ -1247,7 +1253,9 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
             f"{_and([_mmss((moved or {}).get((c.name, t), t)) for t in ts[1:]])}" for _sp, ts in c.rhythms)
            + "</small>"
            if c.rhythms else "")
-        + (f"<small class='alt'>on cooldown, about every {c.every:.0f} s</small>" if c.every and not _held(c) else
+        + (f"<small class='alt'>on cooldown, about every {c.every:.0f} s"  # its other presses said too (round 109:
+           + (f"; {_more(c, named)} more at varying times" if c.times and _more(c, named) else "")  # Stasis "3 a
+           + "</small>" if c.every and not _held(c) else  # kill", two chips)
            # a held habit kept (only one for a hit is): the cadence is the other group's (round 79: Avenging Wrath
            # "on cooldown" beside 26% holding it for 0:35, whose later presses vary)
            f"<small class='alt'>on cooldown from {_mmss(c.times[0])}, about every {c.every:.0f} s; those pressing it "
@@ -1263,6 +1271,8 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
            + ("; its players' times differ, so more times than presses" if c.why == MINUTE  # (round 89: 6 chips for
               and len(c.times) > round(c.per_kill) else "")  # Nature's Swiftness "4 a kill")
            + "</small>" if c.why and c.times else "")
+        + ("<small class='alt'>its players' times differ, so more times than presses</small>"  # any button (round
+           if not c.why and len(c.times) > round(c.per_kill) else "")  # 109: Tranquility "2 a kill", three chips)
         + "</span></li>"
         for c in cds)
 
