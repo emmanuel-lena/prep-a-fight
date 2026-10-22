@@ -541,6 +541,15 @@ def render_sheet(p: TankPrep) -> str:
             extra.append((*best, x))  # with its hit, for its chip's time
             return f"; {best[2]:.0%} press {e(best[0])}, a long defensive (about {when(best, x)})"
 
+        def more_back(a: tuple | None, x: Moment) -> str:  # a long defensive pressed there more than the answer,
+            if a is None:                                  # back from cooldown: said, or the lead hides it (round
+                return ""                                  # 111: Rallying Cry 15% named, Shield Wall 23% unsaid)
+            got = max(((c.name, window(c.name, t, 0.0, x.t)) for c in defs for t in [*c.times, *c.alt]
+                       if c.name != a[0] and -ANSWER[0] - 3 <= t - x.t <= ANSWER[1] + 3 and t in c.back),
+                      key=lambda y: y[1], default=None)
+            return (f" ({e(got[0])} {got[1]:.0%} in its window, back from cooldown)" if got and got[1] > a[2]
+                    else "")
+
         big = answer(m)  # the biggest moment and its answer first, then the other hits in time order
         lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({_x(m.ratio)}&times; the "
                     f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
@@ -554,6 +563,7 @@ def render_sheet(p: TankPrep) -> str:
         def at(x: Moment) -> str:  # each hit with its size, as the biggest moment (round 76: "the 1:35 hit" never
             return f"{_mmss(x.t)} ({_x(x.ratio)}&times;)"  # sized, 1.46x, out of time order after the biggest)
         said = [f"for the {at(x)} {noun(x)}, {a[2]:.0%} press {e(a[0])} (about {when(a, x)}){long_too(a, x)}"
+                f"{more_back(a, x)}"
                 for x, a in pairs if a]
         answered = {(a[0], a[1]) for a in [big, *(a for _x, a in pairs), *extra] if a}  # the chart draws these full
         tied.update({(a[0], a[1]): a[2] for a in [big, *(a for _x, a in pairs), *extra] if a})

@@ -719,3 +719,9 @@ def test_a_button_pressed_twice_by_some_says_so():
     c = healer.Cooldown("Ultimate Penitence", 1, 0.97, 1.0, [76.0], [""], n_all=100,
                         presses=[[76.0, 230.0]] * 31 + [[76.0]] * 66)
     assert healer._twice(c) == " (31% press it twice: a player can count in two shares)"
+
+
+def test_a_side_line_gives_each_time_its_share():
+    # Holy Paladin, Nek'zali (round 111): "Divine Steed (71%, about 2:20)" read as 71% at 2:20, 29% press it there
+    c = healer.Cooldown("Divine Steed", 1, 0.71, 2.0, [140.0], [""], support=[0.29])
+    assert healer._times_line(c) == "pressed by 71%; 29% about 2:20"

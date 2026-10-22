@@ -911,6 +911,15 @@ def _share(sp: float) -> str:
     return f" &middot; {_pct(sp)} of the top players" if sp else ""
 
 
+def _times_line(c: Cooldown) -> str:
+    """A side line's button: who presses it, then each time with its own share (round 111: "Divine Steed (71%, about
+    2:20)" read as 71% at 2:20, 29% press it there)."""
+    shares = c.support or [0.0] * len(c.times)
+    times = "; ".join(f"{_pct(sp)} about {_mmss(t)}" if sp else f"about {_mmss(t)}"
+                      for t, sp in zip(c.times, shares, strict=False))
+    return f"pressed by {_pct(c.users)}" + (f"; {times}" if times else ", no shared moment")
+
+
 def _twice(c: Cooldown) -> str:
     """A button pressed once a kill by most, twice by some: said, or its shares add past who presses it (round 110:
     Ultimate Penitence 27 + 20 + 15 + "the other 38%" past its 97%, 31% pressing it twice)."""
@@ -1272,7 +1281,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
            + "</small>"
            if c.rhythms else "")
         + (f"<small class='alt'>on cooldown, about every {c.every:.0f} s"  # its other presses said too (round 109:
-           + (f"; {_more(c, named)} more at varying times" if c.times and _more(c, named) else "")  # Stasis "3 a
+           + (f"; {_more(c, named)} more on that cadence" if c.times and _more(c, named) else "")  # Stasis "3 a
            + "</small>" if c.every and not _held(c) else  # kill", two chips)
            # a held habit kept (only one for a hit is): the cadence is the other group's (round 79: Avenging Wrath
            # "on cooldown" beside 26% holding it for 0:35, whose later presses vary)
@@ -1599,7 +1608,9 @@ def _why_not(c: Cooldown, t: float, found: list | None = None) -> str:
     if m is not None:
         return f": in the {_mmss(m.t)} hit's window, not kept for it"
     m = next((m for m in found or [] if 0 < m.t - ANSWER[0] - t <= RAMP[1]), None)  # just ahead of a hit (round 97:
-    return (f": before the {_mmss(m.t)} hit's window" if m is not None  # Stasis release 1:55, 10 s before the 2:10
+    mostly = m is not None and c.presses and any(m.t - ANSWER[0] <= x <= m.t + ANSWER[1] for ts in c.presses
+                                                 for x in ts if abs(x - t) <= 15)  # some of its presses in it
+    return (f": {'mostly ' if mostly else ''}before the {_mmss(m.t)} hit's window" if m is not None  # Stasis
             else ": away from the big hits")                             # hit's window, read "away")
 
 
@@ -2490,7 +2501,7 @@ def render_sheet(h: HealerPrep) -> str:
     rare_def = [c for c in rare_kept if c not in items and c not in rare_ext and is_defensive(c.spell_id, c.name)]
     if rare:  # a big cooldown the top players skip is information too (Healing Tide Totem: 3 kills in 100)
         fight.append(f"<p class='small muted'>Fewer than half of the top {e(h.spec)}s press "
-                     + ", ".join(f"{e(c.name)} ({c.users:.0%}, {_and([_mmss(t) for t in c.times]) or 'no shared moment'})"
+                     + ", ".join(f"{e(c.name)} ({_times_line(c)})"
                                  for c in rare) + " on this boss.</p>")
     # the rule, once, under the long cooldowns and their "fewer than half" line (Zephyr's read as part of it)
     # one definition a line, the term first (round 76: 120 words in one paragraph read as no reference)
@@ -2513,7 +2524,7 @@ def render_sheet(h: HealerPrep) -> str:
 
     def fewer(cs: list) -> str:
         return (f"<p class='small muted'>Fewer than half of the top {e(h.spec)}s press "
-                + ", ".join(f"{e(c.name)} ({c.users:.0%}, {_and([_mmss(t) for t in c.times]) or 'no shared moment'})"
+                + ", ".join(f"{e(c.name)} ({_times_line(c)})"
                             for c in cs) + ".</p>") if cs else ""
     buffers = [c for c in heals if _external(c.spell_id) == "damage"]  # Power Infusion: a buff on a damage dealer
     buff_note = (f" {_and([e(_shown(c.name)) for c in buffers])}, a buff cast on a damage dealer, is with your long "
@@ -2546,9 +2557,7 @@ def render_sheet(h: HealerPrep) -> str:
         fight.append(f"<h2>Consumables</h2><ul class='hl2'>{cooldowns_html(potions, set())}</ul>")
     if utility:
         fight.append("<p class='small muted'>Also pressed, no healing cooldown: "
-                     + ", ".join(f"{e(_shown(c.name))} ({_pct(c.users)} of the top players, "
-                                 + (f"about {_and([_mmss(t) for t in c.times])}" if c.times else "no shared moment")
-                                 + ")" for c in utility)
+                     + ", ".join(f"{e(_shown(c.name))} ({_times_line(c)})" for c in utility)
                      + ".</p>")
     n_kills = h.own_kills or h.kills  # the healers in this spec's top kills; the pooled numbers say their own
     change = [build_lead(h.builds, h.spec, h.split_players or h.kills, h.split, h.split_wide)]
