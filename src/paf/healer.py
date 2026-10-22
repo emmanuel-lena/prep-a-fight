@@ -909,6 +909,15 @@ def _share(sp: float) -> str:
     return f" &middot; {_pct(sp)} of the top players" if sp else ""
 
 
+def _twice(c: Cooldown) -> str:
+    """A button pressed once a kill by most, twice by some: said, or its shares add past who presses it (round 110:
+    Ultimate Penitence 27 + 20 + 15 + "the other 38%" past its 97%, 31% pressing it twice)."""
+    if not c.presses or not c.n_all:
+        return ""
+    two = sum(1 for ts in c.presses if len(ts) >= 2) / c.n_all
+    return f" ({_pct(two)} press it twice: a player can count in two shares)" if two >= 0.1 else ""
+
+
 def _rest(c: Cooldown, named: dict | None = None) -> float:
     """A button pressed once a kill: the share of the top players its chips leave out (round 87: Ultimate Penitence
     pressed by 97%, its chips 27% and 20%, the other half unsaid). Its players press it once, so the chips' shares
@@ -1269,8 +1278,9 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
            f"at {_and([_mmss((moved or {}).get((c.name, a), a)) for a in _held(c)])} instead press it again at varying "
            "times</small>" if c.every else
            f"<small class='alt'>{_more(c, named)} more at varying times</small>" if c.times and _more(c, named) else
-           f"<small class='alt'>the other {_pct(_rest(c, named))} at varying times</small>"
-           if c.times and _rest(c, named) >= 0.15
+           f"<small class='alt'>the other {_pct(_rest(c, named))} at varying times{_twice(c)}</small>"
+           if (c.times or any(k[0] == c.name and isinstance(k[1], tuple) for k in (named or {})))  # a card with
+           and _rest(c, named) >= 0.15  # only a window line too (round 110: Spirit Link Totem's other 76% unsaid)
            else "")
         + _released(c)
         + (f"<small class='alt'>{'mostly ' if c.why.startswith('cast on another') and 0 <= c.on_others < 0.95 else ''}"
@@ -2513,10 +2523,15 @@ def render_sheet(h: HealerPrep) -> str:
                      f"{cooldowns_html(exts, answered, named)}</ul>{fewer(rare_ext)}"
                      + (f"<p class='small muted'>{buff_note.strip()}</p>" if buff_note else ""))
     elif rare_ext or exts:  # Pain Suppression at 34%: still an external, never filed with the defensives
-        fight.append(f"<h2>Your externals</h2><p class='small muted'>{'Fewer than half of the top ' + e(h.spec) + 's cast one here' if not exts else 'The top ' + e(h.spec) + 's cast these at no shared moment'}: "
-                     + ", ".join(f"{e(c.name)} ({c.users:.0%}" + (f", {_and([_mmss(t) for t in c.times])}" if c.times
-                                                                 else "" if exts else ", no shared moment") + ")"
-                                 for c in [*exts, *rare_ext]) + f".{buff_note}</p>")
+        def named_(cs: list, shared: bool) -> str:
+            return ", ".join(f"{e(c.name)} ({c.users:.0%}" + (f", {_and([_mmss(t) for t in c.times])}" if c.times
+                                                              else "" if shared else ", no shared moment") + ")"
+                             for c in cs)
+        # half or more at no shared moment, then those fewer than half press, each said as such (round 110: Blessing
+        # of Sacrifice 28% listed beside Lay on Hands 66% as if both were staples)
+        parts = ([f"The top {e(h.spec)}s cast these at no shared moment: {named_(exts, True)}"] if exts else []) + (
+            [f"{'fewer' if exts else 'Fewer'} than half of them cast {named_(rare_ext, False)}"] if rare_ext else [])
+        fight.append(f"<h2>Your externals</h2><p class='small muted'>{'; '.join(parts)}.{buff_note}</p>")
     else:  # none, said (round 92: the Shaman's sheet had no line, the Dig deeper table a "–")
         fight.append(f"<h2>Your externals</h2><p class='small muted'>The top {e(h.spec)}s cast no long protective "
                      f"cooldown on another player here.{buff_note}</p>")

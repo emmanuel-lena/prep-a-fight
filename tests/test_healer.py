@@ -712,3 +712,10 @@ def test_the_other_share_counts_players_not_shares():
     c = healer.Cooldown("Rallying Cry", 1, 0.52, 1.0, [230.0], [""], support=[0.15], n_all=100,
                         presses=[[230.0]] * 15 + [[120.0]] * 37)
     assert round(healer._rest(c), 2) == 0.37
+
+
+def test_a_button_pressed_twice_by_some_says_so():
+    # Discipline Priest, Nek'zali (round 110): 27 + 20 + 15 + "the other 38%" past the 97% who press it
+    c = healer.Cooldown("Ultimate Penitence", 1, 0.97, 1.0, [76.0], [""], n_all=100,
+                        presses=[[76.0, 230.0]] * 31 + [[76.0]] * 66)
+    assert healer._twice(c) == " (31% press it twice: a player can count in two shares)"
