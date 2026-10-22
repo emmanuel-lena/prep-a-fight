@@ -96,6 +96,7 @@ class Cooldown:
     # press it at different moments all kill long (Disc's Evangelism: 0:04, 1:42, 3:15 or 0:24, 2:07, 3:38)
     # a button pressed in two steps (Stasis: store, then release, which is when it heals; the owner, round 79)
     pulls: list = field(default_factory=list)  # each press's pull time, parallel to presses (stage time: a gap)
+    twice: float = -1.0  # the share of the top players pressing it twice or more, every cast counted; -1 unread
     release: Cooldown | None = None  # its release presses, as a cooldown's (its moments, shares and hits)
     release_gap: float = 0.0  # median seconds from a store to its release
     stored: list = field(default_factory=list)  # (spell, share of the stores holding it, share holding it twice)
@@ -681,6 +682,7 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
                             back=sorted(x for x in back if x in times or x in alt),
                             rhythms=sorted(two, key=lambda r: r[1][0]) if two and not (every or why) else [],
                             presses=per_player, pulls=pulls, n_all=n_all, back_half=sorted(half),
+                            twice=sum(1 for ts in raw if len(ts) >= 2) / max(1, len(tl.players)),
                             lasts=[p.get("duration") or tl.duration for p in tl.players],
                             press_lasts=pressed_lasts))
     return sorted(out, key=lambda c: -c.users)
@@ -914,7 +916,7 @@ def _twice(c: Cooldown) -> str:
     Ultimate Penitence 27 + 20 + 15 + "the other 38%" past its 97%, 31% pressing it twice)."""
     if not c.presses or not c.n_all:
         return ""
-    two = sum(1 for ts in c.presses if len(ts) >= 2) / c.n_all
+    two = c.twice if c.twice >= 0 else sum(1 for ts in c.presses if len(ts) >= 2) / c.n_all  # every cast (r. 111)
     return f" ({_pct(two)} press it twice: a player can count in two shares)" if two >= 0.1 else ""
 
 
