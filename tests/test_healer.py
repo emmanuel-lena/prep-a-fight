@@ -507,6 +507,7 @@ def test_a_two_step_button_says_its_release_and_what_it_stores():
             "each a median 16 s after its own (nearly all released) &middot; in the window of the 3:35 hit: 50% of the "
             "top players") in out
     assert "and about 0.5 more releases a kill, of stores made at other times" in out  # the 1:40 stores
+    assert "in the 3:35 hit's window, from any store: 50% of the top players, a median 16 s after storing" in out
     # a store never released before the next store is not paired with the next one's release (round 83)
     tl.players = [{"casts": {1: [100.0, 200.0], 2: [216.0]}, "duration": 270.0}] * 4
     healer.two_step(tl, [c], [m])
@@ -651,5 +652,6 @@ def test_a_quarter_not_kept_names_the_button_kept():
     # Mistweaver Monk, Nek'zali (round 95): Conduit "not kept for the 0:35 hit: 25%" beside the note's quarter bar
     named = {(healer.KEPT, 35.0): ("Revival / Restoral", 0.38)}
     assert (healer._not_kept(35.0, 0.25, named)
-            == " &middot; not kept for the 0:35 hit: 25% in its window, under Revival / Restoral's 38%")
+            == " &middot; not kept for the 0:35 hit: 25% in its window, under Revival / Restoral's 38% of the top "
+            "players")
     assert healer._not_kept(35.0, 0.16, named) == " &middot; not kept for the 0:35 hit: 16% in its window"

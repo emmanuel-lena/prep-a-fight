@@ -592,7 +592,7 @@ def render_sheet(p: TankPrep) -> str:
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + [
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the ranked tank "
         f"of each top kill takes per second, median of {p.damage_kills or 'the'} kills (read on up to 40 of the top kills; "
-        f"that tank alone, so a swap moves it up or down); under it, the defensives the lead ties to a hit (an "
+        f"that tank alone, so a swap moves it up or down; past the median kill, fewer kills are still going); under it, the defensives the lead ties to a hit (an "
         f"outline: another press of the same button) and the swaps. A dot is one of the tanks' three biggest "
         f"moments of damage, whatever casts it: only the three highest are dotted, another as high may be left out.</p><ul class='hl2'>"
         f"{moments_html(p.moments, 'tank damage') or '<li>No big moment: steady damage.</li>'}</ul></div>",

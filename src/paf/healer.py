@@ -778,7 +778,7 @@ KEPT = "\x00kept"  # a key of `named` no button has: (KEPT, hit) -> (the button 
 def _not_kept(hit: float, hs: float, named: dict | None) -> str:
     """"not kept for the X hit: N% in its window", with the lead's button when N reaches the quarter bar."""
     kept = (named or {}).get((KEPT, hit))
-    why = (f", under {e(kept[0])}'s {_pct(kept[1])}" if kept and hs >= 0.25 else "")
+    why = (f", under {e(kept[0])}'s {_pct(kept[1])} of the top players" if kept and hs >= 0.25 else "")
     return f" &middot; not kept for the {_mmss(hit)} hit: {_pct(hs)} in its window{why}"
 
 
@@ -1369,6 +1369,15 @@ def _released(c: Cooldown) -> str:
                 + (f" ({_pct(never)} of those stores never released)" if never >= 0.05 else " (nearly all released)")
                 + win + "</span>")
     chips = "".join(chip(g, by[g]) for g in groups)
+    # each hit the lead answers with the release: its count of any store, as the lead says it (round 97: the lead's
+    # 51% and 13 s found nowhere on the card, its chips 40% and 15 s from one store)
+    for h in c.hits:
+        hs = hit_share(r, h, h)
+        inside = _counted(r, h, h)
+        if hs is not None and hs >= 0.25 and inside:
+            chips += (f"<small class='alt'>in the {_mmss(h)} hit's window, from any store: {_pct(hs)} of the top "
+                      f"players{_reach_note(r, h)}"
+                      + (f", a median {gap:.0f} s after storing" if (gap := _gap_of(c, inside)) else "") + "</small>")
     rest = [u for _s, u in other if u is not None]
     if chips and rest:
         chips += (f"<small class='alt'>and about {len(rest) / n:.1f} more releases a kill, of stores made at other "
@@ -1852,7 +1861,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                         if _pct(pp) != _pct(sp) else "")  # bar reads, rounded as the share (r. 76-77)
                                      for n, t, sp, rp, pp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
-                                        + ("<small>(under a quarter, also of those who press it: "
+                                        + (f"<small>(under a quarter, also {int(pp * 100)}% of those who press it: "
                                            + ("all" if sp >= pp - 1e-9 else "nearly all") + " press it in the kill)</small>"  # round 79: "24% of
                                            if f"{int(pp * 100)}%" == _pct(sp) else  # them too" read as nonsense
                                            f"<small>(under a quarter of those who press it: {int(pp * 100)}%)</small>")
@@ -2276,7 +2285,8 @@ def render_sheet(h: HealerPrep) -> str:
     fight = ([lead] if lead else []) + [
         f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Raid "
         f"damage taken per second, median of the {h.raid_kills or 'top'} kills of this boss whose raid damage is recorded "
-        f"(up to 40 for each spec read: every healer sheet shows the same hits); "
+        f"(up to 40 for each spec read: every healer sheet shows the same hits; past the median kill, fewer kills are "
+        f"still going); "
         + ("under it, the cooldowns the lead ties to a hit (an outline: another press of the same button). " if lead_names
            else "no cooldown is kept for these hits, so none is drawn. ")
         + "A dot is a big moment, "
