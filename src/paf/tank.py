@@ -33,6 +33,7 @@ from paf.healer import (
     Moment,
     _and,
     _mmss,
+    _pct,
     moment_names,
 )
 from paf.theme import diff_pill
@@ -431,6 +432,10 @@ def render_sheet(p: TankPrep) -> str:
             m = next((m for m in p.moments if (n, t) in answered and -ANSWER[0] <= t - m.t <= ANSWER[1]), None)
             return f"{_mmss(m.t)} hit" if m else ""
 
+        def _of_pressers(x: float, u: float) -> str:  # under a quarter, also of those who press it (round 89)
+            return (f" ({_pct(min(1.0, x / u))} of those who press it)"
+                    if x and x < 0.25 and u and _pct(x / u) != _pct(x) else "")
+
         def why(n: str, t: float) -> str:  # untied in a hit's window: the reason said (round 88: Spell Reflection at
             if hit_of(n, t):                # 2:59, in the 2:55 melee hit's window, with no word why)
                 return ""
@@ -446,7 +451,8 @@ def render_sheet(p: TankPrep) -> str:
             f"<li><b>{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top players"
             + (f" &middot; on cooldown, about every {ev:.0f} s" if ev else "") + "</small>"
             + ("<span class='when'>" + "".join(f"<span class='chip'>{_chip(moved_t.get((n, t), t), hit_of(n, t))}"
-                                               f"{_share(tied.get((n, t), sp) if hit_of(n, t) else sp)}{why(n, t)}</span>"
+                                               f"{_share(x := tied.get((n, t), sp) if hit_of(n, t) else sp)}"
+                                               f"{_of_pressers(x, u)}{why(n, t)}</span>"
                                                for t, sp in zip(ts, sps, strict=False)) + "</span>" if ts else "")
             + "</li>" for n, u, k, ts, ev, sps, *_rest in p.short_defs)
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]

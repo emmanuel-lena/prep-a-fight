@@ -772,6 +772,20 @@ def _shown(name: str) -> str:
     return re.sub(r"\s*\([^)]*\)$", "", name) or name
 
 
+def _also_pressers(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
+    """A chip's share under a quarter, also of those who press the button: the moment's, or a tied chip's hit share
+    (round 89: Shield Wall "0:34 · 1 s before the 0:35 hit · 23%" said none)."""
+    shown = _named(c, t, named, n, sp)
+    if "of those who press it" in shown:
+        return ""
+    if shown == _share(sp):
+        return _pressers(c, sp)
+    if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None and shown == _base(
+            c, hs, _secs(n.partition(" ")[0])):
+        return _pressers(c, hs)
+    return ""
+
+
 def _pressers(c: Cooldown, sp: float) -> str:
     """Under a quarter of all the top players, the share of those who press the button, the one the quarter rule
     reads (round 83: "Shield Wall 2:57 · 15%" read as under the rule; 25% of the 60% who press it)."""
@@ -785,13 +799,15 @@ def _share(sp: float) -> str:
     return f" &middot; {_pct(sp)} of the top players" if sp else ""
 
 
-def _rest(c: Cooldown) -> float:
+def _rest(c: Cooldown, named: dict | None = None) -> float:
     """A button pressed once a kill: the share of the top players its chips leave out (round 87: Ultimate Penitence
     pressed by 97%, its chips 27% and 20%, the other half unsaid). Its players press it once, so the chips' shares
     are of different players."""
     if round(c.per_kill) != 1 or c.every or c.why:
         return 0.0
-    return max(0.0, c.users - sum([*(c.support or []), *(c.alt_support or [])]))
+    lines = [v[0] for k, v in (named or {}).items() if k[0] == c.name and isinstance(k[1], tuple)]  # its card's own
+    return max(0.0, c.users - sum([*(c.support or []), *(c.alt_support or []), *lines]))  # lines too (round 89: the
+    # 20% named in the 0:35 window counted again in "the other 69%")
 
 
 def _more(c: Cooldown) -> str:
@@ -1053,7 +1069,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
            ", all on another player" if c.on_others >= 0.95 else "") + "</small>"
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip((moved or {}).get((c.name, t), _named_at(c, t, named, sp)), tie(c, t, n))}"
                                         + _split(_named(c, t, named, tie(c, t, n), sp))[0]
-                                        + (_pressers(c, sp) if _named(c, t, named, tie(c, t, n), sp) == _share(sp) else "")
+                                        + _also_pressers(c, t, named, tie(c, t, n), sp)
 
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
                                            if t in c.back and not (c.why or c.every)  # its line says it; its
@@ -1082,11 +1098,15 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
            f"for {_and([_mmss((moved or {}).get((c.name, a), a)) for a in _held(c)])} press it again at varying "
            "times</small>" if c.every else
            f"<small class='alt'>{_more(c)} more at varying times</small>" if c.times and _more(c) else
-           f"<small class='alt'>the other {_pct(_rest(c))} at varying times</small>" if c.times and _rest(c) >= 0.15
+           f"<small class='alt'>the other {_pct(_rest(c, named))} at varying times</small>"
+           if c.times and _rest(c, named) >= 0.15
            else "")
         + _released(c)
         + (f"<small class='alt'>{'mostly ' if c.why.startswith('cast on another') and 0 <= c.on_others < 0.95 else ''}"
-           f"{e(c.why)}: not tied to a hit</small>" if c.why and c.times else "")
+           f"{e(c.why)}: not tied to a hit"
+           + ("; its players' times differ, so more times than presses" if c.why == MINUTE  # (round 89: 6 chips for
+              and len(c.times) > round(c.per_kill) else "")  # Nature's Swiftness "4 a kill")
+           + "</small>" if c.why and c.times else "")
         + "</span></li>"
         for c in cds)
 
@@ -1294,7 +1314,8 @@ def _released(c: Cooldown) -> str:
                    f"{_reach_note(r, h)}")
         return (f"<span class='chip'>{_about(us)} &middot; {_pct(len(us) / n)} of the top players &middot; from the "
                 f"{_mmss(g)} store, each a median {gap:.0f} s after its own"
-                + (f" ({_pct(never)} of those stores never released)" if never >= 0.05 else "") + win + "</span>")
+                + (f" ({_pct(never)} of those stores never released)" if never >= 0.05 else " (nearly all released)")
+                + win + "</span>")
     chips = "".join(chip(g, by[g]) for g in groups)
     rest = [u for _s, u in other if u is not None]
     if chips and rest:
@@ -1622,8 +1643,9 @@ NOT_ADVICE = " Their choices, not a recommendation: no sim weighs them."
 def split_html(split: list, players: int, spec: str, wide: bool = False) -> str:
     """The talents the top players split on, with how often each is picked: what the builds above hide. wide: none
     or one is taken by 35 to 65% of them (Holy Paladin, Holy Priest), so the talents they differ on most, 15 to 85%."""
-    return ((f"<h2>The talents the top {e(spec)}s differ on most</h2><p>{'Almost no talent' if any(0.35 <= x <= 0.65 for _n, x in split) else 'No talent'} splits them near "
-             f"half; these are the ones 15 to 85% of the {players} players read take, closest to half first:</p>" if wide else
+    return ((f"<h2>The talents the top {e(spec)}s differ on most</h2><p>{(f'Only {e(near[0])} splits' if (near := [n for n, x in split if 0.35 <= x <= 0.65]) else 'No talent splits')} "
+             f"them near half; {'the others listed are' if near else 'these are'} the ones 15 to 85% of the "
+             f"{players} players read take, closest to half first:</p>" if wide else
              f"<h2>The talents the top {e(spec)}s split on</h2><p>The share of the {players} players read "
              "who take each, closest to half first:</p>") + "<ul class='hl2 split'>"
             + "".join(f"<li><b>{e(n)}</b><small>{s:.0%}</small></li>" if s >= 0 else
@@ -1751,8 +1773,9 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                         if _pct(pp) != _pct(sp) else "")  # bar reads, rounded as the share (r. 76-77)
                                      for n, t, sp, rp, pp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
-                                        + (f"<small>({'all' if sp >= pp - 1e-9 else 'nearly all'} {e(r.spec)}s press it "
-                                           "in the kill, under a quarter in this window)</small>"  # round 79: "24% of
+                                        + (f"<small>(under a quarter of those who press it: {int(pp * 100)}%; "
+                                           f"{'all' if sp >= pp - 1e-9 else 'nearly all'} {e(r.spec)}s press it in "
+                                           "the kill)</small>"  # round 79: "24% of
                                            if f"{int(pp * 100)}%" == _pct(sp) else  # them too" read as nonsense
                                            f"<small>(under a quarter of those who press it: {int(pp * 100)}%)</small>")
                                         for u in under if len(u) > 4 and u[0] != "back" for n, t, sp, pp in [u[:4]])
@@ -2089,6 +2112,7 @@ def render_sheet(h: HealerPrep) -> str:
                     if t_rel is not None and abs(t_rel - m.t) <= ANSWER[1] + SLACK:  # as the lead says (the chart
                         rel_marks.append((c.release, t_rel, _center(inside)))  # follows the lead)
                     released.append((m.t, f"for the {b} hit, {_pct(hs)} release their {e(_shown(c.name))}"
+                                          " (of any store)"
                                           f"{_reach_note(c.release, m.t)} (about {_about(inside)}"
                                           + (f", stored a median {gap:.0f} s before"  # these releases' own
                                              if (gap := _gap_of(c, inside)) else "")  # stores (round 83: 16 s for 13)
@@ -2157,7 +2181,7 @@ def render_sheet(h: HealerPrep) -> str:
     fight.append("<p class='small muted'><b>Tied to a hit:</b> only the lead ties a press to a hit; a button on "
                  "cooldown, cast on another player, used while moving or a trinket says why it is not; a time with no "
                  "hit named lands on none.<br><b>A time shown:</b> a quarter of those who press the button share "
-                 "it.<br><b>A time's share:</b> the top players pressing within 8 s of it (under a quarter of them, also "
+                 "it (a first press at the pull: a fifth of the top players).<br><b>A time's share:</b> the top players pressing within 8 s of it (under a quarter of them, also "
                  "of those who press the button).<br><b>A hit's share:</b> for a press the lead names for a hit, the "
                  "top players pressing in that hit's window, 5 s before to 8 s after it starts (a ramp: 8 to 30 s "
                  "ahead).<br><b>\"or\":</b> the time other "

@@ -504,7 +504,8 @@ def test_a_two_step_button_says_its_release_and_what_it_stores():
     c.stored = healer.stored_spells(con, 9, 4, "Stasis (Store)")
     out = healer.cooldowns_html([c])
     assert ("released:</small><span class='chip'>3:36 &middot; 50% of the top players &middot; from the 3:20 store, "
-            "each a median 16 s after its own &middot; in the window of the 3:35 hit: 50% of the top players") in out
+            "each a median 16 s after its own (nearly all released) &middot; in the window of the 3:35 hit: 50% of the "
+            "top players") in out
     assert "and about 0.5 more releases a kill, of stores made at other times" in out  # the 1:40 stores
     # a store never released before the next store is not paired with the next one's release (round 83)
     tl.players = [{"casts": {1: [100.0, 200.0], 2: [216.0]}, "duration": 270.0}] * 4
@@ -572,3 +573,14 @@ def test_a_once_a_kill_button_says_the_rest_of_its_presses():
     c = healer.Cooldown("Ultimate Penitence", 1, 0.97, 1.0, [75.0], ["1:15 Soulcoil Rite"], alt=[36.0],
                         support=[0.27], alt_support=[0.2], alt_of=[75.0])
     assert "the other 50% at varying times" in healer.cooldowns_html([c])
+
+
+def test_the_rest_leaves_out_a_named_line_and_a_tied_chip_gives_its_pressers():
+    # Discipline Priest, Nek'zali (round 89): "the other 69%" counted the 20% named in the 0:35 window again
+    c = healer.Cooldown("Ultimate Penitence", 1, 0.97, 1.0, [76.0], [""], support=[0.27])
+    named = {("Ultimate Penitence", ("line", 35.0)): (0.2, "0:37", "", "")}
+    assert round(healer._rest(c, named), 2) == 0.5
+    # Protection Warrior, Nek'zali: "0:34 · 1 s before the 0:35 hit · 23%" without the pressers' share
+    sw = healer.Cooldown("Shield Wall", 1, 0.77, 2.0, [34.0], ["0:35 Soulcoil Rite"], support=[0.23],
+                         presses=[[34.0]] * 23 + [[100.0]] * 54, n_all=100)
+    assert healer._also_pressers(sw, 34.0, {}, "0:35 Soulcoil Rite", 0.23) == " (30% of those who press it)"
