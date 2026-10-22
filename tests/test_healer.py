@@ -664,3 +664,12 @@ def test_a_late_time_share_says_the_kills_still_going():
     assert healer._still(c, 100.0) == ""
     c.lasts = [300.0] * 99 + [200.0]  # one kill ended: the share reads the same over all, nothing said (round 99)
     assert healer._still(c, 232.0, 0.25) == "" and healer._still(c, 232.0) == ", in the 99 kills still going"
+
+
+def test_the_pull_group_a_card_shows_is_drawn():
+    # Holy Priest, Nek'zali (round 99): Divine Hymn's 0:05 pull group on the card and in the lead, not on the chart
+    c = healer.Cooldown("Divine Hymn", 1, 1.0, 2.0, [36.0], ["0:35 Soulcoil Rite"],
+                        presses=[[5.0, 75.0]] * 23 + [[36.0, 75.0]] * 77, n_all=100)
+    found = [healer.Moment(35.0, 1000.0, 1.6, "Soulcoil Rite")]
+    svg = healer.curve_svg([100.0] * 60, found, [], "x", [c], {"Divine Hymn"}, {("Divine Hymn", 36.0)})
+    assert "Divine Hymn 0:05 (tied to no hit: at the pull)" in svg

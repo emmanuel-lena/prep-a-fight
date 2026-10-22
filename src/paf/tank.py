@@ -528,9 +528,12 @@ def render_sheet(p: TankPrep) -> str:
                        f"{long_too(big, m)}." if big else _none_for(landed_in(m, defs, named, 'long defensive'))))
         # the other dots in time order: their most shared press, or one clause for those with none
         pairs = [(x, answer(x)) for x in sorted(p.moments, key=lambda x: x.t) if x is not m]
+        def noun(x: Moment) -> str:  # under 1.5x a moment, not a hit (round 99: "hits" then "not set hits")
+            return "hit" if x.ratio >= 1.5 else "moment"
+
         def at(x: Moment) -> str:  # each hit with its size, as the biggest moment (round 76: "the 1:35 hit" never
             return f"{_mmss(x.t)} ({_x(x.ratio)}&times;)"  # sized, 1.46x, out of time order after the biggest)
-        said = [f"for the {at(x)} hit, {a[2]:.0%} press {e(a[0])} (about {when(a, x)}){long_too(a, x)}"
+        said = [f"for the {at(x)} {noun(x)}, {a[2]:.0%} press {e(a[0])} (about {when(a, x)}){long_too(a, x)}"
                 for x, a in pairs if a]
         answered = {(a[0], a[1]) for a in [big, *(a for _x, a in pairs), *extra] if a}  # the chart draws these full
         tied.update({(a[0], a[1]): a[2] for a in [big, *(a for _x, a in pairs), *extra] if a})
@@ -544,15 +547,16 @@ def render_sheet(p: TankPrep) -> str:
         notes = [(x, landed_in(x, defs, named, 'long defensive')) for x, a in pairs if not a]
         none = " (no long defensive of theirs pressed by a tenth of them in it)"
         quiet = [x for x, n in notes if n == none]  # the same aside once, for every such hit (round 62)
-        bare = [f"the {at(x)} hit{n}" for x, n in notes if n != none]
+        bare = [f"the {at(x)} {noun(x)}{n}" for x, n in notes if n != none]
         if said:
             lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 0:35 hit, 41% press Spell Reflection"
         first_none = not big and "no long defensive" in lead[0]
-        hits = f"the {_and([at(x) for x in quiet])} hit{'s' if len(quiet) > 1 else ''}"
+        hits = (f"the {_and([at(x) for x in quiet])} {noun(quiet[0]) if quiet else 'hit'}"
+                f"{'s' if len(quiet) > 1 else ''}")
         if quiet and first_none:  # "nor": the biggest moment said the same, in one sentence (round 65)
             lead[0] = lead[0].rstrip(".") + f", nor in {hits}."  # (rounds 91, 96: "it" read across the clause)
         elif quiet:  # the pattern of every other hit, in one sentence with them (round 68)
-            bare = [f"the {at(x)} hit{none}" for x in quiet] + bare
+            bare = [f"the {at(x)} {noun(x)}{none}" for x in quiet] + bare
         up = [(n, u) for n, u in p.mitigation if u >= 0.5][:2]  # what they do have, measured: their active
         if first_none and up:  # mitigation's uptime (round 86: the biggest hit's answer was a negative alone)
             lead[0] = lead[0].rstrip(".") + ("; instead, their active mitigation is up most of the kill: "
@@ -562,7 +566,7 @@ def render_sheet(p: TankPrep) -> str:
         low = [x for x in sorted(p.moments, key=lambda x: x.t) if x.ratio < 1.5]  # the healers' rule said (round 98:
         if low:                                                                  # 1.45x "hits" with no word)
             lead.append(f"The {_and([_mmss(x.t) for x in low])} {'moments stay' if len(low) > 1 else 'moment stays'} "
-                        "under 1.5&times; the usual damage: they are among the tanks' three highest, not set hits.")
+                        "under 1.5&times; the usual damage: they are among the tanks' three highest.")
         # a hit that comes with a swap (Vashnik's 1:35 and 2:55, after Dripping Fangs): the time is the link
         with_swap = [(x, w) for x in p.moments for w in p.swaps if abs(w - x.t) <= ANSWER[0]]
         # said only when swaps are rare enough for it to mean something: one every 28 s (Vashnik) lands within 5 s

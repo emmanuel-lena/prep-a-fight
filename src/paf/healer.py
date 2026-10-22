@@ -750,7 +750,8 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
                   f"width='8' height='13' rx='2' "
                   f"class='cp{'' if t in tied else ' off'}'><title>{e(c.name)} {_mmss((moved or {}).get((c.name, t), t))}"
                   f"{'' if t in tied else ' (tied to no hit' + _why_not(c, t, found) + ')'}</title></rect>"
-                  for t in sorted([*c.times, *c.alt]) if t <= span  # in time order (round 84)
+                  for t in sorted([*c.times, *c.alt, *[pt for pt in [_pull_t(c)] if pt is not None]])
+                  if t <= span  # in time order (round 84), the pull group the card shows too (round 99)
                   for tied in [{a for a in [*c.times, *c.alt] if (c.name, a) in answered} if answered is not None
                                else {a for a, n in [*zip(c.times, c.near, strict=False),
                                                     *zip(c.alt, c.alt_near or [""] * len(c.alt), strict=False)] if n}])
@@ -1197,14 +1198,23 @@ def _still(c: Cooldown, t: float, sp: float | None = None) -> str:
 def _pull_chip(c: Cooldown) -> str:
     """The pull group the lead names for a first press ("23% open with it at the pull"), on its card too (rounds 54,
     60: the lead quoted a group no chip showed), when no moment of the card is already at the pull."""
-    if (not c.presses or not c.n_all or any(x <= PULL for x in [*c.times, *c.alt]) or round(c.per_kill) > 2
-            or round(c.per_kill) - len(c.times) <= 0):  # a press the card does not show already (not Ascendance's
-        return ""                                          # 0:05 beside its 0:35 and 3:45, 2 a kill)
-    first = [ts[0] for ts in c.presses if ts and ts[0] <= PULL]
-    if len(first) < 0.2 * c.n_all:
+    # a press the card does not show already (not Ascendance's 0:05 beside its 0:35 and 3:45, 2 a kill): _pull_t
+    t = _pull_t(c)
+    if t is None:
         return ""
-    return (f"<span class='chip'>{_mmss(st.median(first))} &middot; {_pct(len(first) / c.n_all)} of the top "
+    first = [ts[0] for ts in c.presses if ts and ts[0] <= PULL]
+    return (f"<span class='chip'>{_mmss(t)} &middot; {_pct(len(first) / c.n_all)} of the top "
             "players, at the pull</span>")
+
+
+def _pull_t(c: Cooldown) -> float | None:
+    """The pull group's time when its card shows it (_pull_chip), else None: the chart draws it too (round 99: Divine
+    Hymn's 0:05 group named in the lead, on its card, and missing from the chart)."""
+    if (not c.presses or not c.n_all or any(x <= PULL for x in [*c.times, *c.alt]) or round(c.per_kill) > 2
+            or round(c.per_kill) - len(c.times) <= 0):
+        return None
+    first = [ts[0] for ts in c.presses if ts and ts[0] <= PULL]
+    return st.median(first) if len(first) >= 0.2 * c.n_all else None
 
 
 def _groups(xs: list[float]) -> list[list[float]]:
@@ -1377,7 +1387,12 @@ def _released(c: Cooldown) -> str:
         h = max(c.hits, key=inwin, default=None)
         win = ""
         if h is not None and inwin(h) / reach(r, h) >= 0.1:
-            win = (f" &middot; in the window of the {_mmss(h)} hit: {_pct(inwin(h) / reach(r, h))} of the top "
+            at = st.median(us)  # the chip's own time outside the window: those who release there said apart (round
+            out = "" if h - ANSWER[0] <= at <= h + ANSWER[1] else (" release it later," if at < h else  # 99: "1:50 to
+                                                                    " release it earlier,")  # 2:04" read in 2:10)
+            win = (f" &middot; {_pct(inwin(h) / reach(r, h))} of the top players{_reach_note(r, h)}{out} in the "
+                   f"window of the {_mmss(h)} hit" if out else
+                   f" &middot; in the window of the {_mmss(h)} hit: {_pct(inwin(h) / reach(r, h))} of the top "
                    f"players{_reach_note(r, h)}")
         return (f"<span class='chip'>{_about(us)} &middot; {_pct(len(us) / n)} of the top players &middot; from the "
                 f"{_mmss(g)} store, each a median {gap:.0f} s after its own"
@@ -1389,7 +1404,7 @@ def _released(c: Cooldown) -> str:
     for h in c.hits:
         hs = hit_share(r, h, h)
         inside = _counted(r, h, h)
-        if hs is not None and hs >= 0.25 and inside:
+        if hs is not None and hs >= 0.1 and inside:  # from a tenth, as the chips (round 99: 19% in 0:40 unsaid)
             chips += (f"<small class='alt'>in the {_mmss(h)} hit's window, from any store: {_pct(hs)} of the top "
                       f"players{_reach_note(r, h)}"
                       + (f", a median {gap:.0f} s after storing" if (gap := _gap_of(c, inside)) else "") + "</small>")
@@ -2350,8 +2365,9 @@ def render_sheet(h: HealerPrep) -> str:
                      f"{cooldowns_html(exts, answered, named)}</ul>{fewer(rare_ext)}"
                      + (f"<p class='small muted'>{buff_note.strip()}</p>" if buff_note else ""))
     elif rare_ext or exts:  # Pain Suppression at 34%: still an external, never filed with the defensives
-        fight.append(f"<h2>Your externals</h2><p class='small muted'>{'Fewer than half of the top ' + e(h.spec) + 's cast one here' if not exts else 'The top ' + e(h.spec) + 's cast one at no shared moment'}: "
-                     + ", ".join(f"{e(c.name)} ({c.users:.0%}, {_and([_mmss(t) for t in c.times]) or 'no shared moment'})"
+        fight.append(f"<h2>Your externals</h2><p class='small muted'>{'Fewer than half of the top ' + e(h.spec) + 's cast one here' if not exts else 'The top ' + e(h.spec) + 's cast these at no shared moment'}: "
+                     + ", ".join(f"{e(c.name)} ({c.users:.0%}" + (f", {_and([_mmss(t) for t in c.times])}" if c.times
+                                                                 else "" if exts else ", no shared moment") + ")"
                                  for c in [*exts, *rare_ext]) + f".{buff_note}</p>")
     else:  # none, said (round 92: the Shaman's sheet had no line, the Dig deeper table a "–")
         fight.append(f"<h2>Your externals</h2><p class='small muted'>The top {e(h.spec)}s cast no long protective "
