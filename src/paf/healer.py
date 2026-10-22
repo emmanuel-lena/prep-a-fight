@@ -100,6 +100,7 @@ class Cooldown:
     stored: list = field(default_factory=list)  # (spell, share of the stores holding it, share holding it twice)
     release_pairs: list = field(default_factory=list)  # (each release, seconds after its own store)
     unreleased: float = 0.0  # the share of stores with no release before the next store
+    fates: list = field(default_factory=list)  # (each store, its release or None)
 
 
 @dataclass
@@ -1040,6 +1041,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip((moved or {}).get((c.name, t), _named_at(c, t, named, sp)), tie(c, t, n))}"
                                         + _split(_named(c, t, named, tie(c, t, n), sp))[0]
                                         + (_pressers(c, sp) if _named(c, t, named, tie(c, t, n), sp) == _share(sp) else "")
+                                        + (_fate(c, t) if c.fates else "")
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
                                            if t in c.back and not (c.why or c.every)  # its line says it; its
                                            and "back from cooldown" not in _split(_named(c, t, named, tie(c, t, n), sp))[1]
@@ -1190,7 +1192,7 @@ def two_step(tl, cds: list[Cooldown], found: list[Moment]) -> None:
         r.alt_of = [next((m.t for m in found if -ANSWER[0] <= t - m.t <= ANSWER[1]), -1.0) for t in r.times]  # its hit
         # each store paired with its own release, before the next store (round 83: a store never released was
         # paired with the next one's, ~100 s later: 19 s for 18); each release keeps its store's gap, for a hit's
-        pairs, unreleased, stores = [], 0, 0
+        pairs, unreleased, stores, fates = [], 0, 0, []
         for p in tl.players:
             st_ts = sorted(t for i in store for t in (p["casts"].get(i) or []))
             rl_ts = sorted(t for i in rel for t in (p["casts"].get(i) or []))
@@ -1198,12 +1200,13 @@ def two_step(tl, cds: list[Cooldown], found: list[Moment]) -> None:
                 stores += 1
                 nxt = st_ts[j + 1] if j + 1 < len(st_ts) else float("inf")
                 u = next((u for u in rl_ts if t < u <= nxt), None)
+                fates.append((t, u))
                 if u is None:
                     unreleased += 1
                 else:
                     pairs.append((u, u - t))
         c.release, c.release_gap = r, (st.median(g for _u, g in pairs) if pairs else 0.0)
-        c.release_pairs, c.unreleased = pairs, (unreleased / stores if stores else 0.0)
+        c.release_pairs, c.unreleased, c.fates = pairs, (unreleased / stores if stores else 0.0), fates
 
 
 def stored_spells(con, encounter_id: int, difficulty: int, store: str) -> list[tuple[str, float, float]]:
@@ -1237,6 +1240,18 @@ def stored_spells(con, encounter_id: int, difficulty: int, store: str) -> list[t
                   key=lambda y: (-y[1], -y[2], y[0]))
 
 
+def _fate(c: Cooldown, t: float) -> str:
+    """Where a store chip's stores go: their release's median time, and the share never released (round 85: what
+    the 64% storing at 1:41 do with it was unreadable)."""
+    near = [u for s, u in c.fates if abs(s - t) <= 8]
+    if not near:
+        return ""
+    out = [u for u in near if u is not None]
+    never = 1 - len(out) / len(near)
+    return ((f" &middot; released about {_about(out)}" if out else "")
+            + (f" ({_pct(never)} never)" if out and never >= 0.05 else "" if out else " &middot; never released"))
+
+
 def _gap_of(c: Cooldown, inside: list[float]) -> float:
     """The median store-to-release gap of the releases counted in a window."""
     got = set(inside)
@@ -1249,10 +1264,11 @@ def _released(c: Cooldown) -> str:
     r = c.release
     if r is None:
         return ""
-    def held(t: float) -> str:  # each release's own gap from its store (round 84: the pull's held ~20 s, the
-        gap = _gap_of(c, [x for ts in r.presses for x in ts if abs(x - t) <= 8])  # others ~14 s, one median 15)
+    def held(t: float, h: float) -> str:  # each release's own gap from its store (round 84: the pull's held ~20
+        near = (_counted(r, t, h) if h >= 0 else []) or [x for ts in r.presses for x in ts if abs(x - t) <= 8]
+        gap = _gap_of(c, near)  # s, the others ~14 s); a hit's: its window's releases, as the lead (round 85)
         return f" &middot; stored {gap:.0f} s before" if gap else ""
-    chips = "".join(f"<span class='chip'>{_mmss(t)} &middot; {_pct(sp)} of the top players{held(t)}"
+    chips = "".join(f"<span class='chip'>{_mmss(t)} &middot; {_pct(sp)} of the top players{held(t, h)}"
                     + (f" &middot; in the window of the {_mmss(h)} hit:{_base(r, hs, h).replace(' &middot;', '')}"
                        + (f", about {_about(inside)}"  # the lead's time (its counted releases')
                           if (inside := _counted(r, t, h)) and _about(inside) != _mmss(t) else "")
@@ -1641,7 +1657,8 @@ def _minute(name: str) -> bool:
         return False
 
 
-def _in_hit(n: str, ts: list, rest: list, h: float, bar: bool = True, back_ok: bool = False) -> tuple | None:
+def _in_hit(n: str, ts: list, rest: list, h: float, bar: bool = True, back_ok: bool = False,
+            ramps: bool = True) -> tuple | None:
     """(button, time, share) of a spec's healers pressing it in a hit's answer window, as the fight tab counts a tied
     press: over the window, not within 8 s of a moment's peak (the Evokers' Rewind for Nek'zali's 1:15: 26% in the
     window, 20% around its 1:13 peak, so "none shared"; round 40). Kept when a quarter of those who press it are
@@ -1649,7 +1666,7 @@ def _in_hit(n: str, ts: list, rest: list, h: float, bar: bool = True, back_ok: b
     if len(rest) < 2:  # no presses carried: its moments
         return next(((n, t, sp) for t, sp, back in ts if -ANSWER[0] <= t - h <= ANSWER[1] and not back), None)
     ps, total, cd, *sid = rest[1]
-    ramp = bool(sid) and _ramp_kind(sid[0])  # a ramp lands its hit 8 to 30 s ahead, as the fight tab reads it
+    ramp = ramps and bool(sid) and _ramp_kind(sid[0])  # a ramp lands its hit 8 to 30 s ahead, as the fight tab
     a, b = (h - RAMP[1], h - RAMP[0]) if ramp else (h - ANSWER[0], h + ANSWER[1])  # (Disc's Evangelism: round 44)
     if ramp:  # the pull's opener is no ramp for the first hit (Evangelism 0:00-0:09 read "0:08 (a ramp)" for 0:35)
         a = max(a, PULL)
@@ -1676,17 +1693,23 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             out += (f"<li><b>{e(r.spec)}</b><small>{getattr(r, 'own_players', 0)} healers: too few in these kills "
                     "to read its casts</small></li>")
             continue
+        # a ramp as the fight tab reads one: its players press it 8 to 30 s ahead of two hits at least (a quarter
+        # of those who press it each time), not every spell its game data could make one (round 85: Tip the Scales
+        # "3:14 (a ramp)" for Vashnik's 3:35, never one on the Evoker's own sheet)
+        ramp_of = {n: sum(1 for h in hits if (g := _in_hit(n, ts, rest, h)) and len(g) > 4 and g[4]) >= 2
+                   for n, _k, ts, *rest in r.cd_names}
+        left = next((n for n, *_x in r.cd_names if n.endswith(STORE)), "")  # its store, said where none is shared
         per_hit = []
         for h in hits:
             got = [(*g[:3], g[4] if len(g) > 4 else False, g[3] if len(g) > 4 else g[2])
                    for n, _k, ts, *rest in r.cd_names if not _unread(n)
-                   for g in [_in_hit(n, ts, rest, h)] if g]
+                   for g in [_in_hit(n, ts, rest, h, ramps=ramp_of[n])] if g]
             under = [] if got else sorted((g for n, _k, ts, *rest in r.cd_names if not _unread(n)  # none at the bar:
-                                           for g in [_in_hit(n, ts, rest, h, bar=False)] if g and g[2] >= 0.1),
+                                           for g in [_in_hit(n, ts, rest, h, bar=False, ramps=ramp_of[n])] if g and g[2] >= 0.1),
                                           key=lambda x: -x[2])[:1]  # its most pressed, said so (round 41: "none
             held = [] if got or under else sorted(  # none held for it: its presses there come back from cooldown,
                 (g for n, _k, ts, *rest in r.cd_names if not _unread(n)  # said, not "none shared" (round 69:
-                 for g in [_in_hit(n, ts, rest, h, bar=False, back_ok=True)] if g and g[2] >= 0.1),  # Conduit 25%)
+                 for g in [_in_hit(n, ts, rest, h, bar=False, back_ok=True, ramps=ramp_of[n])] if g and g[2] >= 0.1),  # Conduit 25%)
                 key=lambda x: -x[2])[:1]
             under = under or [("back", *g) for g in held]
             per_hit.append((h, sorted(got, key=lambda x: -x[2])[:2], under))  # shared" read as "nothing pressed")
@@ -1703,7 +1726,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                         for u in under if len(u) > 4 and u[0] != "back" for n, t, sp, pp in [u[:4]])
                            or "".join(f"none held for it <small>({e(_shown(u[1]))} {_mmss(u[2])} &middot; {_pct(u[3])}, "
                                       "back from cooldown)</small>" for u in under if u[0] == "back")
-                           or "none shared") + "</span>"
+                           or "none shared" + (f" <small>({e(_shown(left))} left out)</small>" if left else ""))
+                        + "</span>"
                         for h, got, under in per_hit)
         n = getattr(r, "own_players", 0)  # under 100: a few players' habit, said (Disc: 43; round 46)
         out += (f"<li><b>{e(r.spec)}</b>" + (f"<small>{n} healers{', few players' if n < 100 else ''}</small>" if n else "")
@@ -1713,7 +1737,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
     # one definition a line, as the fight tab's (round 77)
     return ("<h2>The other healers' cooldowns on the big hits</h2>"
             f"<ul class='hl2'>{out}</ul><p class='small muted'>From the same kills as the table, every player of each "
-            "spec (that spec's own sheet reads its top players, so its times can differ).<br><b>A hit's "
+            "spec (that spec's own sheet reads its top players, so its times, and whether a press counts for a "
+            "hit, can differ).<br><b>A hit's "
             "window:</b> 5 s before to 8 s after it starts; a ramp button, as Evangelism, 8 to 30 s "
             "ahead, never the pull's opener before 0:12.<br><b>A button shown:</b> a quarter of the spec's healers who "
             "press it do so in the window; its share is of all that spec's healers, then of those who press it when "
@@ -1792,8 +1817,9 @@ def nums_note(roles: list, own: str = "") -> str:
                        "and beyond chance. With two bosses read, a job may be a habit of the spec rather than of this "
                        "boss."),
              ("A spike", f"5 s at 1.5 times the kill's median damage{spikes}, counted kill by kill: the fight tab's "
-                         "median curve smooths most of them away. A spec whose share of healing in them is above "
-                         "that heals harder in spikes than the rest of the time."),  # round 79: 24% against what
+                         "median curve smooths most of them away. Every spec heals more in them than the rest of "
+                         "the time; a spec heals harder in spikes than the others when its share is higher, and the "
+                         "jobs above say when the gap is beyond chance."),  # round 85: a yardstick every spec passed
              ("The shares", "from different kills, so they do not add up; externals and overheal follow each kit.")]
     method = ("Externals and buffs: a mean over every player of the spec (not only the top ones the fight tab "
               "reads), on others only. Jobs: paired within each kill, Benjamini-Hochberg at 5% over every spec and "
@@ -2183,8 +2209,9 @@ def render_sheet(h: HealerPrep) -> str:
             stages = stages.replace(f"<b>{e(name)}</b>", f"<b>{e(name)}</b> <small class=\"muted\">(the top "
                                     f"{e(h.spec)}s dispel it {k:.1f} times a kill)</small>", 1)
         boss.append(f"<h2>Every ability{', phase by phase' if '<h3>' in stages else ''}</h2>"  # Vashnik: one phase
-                    f"<p class='small muted'>The times are the boss's casts in the {h.kills} top {e(h.spec)} kills "
-                    f"(median {_mmss(h.duration)}): a slower or faster raid sees the later ones shift.</p>"
+                    f"<p class='small muted'>The times and stage starts are the boss's in the {h.kills} top "
+                    f"{e(h.spec)} kills (median {_mmss(h.duration)}): a slower or faster raid sees the later ones "
+                    f"shift, and another spec's sheet, read on its own kills, can say other times.</p>"
                     f"<div class='stages'>{stages}</div>")
     # every spec the pool reads (paf.healroles.POOL_PLAYERS): the Disc Priest, 3 in a Holy Priest's kills, has 43
     # in the pool; its casts unread here are said so in its cells

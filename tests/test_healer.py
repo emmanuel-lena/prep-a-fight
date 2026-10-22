@@ -536,3 +536,20 @@ def test_a_share_under_a_quarter_gives_the_pressers_share():
     assert healer._pressers(c, 0.3) == ""
     c.release_pairs = [(216.0, 13.0), (217.0, 12.0), (130.0, 30.0)]  # a hit's releases: their own stores' gap
     assert healer._gap_of(c, [216.0, 217.0]) == 12.5
+
+
+def test_a_ramp_on_the_other_healers_lines_is_one_its_players_play(monkeypatch):
+    # Vashnik (round 85): Tip the Scales "3:14 (a ramp)" for the 3:35 hit, a spell mod no Evoker plays as a ramp
+    monkeypatch.setattr(healer, "_ramp_kind", lambda sid: True)
+    ps = [[194.0]] * 15 + [[60.0]] * 70 + [[]] * 15
+    ev = SimpleNamespace(spec="Preservation Evoker", raid_cds=1, own_players=150,
+                         cd_names=[("Tip the Scales", 1, [], 0.85, (ps, 100, 120.0, 370553))])
+    found = [healer.Moment(t, 1000.0, 1.4, "Caustic Surge") for t in (40.0, 130.0, 215.0)]
+    assert "(a ramp)" not in healer.roles_more([ev], found=found)
+
+
+def test_a_store_chip_says_where_its_stores_go():
+    # Preservation Evoker, Vashnik (round 85): what the 64% storing Stasis at 1:41 do with it
+    c = healer.Cooldown("Stasis (Store)", 1, 1.0, 3.0, [101.0], [""])
+    c.fates = [(101.0, 116.0)] * 8 + [(101.0, None)] * 2
+    assert healer._fate(c, 101.0) == " &middot; released about 1:56 (20% never)"
