@@ -794,10 +794,19 @@ def _per_s(v: float) -> str:
     return f"{v / 1e6:.1f}M/s" if v >= 1e6 else f"{v / 1e3:.0f}k/s"
 
 
-def moments_html(found: list[Moment], what: str) -> str:
-    """what: kept for the callers; a moment no boss cast explains shows its time only."""
+def moments_html(found: list[Moment], what: str, phases: list | None = None) -> str:
+    """what: kept for the callers; a moment no boss cast explains shows its time only; in a later stage, its time
+    from that stage's start, the one a raider reads on their own kill (round 103: 3:50 is Stage Two +0:52)."""
     return "".join(f"<li><b>{_mmss(m.t)}</b><span>{e(m.boss_spell) if m.boss_spell else ''}</span>"
-                   f"<small>{_x(m.ratio)}&times; the usual damage</small></li>" for m in found)
+                   f"<small>{_x(m.ratio)}&times; the usual damage"
+                   + (f" &middot; {e(tag)}" if (tag := _stage_tag(m.t, phases)) else "") + "</small></li>"
+                   for m in found)
+
+
+def _stage_tag(t: float, phases: list | None) -> str:
+    """"Stage Two +0:52": a time's place in the stage it falls in, after the first one (stage time)."""
+    cur = max(((n, s) for n, s, *_r in phases or [] if 0 < s <= t), key=lambda x: x[1], default=None)
+    return f"{cur[0].split(':')[0]} +{_mmss(t - cur[1])}" if cur else ""
 
 
 def _shown(name: str) -> str:
@@ -1047,6 +1056,8 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
                                         or _external(c.spell_id) == "damage" or is_defensive(c.spell_id, c.name)
                                         or not (c.ramp or any([*c.near, *(c.alt_near or [])]) or _raid(c.spell_id)))
            for hs in [hit_share(c, m.t, m.t)] if hs and FEW_SHARE <= hs]  # (a raid kind by the game data
+    few += [(hs, c.release) for c in cds if c.release is not None  # a two-step button's release competes too: its
+            for hs in [hit_share(c.release, m.t, m.t)] if hs and FEW_SHARE <= hs]  # heal (round 103: Stasis 24%)
     # counts too: Spirit Link Totem, 17% in Vashnik's 2:10, timing varies elsewhere; round 58)
 
     def said(c: Cooldown, hs: float, reason: str) -> str:  # one wording for every hit kept for none (round 58),
@@ -1056,8 +1067,11 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
             b = _back_in(c, m.t, m.t)  # before its card line keeps it (round 69)
             reason = ("" if b is None or b <= BACK_SHARE[0] else "back from cooldown"
                       + (" for about half" if b <= BACK_SHARE[1] else ""))
-        if hs >= 0.25 and not reason:  # a quarter or more, yet no time of theirs shared there (round 102: Tranquility
-            reason = "no time they share is near it"  # 26% at Nek'zali's 4:15 refused with no word), on its card too
+        if hs >= 0.25 and not reason and c.presses:  # a quarter or more in the window, refused: its time's share
+            k = sum(1 for ts in c.presses if any(abs(x - when) <= 8 for x in ts))  # said, the rule's (round 103: "no
+            if k < 0.25 * len(c.presses):  # time they share is near it" read false for presses at 4:17 to 4:21), on
+                reason = (f"its {_mmss(when)} is shared by {_pct(k / len(c.presses))} of those who press it, under a "
+                          "quarter")  # its card too; said only when it is so
         near_t = min([*c.times, *c.alt], key=lambda x: abs(x - when), default=None)
         if named is not None and near_t is not None and abs(near_t - when) <= 15:
             named[(c.name, near_t)] = m.t
@@ -1066,7 +1080,9 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
                                               reason)  # "timing varies" under the
             # lead's 2:12), its reason too (round 69: Apotheosis "back from cooldown")
         few_ = "only " if hs < 0.25 else ""
-        return (f" ({few_}{_pct(hs)} press {e(_shown(c.name))} in its window{_reach_note(c, m.t)}, about "
+        verb = (f"release a {e(c.name[:-len(' release')])}, whichever store it was," if c.name.endswith(" release")
+                else f"press {e(_shown(c.name))}")
+        return (f" ({few_}{_pct(hs)} {verb} in its window{_reach_note(c, m.t)}, about "
                 f"{_mmss(when)}{', ' + reason if reason else ''})")
     best_near = max((x[0] for x in near), default=0.0)
     rhythm_only = all(x[1].why == MINUTE or x[1].every for x in near)
@@ -1077,7 +1093,9 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
     no_raid = not any((_raid(x[1].spell_id) and not is_defensive(x[1].spell_id, x[1].name)) or x[1].ramp
                       for x in near)  # a personal defensive is no raid cooldown, whatever its game data's kind
     if few and (not near or (best_near < 0.25 and rhythm_only and max(h for h, _c in few) >= best_near - 0.03)
-                or (no_raid and max(h for h, _c in few) >= best_near)):
+                or (no_raid and max(h for h, _c in few) >= best_near)
+                or max(h for h, _c in few) > best_near + 0.03):  # clearly more pressed (round 103: a Stasis release
+        # 24% under a Rewind 19% back from cooldown)
         hs, c = max(few, key=lambda x: x[0])
         return said(c, hs, "")
     if not near:
@@ -1224,7 +1242,7 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
         tag = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"
                + (" for about half" if b <= BACK_SHARE[1] else ""))
         if _pct(hs) == _pct(sp):  # one count: said once, at the lead's time, the chip's own (round 78: "2:59 ·
-            return f"{_base(c, hs, hit)}{_pressers(c, sp)} &middot; {where} the {_mmss(hit)} hit: the same players"  # 15% … about
+            return f"{_base(c, hs, hit)}{_pressers(c, sp)} &middot; {where} the {_mmss(hit)} hit: the same {_pct(hs)}"  # 15% …
             # 2:57", two times); under a quarter, of those who press it too (round 84)
         return (f"{_share(sp)}{_still(c, t, sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
                 + (f", about {_about(inside)}" if inside and _about(inside) != _mmss(t) else "") + tag)  # the lead's time (round 67)
@@ -2383,7 +2401,7 @@ def render_sheet(h: HealerPrep) -> str:
         + ("named after what does most of the raid's damage there"
            if h.named_by_damage else "named after the boss cast just before it (&quot;after X&quot;: 8 to 30 s "
            "before, matched by timing)") + f".</p><ul class='hl2'>"
-        f"{moments_html(h.moments, 'raid damage') or '<li>No big moment: steady raid damage.</li>'}</ul></div>",
+        f"{moments_html(h.moments, 'raid damage', h.phases) or '<li>No big moment: steady raid damage.</li>'}</ul></div>",
         f"<h2>Your long cooldowns, where the top {e(h.spec)}s press them</h2><ul class='hl2'>"
         f"{cooldowns_html(sorted((c for c in heals if _external(c.spell_id) != 'protective'), key=_rank(lead_names)), answered, named, moved) or '<li>Not enough top players in the corpus yet.</li>'}</ul>"]
     rare_kept = [c for c in h.rare if c not in utility]

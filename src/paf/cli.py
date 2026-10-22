@@ -770,9 +770,13 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     if not tl.kills:
         print(f"No kill of {enc.name} {diff_name} for {spec} {cls} yet.")
         return 1
+    # a late stage's tank hits and presses lined up on its start (round 100), at this corpus' own stage starts: the
+    # tank curve and swaps are its kills' (round 103: Stage Two at 2:58, every corpus', for its tanks' 2:36)
+    from pathlib import Path
+
     from paf import stagetime
 
-    clk = stagetime.clock(enc.id, diff)  # a late stage's tank hits and presses lined up on its start (round 100)
+    clk = stagetime.clock(enc.id, diff, [Path(con.execute("PRAGMA database_list").fetchone()[2])])
     tls = stagetime.warp(tl, clk)
     curve, by, hitters = tank.tank_curves(con, enc.id, diff, max(tl.duration, tls.duration), clock=clk)
     found = tank.tank_busters(curve, by, top=3)  # its three biggest: five "biggest moments" lost the point
