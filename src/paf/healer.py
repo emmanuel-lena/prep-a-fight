@@ -1696,7 +1696,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
         # a ramp as the fight tab reads one: its players press it 8 to 30 s ahead of two hits at least (a quarter
         # of those who press it each time), not every spell its game data could make one (round 85: Tip the Scales
         # "3:14 (a ramp)" for Vashnik's 3:35, never one on the Evoker's own sheet)
-        ramp_of = {n: sum(1 for h in hits if (g := _in_hit(n, ts, rest, h)) and len(g) > 4 and g[4]) >= 2
+        ramp_of = {n: sum(1 for h in hits if (g := _in_hit(n, ts, rest, h, back_ok=True)) and len(g) > 4 and g[4]) >= 2
                    for n, _k, ts, *rest in r.cd_names}
         left = next((n for n, *_x in r.cd_names if n.endswith(STORE)), "")  # its store, said where none is shared
         per_hit = []

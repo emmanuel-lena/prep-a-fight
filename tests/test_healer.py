@@ -553,3 +553,14 @@ def test_a_store_chip_says_where_its_stores_go():
     c = healer.Cooldown("Stasis (Store)", 1, 1.0, 3.0, [101.0], [""])
     c.fates = [(101.0, 116.0)] * 8 + [(101.0, None)] * 2
     assert healer._fate(c, 101.0) == " &middot; released about 1:56 (20% never)"
+
+
+def test_a_ramp_played_back_from_cooldown_stays_a_ramp(monkeypatch):
+    # Discipline Priest, Vashnik (round 86): Evangelism ahead of 2:10 and 3:35, the 3:35 one back from cooldown, lost
+    # its ramp when the check dropped presses back from cooldown
+    monkeypatch.setattr(healer, "_ramp_kind", lambda sid: True)
+    ps = [[109.0, 194.0]] * 40 + [[60.0]] * 60
+    di = SimpleNamespace(spec="Discipline Priest", raid_cds=1, own_players=100,
+                         cd_names=[("Evangelism", 1, [], 1.0, (ps, 100, 90.0, 472433))])
+    found = [healer.Moment(t, 1000.0, 1.4, "Caustic Surge") for t in (40.0, 130.0, 215.0)]
+    assert "the 2:10 hit: Evangelism 1:49 (a ramp)" in healer.roles_more([di], found=found)
