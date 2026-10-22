@@ -784,6 +784,15 @@ def _share(sp: float) -> str:
     return f" &middot; {_pct(sp)} of the top players" if sp else ""
 
 
+def _rest(c: Cooldown) -> float:
+    """A button pressed once a kill: the share of the top players its chips leave out (round 87: Ultimate Penitence
+    pressed by 97%, its chips 27% and 20%, the other half unsaid). Its players press it once, so the chips' shares
+    are of different players."""
+    if round(c.per_kill) != 1 or c.every or c.why:
+        return 0.0
+    return max(0.0, c.users - sum([*(c.support or []), *(c.alt_support or [])]))
+
+
 def _more(c: Cooldown) -> str:
     """The casts a kill no shared moment shows ("+1"): the count always matches the "a kill" number."""
     n = round(c.per_kill) - len(c.times)  # the pull chip is the first press's other habit, not another press
@@ -1071,7 +1080,9 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
            f"<small class='alt'>on cooldown from {_mmss(c.times[0])}, about every {c.every:.0f} s; those holding it "
            f"for {_and([_mmss((moved or {}).get((c.name, a), a)) for a in _held(c)])} press it again at varying "
            "times</small>" if c.every else
-           f"<small class='alt'>{_more(c)} more at varying times</small>" if c.times and _more(c) else "")
+           f"<small class='alt'>{_more(c)} more at varying times</small>" if c.times and _more(c) else
+           f"<small class='alt'>the other {_pct(_rest(c))} at varying times</small>" if c.times and _rest(c) >= 0.15
+           else "")
         + _released(c)
         + (f"<small class='alt'>{'mostly ' if c.why.startswith('cast on another') and 0 <= c.on_others < 0.95 else ''}"
            f"{e(c.why)}: not tied to a hit</small>" if c.why and c.times else "")
@@ -1276,7 +1287,8 @@ def _released(c: Cooldown) -> str:
         at = st.median(u - g for u, g in c.release_pairs if u in got)  # "3:49 · stored 20 s before" from 3:29,
         chip = min([*c.times, *c.alt], key=lambda x: abs(x - at), default=None)  # no chip there)
         where = f"the {_mmss(chip)}" if chip is not None and abs(chip - at) <= 8 else f"a store about {_mmss(at)}"
-        return f" &middot; from {where}{' store' if where.startswith('the') else ''}, {gap:.0f} s before"
+        return (f" &middot; from {where}{' store' if where.startswith('the') else ''}, each a median {gap:.0f} s "
+                "after its own")  # a median of each press's gap, not the chips' (round 87: 21 s for 0:03 to 0:26)
     chips = "".join(f"<span class='chip'>{_mmss(t)} &middot; {_pct(sp)} of the top players{held(t, h)}"
                     + (f" &middot; in the window of the {_mmss(h)} hit:{_base(r, hs, h).replace(' &middot;', '')}"
                        + (f", about {_about(inside)}"  # the lead's time (its counted releases')
@@ -1285,7 +1297,8 @@ def _released(c: Cooldown) -> str:
                     for t, sp, h in zip(r.times, r.support, r.alt_of or [-1.0] * len(r.times), strict=False))
     gap = "" if chips else f", a median {c.release_gap:.0f} s after its store" if c.release_gap else ""
     never = f"; {_pct(c.unreleased)} of the stores are never released" if c.unreleased >= 0.05 else ""
-    out = (f"<span class='subrow'><small class='alt'>released{gap}{never}:</small>{chips}</span>" if chips else
+    out = (f"<span class='subrow'><small class='alt'>released{gap}{never.replace('; ', ' (', 1) + ')' if never else ''}"
+           f":</small>{chips}</span>" if chips else
            f"<small class='alt'>released{gap} at varying times{never}</small>")  # as chips, as the store's (r. 83)
     if c.stored:
         out += (f"<small class='alt'>what they store (the first {STORED} spells cast after storing): " + ", ".join(
@@ -1348,7 +1361,8 @@ def _chip(t: float, n: str) -> str:
         return _mmss(t)
     hit = n.partition(" ")[0]
     m, _, sec = hit.partition(":")
-    gap = int(t) - (int(m) * 60 + int(sec))  # from the seconds shown: "0:42 · 2 s into the 0:40 hit"
+    gap = int(round(t)) - (int(m) * 60 + int(sec))  # from the seconds shown, rounded as they are (round 87: "0:40 ·
+    # 1 s before the 0:40 hit" after the times were rounded and the gap not)
     # said with its offset from the hit's start: "4 s into" its 5 s window, "3 s before", "2 s after" it
     return _mmss(t) + (f" &middot; as the {e(hit)} hit starts" if gap == 0 else  # one form, from its start (a hit
                        f" &middot; {-gap} s before the {e(hit)} hit" if gap < 0 else  # is a 5 s window: "6 s into"
@@ -1519,7 +1533,7 @@ def contested(con, encounter_id: int, difficulty: int, spec: str, lo: float = 0.
     for sides in by_node.values():
         sides.sort(key=lambda x: -x[1])
         rest = 1 - sum(x for _n, x in sides)  # a choice node left empty, said (round 84: Bloodborne 48% /
-        none = f" ({rest:.0%} take neither)" if len(sides) > 1 and round(rest * 100) >= 3 else ""  # Sudden Death 43%)
+        none = f" ({rest:.0%} take neither)" if len(sides) > 1 and round(rest * 100) >= 1 else ""  # Sudden Death 43%)
         split.append((" / ".join(f"{n} {s:.0%}" for n, s in sides) + none if len(sides) > 1 else sides[0][0],
                       sides[0][1] if len(sides) == 1 else -1.0, sides[0][1]))
     # a pair says its own shares (-1 in the second place) and sorts by its first side, as a single talent by its
@@ -1565,8 +1579,13 @@ def _many(split: list, wide: bool = True) -> str:
         lo, hi = SPLIT if wide else (0.35, 0.65)  # paf.healer.contested's default band, else the wide one
         return (f"their builds differ by many small choices, each taken by under {lo:.0%} or over "
                 f"{hi:.0%} of them, except {e(split[0][0])}")
+    def said(n: str) -> str:  # a choice node is one choice: "the choice of Wild Charge or Tiger Dash", never
+        if " / " not in n:     # joined to the list's "and" (round 87: "Rake and Wild Charge 61% / Tiger Dash 39%")
+            return n
+        sides = [re.sub(r" [0-9]+%.*$", "", x) for x in n.split(" / ")]
+        return "the choice of " + " or ".join(sides)
     return (f"their builds differ by many small choices, {'the most split' if wide else 'the closest to 50/50'} "
-            "being " + e(_and([n for n, _s in split[:4]])))  # none near 50/50 in the wide list (round 44)
+            "being " + e(_and([said(n) for n, _s in split[:4]])))  # none near 50/50 in the wide list (round 44)
 
 
 def build_lead(builds: list, spec: str, players: int, split: list | None = None, wide: bool = True) -> str:

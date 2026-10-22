@@ -600,6 +600,9 @@ def render_sheet(p: TankPrep) -> str:
                                                           f"</li></ul>" if swap else "")
         + (f"<p class='small muted'>About {extra} more swaps a kill come at varying times.</p>"
            if swap and (extra := round(2 * p.taunts_per_kill) - len(p.swaps)) > 0 else "")
+        # the rule said (round 87: a swap tied on Nek'zali, none on Vashnik's swap every 28 s, with no word why)
+        + ("<p class='small muted'>The lead ties a swap to a hit only when swaps are rare enough not to land within "
+           "5 s of it by chance one time in three or more.</p>" if swap else "")
         + "".join(f"<p><b>Taunts stop working with {e(n)}:</b> {e(t)} <span class='muted'>(The Encounter Journal; "
                   + (f"never reached in the {k} top kills read" if not hit and k else
                      f"reached in {hit} of the {k} top kills read" if k else "not measured") + ".)</span></p>"

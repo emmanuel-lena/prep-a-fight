@@ -504,7 +504,7 @@ def test_a_two_step_button_says_its_release_and_what_it_stores():
     c.stored = healer.stored_spells(con, 9, 4, "Stasis (Store)")
     out = healer.cooldowns_html([c])
     assert ("released:</small><span class='chip'>1:56 &middot; 50% of the top players &middot; from a store about "
-            "1:40, 16 s before") in out
+            "1:40, each a median 16 s after its own") in out
     # a store never released before the next store is not paired with the next one's release (round 83)
     tl.players = [{"casts": {1: [100.0, 200.0], 2: [216.0]}, "duration": 270.0}] * 4
     healer.two_step(tl, [c], [m])
@@ -565,3 +565,16 @@ def test_a_ramp_played_back_from_cooldown_stays_a_ramp(monkeypatch):
                          cd_names=[("Evangelism", 1, [], 1.0, (ps, 100, 90.0, 472433))])
     found = [healer.Moment(t, 1000.0, 1.4, "Caustic Surge") for t in (40.0, 130.0, 215.0)]
     assert "the 2:10 hit: Evangelism 1:49 (a ramp)" in healer.roles_more([di], found=found)
+
+
+def test_a_chip_offset_is_the_shown_times_difference():
+    # round 87: "0:40 · 1 s before the 0:40 hit" (39.6 s shown rounded, the gap from the truncated 39)
+    assert healer._chip(39.6, "0:40 Caustic Surge") == "0:40 &middot; as the 0:40 hit starts"
+    assert healer._chip(33.5, "0:35 Soulcoil Rite") == "0:34 &middot; 1 s before the 0:35 hit"
+
+
+def test_a_once_a_kill_button_says_the_rest_of_its_presses():
+    # Discipline Priest, Nek'zali (round 87): Ultimate Penitence pressed by 97%, chips at 27% and 20%
+    c = healer.Cooldown("Ultimate Penitence", 1, 0.97, 1.0, [75.0], ["1:15 Soulcoil Rite"], alt=[36.0],
+                        support=[0.27], alt_support=[0.2], alt_of=[75.0])
+    assert "the other 50% at varying times" in healer.cooldowns_html([c])
