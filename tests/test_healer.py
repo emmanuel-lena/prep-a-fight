@@ -613,3 +613,14 @@ def test_a_first_press_at_the_pull_says_so_on_hover():
     # Holy Paladin, Nek'zali (round 92): "Avenging Wrath 0:04 (tied to no hit: on cooldown)"
     c = healer.Cooldown("Avenging Wrath", 1, 1.0, 3.0, [4.0, 126.0], ["", ""], every=122.0)
     assert healer._why_not(c, 4.0) == ": at the pull" and healer._why_not(c, 126.0) == ": on cooldown"
+
+
+def test_every_outline_gives_its_reason():
+    # round 93: Stasis 1:57 "on cooldown" for a group held past it; four outlines with no reason at all
+    hit = healer.Moment(130.0, 1000.0, 1.4, "Caustic Surge")
+    st_ = healer.Cooldown("Stasis (Store)", 1, 1.0, 3.0, [101.0], [""], alt=[117.0], every=99.0)
+    st_.fates = [(117.0, 131.0)] * 9
+    assert healer._why_not(st_, 117.0, [hit]) == ": its release goes on the 2:10 hit"
+    sw = healer.Cooldown("Shield Wall", 2, 0.8, 2.0, [69.0, 231.0], ["", ""])
+    assert healer._why_not(sw, 69.0, [hit]) == ": away from the big hits"
+    assert healer._why_not(sw, 128.0, [hit]) == ": in the 2:10 hit's window, not kept for it"

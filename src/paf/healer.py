@@ -745,7 +745,7 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
         + "".join(f"<rect x='{float(x((moved or {}).get((c.name, t), t))) - 4:.1f}' y='{H - B + 6 + 18 * i}' "
                   f"width='8' height='13' rx='2' "
                   f"class='cp{'' if t in tied else ' off'}'><title>{e(c.name)} {_mmss((moved or {}).get((c.name, t), t))}"
-                  f"{'' if t in tied else ' (tied to no hit' + _why_not(c, t) + ')'}</title></rect>"
+                  f"{'' if t in tied else ' (tied to no hit' + _why_not(c, t, found) + ')'}</title></rect>"
                   for t in sorted([*c.times, *c.alt]) if t <= span  # in time order (round 84)
                   for tied in [{a for a in [*c.times, *c.alt] if (c.name, a) in answered} if answered is not None
                                else {a for a, n in [*zip(c.times, c.near, strict=False),
@@ -1363,13 +1363,28 @@ def _held(c: Cooldown) -> list[float]:
     return [a for a, n in zip(c.alt, c.alt_near or [""] * len(c.alt), strict=False) if n]
 
 
-def _why_not(c: Cooldown, t: float) -> str:
+def _why_not(c: Cooldown, t: float, found: list | None = None) -> str:
     """An untied mark's reason on hover, as its card gives it (round 75: an outline on a hit's dot read "tied to no
-    hit" with no word why)."""
-    reason = (c.why or ("at the pull" if t <= PULL else "on cooldown" if c.every else "back from cooldown"  # the
-                        + (" for about half" if t in c.back_half else "") if t in c.back else ""))  # pull's first:
-    # "at the pull", never "on cooldown" (round 92: Avenging Wrath 0:04); "back from cooldown" as its chip (round 83)
-    return f": {reason}" if reason else ""
+    hit" with no word why); every outline gives one (round 93: four said none). The pull's first press: "at the pull",
+    never "on cooldown" (round 92); a store whose release the lead keeps for a hit says so, and a group of a button on
+    cooldown that holds it past its cooldown is held, not on cooldown (round 93: Stasis 1:57)."""
+    def hit_near(x: float):
+        return next((m for m in found or [] if -ANSWER[0] <= x - m.t <= ANSWER[1]), None)
+    if c.why:
+        return f": {c.why}"
+    if t <= PULL:
+        return ": at the pull"
+    if c.fates:  # a two-step button's store: where its release lands
+        us = [u for s_, u in c.fates if u is not None and abs(s_ - t) <= 8]
+        m = hit_near(st.median(us)) if us else None
+        if m is not None:
+            return f": its release goes on the {_mmss(m.t)} hit"
+    if t in c.back:
+        return ": back from cooldown" + (" for about half" if t in c.back_half else "")
+    if c.every:
+        return ": held past its cooldown" if t in c.alt else ": on cooldown"
+    m = hit_near(t)
+    return f": in the {_mmss(m.t)} hit's window, not kept for it" if m is not None else ": away from the big hits"
 
 
 def _split(chip: str) -> tuple[str, str]:
@@ -1798,8 +1813,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                         if _pct(pp) != _pct(sp) else "")  # bar reads, rounded as the share (r. 76-77)
                                      for n, t, sp, rp, pp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
-                                        + (f"<small>(under a quarter: {'all' if sp >= pp - 1e-9 else 'nearly all'} of "
-                                           "them press it in the kill)</small>"  # round 79: "24% of
+                                        + ("<small>(also of those who press it: "
+                                           + ("all" if sp >= pp - 1e-9 else "nearly all") + " press it in the kill)</small>"  # round 79: "24% of
                                            if f"{int(pp * 100)}%" == _pct(sp) else  # them too" read as nonsense
                                            f"<small>(under a quarter of those who press it: {int(pp * 100)}%)</small>")
                                         for u in under if len(u) > 4 and u[0] != "back" for n, t, sp, pp in [u[:4]])
@@ -1823,8 +1838,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             "ahead, never the pull's opener before 0:12.<br><b>A button shown:</b> a quarter of the spec's healers who "
             "press it do so in the window; its share is of all that spec's healers, then of those who press it when "
             "that differs.<br><b>\"Under a quarter\":</b> no button reaches that; its most pressed one, if a tenth of "
-            "the spec's healers press it there, with the share of those who press it, or \"all of them press it in the kill\" when that is nearly "
-            "all of them.<br><b>\"None held for it\":</b> its presses there come back from cooldown.<br><b>\"None "
+            "the spec's healers press it there, with the share of those who press it, or \"also of those who press it\" when (nearly) all of them "
+            "press it in the kill.<br><b>\"None held for it\":</b> its presses there come back from cooldown.<br><b>\"None "
             "shared\":</b> no button reaches a tenth.<br><b>\"Few players\":</b> under 100 of the spec's healers in "
             "these kills, a habit of a few.<br><b>Back from cooldown:</b> a button whose presses there come back from "
             "cooldown for over 40% of them is no answer, as on the fight tab."
@@ -2064,6 +2079,43 @@ def render_sheet(h: HealerPrep) -> str:
             else:
                 by_press[(hit,)] = xs
 
+        # one button for two hits with no player in both: one press, "their X goes on A or B" (round 93: Aura
+        # Mastery "28% for 0:35 … 30% for 1:15" read as two presses of a 3-minute button nobody pressed twice)
+        singles: dict[str, list] = {}
+        for k, ps in by_press.items():
+            if len(k) == 2 and len(ps) == 1:
+                singles.setdefault(k[0], []).append(k)
+        for _n, ks in singles.items():
+            if len(ks) != 2:
+                continue
+            (h1, t1, _s1, c1), (h2, t2, _s2, _c2) = by_press[ks[0]][0], by_press[ks[1]][0]
+            w1, w2 = _window(c1, t1, h1), _window(c1, t2, h2)
+            both = sum(1 for ts in c1.presses if any(w1[0] <= x <= w1[1] for x in ts)
+                       and any(w2[0] <= x <= w2[1] for x in ts))
+            if both:
+                continue
+            by_press[ks[0]] = by_press[ks[0]] + by_press.pop(ks[1])
+
+        def _other_players(n: str, hit: float, t: float, c) -> bool:
+            """The same button said for an earlier hit by other players, none in both windows: "another" (round 93:
+            Aura Mastery for 0:35 and 1:15 read as two presses nobody made)."""
+            w = _window(c, t, hit)
+            for xs in by_press.values():
+                for x in xs:
+                    if len(x) == 5:
+                        n2, t2, _sp2, _p2, c2 = x
+                        h2 = next((h for h, ys in tops.items() if x in ys), None)
+                    else:
+                        h2, t2, _sp2, c2 = x
+                        n2 = c2.name
+                    if n2 != n or h2 is None or h2 >= hit:
+                        continue
+                    w2 = _window(c, t2, h2)
+                    if not any(any(w[0] <= y <= w[1] for y in ts) and any(w2[0] <= y <= w2[1] for y in ts)
+                               for ts in c.presses):
+                        return True
+            return False
+
         def which(n: str, press: float, c) -> str:
             """Which press of the kill: "their first Divine Hymn" (2 a kill), "their Rewind" (one)."""
             k = sorted(c.times).index(press) if press in c.times else 0
@@ -2091,7 +2143,8 @@ def render_sheet(h: HealerPrep) -> str:
             n, press = key
             if len(ps) == 1:
                 hit, t, sp, c = ps[0]
-                return hit, (f"for the {_mmss(hit)} hit, {_pct(sp)} press {e(_shown(n))} (about {_tw(c, t, hit)}"
+                return hit, (f"for the {_mmss(hit)} hit, {'another ' if _other_players(n, hit, t, c) else ''}"
+                             f"{_pct(sp)} press {e(_shown(n))} (about {_tw(c, t, hit)}"
                              f"{ramp_of(c, t, hit)})" + (_other([(hit, t, sp, c)]) if ramp_of(c, t, hit) else
                                                          _also(c, press, t, sp, hit)))
             c0 = ps[0][3]

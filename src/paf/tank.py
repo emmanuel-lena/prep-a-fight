@@ -445,7 +445,7 @@ def render_sheet(p: TankPrep) -> str:
                 return ""
             if not any(magic_only(i) for i in same_name_spells().get(n, [])):
                 return ""
-            return f" &middot; magic only: no answer to the {_mmss(m.t)} hit, physical"
+            return f" &middot; no answer to the physical {_mmss(m.t)} hit (magic only)"
         return "".join(f"<li><b>{e(n)}</b><small>up {u:.0%} of the kill for the top tanks</small></li>"
                        for n, u in p.mitigation) + "".join(
             f"<li><b>{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top players"
