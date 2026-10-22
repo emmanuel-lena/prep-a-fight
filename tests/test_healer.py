@@ -584,3 +584,11 @@ def test_the_rest_leaves_out_a_named_line_and_a_tied_chip_gives_its_pressers():
     sw = healer.Cooldown("Shield Wall", 1, 0.77, 2.0, [34.0], ["0:35 Soulcoil Rite"], support=[0.23],
                          presses=[[34.0]] * 23 + [[100.0]] * 54, n_all=100)
     assert healer._also_pressers(sw, 34.0, {}, "0:35 Soulcoil Rite", 0.23) == " (30% of those who press it)"
+
+
+def test_a_named_chip_with_two_shares_gives_its_pressers():
+    # Protection Warrior, Nek'zali (round 90): "3:52 · 24% · in the window of the 3:55 hit: 28%" without its 31%
+    c = healer.Cooldown("Shield Wall", 1, 0.77, 2.0, [232.0], [""], support=[0.24],
+                        presses=[[234.0]] * 16 + [[232.0]] * 8 + [[100.0]] * 53, n_all=100,
+                        lasts=[300.0] * 58 + [200.0] * 42)
+    assert healer._also_pressers(c, 232.0, {("Shield Wall", 232.0): 235.0}, "", 0.24) == " (31% of those who press it)"

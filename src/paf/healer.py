@@ -778,8 +778,8 @@ def _also_pressers(c: Cooldown, t: float, named: dict | None, n: str, sp: float)
     shown = _named(c, t, named, n, sp)
     if "of those who press it" in shown:
         return ""
-    if shown == _share(sp):
-        return _pressers(c, sp)
+    if shown == _share(sp) or _split(shown)[0] == _share(sp):  # its own share, before a window clause (round 90:
+        return _pressers(c, sp)                                   # Shield Wall "3:52 · 24% · in the window…")
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None and shown == _base(
             c, hs, _secs(n.partition(" ")[0])):
         return _pressers(c, hs)
