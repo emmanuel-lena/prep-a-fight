@@ -917,7 +917,13 @@ def _rest(c: Cooldown, named: dict | None = None) -> float:
         return 0.0
     if c.presses and c.n_all:  # the players its card shows, counted: shares on different bases did not add up
         hits = [k[1][1] for k in (named or {}) if k[0] == c.name and isinstance(k[1], tuple)]  # (round 109: 52% -
-        shown = sum(1 for ts in c.presses if any(abs(x - t) <= 8 for x in ts for t in [*c.times, *c.alt])  # 15% read
+        # a chip tied to a hit shows its window's players: those counted, as its share (round 110: 15% shown, 19
+        # counted within 8 s of its time)
+        for _t, n in zip(c.times, c.near or [""] * len(c.times), strict=False):
+            if n:
+                hits.append(_secs(n.partition(" ")[0]))
+        free = [t for t, n in zip(c.times, c.near or [""] * len(c.times), strict=False) if not n] + list(c.alt)
+        shown = sum(1 for ts in c.presses if any(abs(x - t) <= 8 for x in ts for t in free)  # 15% read
                     or any(h - ANSWER[0] <= x <= h + ANSWER[1] for x in ts for h in hits))  # "the other 36%")
         return max(0.0, (len(c.presses) - shown) / c.n_all)
     lines = [v[0] for k, v in (named or {}).items() if k[0] == c.name and isinstance(k[1], tuple)]  # its card's own
