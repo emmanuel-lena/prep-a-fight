@@ -1411,7 +1411,11 @@ def _why_not(c: Cooldown, t: float, found: list | None = None) -> str:
     if t in c.back:
         return ": back from cooldown" + (" for about half" if t in c.back_half else "")
     m = hit_near(t)
-    return f": in the {_mmss(m.t)} hit's window, not kept for it" if m is not None else ": away from the big hits"
+    if m is not None:
+        return f": in the {_mmss(m.t)} hit's window, not kept for it"
+    m = next((m for m in found or [] if 0 < m.t - ANSWER[0] - t <= RAMP[1]), None)  # just ahead of a hit (round 97:
+    return (f": before the {_mmss(m.t)} hit's window" if m is not None  # Stasis release 1:55, 10 s before the 2:10
+            else ": away from the big hits")                             # hit's window, read "away")
 
 
 def _split(chip: str) -> tuple[str, str]:

@@ -623,6 +623,7 @@ def test_every_outline_gives_its_reason():
     assert healer._why_not(st_, 117.0, [hit]) == ": its release goes on the 2:10 hit"
     sw = healer.Cooldown("Shield Wall", 2, 0.8, 2.0, [69.0, 231.0], ["", ""])
     assert healer._why_not(sw, 69.0, [hit]) == ": away from the big hits"
+    assert healer._why_not(sw, 115.0, [hit]) == ": before the 2:10 hit's window"
     assert healer._why_not(sw, 128.0, [hit]) == ": in the 2:10 hit's window, not kept for it"
 
 
