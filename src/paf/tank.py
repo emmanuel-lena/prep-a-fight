@@ -550,7 +550,7 @@ def render_sheet(p: TankPrep) -> str:
         first_none = not big and "no long defensive" in lead[0]
         hits = f"the {_and([at(x) for x in quiet])} hit{'s' if len(quiet) > 1 else ''}"
         if quiet and first_none:  # "nor": the biggest moment said the same, in one sentence (round 65)
-            lead[0] = lead[0].rstrip(".") + f", nor for {hits}."  # (round 77: "nor in the window of", no subject)
+            lead[0] = lead[0].rstrip(".") + f" or in {hits}."  # (round 91: "in it, nor for the 1:35 hit" read broken)
         elif quiet:  # the pattern of every other hit, in one sentence with them (round 68)
             bare = [f"the {at(x)} hit{none}" for x in quiet] + bare
         up = [(n, u) for n, u in p.mitigation if u >= 0.5][:2]  # what they do have, measured: their active

@@ -599,3 +599,11 @@ def test_an_untied_time_in_a_hit_window_says_it_is_not_kept():
     c = healer.Cooldown("Invoke Yu'lon", 1, 1.0, 2.0, [5.0], [""], alt=[32.0], alt_support=[0.3], alt_of=[5.0],
                         alt_near=["0:35 Soulcoil Rite"], presses=[[32.0]] * 16 + [[5.0]] * 84, n_all=100)
     assert "or 0:32 for 30% &middot; not kept for the 0:35 hit: 16% in its window" in healer.cooldowns_html([c], set())
+
+
+def test_a_held_habit_of_a_button_on_cooldown_says_it_is_not_kept():
+    # Mistweaver Monk, Nek'zali (round 91): Celestial Conduit "0:05 · 58%, or 0:37 for 25%" in the 0:35 hit, no clause
+    c = healer.Cooldown("Celestial Conduit", 1, 1.0, 3.0, [5.0], [""], alt=[37.0], alt_support=[0.25],
+                        alt_of=[5.0], alt_near=["0:35 Soulcoil Rite"], every=97.0,
+                        presses=[[37.0]] * 25 + [[5.0]] * 75, n_all=100)
+    assert "or 0:37 for 25% &middot; not kept for the 0:35 hit: 25% in its window" in healer.cooldowns_html([c], set())

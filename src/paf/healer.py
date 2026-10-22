@@ -901,8 +901,9 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
 
     def untied(a: float, n: str) -> str:  # in a hit's window, not kept by the lead: its count there said, so "lands
         h = orig.get(a) or ""              # on none" never reads false (round 90: Yu'lon "or 0:32" in the 0:35 hit)
-        if n or not h or (named or {}).get((c.name, a)) is not None or a in c.back or c.why or c.every:
-            return ""
+        if (n or not h or (named or {}).get((c.name, a)) is not None or a in c.back or c.why
+                or (c.every and a not in _held(c))):  # a held habit of a button on cooldown too (round 91: Conduit
+            return ""                                  # "or 0:37 for 25%" in the 0:35 hit, no clause)
         hit = _secs(h.partition(" ")[0])
         hs = hit_share(c, a, hit)
         return "" if hs is None else f" &middot; not kept for the {_mmss(hit)} hit: {_pct(hs)} in its window"
@@ -1100,10 +1101,14 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
                                         for k, (t, n, sp) in enumerate(zip(c.times, c.near,
                                                                            c.support or [0.0] * len(c.times),
                                                                            strict=False)))
-                                or "<small>timing varies: no shared moment</small>")
+                                or ("<small>no time a quarter of them share</small>"  # a named line may follow
+                                    if any(k[0] == c.name and isinstance(k[1], tuple) for k in (named or {}))
+                                    else "<small>timing varies: no shared moment</small>"))  # (round 91)
         + _pull_chip(c)
-        + "".join(f"<small class='alt'>in the window of the {_mmss(k[1][1])} hit: {_pct(v[0])} of the top players"
-                  f"{v[2]}, about {v[1] if isinstance(v[1], str) else _mmss(v[1])}{', ' + v[3] if len(v) > 3 and v[3] else ''}</small>"
+        + "".join(f"<span class='chip'>about {v[1] if isinstance(v[1], str) else _mmss(v[1])} &middot; in the "
+                  f"window of the {_mmss(k[1][1])} hit: {_pct(v[0])} of the top players{v[2]}"
+                  f"{' &middot; ' + v[3] if len(v) > 3 and v[3] else ''}</span>"  # a chip of its own, led by its time
+                  # (round 91: plain text after a chip read as that chip's continuation)
                   for k, v in (named or {}).items()
                   if k[0] == c.name and isinstance(k[1], tuple))
         + ("<small class='alt'>two rhythms, by their first press: " + "; or ".join(
@@ -1793,8 +1798,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                         if _pct(pp) != _pct(sp) else "")  # bar reads, rounded as the share (r. 76-77)
                                      for n, t, sp, rp, pp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
-                                        + (f"<small>(under a quarter of those who press it: {int(pp * 100)}%; "
-                                           f"{'all' if sp >= pp - 1e-9 else 'nearly all'} {e(r.spec)}s press it in "
+                                        + (f"<small>({'all' if sp >= pp - 1e-9 else 'nearly all'} of them press it in "
                                            "the kill)</small>"  # round 79: "24% of
                                            if f"{int(pp * 100)}%" == _pct(sp) else  # them too" read as nonsense
                                            f"<small>(under a quarter of those who press it: {int(pp * 100)}%)</small>")
@@ -1819,8 +1823,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             "ahead, never the pull's opener before 0:12.<br><b>A button shown:</b> a quarter of the spec's healers who "
             "press it do so in the window; its share is of all that spec's healers, then of those who press it when "
             "that differs.<br><b>\"Under a quarter\":</b> no button reaches that; its most pressed one, if a tenth of "
-            "the spec's healers press it there, with the share of those who press it (\"all … press it in the kill\" when that is nearly all "
-            "of them).<br><b>\"None held for it\":</b> its presses there come back from cooldown.<br><b>\"None "
+            "the spec's healers press it there, with the share of those who press it, or \"all of them press it in the kill\" when that is nearly "
+            "all of them.<br><b>\"None held for it\":</b> its presses there come back from cooldown.<br><b>\"None "
             "shared\":</b> no button reaches a tenth.<br><b>\"Few players\":</b> under 100 of the spec's healers in "
             "these kills, a habit of a few.<br><b>Back from cooldown:</b> a button whose presses there come back from "
             "cooldown for over 40% of them is no answer, as on the fight tab."
@@ -2131,10 +2135,10 @@ def render_sheet(h: HealerPrep) -> str:
                     t_rel = min(c.release.times, key=lambda t: abs(t - m.t), default=None)  # its chart mark, tied
                     if t_rel is not None and abs(t_rel - m.t) <= ANSWER[1] + SLACK:  # as the lead says (the chart
                         rel_marks.append((c.release, t_rel, _center(inside)))  # follows the lead)
-                    released.append((m.t, f"for the {b} hit, {_pct(hs)} release their {e(_shown(c.name))}"
-                                          " (of any store)"
+                    released.append((m.t, f"for the {b} hit, {_pct(hs)} release a {e(_shown(c.name))}, whichever "
+                                          "store it was"
                                           f"{_reach_note(c.release, m.t)} (about {_about(inside)}"
-                                          + (f", stored a median {gap:.0f} s before"  # these releases' own
+                                          + (f", a median {gap:.0f} s after storing"  # these releases' own
                                              if (gap := _gap_of(c, inside)) else "")  # stores (round 83: 16 s for 13)
                                           + ")"))
                     bare.remove(b)
