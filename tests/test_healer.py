@@ -630,3 +630,17 @@ def test_an_on_cooldown_button_says_so_on_hover():
     # Holy Paladin, Nek'zali (round 94): Avenging Wrath 2:05, on cooldown, read "back from cooldown" on hover
     c = healer.Cooldown("Avenging Wrath", 1, 1.0, 3.0, [4.0, 125.0], ["", ""], every=122.0, back=[125.0])
     assert healer._why_not(c, 125.0, []) == ": on cooldown"
+
+
+def test_a_talent_choice_side_keeps_its_note_muted():
+    # Protection Warrior (round 94): "Sudden Death 38% (3% take" in bold, "neither)" muted
+    assert (healer._side("Sudden Death 38% (3% take neither)")
+            == "<b>Sudden Death</b> <small>38% (3% take neither)</small>")
+    assert healer._side("Bloodborne 59%") == "<b>Bloodborne</b> <small>59%</small>"
+
+
+def test_more_counts_a_press_named_in_a_hit_window():
+    # Holy Priest, Vashnik (round 94): Apotheosis "2 a kill", a 0:40 chip, "about 2:16" and "+1 more"
+    c = healer.Cooldown("Apotheosis", 1, 1.0, 2.0, [40.0], ["0:40 Caustic Surge"])
+    assert healer._more(c) == "+1"
+    assert healer._more(c, {("Apotheosis", ("line", 130.0)): (0.12, "2:16", "", "")}) == ""

@@ -820,9 +820,11 @@ def _rest(c: Cooldown, named: dict | None = None) -> float:
     # 20% named in the 0:35 window counted again in "the other 69%")
 
 
-def _more(c: Cooldown) -> str:
-    """The casts a kill no shared moment shows ("+1"): the count always matches the "a kill" number."""
-    n = round(c.per_kill) - len(c.times)  # the pull chip is the first press's other habit, not another press
+def _more(c: Cooldown, named: dict | None = None) -> str:
+    """The casts a kill no shared moment shows ("+1"): the count always matches the "a kill" number; a press its
+    card names in a hit's window counts as shown (round 94: Apotheosis "2 a kill", 0:40, about 2:16 and "+1 more")."""
+    lines = sum(1 for k in named or {} if k[0] == c.name and isinstance(k[1], tuple))
+    n = round(c.per_kill) - len(c.times) - lines  # the pull chip is the first press's other habit, not another press
     return f"+{n}" if n > 0 else ""
 
 
@@ -1122,7 +1124,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
            f"<small class='alt'>on cooldown from {_mmss(c.times[0])}, about every {c.every:.0f} s; those pressing it "
            f"at {_and([_mmss((moved or {}).get((c.name, a), a)) for a in _held(c)])} instead press it again at varying "
            "times</small>" if c.every else
-           f"<small class='alt'>{_more(c)} more at varying times</small>" if c.times and _more(c) else
+           f"<small class='alt'>{_more(c, named)} more at varying times</small>" if c.times and _more(c, named) else
            f"<small class='alt'>the other {_pct(_rest(c, named))} at varying times</small>"
            if c.times and _rest(c, named) >= 0.15
            else "")
@@ -1680,6 +1682,15 @@ def build_lead(builds: list, spec: str, players: int, split: list | None = None,
 NOT_ADVICE = " Their choices, not a recommendation: no sim weighs them."
 
 
+def _side(x: str) -> str:
+    """One side of a talent choice: its name in bold, its share and any note muted ("Sudden Death 38% (3% take
+    neither)": split at its last space, the note read as part of the name; round 94)."""
+    m = re.match(r"^(.*?) ([0-9]+%)( \(.*\))?$", x)
+    if not m:
+        return f"<b>{e(x)}</b>"
+    return f"<b>{e(m.group(1))}</b> <small>{m.group(2)}{e(m.group(3) or '')}</small>"
+
+
 def split_html(split: list, players: int, spec: str, wide: bool = False) -> str:
     """The talents the top players split on, with how often each is picked: what the builds above hide. wide: none
     or one is taken by 35 to 65% of them (Holy Paladin, Holy Priest), so the talents they differ on most, 15 to 85%."""
@@ -1689,8 +1700,7 @@ def split_html(split: list, players: int, spec: str, wide: bool = False) -> str:
              f"<h2>The talents the top {e(spec)}s split on</h2><p>The share of the {players} players read "
              "who take each, closest to half first:</p>") + "<ul class='hl2 split'>"
             + "".join(f"<li><b>{e(n)}</b><small>{s:.0%}</small></li>" if s >= 0 else
-                      "<li>" + " / ".join(f"<b>{e(a)}</b> <small>{b}</small>" for a, _, b in
-                                          (x.rpartition(" ") for x in n.split(" / "))) + "</li>"
+                      "<li>" + " / ".join(_side(x) for x in n.split(" / ")) + "</li>"
                       for n, s in split) + "</ul>")
 
 
@@ -1813,7 +1823,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                         if _pct(pp) != _pct(sp) else "")  # bar reads, rounded as the share (r. 76-77)
                                      for n, t, sp, rp, pp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
-                                        + ("<small>(also of those who press it: "
+                                        + ("<small>(under a quarter, also of those who press it: "
                                            + ("all" if sp >= pp - 1e-9 else "nearly all") + " press it in the kill)</small>"  # round 79: "24% of
                                            if f"{int(pp * 100)}%" == _pct(sp) else  # them too" read as nonsense
                                            f"<small>(under a quarter of those who press it: {int(pp * 100)}%)</small>")
@@ -1838,8 +1848,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             "ahead, never the pull's opener before 0:12.<br><b>A button shown:</b> a quarter of the spec's healers who "
             "press it do so in the window; its share is of all that spec's healers, then of those who press it when "
             "that differs.<br><b>\"Under a quarter\":</b> no button reaches that; its most pressed one, if a tenth of "
-            "the spec's healers press it there, with the share of those who press it, or \"also of those who press it\" when (nearly) all of them "
-            "press it in the kill.<br><b>\"None held for it\":</b> its presses there come back from cooldown.<br><b>\"None "
+            "the spec's healers press it there, with the share of those who press it, or \"under a quarter, also of those who press it\" when (nearly) "
+            "all of them press it in the kill.<br><b>\"None held for it\":</b> its presses there come back from cooldown.<br><b>\"None "
             "shared\":</b> no button reaches a tenth.<br><b>\"Few players\":</b> under 100 of the spec's healers in "
             "these kills, a habit of a few.<br><b>Back from cooldown:</b> a button whose presses there come back from "
             "cooldown for over 40% of them is no answer, as on the fight tab."
@@ -2257,11 +2267,12 @@ def render_sheet(h: HealerPrep) -> str:
     # one definition a line, the term first (round 76: 120 words in one paragraph read as no reference)
     fight.append("<p class='small muted'><b>Tied to a hit:</b> only the lead ties a press to a hit; a button on "
                  "cooldown, cast on another player, used while moving or a trinket says why it is not; a time with no "
-                 "hit named lands on none, or says it is not kept for the hit in whose window it sits (a second button is kept "
-                 "for a hit only when its share is within the noise of the first's).<br><b>A time shown:</b> a quarter of those who press the button share "
+                 "hit named lands on none, or says it is not kept for the hit in whose window it sits (a press is kept for a hit when "
+                 "a quarter of the top players press it in its window, else \"only N%\"; a second button only when its "
+                 "share is within the noise of the first's).<br><b>A time shown:</b> a quarter of those who press the button share "
                  "it (a first press at the pull: a fifth of the top players).<br><b>A time's share:</b> the top players pressing within 8 s of it (under a quarter of them, also "
-                 "of those who press the button).<br><b>A hit's share:</b> for a press the lead names for a hit, the "
-                 "top players pressing in that hit's window, 5 s before to 8 s after it starts (a ramp: 8 to 30 s "
+                 "of those who press the button).<br><b>A hit's share:</b> for a press the lead names for a hit (a chip "
+                 "tied to a hit gives it, not its time's), the top players pressing in that hit's window, 5 s before to 8 s after it starts (a ramp: 8 to 30 s "
                  "ahead).<br><b>\"or\":</b> the time other "
                  "top players press the same press instead.<br><b>\"Back from cooldown\":</b> most of its players "
                  "press it as soon as it came back from their last use, so it was not saved for what it lands on "
