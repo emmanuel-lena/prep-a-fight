@@ -1176,7 +1176,7 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
         if _pct(hs) == _pct(sp):  # one count: said once, at the lead's time, the chip's own (round 78: "2:59 ·
             return f"{_base(c, hs, hit)}{_pressers(c, sp)} &middot; {where} the {_mmss(hit)} hit: the same players"  # 15% … about
             # 2:57", two times); under a quarter, of those who press it too (round 84)
-        return (f"{_share(sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
+        return (f"{_share(sp)}{_still(c, t)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
                 + (f", about {_about(inside)}" if inside and _about(inside) != _mmss(t) else "") + tag)  # the lead's time (round 67)
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
         return _base(c, hs, _secs(n.partition(" ")[0]))
