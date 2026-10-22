@@ -741,7 +741,7 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
                   f"width='8' height='13' rx='2' "
                   f"class='cp{'' if t in tied else ' off'}'><title>{e(c.name)} {_mmss((moved or {}).get((c.name, t), t))}"
                   f"{'' if t in tied else ' (tied to no hit' + _why_not(c, t) + ')'}</title></rect>"
-                  for t in [*c.times, *c.alt] if t <= span
+                  for t in sorted([*c.times, *c.alt]) if t <= span  # in time order (round 84)
                   for tied in [{a for a in [*c.times, *c.alt] if (c.name, a) in answered} if answered is not None
                                else {a for a, n in [*zip(c.times, c.near, strict=False),
                                                     *zip(c.alt, c.alt_near or [""] * len(c.alt), strict=False)] if n}])
@@ -836,7 +836,8 @@ def reach(c: Cooldown, hit: float) -> int:
 
 def _reach_note(c: Cooldown, hit: float) -> str:
     n = reach(c, hit)
-    return f", in the {n} kills still going after it" if c.lasts and n < 0.9 * len(c.lasts) else ""
+    # said whenever a kill ended before it: "51% of the top players" read as 51 of 100 for 48 of 95 (round 84)
+    return f", in the {n} kills still going after it" if c.lasts and n < len(c.lasts) else ""
 
 
 def _secs(mmss: str) -> float:
@@ -1095,7 +1096,8 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
         tag = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"
                + (" for about half" if b <= BACK_SHARE[1] else ""))
         if _pct(hs) == _pct(sp):  # one count: said once, at the lead's time, the chip's own (round 78: "2:59 ·
-            return f"{_base(c, hs, hit)} &middot; {where} the {_mmss(hit)} hit"  # 15% … about 2:57", two times)
+            return f"{_base(c, hs, hit)}{_pressers(c, sp)} &middot; {where} the {_mmss(hit)} hit"  # 15% … about
+            # 2:57", two times); under a quarter, of those who press it too (round 84)
         return (f"{_share(sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
                 + (f", about {_about(inside)}" if inside and _about(inside) != _mmss(t) else "") + tag)  # the lead's time (round 67)
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
@@ -1247,13 +1249,16 @@ def _released(c: Cooldown) -> str:
     r = c.release
     if r is None:
         return ""
-    chips = "".join(f"<span class='chip'>{_mmss(t)} &middot; {_pct(sp)} of the top players"
+    def held(t: float) -> str:  # each release's own gap from its store (round 84: the pull's held ~20 s, the
+        gap = _gap_of(c, [x for ts in r.presses for x in ts if abs(x - t) <= 8])  # others ~14 s, one median 15)
+        return f" &middot; stored {gap:.0f} s before" if gap else ""
+    chips = "".join(f"<span class='chip'>{_mmss(t)} &middot; {_pct(sp)} of the top players{held(t)}"
                     + (f" &middot; in the window of the {_mmss(h)} hit:{_base(r, hs, h).replace(' &middot;', '')}"
                        + (f", about {_about(inside)}"  # the lead's time (its counted releases')
                           if (inside := _counted(r, t, h)) and _about(inside) != _mmss(t) else "")
                        if h >= 0 and (hs := hit_share(r, t, h)) is not None else "") + "</span>"
                     for t, sp, h in zip(r.times, r.support, r.alt_of or [-1.0] * len(r.times), strict=False))
-    gap = f", a median {c.release_gap:.0f} s after its store" if c.release_gap else ""
+    gap = "" if chips else f", a median {c.release_gap:.0f} s after its store" if c.release_gap else ""
     never = f"; {_pct(c.unreleased)} of the stores are never released" if c.unreleased >= 0.05 else ""
     out = (f"<span class='subrow'><small class='alt'>released{gap}{never}:</small>{chips}</span>" if chips else
            f"<small class='alt'>released{gap} at varying times{never}</small>")  # as chips, as the store's (r. 83)
@@ -1291,7 +1296,7 @@ def _base(c: Cooldown, hs: float, hit: float) -> str:
     """A hit's share on a chip, of what the lead counts it of: "33% of the 58 kills still going" when a late hit's
     kills are fewer (round 53: "33% of the top players" read as 33 of 100, for 19 of 58)."""
     n = reach(c, hit)
-    of = ("of the top players, in the " + f"{n} kills still going" if c.lasts and n < 0.9 * len(c.lasts)
+    of = ("of the top players, in the " + f"{n} kills still going" if c.lasts and n < len(c.lasts)
           else "of the top players")  # a share of players (round 54: "24% of the 87 kills" read as 21 kills)
     return f" &middot; {_pct(hs)} {of}"
 
@@ -1488,7 +1493,9 @@ def contested(con, encounter_id: int, difficulty: int, spec: str, lo: float = 0.
     split = []
     for sides in by_node.values():
         sides.sort(key=lambda x: -x[1])
-        split.append((" / ".join(f"{n} {s:.0%}" for n, s in sides) if len(sides) > 1 else sides[0][0],
+        rest = 1 - sum(x for _n, x in sides)  # a choice node left empty, said (round 84: Bloodborne 48% /
+        none = f" ({rest:.0%} take neither)" if len(sides) > 1 and round(rest * 100) >= 3 else ""  # Sudden Death 43%)
+        split.append((" / ".join(f"{n} {s:.0%}" for n, s in sides) + none if len(sides) > 1 else sides[0][0],
                       sides[0][1] if len(sides) == 1 else -1.0, sides[0][1]))
     # a pair says its own shares (-1 in the second place) and sorts by its first side, as a single talent by its
     # share: the closest to half first
@@ -1615,6 +1622,12 @@ def roles_table(roles: list, mine: str = "") -> str:
     # player left out (paf.healroles.pooled_kills): no row is high by design any more (round 30)
 
 
+def _unread(name: str) -> bool:
+    """A button the other healers' lines leave out: one back every minute, or a two-step button's store, which heals
+    nothing (round 84: "Stasis 2:11 · 14%" counted stores, the Evoker's sheet the releases)."""
+    return _minute(name) or name.endswith(STORE)
+
+
 def _minute(name: str) -> bool:
     """A button back every minute or sooner by the game data (Nature's Swiftness, 60 s): never tied to a hit, on the
     other healers' lines as on the fight tab."""
@@ -1666,13 +1679,13 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
         per_hit = []
         for h in hits:
             got = [(*g[:3], g[4] if len(g) > 4 else False, g[3] if len(g) > 4 else g[2])
-                   for n, _k, ts, *rest in r.cd_names if not _minute(n)
+                   for n, _k, ts, *rest in r.cd_names if not _unread(n)
                    for g in [_in_hit(n, ts, rest, h)] if g]
-            under = [] if got else sorted((g for n, _k, ts, *rest in r.cd_names if not _minute(n)  # none at the bar:
+            under = [] if got else sorted((g for n, _k, ts, *rest in r.cd_names if not _unread(n)  # none at the bar:
                                            for g in [_in_hit(n, ts, rest, h, bar=False)] if g and g[2] >= 0.1),
                                           key=lambda x: -x[2])[:1]  # its most pressed, said so (round 41: "none
             held = [] if got or under else sorted(  # none held for it: its presses there come back from cooldown,
-                (g for n, _k, ts, *rest in r.cd_names if not _minute(n)  # said, not "none shared" (round 69:
+                (g for n, _k, ts, *rest in r.cd_names if not _unread(n)  # said, not "none shared" (round 69:
                  for g in [_in_hit(n, ts, rest, h, bar=False, back_ok=True)] if g and g[2] >= 0.1),  # Conduit 25%)
                 key=lambda x: -x[2])[:1]
             under = under or [("back", *g) for g in held]
@@ -1709,7 +1722,12 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             "them).<br><b>\"None held for it\":</b> its presses there come back from cooldown.<br><b>\"None "
             "shared\":</b> no button reaches a tenth.<br><b>\"Few players\":</b> under 100 of the spec's healers in "
             "these kills, a habit of a few.<br><b>Back from cooldown:</b> a button whose presses there come back from "
-            "cooldown for over 40% of them is no answer, as on the fight tab.</p>")
+            "cooldown for over 40% of them is no answer, as on the fight tab."
+            + "".join(f"<br><b>{e(_shown(n))}:</b> left out; its store heals nothing, and its release, when it heals, "
+                      "is read for the top players of its spec only (their own sheet)."
+                      for n in dict.fromkeys(n for r in roles if r.spec != mine for n, *_x in getattr(r, "cd_names", [])
+                                             if n.endswith(STORE)))
+            + "</p>")
 
 
 def _job(r) -> str:
