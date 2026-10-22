@@ -202,8 +202,10 @@ def describe(spell_id: int, locale: str = "") -> str:
 
 
 def _ability(s: Section, depth: int, ctx: dict) -> str:
-    tags = "".join(f'<span class="pill {"warn" if f in ("deadly", "interruptible") else ""}">{SHOWN_FLAGS[f]}</span>'
-                   for f in s.flags if f in SHOWN_FLAGS)
+    raid = "raid damage" in ctx["also"].get(s.title, "")  # measured as a big raid hit: its tank tag says the raid
+    tags = "".join(f'<span class="pill {"warn" if f in ("deadly", "interruptible") else ""}">{SHOWN_FLAGS[f]}'  # too
+                   + (" &middot; raid too" if f == "tank" and raid else "") + "</span>"  # (round 112: Possession
+                   for f in s.flags if f in SHOWN_FLAGS)  # Barrage tagged "tank", three of the four raid hits)
     facts = []
     times = ctx["timings"].get(s.title.lower())
     if times:

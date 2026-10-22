@@ -612,7 +612,11 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
 
         def n_at(t: float, alld=alld) -> int:  # "3:52 · 24%" of 100 beside "28% of the 58 kills still going")
             return max(1, sum(1 for d in alld if d >= t))
-        support = [sum(1 for ts in per_player if any(abs(x - t) <= 8 for x in ts)) / n_at(t) for t in times]
+        # a press counted from a kill still going at t, as its base (round 112: a kill ended within 8 s before t
+        # counted on top, not below: Rewind "4:20 · 42% in the 92 kills" beside "43% in the 87")
+        def near_at(t: float, pp=per_player, pl=pressed_lasts) -> int:
+            return sum(1 for ts, d in zip(pp, pl, strict=False) if d >= t and any(abs(x - t) <= 8 for x in ts))
+        support = [near_at(t) / n_at(t) for t in times]
         # a moment a quarter of those who press it share at least: under, it is timing that varies (a chip at 12%
         # of the top players read as a moment next to "no moment most of them share")
         # a quarter of those who press it, of the kills still going then: a late time's pressers are those whose kill
@@ -650,7 +654,7 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         if every:
             keep = [i for i, x in enumerate(alt) if x not in back]
             alt, alt_of = [alt[i] for i in keep], [alt_of[i] for i in keep]
-        alt_support = [sum(1 for ts in per_player if any(abs(x - t) <= 8 for x in ts)) / n_at(t) for t in alt]
+        alt_support = [near_at(t) / n_at(t) for t in alt]
         kept = [i for i, sp in enumerate(alt_support) if sp >= 0.25 * users_at(alt[i]) - 1e-9  # the same quarter,
                 and alt_of[i] in times]  # of a moment still shown
         alt, alt_support, alt_of = [alt[i] for i in kept], [alt_support[i] for i in kept], [alt_of[i] for i in kept]
