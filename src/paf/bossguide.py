@@ -311,8 +311,8 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
         title = "" if top.kind == "ability" else f"<h3>{head}</h3>"  # an ability's card: its row names it
         also = "".join("<p class='small muted also'>" + (
             f"Also, as in {e(where)}: {e(', '.join(dict.fromkeys(names)))}." if len(set(names)) <= 4 else
-            f"{len(set(names))} abilities {'you deal with ' if role else ''}from {e(where)} stay as they were.")  # a
-            + "</p>"  # role's own count, the others' named below (round 79: 7 on a healer sheet, 9 on a tank's)
+            f"{len(set(names))} abilities {'you deal with ' if role else ''}from {e(where)} stay as they were.")
+            + "</p>"  # the role's own count, the others' named below (round 79: 7 on a healer sheet, 9 on a tank's)
             for where, names in repeated.items())
         also += "".join(f"<p class='small muted also'>For {ROLE_OTHERS[r]}: {e(', '.join(dict.fromkeys(names)))}.</p>"
                         for r, names in others.items())
