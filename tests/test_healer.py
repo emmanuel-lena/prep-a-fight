@@ -523,6 +523,7 @@ def test_two_groups_of_presses_in_a_window_are_said_apart():
     spread = [100.0, 101, 101, 104, 105, 105, 108, 108, 109, 114, 115, 118, 119, 120, 121, 121]  # the real 1:40-2:01
     assert healer._about(spread) == "1:44 to 1:59"
     assert healer._center([101.0] * 20 + [121.0] * 21) == 121.0
+    assert healer._about([70.0] * 3 + [72.0] * 13 + [74.0] * 10 + [80.0] * 11 + [82.0] * 10) == "1:12 or 1:20"  # r105
 
 
 def test_a_named_chip_with_one_share_shows_one_time():
@@ -655,7 +656,8 @@ def test_a_quarter_not_kept_names_the_button_kept():
     assert (healer._not_kept(35.0, 0.25, named)
             == " &middot; not kept for the 0:35 hit: 25% in its window, under Revival / Restoral's 38% of the top "
             "players")
-    assert healer._not_kept(35.0, 0.16, named) == " &middot; not kept for the 0:35 hit: 16% in its window"
+    assert healer._not_kept(35.0, 0.16, named) == (" &middot; not kept for the 0:35 hit: 16% in its window, under "
+                                                   "Revival / Restoral's 38% of the top players")  # round 105
 
 
 def test_a_late_time_share_says_the_kills_still_going():

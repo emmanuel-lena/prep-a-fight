@@ -828,7 +828,9 @@ def _not_kept(hit: float, hs: float, named: dict | None, c: Cooldown | None = No
     from paf.defensives import is_defensive
 
     why = (", a personal defensive, no raid answer" if c is not None and is_defensive(c.spell_id, c.name)  # round
-           else f", under {e(kept[0])}'s {_pct(kept[1])} of the top players" if kept and hs >= 0.25 else "")  # 104
+           else f", under {e(kept[0])}'s {_pct(kept[1])} of the top players"  # 104; the kept button whatever the
+           if kept and (c is None or kept[0] != _shown(c.name)) else "")  # window share (round 105: Yu'lon "16% in
+    # its window" read as the reason, its time shared by 30%)
     return (f" &middot; not kept for the {_mmss(hit)} hit: {_pct(hs)} in its window"
             f"{_reach_note(c, hit) if c is not None else ''}{why}")
 
@@ -1302,7 +1304,9 @@ def _groups(xs: list[float]) -> list[list[float]]:
     if len(xs) < 4:
         return [xs]
     k = max(range(1, len(xs)), key=lambda i: xs[i] - xs[i - 1])
-    if xs[k] - xs[k - 1] >= GROUP_GAP and min(k, len(xs) - k) >= GROUP_SHARE * len(xs):
+    if ((xs[k] - xs[k - 1] >= GROUP_GAP and min(k, len(xs) - k) >= GROUP_SHARE * len(xs))
+            or (xs[k] - xs[k - 1] >= 0.6 * GROUP_GAP and min(k, len(xs) - k) >= 0.4 * len(xs))):  # two balanced groups
+        # 6 s apart too (round 105: Rewind at 1:10-1:14 and 1:20-1:23, 26 and 21 presses, said "1:14")
         return [xs[:k], xs[k:]]
     return [xs]
 
