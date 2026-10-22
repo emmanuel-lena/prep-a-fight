@@ -505,3 +505,18 @@ def test_a_two_step_button_says_its_release_and_what_it_stores():
     out = healer.cooldowns_html([c])
     assert "released a median 16 s after it is stored: " in out
     assert "Dream Breath (in 100% of the stores, twice in 75%)" in out
+
+
+def test_two_groups_of_presses_in_a_window_are_said_apart():
+    # Discipline Priest, Vashnik (round 77): Evangelism ahead of 2:10 at 1:41 and 2:01, "about 1:48" nobody presses
+    assert healer._about([101.0] * 20 + [121.0] * 21) == "1:41 or 2:01"
+    assert healer._about([101.0, 103.0, 104.0, 106.0, 108.0]) == "1:44"
+    assert healer._center([101.0] * 20 + [121.0] * 21) == 121.0
+
+
+def test_a_named_chip_with_one_share_shows_one_time():
+    # Protection Warrior, Vashnik (round 78): Shield Wall "2:59 · 15% … in the window of the 2:55 hit, about 2:57"
+    c = healer.Cooldown("Shield Wall", 1, 0.6, 2.0, [179.0], [""], support=[0.15],
+                        presses=[[177.0]] * 15 + [[60.0]] * 45, n_all=100)
+    out = healer.cooldowns_html([c], set(), {("Shield Wall", 179.0): 175.0})
+    assert "2:57 &middot; 15% of the top players &middot; in the window of the 2:55 hit" in out and "about" not in out

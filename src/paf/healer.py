@@ -864,7 +864,7 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
         tag = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"
                + (" for about half" if b <= BACK_SHARE[1] else ""))
         return (f" &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
-                + (f", about {_mmss(st.median(inside))}" if inside else "") + tag)
+                + (f", about {_about(inside)}" if inside else "") + tag)
     sp_of = {a: sp for a, sp, _n in near}
     return ", or " + ", ".join(f"{_chip((moved or {}).get((c.name, a), a), n)}" + (f" for {_pct(sp)}" if sp else " for some")
                                + ("" if window(a, n) and "back from cooldown" in window(a, n) else
@@ -886,6 +886,8 @@ def back_share(per_player: list[list[float]], t: float, cd: float) -> float:
     return (sum(1 for x, y in near if y is not None and x - y <= cd + BACK) / len(near)) if near and cd else 0.0
 
 
+GROUP_GAP = 10.0  # seconds between two groups of presses in one window said apart ("1:41 or 2:01")
+GROUP_SHARE = 0.3  # ... each holding this share of the presses at least
 FEW_SHARE = 0.1  # a press in a hit no cooldown is kept for, said under the quarter bar from this share
 SLACK = 3.0  # seconds past the answer window a moment may sit when its presses are counted in the window
 PULL = 12.0  # seconds: a press before this is the pull's opener, never a ramp for the first hit (round 45)
@@ -937,7 +939,8 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
         if named is not None and near_t is not None and abs(near_t - when) <= 15:
             named[(c.name, near_t)] = m.t
         elif named is not None:  # no chip near it: its card gets a line of its own (round 66: Spirit Link Totem
-            named[(c.name, ("line", m.t))] = (hs, when, _reach_note(c, m.t), reason)  # "timing varies" under the
+            named[(c.name, ("line", m.t))] = (hs, _about(inside) if inside else _mmss(when), _reach_note(c, m.t),
+                                              reason)  # "timing varies" under the
             # lead's 2:12), its reason too (round 69: Apotheosis "back from cooldown")
         few_ = "only " if hs < 0.25 else ""
         return (f" ({few_}{_pct(hs)} press {e(_shown(c.name))} in its window{_reach_note(c, m.t)}, about "
@@ -975,7 +978,7 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
     if back is not None and why.startswith("back from cooldown"):
         why = ("back from cooldown" if back > BACK_SHARE[1] else "back from cooldown for about half"
                if back > BACK_SHARE[0] else why)
-    when = _mmss(st.median(inside) if inside else t)  # the presses counted, not the moment's (round 53: "2:20" for a
+    when = _about(inside) if inside else _mmss(t)  # the presses counted, not the moment's (round 53: "2:20" for a
     if ramp:                                          # window ending at 2:18, its presses at 2:14)
         return f" ({few}{_pct(sp)} ramp with {e(_shown(c.name))} ahead of it{of}, about {when}, {e(why)})"
     return f" ({few}{_pct(sp)} press {e(_shown(c.name))} in its window{of}, about {when}, {e(why)})"
@@ -1021,7 +1024,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
         f"<li><b>{e(_shown(c.name))}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill"
         + (f", {_pct(c.on_others)} of the presses on another player" if 0 <= c.on_others < 0.95 else
            ", all on another player" if c.on_others >= 0.95 else "") + "</small>"
-        "<span class='when'>" + ("".join(f"<span class='chip'>{_chip((moved or {}).get((c.name, t), t), tie(c, t, n))}"
+        "<span class='when'>" + ("".join(f"<span class='chip'>{_chip((moved or {}).get((c.name, t), _named_at(c, t, named, sp)), tie(c, t, n))}"
                                         + _split(_named(c, t, named, tie(c, t, n), sp))[0]
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
                                            if t in c.back and not (c.why or c.every)  # its line says it; its
@@ -1035,7 +1038,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
                                 or "<small>timing varies: no shared moment</small>")
         + _pull_chip(c)
         + "".join(f"<small class='alt'>in the window of the {_mmss(k[1][1])} hit: {_pct(v[0])} of the top players"
-                  f"{v[2]}, about {_mmss(v[1])}{', ' + v[3] if len(v) > 3 and v[3] else ''}</small>"
+                  f"{v[2]}, about {v[1] if isinstance(v[1], str) else _mmss(v[1])}{', ' + v[3] if len(v) > 3 and v[3] else ''}</small>"
                   for k, v in (named or {}).items()
                   if k[0] == c.name and isinstance(k[1], tuple))
         + ("<small class='alt'>two rhythms, by their first press: " + "; or ".join(
@@ -1057,6 +1060,16 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
         for c in cds)
 
 
+def _named_at(c: Cooldown, t: float, named: dict | None, sp: float) -> float:
+    """A chip's time: a press the lead names for a hit kept for none, its window counting the same share as its
+    moment, is shown at the lead's time (its counted presses'), said once."""
+    hit = (named or {}).get((c.name, t))
+    if hit is None or (hs := hit_share(c, t, hit)) is None or _pct(hs) != _pct(sp):
+        return t
+    inside = _counted(c, t, hit)
+    return _center(inside) if inside else t
+
+
 def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
     """A chip's share: of the hit's window when the lead names this press for a hit kept for none, said so, as the
     lead's count (round 50: "1:11 · 70%" under a lead saying 61% in the 1:15 window); else _tied_share's."""
@@ -1064,16 +1077,14 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
     if hit is not None and (hs := hit_share(c, t, hit)) is not None:
         where = "ahead of" if c.ramp and t < hit - ANSWER[0] else "in the window of"  # a ramp: around its own time
         inside = _counted(c, t, hit)  # its own moment, then the lead's count with its own time (round 54)
-        when = st.median(inside) if inside else t
         b = None if c.why == MINUTE else _back_in(c, t, hit)  # its own reading (round 63); a minute button's
         # reason is the lead's, not "back from cooldown" (round 64: Convoke)
         tag = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"
                + (" for about half" if b <= BACK_SHARE[1] else ""))
-        if _pct(hs) == _pct(sp):  # one count: said once, its time only when 5 s or more off (round 60)
-            return (f"{_base(c, hs, hit)} &middot; {where} the {_mmss(hit)} hit"
-                    + (f", about {_mmss(when)}" if _mmss(when) != _mmss(t) else ""))  # the lead's time (round 67)
+        if _pct(hs) == _pct(sp):  # one count: said once, at the lead's time, the chip's own (round 78: "2:59 ·
+            return f"{_base(c, hs, hit)} &middot; {where} the {_mmss(hit)} hit"  # 15% … about 2:57", two times)
         return (f"{_share(sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
-                + (f", about {_mmss(when)}" if _mmss(when) != _mmss(t) else "") + tag)  # the lead's time (round 67)
+                + (f", about {_about(inside)}" if inside and _about(inside) != _mmss(t) else "") + tag)  # the lead's time (round 67)
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
         return _base(c, hs, _secs(n.partition(" ")[0]))
     return _share(sp)
@@ -1092,11 +1103,34 @@ def _pull_chip(c: Cooldown) -> str:
             "players, at the pull</span>")
 
 
+def _groups(xs: list[float]) -> list[list[float]]:
+    """Presses counted in a window: one group, or two when a gap of GROUP_GAP s or more splits them and each side
+    holds GROUP_SHARE of them (Disc's Evangelism ahead of Vashnik's 2:10: 1:41 and 2:01, a median 1:48 nobody
+    presses at; round 77)."""
+    xs = sorted(xs)
+    if len(xs) < 4:
+        return [xs]
+    k = max(range(1, len(xs)), key=lambda i: xs[i] - xs[i - 1])
+    if xs[k] - xs[k - 1] >= GROUP_GAP and min(k, len(xs) - k) >= GROUP_SHARE * len(xs):
+        return [xs[:k], xs[k:]]
+    return [xs]
+
+
+def _about(xs: list[float]) -> str:
+    """The time of the presses counted: their median, or each group's ("1:41 or 2:01")."""
+    return " or ".join(_mmss(st.median(g)) for g in _groups(xs))
+
+
+def _center(xs: list[float]) -> float:
+    """Where a chart mark goes: the median of the larger group of the presses counted."""
+    return st.median(max(_groups(xs), key=len))
+
+
 def _tw(c: Cooldown, t: float, hit: float) -> str:
     """A tied press's time: its counted presses' median, as the share's (round 63: "about 1:11" for presses at
     1:13), else its moment's."""
     inside = _counted(c, t, hit) if c.presses else []
-    return _mmss(st.median(inside) if inside else t)
+    return _about(inside) if inside else _mmss(t)
 
 
 STORE, RELEASE = " (Store)", " (Release)"  # a two-step button's two casts in the logs (Stasis)
@@ -1179,7 +1213,7 @@ def _released(c: Cooldown) -> str:
         return ""
     chips = ", ".join(f"{_mmss(t)} &middot; {_pct(sp)}"
                       + (f" (in the window of the {_mmss(h)} hit: {_pct(hs)}{_reach_note(r, h)}"
-                         + (f", about {_mmss(st.median(inside))}"  # the lead's time (its counted releases')
+                         + (f", about {_about(inside)}"  # the lead's time (its counted releases')
                             if (inside := _counted(r, t, h)) and _mmss(st.median(inside)) != _mmss(t) else "") + ")"
                          if h >= 0 and (hs := hit_share(r, t, h)) is not None else "")
                       for t, sp, h in zip(r.times, r.support, r.alt_of or [-1.0] * len(r.times), strict=False))
@@ -1856,7 +1890,7 @@ def render_sheet(h: HealerPrep) -> str:
             for x in xs:                # 5 s or more off (round 64: Divine Hymn "0:47" for presses at 0:41)
                 inside = _counted(x[4], x[1], hit_t) if x[4].presses else []
                 if inside and _mmss(st.median(inside)) != _mmss(x[1]):  # any shown difference (round 65: 0:42
-                    moved[(x[0], x[1])] = st.median(inside)                 # in the lead, 0:44 on the chip)
+                    moved[(x[0], x[1])] = _center(inside)                   # in the lead, 0:44 on the chip)
         # one press answering either of two hits (Aura Mastery at 0:36 for some, 1:19 for others) is said once
         by_press: dict[tuple, list] = {}
         for hit, xs in sorted(tops.items()):
@@ -1935,9 +1969,9 @@ def render_sheet(h: HealerPrep) -> str:
                     inside = _counted(c.release, m.t, m.t)
                     t_rel = min(c.release.times, key=lambda t: abs(t - m.t), default=None)  # its chart mark, tied
                     if t_rel is not None and abs(t_rel - m.t) <= ANSWER[1] + SLACK:  # as the lead says (the chart
-                        rel_marks.append((c.release, t_rel, st.median(inside)))  # follows the lead)
+                        rel_marks.append((c.release, t_rel, _center(inside)))  # follows the lead)
                     released.append((m.t, f"for the {b} hit, {_pct(hs)} release their {e(_shown(c.name))}"
-                                          f"{_reach_note(c.release, m.t)} (about {_mmss(st.median(inside))}"
+                                          f"{_reach_note(c.release, m.t)} (about {_about(inside)}"
                                           + (f", stored a median {c.release_gap:.0f} s before" if c.release_gap else "")
                                           + ")"))
                     bare.remove(b)
