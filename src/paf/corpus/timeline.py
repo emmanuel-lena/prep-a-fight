@@ -127,7 +127,7 @@ def build_timeline(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
     for r in ranked[:top]:
         k = (r["report"], r["fight_id"])
         dur = next((f["duration_s"] for f in fights if (f["report"], f["fight_id"]) == k), duration)
-        players.append({"rank": r["rank_pos"], "dps": r["dps"], "ilvl": r["ilvl"], "duration": dur,
+        players.append({"rank": r["rank_pos"], "dps": r["dps"], "ilvl": r["ilvl"], "duration": dur, "kill": k,
                         "casts": {a: ts for a, ts in casts.get(k, {}).items() if a in shown},
                         "targets": target_segments(targets.get(k, []))})
 

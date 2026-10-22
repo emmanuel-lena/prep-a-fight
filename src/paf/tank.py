@@ -27,6 +27,7 @@ from paf.healer import (
     RELATIVE,
     SPIKE,
     SPIKE_GAP,
+    STAGED,
     STEP,
     UNSIMMED,
     Cooldown,
@@ -111,9 +112,10 @@ def fetch_tank_damage(client, con, encounter_id: int, difficulty: int, limit: in
     return len(todo)
 
 
-def tank_curves(con, encounter_id: int, difficulty: int, duration: float
+def tank_curves(con, encounter_id: int, difficulty: int, duration: float, clock=None
                 ) -> tuple[list[float], dict[str, list[float]], list[tuple[str, float]]]:
-    """(median damage taken per second per STEP, the same per ability, (ability, median share) of the hitters)."""
+    """(median damage taken per second per STEP, the same per ability, (ability, median share) of the hitters); with
+    a stage clock (paf.stagetime), each kill in stage time (round 100)."""
     from paf.corpus.analyze import kills_filter
 
     ensure_table(con)
@@ -123,8 +125,10 @@ def tank_curves(con, encounter_id: int, difficulty: int, duration: float
     per_ability: dict[str, list[list[float]]] = defaultdict(lambda: [[] for _ in range(n)])
     shares: dict[str, list[float]] = defaultdict(list)
     kills = 0
-    for step, series in con.execute(f"SELECT d.step, d.series FROM tank_damage d JOIN fight f "
-                                    f"USING(report, fight_id) WHERE {where}", params):
+    for rep, fid, step, series in con.execute(f"SELECT d.report, d.fight_id, d.step, d.series FROM tank_damage d "
+                                              f"JOIN fight f USING(report, fight_id) WHERE {where}", params):
+        def at(t: float, k=(rep, fid)) -> float | None:
+            return clock.at(k, t) if clock else t
         data = json.loads(series)
         kills += 1
         sums = {name: sum(v or 0 for v in values) for name, values in data.items()}
@@ -134,17 +138,23 @@ def tank_curves(con, encounter_id: int, difficulty: int, duration: float
         buckets = [0.0] * n
         # the buckets this kill lasts: a finished kill is no zero damage (the curve fell at the end, "the boss gets
         # easy", as the shorter kills ended)
-        lasts = min(n, int((max((len(v) for v in data.values()), default=0) * step) // STEP))
+        # the buckets this kill covers: its seconds in stage time (a stage that came early leaves a gap before the
+        # next one's median start: no zero damage there either)
+        covered = {int(x // STEP) for i in range(max((len(v) for v in data.values()), default=0))
+                   if (x := at(i * step)) is not None and int(x // STEP) < n}
         for name, values in data.items():
             mine = [0.0] * n
             for i, v in enumerate(values):
-                b = int(i * step // STEP)
+                x = at(i * step)
+                if x is None:
+                    continue
+                b = int(x // STEP)
                 if b < n:
                     mine[b] += v or 0
                     buckets[b] += v or 0
-            for b in range(lasts):
+            for b in sorted(covered):
                 per_ability[name][b].append(mine[b])
-        for b in range(lasts):
+        for b in sorted(covered):
             total[b].append(buckets[b])
     curve = [st.median(v) if v else 0.0 for v in total]
     by = {name: [st.median(v) if v else 0.0 for v in rows] for name, rows in per_ability.items()}
@@ -175,8 +185,9 @@ def tank_busters(curve: list[float], by: dict[str, list[float]], top: int = 8) -
     return sorted(sorted(found, key=lambda m: -m.ratio)[:top], key=lambda m: m.t)
 
 
-def swaps(con, encounter_id: int, difficulty: int) -> tuple[list[float], float]:
-    """When most of the top tanks taunt (the tank swaps), and their median taunts a kill."""
+def swaps(con, encounter_id: int, difficulty: int, clock=None) -> tuple[list[float], float]:
+    """When most of the top tanks taunt (the tank swaps), and their median taunts a kill; with a stage clock
+    (paf.stagetime), in stage time, as the curve."""
     from paf.corpus.analyze import kills_filter
     from paf.defensives import peaks
 
@@ -190,7 +201,9 @@ def swaps(con, encounter_id: int, difficulty: int) -> tuple[list[float], float]:
             f"SELECT c.report, c.fight_id, c.t FROM player_cast c JOIN fight f USING(report, fight_id) "
             f"JOIN ranked r ON r.report=c.report AND r.fight_id=c.fight_id AND r.actor_id=c.actor_id "
             f"WHERE {where} AND c.ability_id IN ({ids}) AND c.type='cast'", params):
-        per_kill[(rep, fid)].append(t)
+        x = clock.at((rep, fid), t) if clock else t
+        if x is not None:
+            per_kill[(rep, fid)].append(x)
     if not kills:
         return [], 0.0
     lists = [[t for t in per_kill.get(k, []) if t >= PULL_TAUNT] for k in kills]  # the pull's taunt is no swap
@@ -600,7 +613,9 @@ def render_sheet(p: TankPrep) -> str:
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + [
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the ranked tank "
         f"of each top kill takes per second, median of {p.damage_kills or 'the'} kills (read on up to 40 of the top kills; "
-        f"that tank alone, so a swap moves it up or down; past the median kill, fewer kills are still going); under it, the defensives the lead ties to a hit (an "
+        f"that tank alone, so a swap moves it up or down; past the median kill, fewer kills are still going); "
+        + (STAGED if getattr(p, "staged", False) else "")
+        + "under it, the defensives the lead ties to a hit (an "
         f"outline: another press of the same button) and the swaps. A dot is one of the tanks' three biggest "
         f"moments of damage, whatever casts it: only the three highest are dotted, another as high may be left out.</p><ul class='hl2'>"
         f"{moments_html(p.moments, 'tank damage') or '<li>No big moment: steady damage.</li>'}</ul></div>",

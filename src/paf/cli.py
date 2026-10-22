@@ -770,11 +770,15 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     if not tl.kills:
         print(f"No kill of {enc.name} {diff_name} for {spec} {cls} yet.")
         return 1
-    curve, by, hitters = tank.tank_curves(con, enc.id, diff, tl.duration)
+    from paf import stagetime
+
+    clk = stagetime.clock(enc.id, diff)  # a late stage's tank hits and presses lined up on its start (round 100)
+    tls = stagetime.warp(tl, clk)
+    curve, by, hitters = tank.tank_curves(con, enc.id, diff, max(tl.duration, tls.duration), clock=clk)
     found = tank.tank_busters(curve, by, top=3)  # its three biggest: five "biggest moments" lost the point
     healer.name_by_damage(found, by)  # by the window's share, as the raid's moments (a lone point named Slithering
     # Flame in Stage Two)
-    swap_times, taunts = tank.swaps(con, enc.id, diff)
+    swap_times, taunts = tank.swaps(con, enc.id, diff, clock=clk)
     from paf.defensives import is_defensive
     from paf.gamedata import is_mitigation, spell_cooldowns, weakens_enemy
 
@@ -794,13 +798,13 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     from paf.healroles import on_cadence, press_moments
 
     def moments_of(a) -> list[float]:  # a short defensive is a timed answer too (Spell Reflection at 0:35); one
-        casts = [p["casts"].get(a.name) or p["casts"].get(a.id) or [] for p in tl.players]  # on cooldown is not
-        every = on_cadence(casts, a.per_kill, tl.duration)  # (Demoralizing Shout every 30 s): no moments
-        lasts = [p.get("duration") or tl.duration for p in tl.players]  # a hit's share: of the kills reaching it
+        casts = [p["casts"].get(a.name) or p["casts"].get(a.id) or [] for p in tls.players]  # on cooldown is not
+        every = on_cadence(casts, a.per_kill, tls.duration)  # (Demoralizing Shout every 30 s): no moments
+        lasts = [p.get("duration") or tls.duration for p in tls.players]  # a hit's share: of the kills reaching it
         if every:
             return [], every, [], casts, lasts
-        times = press_moments(casts, max(1, round(a.per_kill)), tl.duration)[0]
-        n = max(1, len(tl.players))  # each moment's share of the top players, as the cooldowns' chips
+        times = press_moments(casts, max(1, round(a.per_kill)), tls.duration)[0]
+        n = max(1, len(tls.players))  # each moment's share of the top players, as the cooldowns' chips
         return (times, 0.0, [sum(1 for ts in casts if any(abs(x - t) <= 8 for x in ts)) / n for t in times],
                 casts, lasts)
     short_defs = sorted(((a.name, a.users, a.per_kill, *moments_of(a)) for a in tl.abilities
@@ -817,15 +821,16 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
 
     p = tank.TankPrep(
         enc.name, diff_name, healroles.pretty(cls, spec), tl.kills, tl.duration, curve, found, hitters,
-        healer.cooldowns(tl, found), swap_times, taunts, mitigation,
+        healer.cooldowns(tls, found), swap_times, taunts, mitigation,
         healer.build_rows(builds), healer.trinkets(con, enc.id, diff),
-        bossguide.role_bullets(bossguide.load(enc.id, diff_name), "tank"), [(n, t) for n, t, _ in tl.phases],
+        bossguide.role_bullets(bossguide.load(enc.id, diff_name), "tank"), [(n, t) for n, t, _ in tls.phases],
         healroles.comps(con, enc.id, diff, role=healroles.TANKS),
         healroles.presence(con, enc.id, diff, role=healroles.TANKS),
         swap_after=tank.swap_causes(swap_times, tl.boss_casts), class_name=cls,
-        rare=[c for c in healer.cooldowns(tl, found, min_users=0.25, max_users=0.5)
+        rare=[c for c in healer.cooldowns(tls, found, min_users=0.25, max_users=0.5)
               if is_defensive(c.spell_id, c.name)],
         character=getattr(profile, "name", "") or "")
+    p.staged = bool(clk)
     p.split, p.split_players = healer.contested(con, enc.id, diff, spec)
     if len(p.split) < 2:  # no talent 35-65%: the ones they differ on most, said as such
         p.split, p.split_players = healer.contested(con, enc.id, diff, spec, *healer.SPLIT, shown=6)
@@ -934,8 +939,13 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     if not tl.kills:
         print(f"No kill of {enc.name} {diff_name} for {spec} {cls} yet.")
         return 1
-    curve = healer.raid_curve(con, enc.id, diff, tl.duration, pool=True)  # one boss: its hits the same on every
-    sections = bossguide.load(enc.id, diff_name)                            # healer sheet
+    from paf import stagetime
+
+    clk = stagetime.clock(enc.id, diff)  # a late stage's waves and answers lined up on its start (round 100)
+    tls = stagetime.warp(tl, clk)        # the top players' presses in stage time, as the curve
+    # one boss: its hits the same on every healer sheet
+    curve = healer.raid_curve(con, enc.id, diff, tl.duration, pool=True, clock=clk)
+    sections = bossguide.load(enc.id, diff_name)
     roles = bossguide.ability_roles(sections)
     from paf.mechanics import walk
 
@@ -947,7 +957,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     skip = {n for n in tank_only if not re.search(r"\bplayers\b|\braid\b", text.get(n, ""), re.I)}
     raid = {n for n, t in text.items() if re.search(r"\ball players\b|\bthe raid\b", t, re.I)}
     found = healer.moments(curve, tl.boss_casts, skip=skip, raid=raid)
-    by = healer.raid_by_ability(con, enc.id, diff, tl.duration, pool=True)
+    by = healer.raid_by_ability(con, enc.id, diff, tl.duration, pool=True, clock=clk)
     if by:  # measured: what hits the raid there
         healer.name_by_damage(found, by)
     for m in found:
@@ -960,10 +970,11 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         print(f"  talent strings: skipped ({str(ex)[:80]})")
     h = healer.HealerPrep(
         enc.name, diff_name, healroles.pretty(cls, spec), tl.kills, tl.duration, curve, found,
-        healer.cooldowns(tl, found), healer.build_rows(builds),
+        healer.cooldowns(tls, found), healer.build_rows(builds),
         healer.trinkets(con, enc.id, diff), bossguide.role_bullets(bossguide.load(enc.id, diff_name), "healer"),
-        [(n, t) for n, t, _ in tl.phases], class_name=cls, character=getattr(profile, "name", "") or "")
-    healer.two_step(tl, h.cooldowns, found)  # Stasis: its release and what it stores
+        [(n, t) for n, t, _ in tls.phases], class_name=cls, character=getattr(profile, "name", "") or "")
+    h.staged = bool(clk)
+    healer.two_step(tls, h.cooldowns, found)  # Stasis: its release and what it stores
     for c in h.cooldowns:
         if c.release is not None:
             c.stored = healer.stored_spells(con, enc.id, diff, c.name)
@@ -1001,9 +1012,9 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     # every long cooldown fewer than half of them press (Pain Suppression, 34%): 25-50% fell between the two lists
     # no potion (they crowded out Healing Tide Totem) nor spell on enemies; worn trinkets go to their own section
     worn_items = {n for n, _i, _s in h.trinkets}
-    h.potions = [c for c in healer.cooldowns(tl, found, min_users=0.25) if healer._item(c.spell_id)
+    h.potions = [c for c in healer.cooldowns(tls, found, min_users=0.25) if healer._item(c.spell_id)
                  and c.name not in worn_items]  # a mana potion 43% drink: on the fight tab, as the tank's
-    h.rare = sorted((c for c in healer.cooldowns(tl, found, min_users=0.02, max_users=0.5)
+    h.rare = sorted((c for c in healer.cooldowns(tls, found, min_users=0.02, max_users=0.5)
                      if c.name in worn or not (healer._item(c.spell_id) or healer._enemy(c.spell_id))),
                     key=lambda c: -c.users)[:5]
     step("The top raids' healers: their compositions and what each spec does here")

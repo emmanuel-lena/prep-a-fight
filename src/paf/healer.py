@@ -104,6 +104,12 @@ class Cooldown:
     hits: list = field(default_factory=list)  # the big hits' times, for a release chip's window
 
 
+LEAD_HITS = 4  # the big moments the lead says at most: Nek'zali's two rites and Stage Two's two waves
+# the stage clock said, on a boss with stages (paf.stagetime, round 100)
+STAGED = ("In stage time: each kill's damage and presses after a stage starts are counted from that stage's start, "
+          "placed at its median start (the dashed lines), so a late stage's waves line up whatever time it began. ")
+
+
 @dataclass
 class HealerPrep:
     boss: str
@@ -192,6 +198,10 @@ def fetch_raid_damage(client, con, encounter_id: int, difficulty: int, limit: in
 
 
 def _raid_rows(con, table: str, encounter_id: int, difficulty: int, pool: bool) -> list[tuple[float, str]]:
+    return [(st_, se) for _k, st_, se in _raid_kills(con, table, encounter_id, difficulty, pool)]
+
+
+def _raid_kills(con, table: str, encounter_id: int, difficulty: int, pool: bool) -> list[tuple[tuple, float, str]]:
     """(step, series) of each kill's raid damage: this corpus', or with pool every corpus' kills of the boss, each
     kill once (the boss is the same on every sheet: Nek'zali's second rite read 1:15 on four sheets, 1:20 on the
     others, and the other healers' answers to it changed with the sheet; round 33)."""
@@ -202,7 +212,7 @@ def _raid_rows(con, table: str, encounter_id: int, difficulty: int, pool: bool) 
     sql = f"SELECT d.report, d.fight_id, d.step, d.series FROM {table} d JOIN fight f USING(report, fight_id) WHERE {where}"
     if not pool:
         ensure_table(con)
-        return [(st_, se) for _r, _f, st_, se in con.execute(sql, params)]
+        return [((r, f), st_, se) for r, f, st_, se in con.execute(sql, params)]
     seen, out = set(), []
     for path in sorted(data_dir().glob("corpus-*.sqlite")):
         c = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
@@ -212,7 +222,7 @@ def _raid_rows(con, table: str, encounter_id: int, difficulty: int, pool: bool) 
             for rep, fid, st_, se in c.execute(sql, params):
                 if (rep, fid) not in seen:
                     seen.add((rep, fid))
-                    out.append((st_, se))
+                    out.append(((rep, fid), st_, se))
         finally:
             c.close()
     return out
@@ -223,16 +233,20 @@ def raid_kills(con, encounter_id: int, difficulty: int, pool: bool = False) -> i
     return len(_raid_rows(con, "raid_damage", encounter_id, difficulty, pool))
 
 
-def raid_by_ability(con, encounter_id: int, difficulty: int, duration: float, pool: bool = False
-                    ) -> dict[str, list[float]]:
-    """The raid's damage taken per ability, per STEP, summed over the kills read (shares compare, not levels)."""
+def raid_by_ability(con, encounter_id: int, difficulty: int, duration: float, pool: bool = False,
+                    clock=None) -> dict[str, list[float]]:
+    """The raid's damage taken per ability, per STEP, summed over the kills read (shares compare, not levels); with a
+    stage clock (paf.stagetime), each kill's times in stage time."""
     n = int(duration // STEP) + 1
     out: dict[str, list[float]] = {}
-    for step, series in _raid_rows(con, "raid_damage_ability", encounter_id, difficulty, pool):
+    for kill, step, series in _raid_kills(con, "raid_damage_ability", encounter_id, difficulty, pool):
         for name, values in json.loads(series).items():
             row = out.setdefault(name, [0.0] * n)
             for i, v in enumerate(values):
-                b = int(i * step // STEP)
+                at = clock.at(kill, i * step) if clock else i * step
+                if at is None:  # a stage's seconds past the next one's median start: left out
+                    continue
+                b = int(at // STEP)
                 if b < n:
                     row[b] += v or 0
     return out
@@ -299,15 +313,18 @@ def name_by_damage(found: list[Moment], by: dict[str, list[float]], width: int =
             m.boss_spell = f"mostly {first} and {second}"
 
 
-def raid_curve(con, encounter_id: int, difficulty: int, duration: float, pool: bool = False) -> list[float]:
-    """Median raid damage taken per second, per STEP seconds, over the kills that have it (pool: every corpus')."""
-    rows = _raid_rows(con, "raid_damage", encounter_id, difficulty, pool)
+def raid_curve(con, encounter_id: int, difficulty: int, duration: float, pool: bool = False,
+               clock=None) -> list[float]:
+    """Median raid damage taken per second, per STEP seconds, over the kills that have it (pool: every corpus'); with
+    a stage clock (paf.stagetime), each kill's damage in stage time, so a late stage's waves line up (round 100)."""
+    rows = _raid_kills(con, "raid_damage", encounter_id, difficulty, pool)
     if pool and rows:  # the pooled kills' own length, not this sheet's: the same curve and ratios on every sheet
-        lengths = [max((len(v) for v in json.loads(se).values()), default=0) * stp for stp, se in rows]
+        lengths = [((clock.at(k, n_ * stp) or n_ * stp) if clock else n_ * stp)
+                   for k, stp, se in rows for n_ in [max((len(v) for v in json.loads(se).values()), default=0)]]
         duration = st.median(lengths) or duration
     n = int(duration // STEP) + 1
     per_bucket: list[list[float]] = [[] for _ in range(n)]
-    for step, series in rows:
+    for kill, step, series in rows:
         data = json.loads(series)
         total: list[float] = []
         for values in data.values():
@@ -316,7 +333,10 @@ def raid_curve(con, encounter_id: int, difficulty: int, duration: float, pool: b
                     total.append(0.0)
                 total[i] += v or 0
         for i, v in enumerate(total):  # each point covers `step` seconds: into STEP buckets
-            b = int(i * step // STEP)
+            at = clock.at(kill, i * step) if clock else i * step
+            if at is None:  # a stage's seconds past the next one's median start: left out
+                continue
+            b = int(at // STEP)
             if b < n:
                 per_bucket[b].append(v)
     return [st.median(v) if v else 0.0 for v in per_bucket]
@@ -2096,8 +2116,8 @@ def render_sheet(h: HealerPrep) -> str:
     lead, lead_names, answered, rel_marks = "", [], set(), []
     named: dict = {}  # the press the lead names for each hit kept for none: its chip counts that window too
     moved: dict = {}  # a tied press whose counted presses sit 5 s or more from its moment: drawn and said there
-    if h.moments:
-        shown = h.moments[:3]
+    if h.moments:  # the highest, in time order (round 100: the first three in time kept Stage Two's 3:50, 1.42x, and
+        shown = sorted(sorted(h.moments, key=lambda m: -m.ratio)[:LEAD_HITS], key=lambda m: m.t)  # lost its 4:15)
         ratios = (f"{'both' if len(shown) == 2 else 'each'} {_x(shown[0].ratio)}&times;"
                   if len({_x(m.ratio) for m in shown}) == 1 and len(shown) > 1
                   else _and([f"{_x(m.ratio)}&times;" for m in shown]))
@@ -2317,6 +2337,7 @@ def render_sheet(h: HealerPrep) -> str:
         f"damage taken per second, median of the {h.raid_kills or 'top'} kills of this boss whose raid damage is recorded "
         f"(up to 40 for each spec read: every healer sheet shows the same hits; past the median kill, fewer kills are "
         f"still going); "
+        + (STAGED if getattr(h, "staged", False) else "")
         + ("under it, the cooldowns the lead ties to a hit (an outline: another press of the same button). " if lead_names
            else "no cooldown is kept for these hits, so none is drawn. ")
         + "A dot is a big moment, "

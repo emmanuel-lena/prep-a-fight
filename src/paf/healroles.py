@@ -729,6 +729,12 @@ def pooled_kills(encounter_id: int, difficulty: int, paths: list | None = None
                 got |= {k for k in casts}
         finally:
             con.close()
+    from paf.stagetime import clock
+
+    clk = clock(encounter_id, difficulty, paths)  # the casts in stage time, as the curve and the hits (round 100)
+    if clk:
+        casts = defaultdict(list, {k: [(ab, x, o) for ab, t, o in v if (x := clk.at((k[0], k[1]), t)) is not None]
+                                   for k, v in casts.items()})
     top = [h for k, hs in rows.items() for a, h in hs.items() if a in out[k]]  # the ranked players themselves
     whole = {k: sum(h[5] or 0 for h in hs.values()) for k, hs in rows.items()}  # each kill's healing, all of it
     per_kill = {k: [h for a, h in hs.items() if a not in out[k]] for k, hs in rows.items()}
