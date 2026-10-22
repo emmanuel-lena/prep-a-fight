@@ -108,7 +108,9 @@ class Cooldown:
 LEAD_HITS = 4  # the big moments the lead says at most: Nek'zali's two rites and Stage Two's two waves
 # the stage clock said, on a boss with stages (paf.stagetime, round 100)
 STAGED = ("in stage time: each kill's damage and presses after a stage starts are counted from that stage's start, "
-          "placed at its median start (the dashed lines), so a late stage's waves line up whatever time it began; ")
+          "placed at its median start (the dashed lines), so a late stage's waves line up whatever time it began (a "
+          "stage's seconds past the next one's median start are left out of the times, its presses still counted in "
+          "who presses a button and how often); ")
 
 
 @dataclass
@@ -527,13 +529,15 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         # game's cooldown, read in pull time (round 101: a Rewind gap read 178 s for 245 s across Stage Two)
         pulls = [sorted(t for i in ids for t in ((p.get("pull") or p["casts"]).get(i) or []))
                  or list((p.get("pull") or p["casts"]).get(name) or []) for p in tl.players]
-        users = sum(1 for ts in per_player if ts) / max(1, len(tl.players))
+        raw = [sorted(t for i in ids for t in ((p.get("raw") or p["casts"]).get(i) or []))
+               or list((p.get("raw") or p["casts"]).get(name) or []) for p in tl.players]  # every cast, stage time or not
+        users = sum(1 for ts in raw if ts) / max(1, len(tl.players))
         pressed_lasts = [p.get("duration") or tl.duration for p, ts in zip(tl.players, per_player, strict=False) if ts]
         pulls = [q for ts, q in zip(per_player, pulls, strict=False) if ts]
         per_player = [ts for ts in per_player if ts]
         if not per_player or not tl.duration:
             continue
-        per_kill = st.median(len(ts) for ts in per_player)
+        per_kill = st.median(len(ts) for ts in raw if ts)  # its presses a kill, all of them (round 107)
         if not min_users <= users < max_users or per_kill > max(1.0, tl.duration / COOLDOWN_GAP):
             continue
         if base and max(base.get(i, (0.0, 1))[0] for i in ids) < COOLDOWN_GAP:
@@ -2553,7 +2557,9 @@ def render_sheet(h: HealerPrep) -> str:
         boss.append(f"<h2>Every ability{', phase by phase' if '<h3>' in stages else ''}</h2>"  # Vashnik: one phase
                     f"<p class='small muted'>The times{' and stage starts' if len(h.phases) > 1 else ''} are the boss's in the {h.kills} top "
                     f"{e(h.spec)} kills (median {_mmss(h.duration)}): a slower or faster raid sees the later ones "
-                    f"shift, and another spec's sheet, read on its own kills, can say other times.</p>"
+                    f"shift, and another spec's sheet, read on its own kills, can say other times"
+                    + ("; the fight tab's hits and stage lines are in stage time, so they can sit a few seconds off "
+                       "these" if getattr(h, "staged", False) else "") + ".</p>"
                     f"<div class='stages'>{stages}</div>")
     # every spec the pool reads (paf.healroles.POOL_PLAYERS): the Disc Priest, 3 in a Holy Priest's kills, has 43
     # in the pool; its casts unread here are said so in its cells

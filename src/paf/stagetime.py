@@ -94,6 +94,8 @@ def warp(tl, clk: Clock):
             continue
         q = dict(p)
         q["casts"] = {a: [x for t in ts if (x := clk.at(k, t)) is not None] for a, ts in p["casts"].items()}
+        q["raw"] = p["casts"]  # every cast, for who presses it and how often (round 107: a press in a stage that ran
+        # long, left out of the times, read Rewind "pressed by 98%" for 100%)
         q["pull"] = {a: [t for t in ts if clk.at(k, t) is not None] for a, ts in p["casts"].items()}  # its pull times,
         # one to one: a gap between two presses is read on them (a cooldown is pull time)
         end = clk.at(k, p.get("duration") or tl.duration)
