@@ -559,6 +559,10 @@ def render_sheet(p: TankPrep) -> str:
                                              + _and([f"{e(n)} {u:.0%}" for n, u in up]) + ".")
         if bare:
             lead.append(f"No defensive is kept for {', nor '.join(bare)}.")  # each hit its own aside (round 42)
+        low = [x for x in sorted(p.moments, key=lambda x: x.t) if x.ratio < 1.5]  # the healers' rule said (round 98:
+        if low:                                                                  # 1.45x "hits" with no word)
+            lead.append(f"The {_and([_mmss(x.t) for x in low])} {'moments stay' if len(low) > 1 else 'moment stays'} "
+                        "under 1.5&times; the usual damage: they are among the tanks' three highest, not set hits.")
         # a hit that comes with a swap (Vashnik's 1:35 and 2:55, after Dripping Fangs): the time is the link
         with_swap = [(x, w) for x in p.moments for w in p.swaps if abs(w - x.t) <= ANSWER[0]]
         # said only when swaps are rare enough for it to mean something: one every 28 s (Vashnik) lands within 5 s

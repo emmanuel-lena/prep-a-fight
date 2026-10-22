@@ -574,8 +574,12 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
             ok = (tied and m is not None and -ANSWER[0] <= t - m.t <= ANSWER[1]  # pressed for the hit: before or in
                   and t not in back)  # it; not a press made as soon as it is back
             near.append(f"{_mmss(m.t)} {m.boss_spell}".strip() if ok else "")
-        n_all = max(1, len(tl.players))  # the share of all the top players pressing it within 8 s of each moment
-        support = [sum(1 for ts in per_player if any(abs(x - t) <= 8 for x in ts)) / n_all for t in times]
+        n_all = max(1, len(tl.players))  # the share of all the top players pressing it within 8 s of each moment,
+        alld = [p.get("duration") or tl.duration for p in tl.players]  # of the kills still going then (round 98:
+
+        def n_at(t: float, alld=alld) -> int:  # "3:52 · 24%" of 100 beside "28% of the 58 kills still going")
+            return max(1, sum(1 for d in alld if d >= t))
+        support = [sum(1 for ts in per_player if any(abs(x - t) <= 8 for x in ts)) / n_at(t) for t in times]
         # a moment a quarter of those who press it share at least: under, it is timing that varies (a chip at 12%
         # of the top players read as a moment next to "no moment most of them share")
         kept = [i for i, sp in enumerate(support) if sp >= 0.25 * users]
@@ -585,7 +589,7 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         if every:
             keep = [i for i, x in enumerate(alt) if x not in back]
             alt, alt_of = [alt[i] for i in keep], [alt_of[i] for i in keep]
-        alt_support = [sum(1 for ts in per_player if any(abs(x - t) <= 8 for x in ts)) / n_all for t in alt]
+        alt_support = [sum(1 for ts in per_player if any(abs(x - t) <= 8 for x in ts)) / n_at(t) for t in alt]
         kept = [i for i, sp in enumerate(alt_support) if sp >= 0.25 * users  # the same quarter as the moments,
                 and alt_of[i] in times]  # of a moment still shown
         alt, alt_support, alt_of = [alt[i] for i in kept], [alt_support[i] for i in kept], [alt_of[i] for i in kept]
@@ -798,7 +802,7 @@ def _also_pressers(c: Cooldown, t: float, named: dict | None, n: str, sp: float)
     shown = _named(c, t, named, n, sp)
     if "of those who press it" in shown:
         return ""
-    if shown == _share(sp) or _split(shown)[0] == _share(sp):  # its own share, before a window clause (round 90:
+    if _split(shown)[0] in (_share(sp), _share(sp) + _still(c, t)):  # its own share, before a window clause (r. 90:
         return _pressers(c, sp)                                   # Shield Wall "3:52 · 24% · in the window…")
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None and shown == _base(
             c, hs, _secs(n.partition(" ")[0])):
@@ -939,7 +943,7 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
         return (f" &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
                 + (f", about {_about(inside)}" if inside else "") + tag)
     sp_of = {a: sp for a, sp, _n in near}
-    return ", or " + ", ".join(f"{_chip((moved or {}).get((c.name, a), a), n)}" + (f" for {_pct(sp)}{_pressers(c, sp)}"
+    return ", or " + ", ".join(f"{_chip((moved or {}).get((c.name, a), a), n)}" + (f" for {_pct(sp)}{_still(c, a)}{_pressers(c, sp)}"
                                                                                    if sp else " for some")
                                + ("" if window(a, n) and "back from cooldown" in window(a, n) else
                                   back(a) if a in c.back and not c.why else "")  # the window's reading alone (r. 72)
@@ -1176,7 +1180,13 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
                 + (f", about {_about(inside)}" if inside and _about(inside) != _mmss(t) else "") + tag)  # the lead's time (round 67)
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
         return _base(c, hs, _secs(n.partition(" ")[0]))
-    return _share(sp)
+    return _share(sp) + _still(c, t)
+
+
+def _still(c: Cooldown, t: float) -> str:
+    """A time's share past the first kill's end is of the kills still going then, said (round 98)."""
+    n = sum(1 for d in c.lasts if d >= t) if c.lasts else 0
+    return f", in the {n} kills still going" if c.lasts and 0 < n < len(c.lasts) else ""
 
 
 def _pull_chip(c: Cooldown) -> str:
@@ -2328,15 +2338,16 @@ def render_sheet(h: HealerPrep) -> str:
     buffers = [c for c in heals if _external(c.spell_id) == "damage"]  # Power Infusion: a buff on a damage dealer
     buff_note = (f" {_and([e(_shown(c.name)) for c in buffers])}, a buff cast on a damage dealer, is with your long "
                  "cooldowns above." if buffers else "")  # round 34: "fewer than half cast one" read as PI's absence
-    if exts:  # cast on another player: their own group, apart from the raid cooldowns
+    if exts and any(c.times for c in exts):  # cast on another player: their own group, apart from the raid
+        # cooldowns; with no shared moment, the one-line form below (round 98: Time Dilation 50% a card, 48% a line)
         fight.append(f"<h2>Your externals{f', where the top {e(h.spec)}s cast them' if any(c.times for c in exts) else ''}"
                      f"</h2><ul class='hl2'>"
                      f"{cooldowns_html(exts, answered, named)}</ul>{fewer(rare_ext)}"
                      + (f"<p class='small muted'>{buff_note.strip()}</p>" if buff_note else ""))
-    elif rare_ext:  # Pain Suppression at 34%: still an external, never filed with the defensives
-        fight.append(f"<h2>Your externals</h2><p class='small muted'>Fewer than half of the top {e(h.spec)}s cast one here: "
+    elif rare_ext or exts:  # Pain Suppression at 34%: still an external, never filed with the defensives
+        fight.append(f"<h2>Your externals</h2><p class='small muted'>{'Fewer than half of the top ' + e(h.spec) + 's cast one here' if not exts else 'The top ' + e(h.spec) + 's cast one at no shared moment'}: "
                      + ", ".join(f"{e(c.name)} ({c.users:.0%}, {_and([_mmss(t) for t in c.times]) or 'no shared moment'})"
-                                 for c in rare_ext) + f".{buff_note}</p>")
+                                 for c in [*exts, *rare_ext]) + f".{buff_note}</p>")
     else:  # none, said (round 92: the Shaman's sheet had no line, the Dig deeper table a "–")
         fight.append(f"<h2>Your externals</h2><p class='small muted'>The top {e(h.spec)}s cast no long protective "
                      f"cooldown on another player here.{buff_note}</p>")

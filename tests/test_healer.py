@@ -655,3 +655,10 @@ def test_a_quarter_not_kept_names_the_button_kept():
             == " &middot; not kept for the 0:35 hit: 25% in its window, under Revival / Restoral's 38% of the top "
             "players")
     assert healer._not_kept(35.0, 0.16, named) == " &middot; not kept for the 0:35 hit: 16% in its window"
+
+
+def test_a_late_time_share_says_the_kills_still_going():
+    # Protection Warrior, Nek'zali (round 98): "3:52 · 24%" of 100 beside "28% … in the 58 kills still going"
+    c = healer.Cooldown("Shield Wall", 1, 0.77, 2.0, [232.0], [""], lasts=[300.0] * 58 + [200.0] * 42)
+    assert healer._still(c, 232.0) == ", in the 58 kills still going"
+    assert healer._still(c, 100.0) == ""
