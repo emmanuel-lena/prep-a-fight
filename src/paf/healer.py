@@ -101,6 +101,7 @@ class Cooldown:
     release_pairs: list = field(default_factory=list)  # (each release, seconds after its own store)
     unreleased: float = 0.0  # the share of stores with no release before the next store
     fates: list = field(default_factory=list)  # (each store, its release or None)
+    hits: list = field(default_factory=list)  # the big hits' times, for a release chip's window
 
 
 @dataclass
@@ -1053,7 +1054,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip((moved or {}).get((c.name, t), _named_at(c, t, named, sp)), tie(c, t, n))}"
                                         + _split(_named(c, t, named, tie(c, t, n), sp))[0]
                                         + (_pressers(c, sp) if _named(c, t, named, tie(c, t, n), sp) == _share(sp) else "")
-                                        + (_fate(c, t) if c.fates else "")
+
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
                                            if t in c.back and not (c.why or c.every)  # its line says it; its
                                            and "back from cooldown" not in _split(_named(c, t, named, tie(c, t, n), sp))[1]
@@ -1221,6 +1222,7 @@ def two_step(tl, cds: list[Cooldown], found: list[Moment]) -> None:
                     pairs.append((u, u - t))
         c.release, c.release_gap = r, (st.median(g for _u, g in pairs) if pairs else 0.0)
         c.release_pairs, c.unreleased, c.fates = pairs, (unreleased / stores if stores else 0.0), fates
+        c.hits = [m.t for m in found]
 
 
 def stored_spells(con, encounter_id: int, difficulty: int, store: str) -> list[tuple[str, float, float]]:
@@ -1254,18 +1256,6 @@ def stored_spells(con, encounter_id: int, difficulty: int, store: str) -> list[t
                   key=lambda y: (-y[1], -y[2], y[0]))
 
 
-def _fate(c: Cooldown, t: float) -> str:
-    """Where a store chip's stores go: their release's median time, and the share never released (round 85: what
-    the 64% storing at 1:41 do with it was unreadable)."""
-    near = [u for s, u in c.fates if abs(s - t) <= 8]
-    if not near:
-        return ""
-    out = [u for u in near if u is not None]
-    never = 1 - len(out) / len(near)
-    return ((f" &middot; released about {_about(out)}" if out else "")
-            + (f" ({_pct(never)} never)" if out and never >= 0.05 else "" if out else " &middot; never released"))
-
-
 def _gap_of(c: Cooldown, inside: list[float]) -> float:
     """The median store-to-release gap of the releases counted in a window."""
     got = set(inside)
@@ -1278,27 +1268,42 @@ def _released(c: Cooldown) -> str:
     r = c.release
     if r is None:
         return ""
-    def held(t: float, h: float) -> str:  # each release's own gap from its store (round 84: the pull's held ~20
-        near = (_counted(r, t, h) if h >= 0 else []) or [x for ts in r.presses for x in ts if abs(x - t) <= 8]
-        gap = _gap_of(c, near)  # s, the others ~14 s); a hit's: its window's releases, as the lead (round 85)
-        if not gap:
+    # one release chip per store chip, from that store's own releases (round 88: "2:13 · 37% · from the 1:57 store"
+    # mixed the 1:57 group with a third of the 1:41 one, whose own release, about 1:54, had no chip); stores far
+    # from every chip said apart
+    groups = sorted([*c.times, *c.alt])
+    by: dict[float, list] = {g: [] for g in groups}
+    other: list = []
+    for st_t, u in c.fates:
+        g = min(groups, key=lambda x: abs(x - st_t), default=None)
+        (by[g] if g is not None and abs(g - st_t) <= 8 else other).append((st_t, u))
+    n = max(1, c.n_all or len(c.presses))
+
+    def chip(g: float, fs: list) -> str:
+        us = [u for _s, u in fs if u is not None]
+        if not us:
             return ""
-        got = set(near)  # the store it comes from, named: its chip's time when one is near, else its own (round 86:
-        at = st.median(u - g for u, g in c.release_pairs if u in got)  # "3:49 · stored 20 s before" from 3:29,
-        chip = min([*c.times, *c.alt], key=lambda x: abs(x - at), default=None)  # no chip there)
-        where = f"the {_mmss(chip)}" if chip is not None and abs(chip - at) <= 8 else f"a store about {_mmss(at)}"
-        return (f" &middot; from {where}{' store' if where.startswith('the') else ''}, each a median {gap:.0f} s "
-                "after its own")  # a median of each press's gap, not the chips' (round 87: 21 s for 0:03 to 0:26)
-    chips = "".join(f"<span class='chip'>{_mmss(t)} &middot; {_pct(sp)} of the top players{held(t, h)}"
-                    + (f" &middot; in the window of the {_mmss(h)} hit:{_base(r, hs, h).replace(' &middot;', '')}"
-                       + (f", about {_about(inside)}"  # the lead's time (its counted releases')
-                          if (inside := _counted(r, t, h)) and _about(inside) != _mmss(t) else "")
-                       if h >= 0 and (hs := hit_share(r, t, h)) is not None else "") + "</span>"
-                    for t, sp, h in zip(r.times, r.support, r.alt_of or [-1.0] * len(r.times), strict=False))
+        gap = st.median(u - s_ for s_, u in fs if u is not None)
+        never = 1 - len(us) / len(fs)
+        at = st.median(us)
+        h = next((m for m in c.hits if -ANSWER[0] <= at - m <= ANSWER[1] + SLACK), None)
+        win = ""
+        if h is not None:
+            k = sum(1 for u in us if h - ANSWER[0] <= u <= h + ANSWER[1])
+            win = (f" &middot; in the window of the {_mmss(h)} hit: {_pct(k / reach(r, h))} of the top players"
+                   f"{_reach_note(r, h)}")
+        return (f"<span class='chip'>{_about(us)} &middot; {_pct(len(us) / n)} of the top players &middot; from the "
+                f"{_mmss(g)} store, each a median {gap:.0f} s after its own"
+                + (f" ({_pct(never)} of those stores never released)" if never >= 0.05 else "") + win + "</span>")
+    chips = "".join(chip(g, by[g]) for g in groups)
+    rest = [u for _s, u in other if u is not None]
+    if chips and rest:
+        chips += (f"<small class='alt'>and about {len(rest) / n:.1f} more releases a kill, of stores made at other "
+                  "times</small>")  # releases, not players: a player may have several (round 88: "94% release")
     gap = "" if chips else f", a median {c.release_gap:.0f} s after its store" if c.release_gap else ""
     never = f"; {_pct(c.unreleased)} of the stores are never released" if c.unreleased >= 0.05 else ""
-    out = (f"<span class='subrow'><small class='alt'>released{gap}{never.replace('; ', ' (', 1) + ')' if never else ''}"
-           f":</small>{chips}</span>" if chips else
+    out = (f"<span class='subrow'><small class='alt'>released:</small>{chips}</span>" if chips else  # each
+           # chip says its stores' share never released
            f"<small class='alt'>released{gap} at varying times{never}</small>")  # as chips, as the store's (r. 83)
     if c.stored:
         out += (f"<small class='alt'>what they store (the first {STORED} spells cast after storing): " + ", ".join(
@@ -1648,7 +1653,7 @@ def roles_table(roles: list, mine: str = "") -> str:
     few = "<small>too few here</small>"  # a spec read in the pool, too rare in this sheet's kills for its casts
     cover = next((r.spike_cover for r in roles if getattr(r, "spike_cover", 0)), 0.0)
     head = ("<th>Healer</th><th>Healing share</th><th>On tanks</th>"
-            f"<th>Healing in spikes{f' <small>(share; spikes {_pct(cover)} of the fight)</small>' if cover else ''}</th>"
+            f"<th>Of its healing, in spikes{f' <small>(spikes: {_pct(cover)} of the fight)</small>' if cover else ''}</th>"
             "<th>Overheal</th><th>Dispels a minute</th><th>Externals given a kill <small>(every player)</small></th>"
             + ("<th>Buffs given a kill</th>" if buffs else "")
             + "<th>Players</th>")
@@ -1746,13 +1751,14 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                         if _pct(pp) != _pct(sp) else "")  # bar reads, rounded as the share (r. 76-77)
                                      for n, t, sp, rp, pp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
-                                        + (f"<small>({'every' if sp >= pp - 1e-9 else 'nearly every'} {e(r.spec)} "
-                                           "presses it: under a quarter of them here)</small>"  # round 79: "24% of
+                                        + (f"<small>({'all' if sp >= pp - 1e-9 else 'nearly all'} {e(r.spec)}s press it "
+                                           "in the kill, under a quarter in this window)</small>"  # round 79: "24% of
                                            if f"{int(pp * 100)}%" == _pct(sp) else  # them too" read as nonsense
                                            f"<small>(under a quarter of those who press it: {int(pp * 100)}%)</small>")
                                         for u in under if len(u) > 4 and u[0] != "back" for n, t, sp, pp in [u[:4]])
                            or "".join(f"none held for it <small>({e(_shown(u[1]))} {_mmss(u[2])} &middot; {_pct(u[3])}, "
-                                      "back from cooldown)</small>" for u in under if u[0] == "back")
+                                      "back from cooldown" + (f"; {e(_shown(left))} left out" if left else "")
+                                      + ")</small>" for u in under if u[0] == "back")
                            or "none shared" + (f" <small>({e(_shown(left))} left out)</small>" if left else ""))
                         + "</span>"
                         for h, got, under in per_hit)
@@ -1770,8 +1776,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
             "ahead, never the pull's opener before 0:12.<br><b>A button shown:</b> a quarter of the spec's healers who "
             "press it do so in the window; its share is of all that spec's healers, then of those who press it when "
             "that differs.<br><b>\"Under a quarter\":</b> no button reaches that; its most pressed one, if a tenth of "
-            "the spec's healers press it there, with the share of those who press it (\"every … presses it\" when that is nearly all of "
-            "them).<br><b>\"None held for it\":</b> its presses there come back from cooldown.<br><b>\"None "
+            "the spec's healers press it there, with the share of those who press it (\"all … press it in the kill\" when that is nearly all "
+            "of them).<br><b>\"None held for it\":</b> its presses there come back from cooldown.<br><b>\"None "
             "shared\":</b> no button reaches a tenth.<br><b>\"Few players\":</b> under 100 of the spec's healers in "
             "these kills, a habit of a few.<br><b>Back from cooldown:</b> a button whose presses there come back from "
             "cooldown for over 40% of them is no answer, as on the fight tab."

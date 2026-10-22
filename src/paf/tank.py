@@ -430,12 +430,23 @@ def render_sheet(p: TankPrep) -> str:
         def hit_of(n: str, t: float) -> str:
             m = next((m for m in p.moments if (n, t) in answered and -ANSWER[0] <= t - m.t <= ANSWER[1]), None)
             return f"{_mmss(m.t)} hit" if m else ""
+
+        def why(n: str, t: float) -> str:  # untied in a hit's window: the reason said (round 88: Spell Reflection at
+            if hit_of(n, t):                # 2:59, in the 2:55 melee hit's window, with no word why)
+                return ""
+            from paf.gamedata import magic_only, physical_only, same_name_spells
+            m = next((m for m in p.moments if -ANSWER[0] <= t - m.t <= ANSWER[1]), None)
+            if m is None or not moment_names(m) or not all(physical_only(x) for x in moment_names(m)):
+                return ""
+            if not any(magic_only(i) for i in same_name_spells().get(n, [])):
+                return ""
+            return f" &middot; magic only: no answer to the {_mmss(m.t)} hit, physical"
         return "".join(f"<li><b>{e(n)}</b><small>up {u:.0%} of the kill for the top tanks</small></li>"
                        for n, u in p.mitigation) + "".join(
             f"<li><b>{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top players"
             + (f" &middot; on cooldown, about every {ev:.0f} s" if ev else "") + "</small>"
             + ("<span class='when'>" + "".join(f"<span class='chip'>{_chip(moved_t.get((n, t), t), hit_of(n, t))}"
-                                               f"{_share(tied.get((n, t), sp) if hit_of(n, t) else sp)}</span>"
+                                               f"{_share(tied.get((n, t), sp) if hit_of(n, t) else sp)}{why(n, t)}</span>"
                                                for t, sp in zip(ts, sps, strict=False)) + "</span>" if ts else "")
             + "</li>" for n, u, k, ts, ev, sps, *_rest in p.short_defs)
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]
@@ -582,8 +593,8 @@ def render_sheet(p: TankPrep) -> str:
         f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
         f"{cooldowns_html(defs, answered, named, moved_t) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
         "<p class='small muted'><b>Tied to a hit:</b> only the lead ties a press to a hit; a button on cooldown, a "
-        "potion or a trinket says why it is not; a time with no hit named lands on none, or the lead keeps another "
-        "button for it.<br><b>A time shown:</b> a quarter of those who press the button share it.<br><b>A time's share:</b> "
+        "potion, a trinket or a magic-only defensive in a physical hit says why it is not; a time with no hit named "
+        "lands on none, or the lead keeps another button for it.<br><b>A time shown:</b> a quarter of those who press the button share it.<br><b>A time's share:</b> "
         "the top players pressing within 8 s of it (under a quarter of them, also of those who press the button)."
         "<br><b>A hit's share:</b> for a press the lead names for a hit, the top players pressing in that hit's "
         "window, 5 s before to 8 s after it starts.<br><b>\"or\":</b> the time other top players press "

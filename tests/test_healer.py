@@ -503,8 +503,9 @@ def test_a_two_step_button_says_its_release_and_what_it_stores():
                                                                    ("Hover", 0.25, 0.0)]
     c.stored = healer.stored_spells(con, 9, 4, "Stasis (Store)")
     out = healer.cooldowns_html([c])
-    assert ("released:</small><span class='chip'>1:56 &middot; 50% of the top players &middot; from a store about "
-            "1:40, each a median 16 s after its own") in out
+    assert ("released:</small><span class='chip'>3:36 &middot; 50% of the top players &middot; from the 3:20 store, "
+            "each a median 16 s after its own &middot; in the window of the 3:35 hit: 50% of the top players") in out
+    assert "and about 0.5 more releases a kill, of stores made at other times" in out  # the 1:40 stores
     # a store never released before the next store is not paired with the next one's release (round 83)
     tl.players = [{"casts": {1: [100.0, 200.0], 2: [216.0]}, "duration": 270.0}] * 4
     healer.two_step(tl, [c], [m])
@@ -547,13 +548,6 @@ def test_a_ramp_on_the_other_healers_lines_is_one_its_players_play(monkeypatch):
                          cd_names=[("Tip the Scales", 1, [], 0.85, (ps, 100, 120.0, 370553))])
     found = [healer.Moment(t, 1000.0, 1.4, "Caustic Surge") for t in (40.0, 130.0, 215.0)]
     assert "(a ramp)" not in healer.roles_more([ev], found=found)
-
-
-def test_a_store_chip_says_where_its_stores_go():
-    # Preservation Evoker, Vashnik (round 85): what the 64% storing Stasis at 1:41 do with it
-    c = healer.Cooldown("Stasis (Store)", 1, 1.0, 3.0, [101.0], [""])
-    c.fates = [(101.0, 116.0)] * 8 + [(101.0, None)] * 2
-    assert healer._fate(c, 101.0) == " &middot; released about 1:56 (20% never)"
 
 
 def test_a_ramp_played_back_from_cooldown_stays_a_ramp(monkeypatch):
