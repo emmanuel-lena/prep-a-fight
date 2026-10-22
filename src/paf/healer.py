@@ -106,8 +106,8 @@ class Cooldown:
 
 LEAD_HITS = 4  # the big moments the lead says at most: Nek'zali's two rites and Stage Two's two waves
 # the stage clock said, on a boss with stages (paf.stagetime, round 100)
-STAGED = ("In stage time: each kill's damage and presses after a stage starts are counted from that stage's start, "
-          "placed at its median start (the dashed lines), so a late stage's waves line up whatever time it began. ")
+STAGED = ("in stage time: each kill's damage and presses after a stage starts are counted from that stage's start, "
+          "placed at its median start (the dashed lines), so a late stage's waves line up whatever time it began; ")
 
 
 @dataclass
