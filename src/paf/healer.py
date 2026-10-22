@@ -1379,10 +1379,10 @@ def _why_not(c: Cooldown, t: float, found: list | None = None) -> str:
         m = hit_near(st.median(us)) if us else None
         if m is not None:
             return f": its release goes on the {_mmss(m.t)} hit"
+    if c.every:  # its card's word first: "on cooldown" (round 94: Avenging Wrath 2:05 read "back from cooldown")
+        return ": held past its cooldown" if t in c.alt and t not in c.back else ": on cooldown"
     if t in c.back:
         return ": back from cooldown" + (" for about half" if t in c.back_half else "")
-    if c.every:
-        return ": held past its cooldown" if t in c.alt else ": on cooldown"
     m = hit_near(t)
     return f": in the {_mmss(m.t)} hit's window, not kept for it" if m is not None else ": away from the big hits"
 

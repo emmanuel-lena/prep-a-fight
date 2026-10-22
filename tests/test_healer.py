@@ -624,3 +624,9 @@ def test_every_outline_gives_its_reason():
     sw = healer.Cooldown("Shield Wall", 2, 0.8, 2.0, [69.0, 231.0], ["", ""])
     assert healer._why_not(sw, 69.0, [hit]) == ": away from the big hits"
     assert healer._why_not(sw, 128.0, [hit]) == ": in the 2:10 hit's window, not kept for it"
+
+
+def test_an_on_cooldown_button_says_so_on_hover():
+    # Holy Paladin, Nek'zali (round 94): Avenging Wrath 2:05, on cooldown, read "back from cooldown" on hover
+    c = healer.Cooldown("Avenging Wrath", 1, 1.0, 3.0, [4.0, 125.0], ["", ""], every=122.0, back=[125.0])
+    assert healer._why_not(c, 125.0, []) == ": on cooldown"
