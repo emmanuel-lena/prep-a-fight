@@ -894,7 +894,10 @@ def _role_journal(encounter_id: int, diff_name: str, role: str, tl, also: dict[s
     sections = bossguide.load(encounter_id, diff_name)
     if not sections:
         return ""
-    return bossguide.abilities_html(sections, timings=dict(tl.boss_casts),
+    # the boss's casts up to the median kill: a later one is in a few kills only (round 95: Imbibe "4:36" on a
+    # sheet whose median kill is 4:26)
+    timings = {n: [t for t in ts if t <= tl.duration] for n, ts in tl.boss_casts}
+    return bossguide.abilities_html(sections, timings={n: ts for n, ts in timings.items() if ts},
                                     icon_map=icons_for(bossguide.spell_refs(sections)), role=role,
                                     difficulty=diff_name, also=also, phases=[(n, t) for n, t, _ in tl.phases])
 

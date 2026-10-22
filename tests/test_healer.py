@@ -644,3 +644,11 @@ def test_more_counts_a_press_named_in_a_hit_window():
     c = healer.Cooldown("Apotheosis", 1, 1.0, 2.0, [40.0], ["0:40 Caustic Surge"])
     assert healer._more(c) == "+1"
     assert healer._more(c, {("Apotheosis", ("line", 130.0)): (0.12, "2:16", "", "")}) == ""
+
+
+def test_a_quarter_not_kept_names_the_button_kept():
+    # Mistweaver Monk, Nek'zali (round 95): Conduit "not kept for the 0:35 hit: 25%" beside the note's quarter bar
+    named = {(healer.KEPT, 35.0): ("Revival / Restoral", 0.38)}
+    assert (healer._not_kept(35.0, 0.25, named)
+            == " &middot; not kept for the 0:35 hit: 25% in its window, under Revival / Restoral's 38%")
+    assert healer._not_kept(35.0, 0.16, named) == " &middot; not kept for the 0:35 hit: 16% in its window"

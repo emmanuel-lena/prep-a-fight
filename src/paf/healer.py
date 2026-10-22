@@ -772,6 +772,16 @@ def _shown(name: str) -> str:
     return re.sub(r"\s*\([^)]*\)$", "", name) or name
 
 
+KEPT = "\x00kept"  # a key of `named` no button has: (KEPT, hit) -> (the button the lead keeps, its share)
+
+
+def _not_kept(hit: float, hs: float, named: dict | None) -> str:
+    """"not kept for the X hit: N% in its window", with the lead's button when N reaches the quarter bar."""
+    kept = (named or {}).get((KEPT, hit))
+    why = (f", under {e(kept[0])}'s {_pct(kept[1])}" if kept and hs >= 0.25 else "")
+    return f" &middot; not kept for the {_mmss(hit)} hit: {_pct(hs)} in its window{why}"
+
+
 def _untied_at(c: Cooldown, t: float, n: str, tied: str, named: dict | None) -> str:
     """A main time in a hit's window the lead does not keep: its count there said (round 90: "a time with no hit
     named lands on none" read false for a press in the hit's window)."""
@@ -779,7 +789,7 @@ def _untied_at(c: Cooldown, t: float, n: str, tied: str, named: dict | None) -> 
         return ""
     hit = _secs(n.partition(" ")[0])
     hs = hit_share(c, t, hit)
-    return "" if hs is None else f" &middot; not kept for the {_mmss(hit)} hit: {_pct(hs)} in its window"
+    return "" if hs is None else _not_kept(hit, hs, named)
 
 
 def _also_pressers(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
@@ -908,7 +918,7 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
             return ""                                  # "or 0:37 for 25%" in the 0:35 hit, no clause)
         hit = _secs(h.partition(" ")[0])
         hs = hit_share(c, a, hit)
-        return "" if hs is None else f" &middot; not kept for the {_mmss(hit)} hit: {_pct(hs)} in its window"
+        return "" if hs is None else _not_kept(hit, hs, named)
     # a tied habit keeps its moment's share; its hit's window count follows, as a named one's (round 64: "or 0:23
     # for 36%" beside a main "0:04 · 31%" mixed a window share with a moment's)
     def back(a: float) -> str:  # tagged as the main time is (Evangelism's 1:42 habit, round 29)
@@ -1160,7 +1170,7 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
         tag = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"
                + (" for about half" if b <= BACK_SHARE[1] else ""))
         if _pct(hs) == _pct(sp):  # one count: said once, at the lead's time, the chip's own (round 78: "2:59 ·
-            return f"{_base(c, hs, hit)}{_pressers(c, sp)} &middot; {where} the {_mmss(hit)} hit"  # 15% … about
+            return f"{_base(c, hs, hit)}{_pressers(c, sp)} &middot; {where} the {_mmss(hit)} hit: the same players"  # 15% … about
             # 2:57", two times); under a quarter, of those who press it too (round 84)
         return (f"{_share(sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
                 + (f", about {_about(inside)}" if inside and _about(inside) != _mmss(t) else "") + tag)  # the lead's time (round 67)
@@ -1332,13 +1342,15 @@ def _released(c: Cooldown) -> str:
             return ""
         gap = st.median(u - s_ for s_, u in fs if u is not None)
         never = 1 - len(us) / len(fs)
-        at = st.median(us)
-        h = next((m for m in c.hits if -ANSWER[0] <= at - m <= ANSWER[1] + SLACK), None)
+        # the hit its releases land in most, said when a tenth of the top players release there (round 95: the
+        # 1:41 store's "1:50 to 2:04" gave 13% of the 2:10 hit's 35% with no word)
+        def inwin(m: float) -> int:
+            return sum(1 for u in us if m - ANSWER[0] <= u <= m + ANSWER[1])
+        h = max(c.hits, key=inwin, default=None)
         win = ""
-        if h is not None:
-            k = sum(1 for u in us if h - ANSWER[0] <= u <= h + ANSWER[1])
-            win = (f" &middot; in the window of the {_mmss(h)} hit: {_pct(k / reach(r, h))} of the top players"
-                   f"{_reach_note(r, h)}")
+        if h is not None and inwin(h) / reach(r, h) >= 0.1:
+            win = (f" &middot; in the window of the {_mmss(h)} hit: {_pct(inwin(h) / reach(r, h))} of the top "
+                   f"players{_reach_note(r, h)}")
         return (f"<span class='chip'>{_about(us)} &middot; {_pct(len(us) / n)} of the top players &middot; from the "
                 f"{_mmss(g)} store, each a median {gap:.0f} s after its own"
                 + (f" ({_pct(never)} of those stores never released)" if never >= 0.05 else " (nearly all released)")
@@ -1828,7 +1840,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
                                            if f"{int(pp * 100)}%" == _pct(sp) else  # them too" read as nonsense
                                            f"<small>(under a quarter of those who press it: {int(pp * 100)}%)</small>")
                                         for u in under if len(u) > 4 and u[0] != "back" for n, t, sp, pp in [u[:4]])
-                           or "".join(f"none held for it <small>({e(_shown(u[1]))} {_mmss(u[2])} &middot; {_pct(u[3])}, "
+                           or "".join(f"none held for it <small>({e(_shown(u[1]))} {_mmss(u[2])}"
+                                      f"{' (a ramp)' if len(u) > 5 and u[5] else ''} &middot; {_pct(u[3])}, "
                                       "back from cooldown" + (f"; {e(_shown(left))} left out" if left else "")
                                       + ")</small>" for u in under if u[0] == "back")
                            or "none shared" + (f" <small>({e(_shown(left))} left out)</small>" if left else ""))
@@ -2075,6 +2088,8 @@ def render_sheet(h: HealerPrep) -> str:
             tops[hit] = [x for i, x in enumerate(xs) if x[2] >= xs[0][2] - noise(x[2])
                          and x[0] not in {y[0] for y in xs[:i]}][:2]
         lead_names = list(dict.fromkeys(x[0] for xs in tops.values() for x in xs))
+        for hit_t, xs in tops.items():  # the button kept for each hit, for a chip not kept at a quarter or more (round
+            named[(KEPT, hit_t)] = (_shown(xs[0][0]), xs[0][2])  # 95: Conduit 25% "not kept" read as the rule broken)
         answered = {(x[0], x[1]) for xs in tops.values() for x in xs}  # what the chart draws full
         for hit_t, xs in tops.items():  # a tied press drawn and said at its counted presses' time when its moment is
             for x in xs:                # 5 s or more off (round 64: Divine Hymn "0:47" for presses at 0:41)
