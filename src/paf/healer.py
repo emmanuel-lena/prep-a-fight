@@ -1070,7 +1070,8 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
     # Nature's Swiftness 16% named over Spirit Link Totem's 17%, Convoke 19% over Tranquility's 21%)
     # and a raid cooldown pressed as much as the near presses when none of them is one (round 101: Obsidian Scales
     # 16% named for Nek'zali's 3:50 over Rewind's 20%; Tranquility 26%, no chip near 4:15, read as "none")
-    no_raid = not any(_raid(x[1].spell_id) or x[1].ramp for x in near)
+    no_raid = not any((_raid(x[1].spell_id) and not is_defensive(x[1].spell_id, x[1].name)) or x[1].ramp
+                      for x in near)  # a personal defensive is no raid cooldown, whatever its game data's kind
     if few and (not near or (best_near < 0.25 and rhythm_only and max(h for h, _c in few) >= best_near - 0.03)
                 or (no_raid and max(h for h, _c in few) >= best_near)):
         hs, c = max(few, key=lambda x: x[0])
