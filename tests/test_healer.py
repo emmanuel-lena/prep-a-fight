@@ -466,8 +466,8 @@ def test_a_cadence_names_its_group_beside_a_held_habit():
     c = healer.Cooldown("Avenging Wrath", 1, 1.0, 3.0, [4.0, 125.0, 248.0], ["", "", ""], alt=[35.0],
                         every=122.0, alt_support=[0.29], alt_near=["0:35 Soulcoil Rite"], alt_of=[4.0])
     out = healer.cooldowns_html([c], {("Avenging Wrath", 35.0)})
-    assert ("on cooldown from 0:04, about every 122 s; those holding it for 0:35 press it again at varying times"
-            in out)
+    assert ("on cooldown from 0:04, about every 122 s; those pressing it at 0:35 instead press it again at varying "
+            "times" in out)
     c.alt_near = [""]
     assert "on cooldown, about every 122 s<" in healer.cooldowns_html([c])
 
@@ -592,3 +592,10 @@ def test_a_named_chip_with_two_shares_gives_its_pressers():
                         presses=[[234.0]] * 16 + [[232.0]] * 8 + [[100.0]] * 53, n_all=100,
                         lasts=[300.0] * 58 + [200.0] * 42)
     assert healer._also_pressers(c, 232.0, {("Shield Wall", 232.0): 235.0}, "", 0.24) == " (31% of those who press it)"
+
+
+def test_an_untied_time_in_a_hit_window_says_it_is_not_kept():
+    # Mistweaver Monk, Nek'zali (round 90): Invoke Yu'lon "or 0:32 for 30%" in the 0:35 hit's window, no reason
+    c = healer.Cooldown("Invoke Yu'lon", 1, 1.0, 2.0, [5.0], [""], alt=[32.0], alt_support=[0.3], alt_of=[5.0],
+                        alt_near=["0:35 Soulcoil Rite"], presses=[[32.0]] * 16 + [[5.0]] * 84, n_all=100)
+    assert "or 0:32 for 30% &middot; not kept for the 0:35 hit: 16% in its window" in healer.cooldowns_html([c], set())

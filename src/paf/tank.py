@@ -594,7 +594,7 @@ def render_sheet(p: TankPrep) -> str:
         f"of each top kill takes per second, median of {p.damage_kills or 'the'} kills (read on up to 40 of the top kills; "
         f"that tank alone, so a swap moves it up or down); under it, the defensives the lead ties to a hit (an "
         f"outline: another press of the same button) and the swaps. A dot is one of the tanks' three biggest "
-        f"moments of damage, whatever casts it: a wave as high may go undotted.</p><ul class='hl2'>"
+        f"moments of damage, whatever casts it: only the three highest are dotted, another as high may be left out.</p><ul class='hl2'>"
         f"{moments_html(p.moments, 'tank damage') or '<li>No big moment: steady damage.</li>'}</ul></div>",
         f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
         f"{cooldowns_html(defs, answered, named, moved_t) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"

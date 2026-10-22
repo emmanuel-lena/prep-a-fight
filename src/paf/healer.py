@@ -772,6 +772,16 @@ def _shown(name: str) -> str:
     return re.sub(r"\s*\([^)]*\)$", "", name) or name
 
 
+def _untied_at(c: Cooldown, t: float, n: str, tied: str, named: dict | None) -> str:
+    """A main time in a hit's window the lead does not keep: its count there said (round 90: "a time with no hit
+    named lands on none" read false for a press in the hit's window)."""
+    if not n or tied or (named or {}).get((c.name, t)) is not None or t in c.back or c.why or c.every:
+        return ""
+    hit = _secs(n.partition(" ")[0])
+    hs = hit_share(c, t, hit)
+    return "" if hs is None else f" &middot; not kept for the {_mmss(hit)} hit: {_pct(hs)} in its window"
+
+
 def _also_pressers(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
     """A chip's share under a quarter, also of those who press the button: the moment's, or a tied chip's hit share
     (round 89: Shield Wall "0:34 · 1 s before the 0:35 hit · 23%" said none)."""
@@ -886,7 +896,16 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
     if not near:
         return ""
     # every other habit, each said, with the hit it answers as the main time is ("0:34 · 1 s before the 0:35 hit")
+    orig = {a: n for a, _sp, n in near}  # the hit a habit sits in, tied or not
     near = [(a, sp, n if answered is None or (c.name, a) in answered else "") for a, sp, n in near]
+
+    def untied(a: float, n: str) -> str:  # in a hit's window, not kept by the lead: its count there said, so "lands
+        h = orig.get(a) or ""              # on none" never reads false (round 90: Yu'lon "or 0:32" in the 0:35 hit)
+        if n or not h or (named or {}).get((c.name, a)) is not None or a in c.back or c.why or c.every:
+            return ""
+        hit = _secs(h.partition(" ")[0])
+        hs = hit_share(c, a, hit)
+        return "" if hs is None else f" &middot; not kept for the {_mmss(hit)} hit: {_pct(hs)} in its window"
     # a tied habit keeps its moment's share; its hit's window count follows, as a named one's (round 64: "or 0:23
     # for 36%" beside a main "0:04 · 31%" mixed a window share with a moment's)
     def back(a: float) -> str:  # tagged as the main time is (Evangelism's 1:42 habit, round 29)
@@ -911,7 +930,7 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
                                                                                    if sp else " for some")
                                + ("" if window(a, n) and "back from cooldown" in window(a, n) else
                                   back(a) if a in c.back and not c.why else "")  # the window's reading alone (r. 72)
-                               + window(a, n) for a, sp, n in near)
+                               + window(a, n) + untied(a, n) for a, sp, n in near)
 
 
 BACK = 8.0  # seconds past its cooldown a press still counts as pressed as soon as it is back
@@ -1076,6 +1095,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
                                            and "back from cooldown" not in _split(_named(c, t, named, tie(c, t, n), sp))[1]
                                            else "")  # window's reading alone, as an "or" time's (round 78)
                                         + _split(_named(c, t, named, tie(c, t, n), sp))[1]  # each time its own
+                                        + _untied_at(c, t, n, tie(c, t, n), named)
                                         + f"{_or(c, t, answered, named, moved)}</span>"  # window, then the "or" (r. 68)
                                         for k, (t, n, sp) in enumerate(zip(c.times, c.near,
                                                                            c.support or [0.0] * len(c.times),
@@ -1094,8 +1114,8 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
         + (f"<small class='alt'>on cooldown, about every {c.every:.0f} s</small>" if c.every and not _held(c) else
            # a held habit kept (only one for a hit is): the cadence is the other group's (round 79: Avenging Wrath
            # "on cooldown" beside 26% holding it for 0:35, whose later presses vary)
-           f"<small class='alt'>on cooldown from {_mmss(c.times[0])}, about every {c.every:.0f} s; those holding it "
-           f"for {_and([_mmss((moved or {}).get((c.name, a), a)) for a in _held(c)])} press it again at varying "
+           f"<small class='alt'>on cooldown from {_mmss(c.times[0])}, about every {c.every:.0f} s; those pressing it "
+           f"at {_and([_mmss((moved or {}).get((c.name, a), a)) for a in _held(c)])} instead press it again at varying "
            "times</small>" if c.every else
            f"<small class='alt'>{_more(c)} more at varying times</small>" if c.times and _more(c) else
            f"<small class='alt'>the other {_pct(_rest(c, named))} at varying times</small>"
@@ -2180,7 +2200,7 @@ def render_sheet(h: HealerPrep) -> str:
     # one definition a line, the term first (round 76: 120 words in one paragraph read as no reference)
     fight.append("<p class='small muted'><b>Tied to a hit:</b> only the lead ties a press to a hit; a button on "
                  "cooldown, cast on another player, used while moving or a trinket says why it is not; a time with no "
-                 "hit named lands on none.<br><b>A time shown:</b> a quarter of those who press the button share "
+                 "hit named lands on none, or says it is not kept for the hit in whose window it sits.<br><b>A time shown:</b> a quarter of those who press the button share "
                  "it (a first press at the pull: a fifth of the top players).<br><b>A time's share:</b> the top players pressing within 8 s of it (under a quarter of them, also "
                  "of those who press the button).<br><b>A hit's share:</b> for a press the lead names for a hit, the "
                  "top players pressing in that hit's window, 5 s before to 8 s after it starts (a ramp: 8 to 30 s "
