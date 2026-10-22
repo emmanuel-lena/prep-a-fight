@@ -232,8 +232,15 @@ ROLE_OTHERS = {"tank": "the tanks", "healer": "the healers", "damage": "the dama
 def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] | None = None,
                    mechanics: list | None = None, burst: dict[str, float] | None = None,
                    icon_map: dict[str, str] | None = None, role: str | None = None,
-                   difficulty: str = "heroic", also: dict[str, str] | None = None) -> str:
-    """Every stage and unit of the journal with its abilities; facts from the logs when known."""
+                   difficulty: str = "heroic", also: dict[str, str] | None = None,
+                   phases: list[tuple[str, float]] | None = None) -> str:
+    """Every stage and unit of the journal with its abilities; facts from the logs when known. phases: the logs'
+    phase names and median starts, said in the stage headings they match ("Stage Two" for "Stage Two: Uncoiling")."""
+    def start(title: str) -> str:
+        base = title.split(":")[0].strip().lower()
+        t = next((t for n, t in phases or [] if n.split(":")[0].strip().lower() == base), None)
+        return "" if t is None else (" <span class='muted small'>from the pull</span>" if t <= 1
+                                     else f" <span class='muted small'>from about {_mmss(t)}</span>")
     ctx = {"timings": {k.lower(): v for k, v in (timings or {}).items()},
            "mechanics": {m.name.lower(): m for m in (mechanics or [])},
            "burst": {k.lower(): v for k, v in (burst or {}).items()}, "icons": icon_map or {},
@@ -296,13 +303,16 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
                                + "</p>" if s.text else ""))
         head = e(top.title) + "".join(f' <span class="pill">{SHOWN_FLAGS[f]}</span>'
                                        for f in top.flags if f in SHOWN_FLAGS)
+        if top.kind == "stage" and phases:  # when it starts, from the logs (round 79: no time in the headings)
+            head += start(top.title)
         intro = f"<p class='small muted'>{e(readable(top.text)[:300])}</p>" if top.text and top.kind != "stage" else ""
         if top.kind == "ability":
             rows.insert(0, _ability(top, 0, ctx))
         title = "" if top.kind == "ability" else f"<h3>{head}</h3>"  # an ability's card: its row names it
         also = "".join("<p class='small muted also'>" + (
             f"Also, as in {e(where)}: {e(', '.join(dict.fromkeys(names)))}." if len(set(names)) <= 4 else
-            f"{len(set(names))} abilities of {e(where)} stay as they were.") + "</p>"
+            f"{len(set(names))} abilities {'you deal with ' if role else ''}from {e(where)} stay as they were.")  # a
+            + "</p>"  # role's own count, the others' named below (round 79: 7 on a healer sheet, 9 on a tank's)
             for where, names in repeated.items())
         also += "".join(f"<p class='small muted also'>For {ROLE_OTHERS[r]}: {e(', '.join(dict.fromkeys(names)))}.</p>"
                         for r, names in others.items())

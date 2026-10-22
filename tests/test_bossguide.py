@@ -109,3 +109,12 @@ def test_another_roles_ability_that_hits_you_is_told():
         sec(5, "Toxic Vapor", "ability", "A cloud of venom.", ["healer"])])
     a = abilities_html([stage], role="tank", also={"Toxic Vapor": "11% of the damage the top tanks take"})
     assert "A cloud of venom." in a and "11% of the damage the top tanks take" in a and "For the healers" not in a
+
+
+def test_a_stage_heading_says_when_it_starts():
+    # Nek'zali (round 79): "Intermission: Ritual of Awakening" with no time, the chart draws its line
+    one = sec(1, "Stage One: Soulcoiler Initiation", "stage", children=[sec(3, "Soulcoil Rite", "ability", "Hits.")])
+    two = sec(2, "Intermission: Ritual of Awakening", "stage", children=[sec(4, "Ritual Burn", "ability", "Burns.")])
+    out = abilities_html([one, two], phases=[("Stage One", 0.0), ("Intermission", 110.0)])
+    assert "Stage One: Soulcoiler Initiation <span class='muted small'>from the pull</span>" in out
+    assert "Intermission: Ritual of Awakening <span class='muted small'>from about 1:50</span>" in out

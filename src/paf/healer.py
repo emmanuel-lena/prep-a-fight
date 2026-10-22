@@ -888,6 +888,7 @@ def back_share(per_player: list[list[float]], t: float, cd: float) -> float:
 
 GROUP_GAP = 10.0  # seconds between two groups of presses in one window said apart ("1:41 or 2:01")
 GROUP_SHARE = 0.3  # ... each holding this share of the presses at least
+SPREAD = 12.0  # seconds the middle half of the presses counted spans from which their span is said, not a median
 FEW_SHARE = 0.1  # a press in a hit no cooldown is kept for, said under the quarter bar from this share
 SLACK = 3.0  # seconds past the answer window a moment may sit when its presses are counted in the window
 PULL = 12.0  # seconds: a press before this is the pull's opener, never a ramp for the first hit (round 45)
@@ -1117,8 +1118,14 @@ def _groups(xs: list[float]) -> list[list[float]]:
 
 
 def _about(xs: list[float]) -> str:
-    """The time of the presses counted: their median, or each group's ("1:41 or 2:01")."""
-    return " or ".join(_mmss(st.median(g)) for g in _groups(xs))
+    """The time of the presses counted: their median, each group's ("1:41 or 2:01"), or the span of their middle
+    half when it is wide (Disc's Evangelism ahead of Vashnik's 2:10, spread from 1:40 to 2:01: "1:43 to 1:58")."""
+    gs = _groups(xs)
+    if len(gs) == 1 and len(xs) >= 4:
+        q = st.quantiles(xs, n=4)
+        if q[2] - q[0] >= SPREAD and _mmss(q[0]) != _mmss(q[2]):
+            return f"{_mmss(q[0])} to {_mmss(q[2])}"
+    return " or ".join(_mmss(st.median(g)) for g in gs)
 
 
 def _center(xs: list[float]) -> float:

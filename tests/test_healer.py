@@ -511,6 +511,8 @@ def test_two_groups_of_presses_in_a_window_are_said_apart():
     # Discipline Priest, Vashnik (round 77): Evangelism ahead of 2:10 at 1:41 and 2:01, "about 1:48" nobody presses
     assert healer._about([101.0] * 20 + [121.0] * 21) == "1:41 or 2:01"
     assert healer._about([101.0, 103.0, 104.0, 106.0, 108.0]) == "1:44"
+    spread = [100.0, 101, 101, 104, 105, 105, 108, 108, 109, 114, 115, 118, 119, 120, 121, 121]  # the real 1:40-2:01
+    assert healer._about(spread) == "1:44 to 1:58"
     assert healer._center([101.0] * 20 + [121.0] * 21) == 121.0
 
 
