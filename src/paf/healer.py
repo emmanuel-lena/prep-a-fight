@@ -756,7 +756,7 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
                     f"<text x='{float(x(m.t)) + 6:.1f}' y='{float(y(m.dtps)) - 8:.1f}' class='ml'>{_mmss(m.t)}</text>"
                     for m in found)
     lines = "".join(f"<line class='ph' x1='{x(t)}' x2='{x(t)}' y1='22' y2='{H - B}'/>"
-                    f"<text x='{float(x(t)) + 4:.1f}' y='18' class='pn'>{e(n.split(':')[0])}</text>"
+                    f"<text x='{float(x(t)) + 4:.1f}' y='18' class='pn'>{e(n.split(':')[0])} &middot; {_mmss(t)}</text>"
                     for n, t in phases if t > 0)  # the phase changes, named
     end_anchor = " text-anchor='end'"  # the last tick inside the right edge (5:00 of a 5:02 fight was cut), the
     mid = " text-anchor='middle'"       # others centred on their minute, the first from the axis's start
@@ -808,11 +808,13 @@ def _shown(name: str) -> str:
 KEPT = "\x00kept"  # a key of `named` no button has: (KEPT, hit) -> (the button the lead keeps, its share)
 
 
-def _not_kept(hit: float, hs: float, named: dict | None) -> str:
-    """"not kept for the X hit: N% in its window", with the lead's button when N reaches the quarter bar."""
+def _not_kept(hit: float, hs: float, named: dict | None, c: Cooldown | None = None) -> str:
+    """"not kept for the X hit: N% in its window", with the lead's button when N reaches the quarter bar, and the
+    kills still going (round 102: a late hit's share without its count)."""
     kept = (named or {}).get((KEPT, hit))
     why = (f", under {e(kept[0])}'s {_pct(kept[1])} of the top players" if kept and hs >= 0.25 else "")
-    return f" &middot; not kept for the {_mmss(hit)} hit: {_pct(hs)} in its window{why}"
+    return (f" &middot; not kept for the {_mmss(hit)} hit: {_pct(hs)} in its window"
+            f"{_reach_note(c, hit) if c is not None else ''}{why}")
 
 
 def _untied_at(c: Cooldown, t: float, n: str, tied: str, named: dict | None) -> str:
@@ -822,7 +824,7 @@ def _untied_at(c: Cooldown, t: float, n: str, tied: str, named: dict | None) -> 
         return ""
     hit = _secs(n.partition(" ")[0])
     hs = hit_share(c, t, hit)
-    return "" if hs is None else _not_kept(hit, hs, named)
+    return "" if hs is None else _not_kept(hit, hs, named, c)
 
 
 def _also_pressers(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
@@ -952,7 +954,7 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
             return ""                                  # "or 0:37 for 25%" in the 0:35 hit, no clause)
         hit = _secs(h.partition(" ")[0])
         hs = hit_share(c, a, hit)
-        return "" if hs is None else _not_kept(hit, hs, named)
+        return "" if hs is None else _not_kept(hit, hs, named, c)
     # a tied habit keeps its moment's share; its hit's window count follows, as a named one's (round 64: "or 0:23
     # for 36%" beside a main "0:04 · 31%" mixed a window share with a moment's)
     def back(a: float) -> str:  # tagged as the main time is (Evangelism's 1:42 habit, round 29)
@@ -1054,6 +1056,8 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
             b = _back_in(c, m.t, m.t)  # before its card line keeps it (round 69)
             reason = ("" if b is None or b <= BACK_SHARE[0] else "back from cooldown"
                       + (" for about half" if b <= BACK_SHARE[1] else ""))
+        if hs >= 0.25 and not reason:  # a quarter or more, yet no time of theirs shared there (round 102: Tranquility
+            reason = "no time they share is near it"  # 26% at Nek'zali's 4:15 refused with no word), on its card too
         near_t = min([*c.times, *c.alt], key=lambda x: abs(x - when), default=None)
         if named is not None and near_t is not None and abs(near_t - when) <= 15:
             named[(c.name, near_t)] = m.t
@@ -1897,7 +1901,7 @@ def _in_hit(n: str, ts: list, rest: list, h: float, bar: bool = True, back_ok: b
     return n, st.median(x for x, _y in inside), players / total, players / max(1, len(ps)), ramp
 
 
-def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
+def roles_more(roles: list, mine: str = "", found: list | None = None, staged: bool = False) -> str:
     """Under the table, what a number cannot say: what each other healer spec presses on each big hit (found), the
     same answer rule as the fight tab's (from 5 s before to 8 s after; a press back from cooldown is no answer); every
     spec and every hit said, "none" too (round 30: specs and hits left out without a word)."""
@@ -1955,9 +1959,11 @@ def roles_more(roles: list, mine: str = "", found: list | None = None) -> str:
         return ""
     # one definition a line, as the fight tab's (round 77)
     return ("<h2>The other healers' cooldowns on the big hits</h2>"
-            f"<ul class='hl2'>{out}</ul><p class='small muted'>From the same kills as the table, every player of each "
-            "spec (that spec's own sheet reads its top players, so its times, and whether a press counts for a "
-            "hit, can differ).<br><b>A hit's "
+            f"<ul class='hl2'>{out}</ul><p class='small muted'>From the same kills as the table"
+            + (", those whose stage starts are read (their presses in stage time, as the curve: fewer healers than "
+               "the table's)" if staged else "")  # round 102: 535 Shamans here, 818 in the table, unsaid
+            + ", every player of each spec (that spec's own sheet reads its top players, so its times, and whether a "
+            "press counts for a hit, can differ).<br><b>A hit's "
             "window:</b> 5 s before to 8 s after it starts; a ramp button, as Evangelism, 8 to 30 s "
             "ahead, never the pull's opener before 0:12.<br><b>A button shown:</b> a quarter of the spec's healers who "
             "press it do so in the window; its share is of all that spec's healers, then of those who press it when "
@@ -2281,7 +2287,8 @@ def render_sheet(h: HealerPrep) -> str:
             return ps[0][0], (f"{which(n, press, c0)} goes on " + _and(  # the most shared hit first
                 [f"the {_mmss(hit)} hit ({_pct(sp)}, about {_tw(c_, t, hit)})"
                  for hit, t, sp, c_ in sorted(ps, key=lambda p: -p[2])], "or")
-                + (f"; {_pct(pull)} open with it at the pull" if pull >= 0.2 else ""))  # round 53: 22% Hymns
+                + (f"; {_pct(pull)} open with it at the pull" if pull >= 0.2 and _pull_t(c0) is not None  # its card
+                   else ""))  # shows it too (round 102: said, on no card); round 53: 22% Hymns
 
         def _also(c, press: float, t: float, sp: float, hit: float) -> str:
             """Another habit of the same press about as shared, tied to no hit: said, or the lead hides a third of
@@ -2294,7 +2301,9 @@ def render_sheet(h: HealerPrep) -> str:
             a, x = max(alts, key=lambda y: y[1])
             other = next((m2 for m2 in shown if m2.t != hit and -ANSWER[0] <= a - m2.t <= ANSWER[1]), None)
             if other is not None:  # in another hit's window: said so, not by its gap (round 101: Conduit's 3:52, on
-                return f"; another {_pct(x)} press it about {_mmss(a)}, in the {_mmss(other.t)} hit's window"  # 3:50)
+                kept = named.get((KEPT, other.t))  # 3:50), with the button kept there (round 102)
+                return (f"; another {_pct(x)} press it about {_mmss(a)}, in the {_mmss(other.t)} hit's window"
+                        + (f" (not kept for it: {e(kept[0])} is)" if kept and kept[0] != _shown(c.name) else ""))
             gap = int(abs(_secs(_mmss(hit)) - _secs(_mmss(a))))  # from the hit, as the times shown (round 45)
             out = not (c.ramp or -ANSWER[0] <= a - hit <= ANSWER[1])  # outside its window: no answer, said so (round
             return (f"; another {_pct(x)} press it about {_mmss(a)}, {gap} s {'before' if a < hit else 'after'} the "  # 61)
@@ -2391,8 +2400,11 @@ def render_sheet(h: HealerPrep) -> str:
     fight.append("<p class='small muted'><b>Tied to a hit:</b> only the lead ties a press to a hit; a button on "
                  "cooldown, cast on another player, used while moving or a trinket says why it is not; a time with no "
                  "hit named lands on none, or says it is not kept for the hit in whose window it sits (a press is kept for a hit when "
-                 "a quarter of the top players press it in its window, else \"only N%\"; a second button only when its "
-                 "share is within the noise of the first's).<br><b>A time shown:</b> a quarter of those who press the button share "
+                 "one of its times, shared by a quarter of those who press the button, sits in the hit's window: its "
+                 "share is then the window's, whatever it is; else the lead names the most pressed in the window, "
+                 "\"only N%\" under a quarter, with why it is not kept; a second button only when its share is within "
+                 "the noise of the first's).<br><b>On cooldown:</b> pressed every time it comes back, all kill long."
+                 "<br><b>A time shown:</b> a quarter of those who press the button share "
                  "it (a first press at the pull: a fifth of the top players).<br><b>A time's share:</b> the top players pressing within 8 s of it (under a quarter of them, also "
                  "of those who press the button).<br><b>A hit's share:</b> for a press the lead names for a hit (a chip "
                  "tied to a hit gives it, not its time's), the top players pressing in that hit's window, 5 s before to 8 s after it starts (a ramp: 8 to 30 s "
@@ -2492,7 +2504,7 @@ def render_sheet(h: HealerPrep) -> str:
     # every spec the pool reads (paf.healroles.POOL_PLAYERS): the Disc Priest, 3 in a Holy Priest's kills, has 43
     # in the pool; its casts unread here are said so in its cells
     shown = sorted(h.roles, key=lambda r: r.spec != h.spec)
-    others = roles_table(shown, h.spec) + roles_more(shown, h.spec, h.moments)
+    others = roles_table(shown, h.spec) + roles_more(shown, h.spec, h.moments, getattr(h, "staged", False))
     few = [p.spec for p in h.presence if p.spec not in {r.spec for r in shown}]
     deeper_first: list[str] = [jobs_lead(shown, h.spec)]  # the cards below only: a spec too rare has no claim
     # every sample of the sheet, once (round 34: five kill counts and no map)
@@ -2504,7 +2516,9 @@ def render_sheet(h: HealerPrep) -> str:
                   f"{h.own_kills - h.own_timed} more, read for their healers only)"
                   if h.own_timed and h.own_kills > h.own_timed else ""))
               if h.own_kills else "",
-              f"the table, jobs and the other healers: {h.role_kills:,} kills of this boss, every spec's" if h.role_kills
+              f"the table, jobs and the other healers: {h.role_kills:,} kills of this boss, every spec's"
+              + (" (the other healers' presses: those whose stage starts are read)" if getattr(h, "staged", False)
+                 else "") if h.role_kills
               else "",
               f"the raid's damage: {h.raid_kills} kills" if h.raid_kills else "",
               "each job: the kills holding the spec and another healer, its own count said",

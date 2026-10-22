@@ -336,7 +336,8 @@ def test_a_hit_kept_for_none_names_a_few_presses_in_it():
                          presses=[[36.0]] * 15 + [[90.0]] * 75, n_all=100)
     assert healer.landed_in(m, [up, ns]) == " (only 20% press Ultimate Penitence in its window, about 0:36)"
     up.presses = [[36.0]] * 30 + [[75.0]] * 30  # a quarter or more, no chip near: named, no "only" (round 101:
-    assert healer.landed_in(m, [up, ns]) == " (30% press Ultimate Penitence in its window, about 0:36)"  # not none)
+    assert healer.landed_in(m, [up, ns]) == (" (30% press Ultimate Penitence in its window, about 0:36, no time they "
+                                             "share is near it)")  # not none, said why (round 102)
 
 
 def test_a_minute_button_in_a_bare_hit_is_named_with_its_reason():
