@@ -98,6 +98,8 @@ class Cooldown:
     release: Cooldown | None = None  # its release presses, as a cooldown's (its moments, shares and hits)
     release_gap: float = 0.0  # median seconds from a store to its release
     stored: list = field(default_factory=list)  # (spell, share of the stores holding it, share holding it twice)
+    release_pairs: list = field(default_factory=list)  # (each release, seconds after its own store)
+    unreleased: float = 0.0  # the share of stores with no release before the next store
 
 
 @dataclass
@@ -765,6 +767,14 @@ def _shown(name: str) -> str:
     return re.sub(r"\s*\([^)]*\)$", "", name) or name
 
 
+def _pressers(c: Cooldown, sp: float) -> str:
+    """Under a quarter of all the top players, the share of those who press the button, the one the quarter rule
+    reads (round 83: "Shield Wall 2:57 · 15%" read as under the rule; 25% of the 60% who press it)."""
+    if not sp or sp >= 0.25 or not c.users or _pct(sp / c.users) == _pct(sp):
+        return ""
+    return f" ({_pct(min(1.0, sp / c.users))} of those who press it)"
+
+
 def _share(sp: float) -> str:
     """How many of the top players press it then: a chip is no consensus ("1:16 · 28% of them")."""
     return f" &middot; {_pct(sp)} of the top players" if sp else ""
@@ -866,7 +876,8 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
         return (f" &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
                 + (f", about {_about(inside)}" if inside else "") + tag)
     sp_of = {a: sp for a, sp, _n in near}
-    return ", or " + ", ".join(f"{_chip((moved or {}).get((c.name, a), a), n)}" + (f" for {_pct(sp)}" if sp else " for some")
+    return ", or " + ", ".join(f"{_chip((moved or {}).get((c.name, a), a), n)}" + (f" for {_pct(sp)}{_pressers(c, sp)}"
+                                                                                   if sp else " for some")
                                + ("" if window(a, n) and "back from cooldown" in window(a, n) else
                                   back(a) if a in c.back and not c.why else "")  # the window's reading alone (r. 72)
                                + window(a, n) for a, sp, n in near)
@@ -1027,6 +1038,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
            ", all on another player" if c.on_others >= 0.95 else "") + "</small>"
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip((moved or {}).get((c.name, t), _named_at(c, t, named, sp)), tie(c, t, n))}"
                                         + _split(_named(c, t, named, tie(c, t, n), sp))[0]
+                                        + (_pressers(c, sp) if _named(c, t, named, tie(c, t, n), sp) == _share(sp) else "")
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
                                            if t in c.back and not (c.why or c.every)  # its line says it; its
                                            and "back from cooldown" not in _split(_named(c, t, named, tie(c, t, n), sp))[1]
@@ -1174,12 +1186,22 @@ def two_step(tl, cds: list[Cooldown], found: list[Moment]) -> None:
                      lasts=lasts, press_lasts=[d for ts, d in zip(per, lasts, strict=False) if ts])
         r.near = [next((_mmss(m.t) for m in found if -ANSWER[0] <= t - m.t <= ANSWER[1]), "") for t in r.times]
         r.alt_of = [next((m.t for m in found if -ANSWER[0] <= t - m.t <= ANSWER[1]), -1.0) for t in r.times]  # its hit
-        gaps = []
+        # each store paired with its own release, before the next store (round 83: a store never released was
+        # paired with the next one's, ~100 s later: 19 s for 18); each release keeps its store's gap, for a hit's
+        pairs, unreleased, stores = [], 0, 0
         for p in tl.players:
             st_ts = sorted(t for i in store for t in (p["casts"].get(i) or []))
             rl_ts = sorted(t for i in rel for t in (p["casts"].get(i) or []))
-            gaps += [g for t in st_ts if (g := next((u - t for u in rl_ts if u > t), None)) is not None]
-        c.release, c.release_gap = r, (st.median(gaps) if gaps else 0.0)
+            for j, t in enumerate(st_ts):
+                stores += 1
+                nxt = st_ts[j + 1] if j + 1 < len(st_ts) else float("inf")
+                u = next((u for u in rl_ts if t < u <= nxt), None)
+                if u is None:
+                    unreleased += 1
+                else:
+                    pairs.append((u, u - t))
+        c.release, c.release_gap = r, (st.median(g for _u, g in pairs) if pairs else 0.0)
+        c.release_pairs, c.unreleased = pairs, (unreleased / stores if stores else 0.0)
 
 
 def stored_spells(con, encounter_id: int, difficulty: int, store: str) -> list[tuple[str, float, float]]:
@@ -1213,19 +1235,28 @@ def stored_spells(con, encounter_id: int, difficulty: int, store: str) -> list[t
                   key=lambda y: (-y[1], -y[2], y[0]))
 
 
+def _gap_of(c: Cooldown, inside: list[float]) -> float:
+    """The median store-to-release gap of the releases counted in a window."""
+    got = set(inside)
+    gaps = [g for u, g in c.release_pairs if u in got]
+    return st.median(gaps) if gaps else 0.0
+
+
 def _released(c: Cooldown) -> str:
     """A two-step button's release and what it holds, on its card (Stasis: the store's chips above)."""
     r = c.release
     if r is None:
         return ""
-    chips = ", ".join(f"{_mmss(t)} &middot; {_pct(sp)}"
-                      + (f" (in the window of the {_mmss(h)} hit: {_pct(hs)}{_reach_note(r, h)}"
-                         + (f", about {_about(inside)}"  # the lead's time (its counted releases')
-                            if (inside := _counted(r, t, h)) and _mmss(st.median(inside)) != _mmss(t) else "") + ")"
-                         if h >= 0 and (hs := hit_share(r, t, h)) is not None else "")
-                      for t, sp, h in zip(r.times, r.support, r.alt_of or [-1.0] * len(r.times), strict=False))
-    out = (f"<small class='alt'>released{f' a median {c.release_gap:.0f} s after it is stored' if c.release_gap else ''}"
-           f"{': ' + chips if chips else ', at varying times'}</small>")
+    chips = "".join(f"<span class='chip'>{_mmss(t)} &middot; {_pct(sp)} of the top players"
+                    + (f" &middot; in the window of the {_mmss(h)} hit:{_base(r, hs, h).replace(' &middot;', '')}"
+                       + (f", about {_about(inside)}"  # the lead's time (its counted releases')
+                          if (inside := _counted(r, t, h)) and _about(inside) != _mmss(t) else "")
+                       if h >= 0 and (hs := hit_share(r, t, h)) is not None else "") + "</span>"
+                    for t, sp, h in zip(r.times, r.support, r.alt_of or [-1.0] * len(r.times), strict=False))
+    gap = f", a median {c.release_gap:.0f} s after its store" if c.release_gap else ""
+    never = f"; {_pct(c.unreleased)} of the stores are never released" if c.unreleased >= 0.05 else ""
+    out = (f"<span class='subrow'><small class='alt'>released{gap}{never}:</small>{chips}</span>" if chips else
+           f"<small class='alt'>released{gap} at varying times{never}</small>")  # as chips, as the store's (r. 83)
     if c.stored:
         out += (f"<small class='alt'>what they store (the first {STORED} spells cast after storing): " + ", ".join(
             f"{e(nm)} (in {_pct(sh)} of the stores" + (f", twice in {_pct(tw)}" if tw >= 0.1 else "") + ")"
@@ -1241,7 +1272,8 @@ def _held(c: Cooldown) -> list[float]:
 def _why_not(c: Cooldown, t: float) -> str:
     """An untied mark's reason on hover, as its card gives it (round 75: an outline on a hit's dot read "tied to no
     hit" with no word why)."""
-    reason = (c.why or ("on cooldown" if c.every else "back from cooldown" if t in c.back else
+    reason = (c.why or ("on cooldown" if c.every else "back from cooldown"  # as its chip says it (round 83)
+                        + (" for about half" if t in c.back_half else "") if t in c.back else
                         "at the pull" if t <= PULL else ""))
     return f": {reason}" if reason else ""
 
@@ -1979,7 +2011,8 @@ def render_sheet(h: HealerPrep) -> str:
                         rel_marks.append((c.release, t_rel, _center(inside)))  # follows the lead)
                     released.append((m.t, f"for the {b} hit, {_pct(hs)} release their {e(_shown(c.name))}"
                                           f"{_reach_note(c.release, m.t)} (about {_about(inside)}"
-                                          + (f", stored a median {c.release_gap:.0f} s before" if c.release_gap else "")
+                                          + (f", stored a median {gap:.0f} s before"  # these releases' own
+                                             if (gap := _gap_of(c, inside)) else "")  # stores (round 83: 16 s for 13)
                                           + ")"))
                     bare.remove(b)
                     break
@@ -2045,9 +2078,10 @@ def render_sheet(h: HealerPrep) -> str:
     fight.append("<p class='small muted'><b>Tied to a hit:</b> only the lead ties a press to a hit; a button on "
                  "cooldown, cast on another player, used while moving or a trinket says why it is not; a time with no "
                  "hit named lands on none.<br><b>A time shown:</b> a quarter of those who press the button share "
-                 "it.<br><b>Its share:</b> of all the top players pressing within 8 s of it; for a press the lead names "
-                 "for a hit (tied to it, or the closest to a hit kept for none), of those pressing in that hit's "
-                 "window: 5 s before to 8 s after it starts, a ramp 8 to 30 s ahead.<br><b>\"or\":</b> the time other "
+                 "it.<br><b>A time's share:</b> the top players pressing within 8 s of it (under a quarter of them, also "
+                 "of those who press the button).<br><b>A hit's share:</b> for a press the lead names for a hit, the "
+                 "top players pressing in that hit's window, 5 s before to 8 s after it starts (a ramp: 8 to 30 s "
+                 "ahead).<br><b>\"or\":</b> the time other "
                  "top players press the same press instead.<br><b>\"Back from cooldown\":</b> most of its players "
                  "press it as soon as it came back from their last use, so it was not saved for what it lands on "
                  "(\"for about half\": 40 to 60% of them); either keeps it from counting for the hit.</p>")

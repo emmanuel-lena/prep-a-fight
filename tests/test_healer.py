@@ -503,7 +503,11 @@ def test_a_two_step_button_says_its_release_and_what_it_stores():
                                                                    ("Hover", 0.25, 0.0)]
     c.stored = healer.stored_spells(con, 9, 4, "Stasis (Store)")
     out = healer.cooldowns_html([c])
-    assert "released a median 16 s after it is stored: " in out
+    assert "released, a median 16 s after its store:</small><span class='chip'>" in out
+    # a store never released before the next store is not paired with the next one's release (round 83)
+    tl.players = [{"casts": {1: [100.0, 200.0], 2: [216.0]}, "duration": 270.0}] * 4
+    healer.two_step(tl, [c], [m])
+    assert c.release_gap == 16.0 and c.unreleased == 0.5
     assert "Dream Breath (in 100% of the stores, twice in 75%)" in out
 
 
@@ -522,3 +526,12 @@ def test_a_named_chip_with_one_share_shows_one_time():
                         presses=[[177.0]] * 15 + [[60.0]] * 45, n_all=100)
     out = healer.cooldowns_html([c], set(), {("Shield Wall", 179.0): 175.0})
     assert "2:57 &middot; 15% of the top players &middot; in the window of the 2:55 hit" in out and "about" not in out
+
+
+def test_a_share_under_a_quarter_gives_the_pressers_share():
+    # Protection Warrior, Vashnik (round 83): "Shield Wall 2:57 · 15%" read as under the quarter rule
+    c = healer.Cooldown("Shield Wall", 1, 0.6, 2.0, [177.0], [""], support=[0.15])
+    assert healer._pressers(c, 0.15) == " (25% of those who press it)"
+    assert healer._pressers(c, 0.3) == ""
+    c.release_pairs = [(216.0, 13.0), (217.0, 12.0), (130.0, 30.0)]  # a hit's releases: their own stores' gap
+    assert healer._gap_of(c, [216.0, 217.0]) == 12.5

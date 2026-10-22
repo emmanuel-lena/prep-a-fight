@@ -569,8 +569,9 @@ def render_sheet(p: TankPrep) -> str:
                     "the swaps", [*defs, *shorts, *lane], {"Tank swaps", *(n for n, _t in answered)}, answered,
                     moved_t)  # its marks at the lead's times (round 71)
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + [
-        f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the top tanks "
-        f"take per second, median of {p.damage_kills or 'the'} kills (the tanks' damage is read on up to 40 of the top kills); under it, the defensives the lead ties to a hit (an "
+        f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the ranked tank "
+        f"of each top kill takes per second, median of {p.damage_kills or 'the'} kills (read on up to 40 of the top kills; "
+        f"that tank alone, so a swap moves it up or down); under it, the defensives the lead ties to a hit (an "
         f"outline: another press of the same button) and the swaps. A dot is one of the tanks' three biggest "
         f"moments of damage, whatever casts it: a wave as high may go undotted.</p><ul class='hl2'>"
         f"{moments_html(p.moments, 'tank damage') or '<li>No big moment: steady damage.</li>'}</ul></div>",
@@ -578,9 +579,10 @@ def render_sheet(p: TankPrep) -> str:
         f"{cooldowns_html(defs, answered, named, moved_t) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
         "<p class='small muted'><b>Tied to a hit:</b> only the lead ties a press to a hit; a button on cooldown, a "
         "potion or a trinket says why it is not; a time with no hit named lands on none, or the lead keeps another "
-        "button for it.<br><b>A time shown:</b> a quarter of those who press the button share it.<br><b>Its share:</b> "
-        "of all the top players pressing within 8 s of it; for a press the lead names for a hit, of those pressing "
-        "in that hit's window, 5 s before to 8 s after it starts.<br><b>\"or\":</b> the time other top players press "
+        "button for it.<br><b>A time shown:</b> a quarter of those who press the button share it.<br><b>A time's share:</b> "
+        "the top players pressing within 8 s of it (under a quarter of them, also of those who press the button)."
+        "<br><b>A hit's share:</b> for a press the lead names for a hit, the top players pressing in that hit's "
+        "window, 5 s before to 8 s after it starts.<br><b>\"or\":</b> the time other top players press "
         "the same press instead.<br><b>\"Back from cooldown\":</b> most of its players press it as soon as it came "
         "back from their last use, so it was not saved for what it lands on (\"for about half\": 40 to 60% of them); "
         "either keeps it from counting for the hit.</p>"
