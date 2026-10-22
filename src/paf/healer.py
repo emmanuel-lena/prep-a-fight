@@ -1079,8 +1079,9 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
             going = [ts for ts, d in zip(c.presses, pl, strict=False) if d >= when]  # those whose kill reaches it
             k = sum(1 for ts in going if any(abs(x - when) <= 8 for x in ts))  # said, the rule's (round 103: "no
             if going and k < 0.25 * len(going):  # time they share is near it" read false for presses at 4:17 to 4:21;
-                reason = (f"its {_mmss(when)} is shared by {_pct(k / len(going))} of those who press it, under a "
-                          "quarter")  # round 104: of the kills still going), on its card too; said only when so
+                reason = (f"its {_mmss(when)} is shared by {int(k / len(going) * 100)}% of those who press it, under a "
+                          "quarter")  # round 104: of the kills still going), on its card too; said only when so;
+                # rounded down beside "under a quarter" (round 105: 24.7% read "25%, under a quarter")
         near_t = min([*c.times, *c.alt], key=lambda x: abs(x - when), default=None)
         if named is not None and near_t is not None and abs(near_t - when) <= 15:
             named[(c.name, near_t)] = m.t
