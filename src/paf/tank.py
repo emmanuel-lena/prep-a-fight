@@ -469,6 +469,13 @@ def render_sheet(p: TankPrep) -> str:
                                                for t, sp in zip(ts, sps, strict=False)) + "</span>" if ts else "")
             + "</li>" for n, u, k, ts, ev, sps, *_rest in p.short_defs)
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]
+
+    def nouned(html: str) -> str:  # the cards' noun as the lead's: a moment under 1.5x is no hit (round 104)
+        for m in p.moments:
+            if m.ratio < 1.5:
+                html = html.replace(f"the {_mmss(m.t)} hit", f"the {_mmss(m.t)} moment").replace(
+                    f"the physical {_mmss(m.t)} hit", f"the physical {_mmss(m.t)} moment")
+        return html
     others = [replace(c, near=["" for _ in c.near]) for c in p.cooldowns  # no buster to answer; taunts: the swaps
               if c not in defs and not _taunt(c.spell_id)]
     causes = p.swap_after or ["" for _ in p.swaps]
@@ -621,7 +628,7 @@ def render_sheet(p: TankPrep) -> str:
         f"moments of damage, whatever casts it: only the three highest are dotted, another as high may be left out.</p><ul class='hl2'>"
         f"{moments_html(p.moments, 'tank damage', p.phases) or '<li>No big moment: steady damage.</li>'}</ul></div>",
         f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
-        f"{cooldowns_html(defs, answered, named, moved_t) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
+        f"{nouned(cooldowns_html(defs, answered, named, moved_t)) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
         "<p class='small muted'><b>Tied to a hit:</b> only the lead ties a press to a hit; a button on cooldown, a "
         "potion, a trinket or a magic-only defensive in a physical hit says why it is not; a time with no hit named "
         "lands on none, or the lead keeps another button for it (a press is kept for a hit when one of its times, "
@@ -636,7 +643,7 @@ def render_sheet(p: TankPrep) -> str:
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
            f"</p>" if p.rare else ""),
         f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"
-        f"{mit_html(answered) or '<li>Not measured yet.</li>'}</ul>",
+        f"{nouned(mit_html(answered)) or '<li>Not measured yet.</li>'}</ul>",
         f"<h2>Tank swaps</h2><p>{'The swap moments most top raids share' if swap else 'No swap moment most top raids share.'}"
         f"{_cause(common, p.stacks) if swap and one else ''}"
         f"{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
@@ -676,7 +683,7 @@ def render_sheet(p: TankPrep) -> str:
         boss.append(f"<h2>What the Encounter Journal asks tanks</h2><ul class='hl2'>{jr}</ul>")
     if p.abilities:  # every ability, the tanks' in full and the others' named
         boss.append(f"<h2>Every ability{', phase by phase' if '<h3>' in p.abilities else ''}</h2>"
-                    f"<p class='small muted'>The times and stage starts are the boss's in the {p.kills} top "
+                    f"<p class='small muted'>The times{' and stage starts' if len(p.phases) > 1 else ''} are the boss's in the {p.kills} top "
                     f"{e(p.spec)} kills (median {_mmss(p.duration)}): a slower or faster raid sees the later ones "
                     f"shift, and another spec's sheet, read on its own kills, can say other times.</p>"
                     f"<div class='stages'>{p.abilities}</div>")

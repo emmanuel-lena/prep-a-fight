@@ -610,7 +610,11 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         support = [sum(1 for ts in per_player if any(abs(x - t) <= 8 for x in ts)) / n_at(t) for t in times]
         # a moment a quarter of those who press it share at least: under, it is timing that varies (a chip at 12%
         # of the top players read as a moment next to "no moment most of them share")
-        kept = [i for i, sp in enumerate(support) if sp >= 0.25 * users]
+        # a quarter of those who press it, of the kills still going then: a late time's pressers are those whose kill
+        # reaches it (round 104: Tranquility's 4:19, 22 of the 89 still going, read 22% of all 98 and refused)
+        def users_at(t: float, pl=pressed_lasts, alld=alld) -> float:
+            return sum(1 for d in pl if d >= t) / max(1, sum(1 for d in alld if d >= t))
+        kept = [i for i, sp in enumerate(support) if sp >= 0.25 * min(users, users_at(times[i]))]
         times, near, support = [times[i] for i in kept], [near[i] for i in kept], [support[i] for i in kept]
         # a button on cooldown keeps another habit of a press its players do not make as soon as it is back (round
         # 74: 26% of the top Holy Paladins hold their first Avenging Wrath for Nek'zali's 0:35, the rest from the pull)
@@ -618,7 +622,7 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
             keep = [i for i, x in enumerate(alt) if x not in back]
             alt, alt_of = [alt[i] for i in keep], [alt_of[i] for i in keep]
         alt_support = [sum(1 for ts in per_player if any(abs(x - t) <= 8 for x in ts)) / n_at(t) for t in alt]
-        kept = [i for i, sp in enumerate(alt_support) if sp >= 0.25 * users  # the same quarter as the moments,
+        kept = [i for i, sp in enumerate(alt_support) if sp >= 0.25 * min(users, users_at(alt[i]))  # the same quarter,
                 and alt_of[i] in times]  # of a moment still shown
         alt, alt_support, alt_of = [alt[i] for i in kept], [alt_support[i] for i in kept], [alt_of[i] for i in kept]
         alt_near = []  # another habit answers a hit too (Aura Mastery at 0:36 for 28%: the 0:35 hit), a button on
@@ -821,7 +825,10 @@ def _not_kept(hit: float, hs: float, named: dict | None, c: Cooldown | None = No
     """"not kept for the X hit: N% in its window", with the lead's button when N reaches the quarter bar, and the
     kills still going (round 102: a late hit's share without its count)."""
     kept = (named or {}).get((KEPT, hit))
-    why = (f", under {e(kept[0])}'s {_pct(kept[1])} of the top players" if kept and hs >= 0.25 else "")
+    from paf.defensives import is_defensive
+
+    why = (", a personal defensive, no raid answer" if c is not None and is_defensive(c.spell_id, c.name)  # round
+           else f", under {e(kept[0])}'s {_pct(kept[1])} of the top players" if kept and hs >= 0.25 else "")  # 104
     return (f" &middot; not kept for the {_mmss(hit)} hit: {_pct(hs)} in its window"
             f"{_reach_note(c, hit) if c is not None else ''}{why}")
 
@@ -1068,10 +1075,12 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
             reason = ("" if b is None or b <= BACK_SHARE[0] else "back from cooldown"
                       + (" for about half" if b <= BACK_SHARE[1] else ""))
         if hs >= 0.25 and not reason and c.presses:  # a quarter or more in the window, refused: its time's share
-            k = sum(1 for ts in c.presses if any(abs(x - when) <= 8 for x in ts))  # said, the rule's (round 103: "no
-            if k < 0.25 * len(c.presses):  # time they share is near it" read false for presses at 4:17 to 4:21), on
-                reason = (f"its {_mmss(when)} is shared by {_pct(k / len(c.presses))} of those who press it, under a "
-                          "quarter")  # its card too; said only when it is so
+            pl = c.press_lasts if len(c.press_lasts) == len(c.presses) else [when] * len(c.presses)
+            going = [ts for ts, d in zip(c.presses, pl, strict=False) if d >= when]  # those whose kill reaches it
+            k = sum(1 for ts in going if any(abs(x - when) <= 8 for x in ts))  # said, the rule's (round 103: "no
+            if going and k < 0.25 * len(going):  # time they share is near it" read false for presses at 4:17 to 4:21;
+                reason = (f"its {_mmss(when)} is shared by {_pct(k / len(going))} of those who press it, under a "
+                          "quarter")  # round 104: of the kills still going), on its card too; said only when so
         near_t = min([*c.times, *c.alt], key=lambda x: abs(x - when), default=None)
         if named is not None and near_t is not None and abs(near_t - when) <= 15:
             named[(c.name, near_t)] = m.t
@@ -2416,7 +2425,7 @@ def render_sheet(h: HealerPrep) -> str:
     # the rule, once, under the long cooldowns and their "fewer than half" line (Zephyr's read as part of it)
     # one definition a line, the term first (round 76: 120 words in one paragraph read as no reference)
     fight.append("<p class='small muted'><b>Tied to a hit:</b> only the lead ties a press to a hit; a button on "
-                 "cooldown, cast on another player, used while moving or a trinket says why it is not; a time with no "
+                 "cooldown, cast on another player, used while moving, a trinket or a personal defensive says why it is not; a time with no "
                  "hit named lands on none, or says it is not kept for the hit in whose window it sits (a press is kept for a hit when "
                  "one of its times, shared by a quarter of those who press the button, sits in the hit's window: its "
                  "share is then the window's, whatever it is; else the lead names the most pressed in the window, "
@@ -2515,7 +2524,7 @@ def render_sheet(h: HealerPrep) -> str:
             stages = stages.replace(f"<b>{e(name)}</b>", f"<b>{e(name)}</b> <small class=\"muted\">(the top "
                                     f"{e(h.spec)}s dispel it {k:.1f} times a kill)</small>", 1)
         boss.append(f"<h2>Every ability{', phase by phase' if '<h3>' in stages else ''}</h2>"  # Vashnik: one phase
-                    f"<p class='small muted'>The times and stage starts are the boss's in the {h.kills} top "
+                    f"<p class='small muted'>The times{' and stage starts' if len(h.phases) > 1 else ''} are the boss's in the {h.kills} top "
                     f"{e(h.spec)} kills (median {_mmss(h.duration)}): a slower or faster raid sees the later ones "
                     f"shift, and another spec's sheet, read on its own kills, can say other times.</p>"
                     f"<div class='stages'>{stages}</div>")
