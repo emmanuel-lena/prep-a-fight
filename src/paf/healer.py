@@ -616,6 +616,28 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
             return sum(1 for d in pl if d >= t) / max(1, sum(1 for d in alld if d >= t))
         kept = [i for i, sp in enumerate(support) if sp >= 0.25 * min(users, users_at(times[i]))]
         times, near, support = [times[i] for i in kept], [near[i] for i in kept], [support[i] for i in kept]
+        # a hit's window a quarter of those who press it press it in, of the kills reaching its end, with no time of
+        # the card there: the window's presses are a time of its own, as the rule says (round 106: Tranquility 26% at
+        # Nek'zali's 4:15 refused, its presses spread 4:12-4:23, while Aura Mastery 23% was kept by its time)
+        if tied:
+            for m in found:
+                a_, b_ = m.t - ANSWER[0], m.t + ANSWER[1]
+                if any(a_ - SLACK <= t <= b_ + SLACK for t in [*times, *alt]):
+                    continue
+                going = [ts for ts, d in zip(per_player, pressed_lasts, strict=False) if d >= b_]
+                inside = [x for ts in going for x in ts if a_ <= x <= b_]
+                k = sum(1 for ts in going if any(a_ <= x <= b_ for x in ts))
+                if not going or k < 0.25 * len(going) or k / max(1, sum(1 for d in alld if d >= b_)) < FEW_SHARE:
+                    continue
+                t_new = st.median(inside)
+                b_new = back_share(per_player, t_new, cd, pulls)
+                if b_new > BACK_SHARE[0]:  # back from cooldown: no time held for it
+                    continue
+                rows_ = sorted([*zip(times, near, support, strict=False),
+                                (t_new, f"{_mmss(m.t)} {m.boss_spell}".strip(),
+                                 sum(1 for ts in per_player if any(abs(x - t_new) <= 8 for x in ts)) / n_at(t_new))])
+                times, near, support = [r[0] for r in rows_], [r[1] for r in rows_], [r[2] for r in rows_]
+
         # a button on cooldown keeps another habit of a press its players do not make as soon as it is back (round
         # 74: 26% of the top Holy Paladins hold their first Avenging Wrath for Nek'zali's 0:35, the rest from the pull)
         if every:

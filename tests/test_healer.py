@@ -684,3 +684,16 @@ def test_back_from_cooldown_reads_its_gap_in_pull_time():
     pull = [[70.0, 315.0]]
     assert healer.back_share(stage, 248.0, 180.0) == 1.0  # in stage time: back as soon as it came back
     assert healer.back_share(stage, 248.0, 180.0, pull) == 0.0  # in pull time: held 65 s past it
+
+
+def test_a_hit_window_a_quarter_press_in_gets_a_time():
+    # Restoration Druid, Nek'zali (round 106): Tranquility 26% in the 4:15 window, its presses spread 4:12-4:23, no
+    # time of its card there: refused while Aura Mastery 23% was kept by its time
+    ab = SimpleNamespace(id=1, name="Tranquility", users=1.0, per_kill=2.0)
+    per_player = ([[36.0, 252.0 + k % 11] for k in range(26)] + [[36.0, 232.0]] * 36 + [[36.0, 300.0]] * 24
+                  + [[36.0]] * 14)
+    tl = SimpleNamespace(abilities=[ab], duration=320.0,
+                         players=[{"casts": {1: ts}, "duration": 330.0} for ts in per_player])
+    found = [healer.Moment(t, 1000.0, 1.5, "x") for t in (35.0, 230.0, 255.0)]
+    c = healer.cooldowns(tl, found, {1: (180.0, 1)})[0]
+    assert any(n.startswith("4:15") for n in [*c.near, *c.alt_near])  # a time tied to it, main or habit
