@@ -186,7 +186,7 @@ def test_every_healer_spec_in_one_table():
     table = healer.roles_table([shaman, disc], "Restoration Shaman")
     assert "<th>Buffs given a kill</th>" in table
     assert "1.4 <small>Power Infusion</small>" in table
-    assert "Restoration Shaman <small>(you)</small>" in table and "&ndash;" in table
+    assert "Restoration Shaman <small>(you)</small>" in table and "<small>none</small>" in table
     more = healer.roles_more([shaman, disc], "Restoration Shaman")
     assert "removes Essence Rend" not in more and "Ascendance" not in more  # the lead's jobs; your times: fight tab
     assert "Discipline Priest" in more  # every other spec said, "none shared" too

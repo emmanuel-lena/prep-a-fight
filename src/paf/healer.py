@@ -1277,6 +1277,19 @@ def two_step(tl, cds: list[Cooldown], found: list[Moment]) -> None:
                     unreleased += 1
                 else:
                     pairs.append((u, u - t))
+        # the chart's release marks: one per store chip, as the card's release chips (round 96: the 1:41 store's
+        # "1:50 to 2:04 · 54%", the largest, had no mark; the marks came from the releases' own clusters)
+        groups = sorted([*c.times, *c.alt])
+        marks = []
+        for g in groups:
+            us = [u for s_, u in fates if u is not None and abs(s_ - g) <= 8
+                  and min(groups, key=lambda x, s_=s_: abs(x - s_)) == g]
+            if us:
+                marks.append((st.median(us), len(us) / n_all))
+        if marks:
+            r.times, r.support = [t for t, _sp in marks], [sp for _t, sp in marks]
+            r.near = [next((_mmss(m.t) for m in found if -ANSWER[0] <= t - m.t <= ANSWER[1]), "") for t in r.times]
+            r.alt_of = [next((m.t for m in found if -ANSWER[0] <= t - m.t <= ANSWER[1]), -1.0) for t in r.times]
         c.release, c.release_gap = r, (st.median(g for _u, g in pairs) if pairs else 0.0)
         c.release_pairs, c.unreleased, c.fates = pairs, (unreleased / stores if stores else 0.0), fates
         c.hits = [m.t for m in found]
@@ -1746,8 +1759,8 @@ def roles_table(roles: list, mine: str = "") -> str:
         f"{' <small>few players</small>' if r.players < 100 else ''}"
         f"</td><td class='n'>{_pct(r.healing)}</td><td class='n'>{_pct(r.tank)}</td><td class='n'>{_pct(r.spike)}</td>"
         f"<td class='n'>{_pct(r.overheal)}</td><td class='n'>{r.dispels:.1f}</td>"
-        f"<td class='n'>{few if r.externals < 0 else f'{r.externals:.1f}' if r.externals >= 0.05 else '&ndash;'}</td>"
-        + (f"<td class='n'>{few if r.buffs < 0 else f'{r.buffs:.1f} <small>{e(_and(r.buff_spells))}</small>' if r.buffs else '&ndash;'}</td>"
+        f"<td class='n'>{few if r.externals < 0 else f'{r.externals:.1f}' if r.externals >= 0.05 else '<small>none</small>'}</td>"
+        + (f"<td class='n'>{few if r.buffs < 0 else f'{r.buffs:.1f} <small>{e(_and(r.buff_spells))}</small>' if r.buffs else '<small>none</small>'}</td>"
            if buffs else "")
         + f"<td class='n'>{r.players}</td></tr>" for r in roles)
     return f"<table class='hcomp'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"  # each kill's ranked

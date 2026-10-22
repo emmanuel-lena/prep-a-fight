@@ -550,12 +550,12 @@ def render_sheet(p: TankPrep) -> str:
         first_none = not big and "no long defensive" in lead[0]
         hits = f"the {_and([at(x) for x in quiet])} hit{'s' if len(quiet) > 1 else ''}"
         if quiet and first_none:  # "nor": the biggest moment said the same, in one sentence (round 65)
-            lead[0] = lead[0].rstrip(".") + f" or in {hits}."  # (round 91: "in it, nor for the 1:35 hit" read broken)
+            lead[0] = lead[0].rstrip(".") + f", nor in {hits}."  # (rounds 91, 96: "it" read across the clause)
         elif quiet:  # the pattern of every other hit, in one sentence with them (round 68)
             bare = [f"the {at(x)} hit{none}" for x in quiet] + bare
         up = [(n, u) for n, u in p.mitigation if u >= 0.5][:2]  # what they do have, measured: their active
         if first_none and up:  # mitigation's uptime (round 86: the biggest hit's answer was a negative alone)
-            lead[0] = lead[0].rstrip(".") + ("; their active mitigation is up most of the kill: "
+            lead[0] = lead[0].rstrip(".") + ("; instead, their active mitigation is up most of the kill: "
                                              + _and([f"{e(n)} {u:.0%}" for n, u in up]) + ".")
         if bare:
             lead.append(f"No defensive is kept for {', nor '.join(bare)}.")  # each hit its own aside (round 42)
