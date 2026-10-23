@@ -141,16 +141,15 @@ def _ic(c: Cooldown | None) -> str:
 # how to read the cards, one term a line (the owner: less text; every rule kept, said once)
 HOW_TO_READ = (
     "<dl class='legend'><dt>N%</dt><dd>of the top players read; &ldquo;(N kills going)&rdquo;: of the kills still "
-    "going then; &ldquo;of its users&rdquo;: of the top players who press the button.</dd><dt>Tied to a hit</dt><dd>a quarter of those who press the button press it in the hit's window "
-    "(5 s before to 8 s after it starts; a ramp: 8 to 30 s ahead); its share is then the window's. The table keeps "
-    "one button a hit (a second within the noise), else names the most pressed, &ldquo;only N%&rdquo; under a "
-    "quarter. A card on cooldown, on another player, used moving, a trinket or a personal defensive says why it is "
-    "not tied.</dd><dt>A time</dt><dd>shared by a quarter of those who press the button (at the pull: a fifth of the "
+    "going then; &ldquo;of its users&rdquo;: of the top players who press the button.</dd><dt>Tied to a hit</dt>"
+    "<dd>pressed in the hit's window (5 s before to 8 s after; a ramp: 8 to 30 s ahead) by a quarter of its users; "
+    "its share is the window's. One button a hit (a second within the noise), else the most pressed, &ldquo;only "
+    "N%&rdquo; under a quarter.</dd><dt>A time</dt><dd>shared by a quarter of those who press the button (at the pull: a fifth of the "
     "top players); its share: the top players pressing within 8 s of it (&ldquo;of its users&rdquo; too, "
     "under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long.</dd>"
     "<dt>Back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, not "
     "counted for it (&ldquo;for about half&rdquo;: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
-    "time some top players press the same press at instead.</dd></dl>")
+    "time some top players press it at instead.</dd></dl>")
 
 LEAD_HITS = 4  # the big moments the lead says at most: Nek'zali's two rites and Stage Two's two waves
 # the stage clock said, on a boss with stages (paf.stagetime, round 100)
@@ -894,7 +893,7 @@ def moments_html(found: list[Moment], what: str, phases: list | None = None) -> 
 
 
 def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list | None, by_icon: dict,
-               rule: str, tags: dict | None = None) -> str:
+               rule: str, tags: dict | None = None, usual: str = "raid damage") -> str:
     """The big hits as a table: when, what hits, how hard (a bar), and what the top players press for it, with its
     icon; the lead's clauses each on their hit's row (a press said for two hits: on the first, the second points to
     it), a hit kept for none with why. Replaces the lead's long sentence and the list under the chart (the owner:
@@ -923,15 +922,15 @@ def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list
         elif k in bare:
             ans = f"<span class='none'>None kept</span>{bare[k]}"
         else:  # a big moment past the lead's four
-            ans = "<span class='muted'>not among the highest the lead reads</span>" if k not in lead else ""
+            ans = "<span class='muted'>not among the highest, the table reads four</span>" if k not in lead else ""
         tag = _stage_tag(m.t, phases)
         rows.append(f"<tr><td class='t'><b>{k}</b>" + (f"<small>{e(tag)}</small>" if tag else "") + "</td>"
                     f"<td>{e(m.boss_spell) if m.boss_spell else '<span class=muted>raid damage</span>'}"
                     + "".join(f"<span class='tag'>{x}</span>" for x in (tags or {}).get(k, [])) + "</td>"
                     f"<td class='sz'><span class='track'><span class='bar' style='width:{max(8, round((m.ratio - 1) / max(0.01, top - 1) * 100))}%'></span></span>"
                     f"<b>{_x(m.ratio)}&times;</b></td><td class='ans'>{ans}</td></tr>")
-    return ("<table class='hits'><thead><tr><th>When</th><th>What hits</th><th>Size <small>(&times; the usual raid "
-            "damage)</small></th><th>What the top players press</th></tr></thead><tbody>" + "".join(rows)
+    return ("<table class='hits'><thead><tr><th>When</th><th>What hits</th><th>Size <small>(&times; the usual "
+            f"{usual}; the bar from 1&times; to the biggest)</small></th><th>What the top players press</th></tr></thead><tbody>" + "".join(rows)
             + f"</tbody></table><p class='small muted hits-rule'>{rule}</p>")
 
 
@@ -1374,8 +1373,27 @@ def _or_then_untied(c: Cooldown, t: float, n: str, tied: str, answered, named, m
     return why + alt
 
 
+def _src_chip(x: str) -> str:
+    """A source as a chip: what, then its kill count; the qualifiers on hover (they add, never answer)."""
+    what, _, rest = x.partition(": ")
+    m = re.search(r"[\d,]+(?: top)? kills", rest)
+    shown = m.group(0) if m else rest
+    more = f" title='{e(rest)}'" if m and rest.strip() != shown else ""
+    return f"<span class='src'{more}><b>{e(what[:1].upper() + what[1:])}</b> {e(shown)}</span>"
+
+
+def _tidy(html: str) -> str:
+    """Two brackets in a row on a chip, one: "(99 kills going) (29% of its users)" -> "(99 kills going; 29% ...)"."""
+    return re.sub(r"\((\d+ kills going)\) \(([^()]*)\)", r"(\1; \2)", html)
+
+
 def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict | None = None,
                    moved: dict | None = None) -> str:
+    return _tidy(_cooldowns_html(cds, answered, named, moved))
+
+
+def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict | None = None,
+                    moved: dict | None = None) -> str:
     """The cooldown rows. answered: the (button, time) pairs the lead ties to a hit; a chip says its hit only for
     those, so no chip reads as an answer the lead and the chart do not give (Apotheosis "1 s before the 0:35 hit")."""
     def tie(c: Cooldown, t: float, n: str) -> str:
@@ -2281,11 +2299,11 @@ def jobs_lead(roles: list, mine: str = "") -> str:
             what, a_, b_, n, ta, tb = m.groups()
             rows += (f"<tr><td><b>{e(sp)}</b></td><td>{e(what)} more</td><td><b>{a_}</b> vs {b_} <small>({n} kills"
                      f"{e(table(sp, j)).replace(' (the table', '; the table').rstrip(')')})</small></td>"
-                     f"<td><b>{ta}</b> vs {tb}</td></tr>")
+                     f"<td><b>{ta}</b> vs {tb}</td><td class='no'>&#10007; not kept</td></tr>")
         return ("<p class='lead'>No healer spec has a job of its own here that the top players keep.</p>"
                 "<table class='jobs fit'><thead><tr><th>Healer</th><th>On average</th><th>Every healer <small>(spec "
                 "vs the others, paired within each kill)</small></th><th>Top players <small>(ranked ones)</small>"
-                f"</th></tr></thead><tbody>{rows}</tbody></table>")
+                f"</th><th>A job?</th></tr></thead><tbody>{rows}</tbody></table>")
     you = next((r for r in roles if r.spec == mine), None)
     head = ""
     if you:
@@ -2624,9 +2642,12 @@ def render_sheet(h: HealerPrep) -> str:
         # as covering both
         by_icon = {_shown(c.name): c for c in [*h.cooldowns, *h.rare] + [c.release for c in h.cooldowns
                                                                          if c.release is not None]}
+        them = ("it" if len(shown) == 1 else "them" if not bare  # never more than its rows (a review: "answer
+                else f"{len(shown) - len(bare)} of them")         # them" over two rows of "None kept")
         lead = (f"<p class='lead'>{len(shown)} big raid {'hit' if len(shown) == 1 else 'hits'}"
-                + (f": the top {e(h.spec)}s answer {'it' if len(shown) == 1 else 'them'} with "
-                   + _and([f"{_ic(by_icon.get(_shown(n)))}<b>{e(_shown(n))}</b>" for n in lead_names]) if lead_names
+                + (f": the top {e(h.spec)}s answer {them} with "
+                   + _and([f"<span class='nw'>{_ic(by_icon.get(_shown(n)))}<b>{e(_shown(n))}</b></span>"
+                           for n in lead_names]) if lead_names
                    else f"; the top {e(h.spec)}s keep no cooldown for {'it' if len(shown) == 1 else 'them'}")
                 + f".{long}{from_dispel}</p>"
                 + hits_table(h.moments, shown, pairs, {b: landed(b) for b in bare}, h.phases, by_icon,
@@ -2644,7 +2665,7 @@ def render_sheet(h: HealerPrep) -> str:
         f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Median raid "
         f"damage per second, {h.raid_kills or 'the top'} kills (up to 40 a spec read: the same hits on every healer "
         f"sheet; fewer kills past the median one). "
-        + (STAGED[:1].upper() + STAGED[1:].rstrip("; ") + ". " if getattr(h, "staged", False) else "")
+        + ("After a dashed line, stage time (below). " if getattr(h, "staged", False) else "")
         + ("Marks: the table's answers (an outline: another press of the same button). " if lead_names
            else "No cooldown is kept for these hits, so none is drawn. ")
         + "A dot: a big hit, "
@@ -2665,7 +2686,8 @@ def render_sheet(h: HealerPrep) -> str:
                                  for c in rare) + " on this boss.</p>")
     # the rule, once, under the long cooldowns and their "fewer than half" line (Zephyr's read as part of it)
     # one definition a line, the term first (round 76: 120 words in one paragraph read as no reference)
-    fight.append(HOW_TO_READ)
+    fight.append(HOW_TO_READ.replace("</dl>", f"<dt>Stage time</dt><dd>{STAGED.rstrip('; ')}.</dd></dl>")
+                 if getattr(h, "staged", False) else HOW_TO_READ)  # the chart's caption points here
     exts = [c for c in heals if _external(c.spell_id) == "protective"]
 
     def fewer(cs: list) -> str:
@@ -2783,9 +2805,7 @@ def render_sheet(h: HealerPrep) -> str:
               "each job: the kills holding the spec and another healer, its own count said",
               f"dispel timings: {h.dispel_kills} kills" if getattr(h, "dispel_kills", 0) else ""]
     deeper_first.append("<p class='sources'><span class='src-lab'>Read on</span>"  # one chip a source (the owner:
-                        + "".join(f"<span class='src'><b>{x.split(': ', 1)[0][:1].upper() + x.split(': ', 1)[0][1:]}"
-                                  f"</b> {x.split(': ', 1)[1] if ': ' in x else ''}</span>"  # less text)
-                                  for x in counts if x) + "</p>")
+                        + "".join(_src_chip(x) for x in counts if x) + "</p>")  # less text)
     if h.presence:
         have = next((x for x in h.presence if x.spec == h.spec), None)
         if have and have.share >= 0.99:  # the corpus is your spec's top players' kills: they all have one

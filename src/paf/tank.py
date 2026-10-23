@@ -416,14 +416,14 @@ def _none_for(note: str) -> str:
 # how to read the defensive cards, one term a line (the owner: less text; every rule kept, said once)
 TANK_HOW_TO_READ = (
     "<dl class='legend'><dt>N%</dt><dd>of the top players read; &ldquo;(N kills going)&rdquo;: of the kills still "
-    "going then; &ldquo;of its users&rdquo;: of the top players who press the button.</dd><dt>Tied to a hit</dt><dd>a quarter of those who press the button press it in the hit's window "
-    "(5 s before to 8 s after it starts); its share is then the window's. A card on cooldown, a potion, a trinket or "
-    "a magic-only defensive in a physical hit says why it is not tied.</dd><dt>A time</dt><dd>shared by a quarter of "
+    "going then; &ldquo;of its users&rdquo;: of the top players who press the button.</dd><dt>Tied to a hit</dt>"
+    "<dd>pressed in the hit's window (5 s before to 8 s after) by a quarter of its users; its share is the "
+    "window's.</dd><dt>A time</dt><dd>shared by a quarter of "
     "those who press the button; its share: the top players pressing within 8 s of it (&ldquo;of its users&rdquo; "
     "too, under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long."
     "</dd><dt>Back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, "
     "not counted for it (&ldquo;for about half&rdquo;: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
-    "time some top players press the same press at instead.</dd></dl>")
+    "time some top players press it at instead.</dd></dl>")
 
 
 def render_sheet(p: TankPrep) -> str:
@@ -593,7 +593,8 @@ def render_sheet(p: TankPrep) -> str:
 
         lead.append(f"{len(p.moments)} big moments for the tanks"
                     + (f": the top {e(p.spec)}s answer them with "
-                       + and_([f"{_ic(by_icon.get(n))}<b>{e(n)}</b>" for n in names]) + "." if names
+                       + and_([f"<span class='nw'>{_ic(by_icon.get(n))}<b>{e(n)}</b></span>" for n in names]) + "."
+                       if names
                        else f"; the top {e(p.spec)}s keep no long defensive for them."))
         if not own:  # the biggest is the raid's damage, not a tank buster (said, as the lead did)
             lead.append(f"The biggest, at {_mmss(m.t)}, is raid damage the tanks take too.")
@@ -615,7 +616,7 @@ def render_sheet(p: TankPrep) -> str:
             for x, w in with_swap:
                 tags.setdefault(_mmss(x.t), []).append(f"tank swap at {_mmss(w)}")
         table = hits_table(p.moments, p.moments, [(t, f"for the {_mmss(t)} hit, {c}") for t, c in cells.items()],
-                           bare, p.phases, by_icon, "", tags)
+                           bare, p.phases, by_icon, "", tags, usual="damage the tank takes")
     swap_said = ""
     if p.swaps:
         # a tank's share of the kill's swaps, at least half the shared moments (round 43: "about 4" beside 9 swaps)
@@ -637,13 +638,14 @@ def render_sheet(p: TankPrep) -> str:
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Median damage per "
         f"second on the ranked tank of each top kill, {p.damage_kills or 'the top'} kills (that tank alone: a swap "
         f"moves it; fewer kills past the median one). "
-        + (STAGED[:1].upper() + STAGED[1:].rstrip("; ") + ". " if getattr(p, "staged", False) else "")
+        + ("After a dashed line, stage time (below). " if getattr(p, "staged", False) else "")
         + "Marks: the table's answers (an outline: another press of the same button) and the swaps. A dot: one of "
         f"the tanks' three biggest moments, whatever casts it (another as high may be left out).</p><ul class='hl2'>"
         f"{'' if p.moments else '<li>No big moment: steady damage.</li>'}</ul></div>",
         f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
         f"{nouned(cooldowns_html(defs, answered, named, moved_t)) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
-        + TANK_HOW_TO_READ
+        + (TANK_HOW_TO_READ.replace("</dl>", f"<dt>Stage time</dt><dd>{STAGED.rstrip('; ')}.</dd></dl>")
+           if getattr(p, "staged", False) else TANK_HOW_TO_READ)
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
            f"</p>" if p.rare else ""),
         f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"
@@ -655,7 +657,7 @@ def render_sheet(p: TankPrep) -> str:
         + (f"<p class='small muted'>About {extra} more swaps a kill come at varying times.</p>"
            if swap and (extra := round(2 * p.taunts_per_kill) - len(p.swaps)) > 0 else "")
         # the rule said (round 87: a swap tied on Nek'zali, none on Vashnik's swap every 28 s, with no word why)
-        + ("<p class='small muted'>The lead ties a swap to a hit only when swaps are rare enough not to land within "
+        + ("<p class='small muted'>The table ties a swap to a hit only when swaps are rare enough not to land within "
            "5 s of it by chance one time in three or more.</p>" if swap else "")
         + "".join(f"<p><b>Taunts stop working with {e(n)}:</b> {e(t)} <span class='muted'>(The Encounter Journal; "
                   + (f"never reached in the {k} top kills read" if not hit and k else

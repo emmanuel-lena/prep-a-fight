@@ -60,3 +60,4 @@ table.jobs td small{color:var(--muted)}
 .sbar{position:relative;display:inline-block;width:120px;height:8px;border-radius:4px;background:color-mix(in srgb,var(--accent) 12%,transparent);align-self:center}
 .sbar>span{display:block;height:100%;border-radius:4px;background:var(--accent)}
 .sbar::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--muted)}
+.nw{white-space:nowrap} table.jobs td.no{color:var(--muted);font-weight:600}
