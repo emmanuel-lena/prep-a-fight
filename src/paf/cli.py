@@ -686,7 +686,8 @@ def cmd_droptimizer(args: argparse.Namespace) -> int:
     if not ilvl:
         print("Your profile has no item levels: give one with --ilvl, or load your /simc export.")
         return 1
-    items = usable_loot([e.id for e in encs], profile.class_name, encounter_loot(), item_classes(), item_names())
+    items = usable_loot([e.id for e in encs], profile.class_name, encounter_loot(), item_classes(), item_names(),
+                        profile.spec, _primary())
     owned = {i.item_id: i.ilvl for i in profile.equipped.values() if i.item_id}
     skipped = [it for it in items if (owned.get(it.item_id) or 0) >= ilvl]
     items = [it for it in items if it not in skipped]
@@ -895,6 +896,16 @@ def _dispel_text(sections, name: str, diff_name: str) -> str:
             sentences = re.split(r"(?<=[.!?])\s+", text)
             return next((x for x in sentences if re.search(r"\b(removal|removed|dispel)", x, re.I)), sentences[0])
     return ""
+
+
+def _primary() -> dict:
+    """Items' primary stats (paf.gamedata.item_primary), none offline: the loot then filters by class only."""
+    try:
+        from paf.gamedata import item_primary
+
+        return item_primary()
+    except Exception:  # noqa: BLE001 - offline
+        return {}
 
 
 def _role_journal(encounter_id: int, diff_name: str, role: str, tl, also: dict[str, str] | None = None) -> str:
@@ -1557,7 +1568,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
                          if c.weighted(weights) > 0]
 
         step("What this boss drops")
-        items = usable_loot([enc.id], profile.class_name, encounter_loot(), item_classes(), item_names())
+        items = usable_loot([enc.id], profile.class_name, encounter_loot(), item_classes(), item_names(),
+                            profile.spec, _primary())
         levels = [i.ilvl for i in profile.equipped.values() if i.ilvl]
         ilvl = args.ilvl or (round(st.median(levels)) if levels else 0)
         if not ilvl:  # a profile without item levels (an old import): the loot cannot be valued

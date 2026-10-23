@@ -360,6 +360,22 @@ def item_classes() -> dict[int, tuple[int, int, int]]:
 
 
 @cache
+def item_primary() -> dict[int, set[str]]:
+    """item id -> the primary stats it carries ({"agi"}, {"int"}, {"str", "agi", "int"}...); none for a ring, a
+    trinket, a neck (ItemSparse's bonus stat types: 3 agility, 4 strength, 5 intellect, 71-74 their mixes)."""
+    kinds = {"3": {"agi"}, "4": {"str"}, "5": {"int"}, "71": {"str", "agi", "int"}, "72": {"str", "agi"},
+             "73": {"agi", "int"}, "74": {"str", "int"}}
+    out: dict[int, set[str]] = {}
+    for r in table_rows("ItemSparse"):
+        if not r.get("ID", "").isdigit():
+            continue
+        got = set().union(*(kinds.get(r.get(f"StatModifier_bonusStat_{i}") or "", set()) for i in range(10)))
+        if got:
+            out[int(r["ID"])] = got
+    return out
+
+
+@cache
 def encounter_loot() -> dict[int, tuple[str, list[int]]]:
     """Warcraft Logs / DungeonEncounter id -> (boss name, item ids of its Encounter Journal loot table)."""
     journal: dict[int, tuple[int, str]] = {}

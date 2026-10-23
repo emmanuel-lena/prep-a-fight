@@ -33,3 +33,16 @@ def test_boss_ev_counts_losses_as_zero():
     a = LootItem(1, "a", "head", "A", {"f": 2.0})
     b = LootItem(2, "b", "head", "A", {"f": -1.0})
     assert boss_ev([a, b], {"f": 1.0}) == [("A", 1.0, 2)]
+
+
+def test_an_item_of_another_specs_main_stat_is_left_out():
+    # Elemental Shaman, Nek'zali (2026-10-23): an agility claw and a strength axe at -17% in the drops table
+    from paf.droptimizer import usable_loot
+
+    loot = {9: ("Boss", [1, 2, 3])}
+    classes = {1: (2, 13, 13), 2: (2, 0, 13), 3: (2, 4, 13)}  # fist, 1H axe, 1H mace: all a shaman's
+    names = {1: ("Claw", -1), 2: ("Axe", -1), 3: ("Mace", -1)}
+    primary = {1: {"agi"}, 2: {"str"}, 3: {"int"}}
+    got = usable_loot([9], "Shaman", loot, classes, names, "Elemental", primary)
+    assert [i.name for i in got] == ["Mace"]
+    assert len(usable_loot([9], "Shaman", loot, classes, names, "Enhancement", primary)) == 1  # the claw

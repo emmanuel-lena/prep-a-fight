@@ -20,3 +20,5 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
   (about -54%). A set list where everything loses more than 5% now says it is a failed sim.
 - The fight tab says how many adds come as the logs count them (Nek'zali's 6, then 14 Restless Amani), not the
   sim's own scaled number (2, then 4).
+- What a boss drops for you no longer lists items of another spec's main stat (an agility or strength weapon on an
+  Elemental Shaman's sheet, at -17%).

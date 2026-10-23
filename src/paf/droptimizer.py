@@ -52,9 +52,26 @@ class LootItem:
         return sum(self.deltas.get(f, 0.0) * w for f, w in weights.items()) / tot
 
 
+# the primary stat of each spec that is not its class's only one (the others follow the class)
+SPEC_PRIMARY = {"enhancement": "agi", "feral": "agi", "guardian": "agi", "brewmaster": "agi", "windwalker": "agi",
+                "protection paladin": "str", "retribution": "str", "holy paladin": "int"}
+CLASS_PRIMARY = {"warrior": "str", "deathknight": "str", "paladin": "str", "rogue": "agi", "hunter": "agi",
+                 "demonhunter": "agi", "monk": "int", "druid": "int", "shaman": "int", "priest": "int", "mage": "int",
+                 "warlock": "int", "evoker": "int"}
+
+
+def spec_primary(class_name: str, spec: str) -> str:
+    cls, sp = class_name.lower(), (spec or "").lower()
+    return SPEC_PRIMARY.get(f"{sp} {cls}") or SPEC_PRIMARY.get(sp) or CLASS_PRIMARY.get(cls, "")
+
+
 def usable_loot(encounters: list[int], class_name: str, loot: dict[int, tuple[str, list[int]]],
-                classes: dict[int, tuple[int, int, int]], names: dict[int, tuple[str, int]]) -> list[LootItem]:
+                classes: dict[int, tuple[int, int, int]], names: dict[int, tuple[str, int]],
+                spec: str = "", primary: dict[int, set[str]] | None = None) -> list[LootItem]:
+    """The boss loot your class can wear and, given the spec and the items' primary stats, your spec can use: an
+    agility weapon is no Elemental Shaman's (a review: two at -17% in the drops table)."""
     cls = class_name.lower()
+    want = spec_primary(class_name, spec) if spec and primary else ""
     bit = 1 << (CLASS_IDS.get(cls, 0) - 1) if cls in CLASS_IDS else -1
     out: list[LootItem] = []
     seen: set[int] = set()
@@ -77,6 +94,8 @@ def usable_loot(encounters: list[int], class_name: str, loot: dict[int, tuple[st
             if inv == 14 and cls not in SHIELD_CLASSES:
                 continue
             if inv == 23 and cls not in HOLDABLE_CLASSES:
+                continue
+            if want and (primary or {}).get(iid) and want not in primary[iid]:  # another spec's main stat
                 continue
             seen.add(iid)
             out.append(LootItem(iid, name, slot, boss))
