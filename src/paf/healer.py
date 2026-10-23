@@ -2285,9 +2285,8 @@ def roles_table(roles: list, mine: str = "") -> str:
         return ""
     buffs = any(r.buffs > 0 for r in roles)
     few = "<small>too few here</small>"  # a spec read in the pool, too rare in this sheet's kills for its casts
-    cover = next((r.spike_cover for r in roles if getattr(r, "spike_cover", 0)), 0.0)
     head = ("<th>Healer</th><th>Healing share</th><th>On tanks</th>"
-            f"<th>Of its healing, in spikes{f' <small>(spikes: {_pct(cover)} of the fight)</small>' if cover else ''}</th>"
+            "<th>In spikes</th>"  # the legend's "A spike" says how much of the fight (heal round 16: 5 lines)
             "<th>Overheal</th><th>Dispels a minute</th><th>Externals given a kill <small>(every player)</small></th>"
             + ("<th>Buffs given a kill</th>" if buffs else "")
             + "<th>Players</th>")
@@ -2443,8 +2442,8 @@ def _pace(h) -> str:
     were said slower: on four sheets they were not)."""
     if not h.role_median or not h.duration or abs(h.role_median - h.duration) < 10:  # under 10 s: noise
         return ""
-    return (f" These kills are {'slower' if h.role_median > h.duration else 'faster'} than the {h.kills} top kills "
-            f"({_mmss(h.role_median)} against {_mmss(h.duration)}).")
+    return (f" {'Slower' if h.role_median > h.duration else 'Faster'} than the {h.kills} top kills "
+            f"({_mmss(h.duration)}).")  # their own median just said (heal round 16: 4:35 twice in a sentence)
 
 
 def jobs_lead(roles: list, mine: str = "") -> str:
