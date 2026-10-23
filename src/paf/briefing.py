@@ -389,7 +389,8 @@ def spec_html(d) -> str:
         what = item or re.sub(r"\d$", "", m[1]).replace("_", " ")
         missing.add(what)
         short_specs.append(name)
-        return "" if name == mine_label else "<small> &dagger;</small>"  # the item said once, under the tiles
+        return "" if mine_label in short_specs else "<small> &dagger;</small>"  # the item said once, under the
+        # tiles; your own spec short: no dagger anywhere, the note says every gap (DPS confirm round 8)
     missing: set[str] = set()  # (DPS confirm rounds 6-7: your own spec short makes every gap rough, no dagger)
     short_specs: list[str] = []
     mine_label = gaps[0][0]

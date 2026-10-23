@@ -472,6 +472,7 @@ class Suggestion:
     gain: float | None = None
     icon: str = ""  # game icon file name
     metric: str = ""  # what the gain is of ("boss", "total", "burst"), when it is not your plain damage
+    base: str = "SimC's default list"  # what the gain is against
 
 
 THIN_CORPUS = 50  # fewer ranked kills than this: say the data is thin
@@ -615,12 +616,17 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         others = ", ".join(f"{_goal(o)} damage {v:+.1f}%" for o, v in p.totals.items()
                            if o not in (p.objective, "adds"))
         played_p = simple_plan(d)
+        shown_gain, base = p.gain, "SimC's default list"
         if played_p is not None and played_p is not p and played_p.gain > 2 * played_p.error:  # the real cost
-            rel = [f"{_goal(o)} damage {100 * ((1 + p.totals[o] / 100) / (1 + played_p.totals[o] / 100) - 1):+.1f}%"
-                   for o in dict.fromkeys((p.objective, "boss", "total"))  # its own gain on that base first
-                   if o in p.totals and o in played_p.totals]  # (DPS confirm round 7: +20.2% vs default beside it)
+
+            def vs(o: str, p=p, played_p=played_p) -> float:
+                return 100 * ((1 + p.totals[o] / 100) / (1 + played_p.totals[o] / 100) - 1)
+            rel = [f"{_goal(o)} damage {vs(o):+.1f}%" for o in ("boss", "total")
+                   if o != p.objective and o in p.totals and o in played_p.totals]
             if rel:  # the trade a player makes: against the plan played, the default list's numbers in Dig deeper
-                others = "vs the plan the sheet plays: " + ", ".join(rel)  # (DPS confirm round 6: four numbers)
+                others = "vs the plan the sheet plays: " + ", ".join(rel)  # (DPS confirm rounds 6-8: one base,
+                if p.objective in p.totals and p.objective in played_p.totals:  # its headline gain too)
+                    shown_gain, base = vs(p.objective), "the plan the sheet plays"
         if others:
             lines.append(f"<span class='muted small'>Also: {e(others)}.</span>")
         if d.mrt.get(p.objective):
@@ -659,9 +665,9 @@ def suggestions(d: PrepData) -> list[Suggestion]:
             else _severity(p.gain)  # a plan the sheet does not play is an alternative, whatever its size
         from paf.simple import _fallback  # a potion or a racial: the picture the fight tab shows for it
 
-        out.append(Suggestion(sev, f"Cooldown plan <b>{e(goal)}</b>{tag}", lines, p.gain,
+        out.append(Suggestion(sev, f"Cooldown plan <b>{e(goal)}</b>{tag}", lines, shown_gain,
                               d.icons.get(first, "") or _fallback(d, cd_name(d, first)), {"boss": "boss damage", "total": "total damage",
-                                                       "secondary": "burst damage"}.get(p.objective, "")))
+                                                       "secondary": "burst damage"}.get(p.objective, ""), base))
     if d.gear:
         changes, _, w = d.gear[0]
         if w > 2 * d.gear_error:
@@ -839,7 +845,7 @@ def suggestions_html(d: PrepData) -> str:
                  "alt": "Alternative"}[s.severity]
         if s.severity == "info" and s.gain is not None:  # a gain only for some raids (a burst they may not need)
             label = "Situational"
-        unit = f"<small>{e(s.metric)}, vs SimC's default list</small>" if s.metric else ""  # the baseline, said
+        unit = f"<small>{e(s.metric)}, vs {e(s.base)}</small>" if s.metric else ""  # the baseline, said
         gain = f'<div class="gain">{s.gain:+.1f}%{unit}</div>' if s.gain is not None else '<div class="gain"></div>'
         pic = icons.img(s.icon or "inv_misc_groupneedmore", "medium")
         details = "".join(f"<div>{x}</div>" for x in s.details)

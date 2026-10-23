@@ -104,13 +104,13 @@ def test_a_press_no_boss_event_explains_says_why(monkeypatch):
     why = {t: it.why for t, it in fightview.items(d) if it.name == "Shadow Blades"}
     assert why[2] == ""  # the pull says it
     assert why[92] == "as soon as it is ready again; 80% of the top players wait until 1:38"
-    assert why[182] == "as soon as it is ready again, like 75% of the top players"
+    assert why[182] == "as soon as it is ready again; 75% of the top players press it then"
     acts = fightview.data(d, fightview.moments(d), 300)["acts"]
     assert next(a for a in acts if a["t"] == 92)["w"] == why[92]
     d.optimized = [Plan("boss", {"shadow_blades": Rule("hold_adds_10", "", None)}, 0.0, 0.2)]  # a held rule: said once
     why = {t: it.why for t, it in fightview.items(d) if it.name == "Shadow Blades"}
     assert why[92].startswith("keep for the next add wave if it comes within 10 s, otherwise use it")
-    assert why[182] == "like 75% of the top players"  # the rule not said again
+    assert why[182] == "75% of the top players press it then"  # the rule not said again
 
 
 def test_a_boss_row_says_what_the_journal_tells_damage_dealers(monkeypatch):

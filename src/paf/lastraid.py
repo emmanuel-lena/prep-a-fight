@@ -354,7 +354,7 @@ def _cmp_table(rows: list[dict], report: str = "") -> str:
         t = f" <small>{clock}{e(lab[i])}</small>" if lab[i] else ""
         if report and fights[i]:
             t += (f"<br><a href='https://www.warcraftlogs.com/reports/{e(report)}#fight={fights[i]}' "
-                  f"target='_blank' rel='noopener'>fight {fights[i]} &#8599;</a>")  # leaves the app: marked
+                  f"target='_blank' rel='noopener'>Fight {fights[i]} &#8599;</a>")  # leaves the app: marked
         return f"<th>{word}{t}</th>"
     # the comparison's own pulls: its best and worst without a death (paf.pulldiff), not the night's best pull
     return ("<table class='lr-cmp fit'><thead><tr><th></th>"
