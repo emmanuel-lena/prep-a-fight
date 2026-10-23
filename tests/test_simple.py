@@ -111,3 +111,14 @@ def test_the_fight_minute_by_minute():
     assert html.count("class='mn'") == 3  # 0:00-1:00, 1:00-2:00, 2:00-2:30
     assert "Big Slam" in html and "Intermission" in html and "A quiet minute" in html
     assert html.count("<a href='#m") == 3  # the mini-map
+
+
+def test_a_plan_a_slower_kill_turns_into_a_loss_plays_the_default_list():
+    # Subtlety Rogue, Vashnik (2026-10-23): +0.6% holding the potion out of Bloodlust, -0.4% on a 5:16 kill
+    p = Plan("boss", {"potion": Rule("hold_adds_60", "", None)}, 0.6, 0.1, sensitivity={"slower": -0.4},
+             timeline=[(108.0, "Potion")], default_timeline=[(2.0, "Potion")])
+    d = PrepData("Vashnik", "heroic", "Subtlety", "Me")
+    d.optimized = [p]
+    played = simple._plan(d)
+    assert played.timeline == [(2.0, "Potion")] and not played.choice  # the fight tab: the default list
+    assert d.optimized[0].timeline == [(108.0, "Potion")]  # Dig deeper keeps the plan

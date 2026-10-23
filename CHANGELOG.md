@@ -22,3 +22,5 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
   sim's own scaled number (2, then 4).
 - What a boss drops for you no longer lists items of another spec's main stat (an agility or strength weapon on an
   Elemental Shaman's sheet, at -17%).
+- A cooldown plan whose small gain turns into a loss on a slower kill is no longer what the fight tab plays: it
+  plays SimC's default list (Dig deeper still shows the plan and its checks).

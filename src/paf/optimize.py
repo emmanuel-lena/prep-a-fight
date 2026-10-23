@@ -210,6 +210,8 @@ class Plan:
     timeline: list[tuple[float, str]] = field(default_factory=list)
     sensitivity: dict[str, float] = field(default_factory=dict)  # uncertain-parameter variant -> gain %
     flags: list[str] = field(default_factory=list)  # reasons to double-check this plan
+    default_timeline: list[tuple[float, str]] = field(default_factory=list)  # the default list's pull, played
+    # instead when the plan is not robust (paf.simple._plan)
 
     @property
     def robust(self) -> bool:
@@ -646,10 +648,11 @@ def optimize_all(profile_text: str, fight: Fight, run_dir: Path, *, objectives: 
              for obj in objectives]
     confirm(profile_text, apl, plans, fight, run_dir)
     sensitivity(profile_text, apl, plans, fight, run_dir, extra=extra_variants)
+    default_pull = play_by_play(profile_text, apl, Plan("default", {}, 0, 0), fight, run_dir, cds)
     if alignment:
-        default_pull = play_by_play(profile_text, apl, Plan("default", {}, 0, 0), fight, run_dir, cds)
         alignment = adjust_alignment(alignment, default_pull, fight)
     for p in plans:
         p.flags = sanity_flags(p, alignment or [], validation)
         p.timeline = play_by_play(profile_text, apl, p, fight, run_dir, cds)
+        p.default_timeline = default_pull
     return plans, cds
