@@ -124,6 +124,11 @@ def modernize(html: str, difficulty: str = "heroic") -> str:
     return readable(h, difficulty)
 
 
+def _short(stage: str) -> str:
+    """"Stage One: Soulcoiler Initiation" -> "Stage One": its name once in its heading (fresh app review 6)."""
+    return stage.split(":", 1)[0].strip() or stage
+
+
 def _mmss(t: float) -> str:
     from paf.plan import mmss  # rounded, as the page's header and plan box (app round 14: 0:52 under 0:53)
 
@@ -292,13 +297,13 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
             if s.kind == "ability" and key(s) in seen and seen[key(s)] != top.title:  # told before: its name only,
                 pic = icons.img(ctx["icons"].get(s.title, ""), "small")           # for what is new under it
                 rows.append(f'<div class="ab" style="margin-left:{min(depth, 1) * 14}px"><div>{pic}<b>{e(s.title)}</b>'
-                            f' <span class="muted small">as in {e(seen[key(s)])}</span></div></div>')
+                            f' <span class="muted small">as in {e(_short(seen[key(s)]))}</span></div></div>')
             elif s.kind == "ability" and prior:  # the same words as before, a new tag (Vessel of Awakening: deadly)
                 was = prior
                 new = [SHOWN_FLAGS[f] for f in s.flags if f in SHOWN_FLAGS and f not in was[1]]
                 pic = icons.img(ctx["icons"].get(s.title, ""), "small")
                 rows.append(f'<div class="ab" style="margin-left:{min(depth, 1) * 14}px"><div>{pic}<b>{e(s.title)}</b>'
-                            f' <span class="muted small">as in {e(was[0])}'
+                            f' <span class="muted small">as in {e(_short(was[0]))}'
                             + (", now</span> " + " ".join(  # the pills every other ability gets (app round 11)
                                 f'<span class="pill {"warn" if x in ("deadly", "interrupt") else ""}">{e(x)}</span>'
                                 for x in new) if new else ", changed</span>")
@@ -326,8 +331,8 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
             rows.insert(0, _ability(top, 0, ctx))
         title = "" if top.kind == "ability" else f"<h3>{head}</h3>"  # an ability's card: its row names it
         also = "".join("<p class='small muted also'>" + (
-            f"Also, as in {e(where)}: {e(', '.join(dict.fromkeys(names)))}." if len(set(names)) <= 4 else
-            f"{len(set(names))} abilities {'you deal with ' if role else ''}from {e(where)} stay as they were.")
+            f"Also, as in {e(_short(where))}: {e(', '.join(dict.fromkeys(names)))}." if len(set(names)) <= 4 else
+            f"{len(set(names))} abilities {'you deal with ' if role else ''}from {e(_short(where))} stay as they were.")
             + "</p>"  # the role's own count, the others' named below (round 79: 7 on a healer sheet, 9 on a tank's)
             for where, names in repeated.items())
         also += "".join(f"<p class='small muted also'>For {ROLE_OTHERS[r]}: {e(', '.join(dict.fromkeys(names)))}.</p>"

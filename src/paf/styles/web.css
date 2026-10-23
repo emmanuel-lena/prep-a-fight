@@ -317,7 +317,7 @@ body.has-side>main .hero-week h2{font-size:30px;line-height:1.15;margin:4px 0 6p
 body.has-side>main .sheets+h2{margin-top:24px}
 form.settings .set-group>legend{line-height:1.25} form.settings{padding-top:10px}
 /* round 7 */
-main a:not(.btn):not(.bcard):not(.ws-card):not(.rb-d):not(.stale):not(.mx){text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+main a:not(.btn):not(.bcard):not(.ws-card):not(.rb-d):not(.stale):not(.mx):not(.rl-sb){text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
 .set-wcl{margin:10px 0}
 .status .path{font:400 13px var(--font-data)} .status td.small{font-size:13px} /* paths in mono, the rest in the body face */
 .status .btn{font:600 15px var(--font-display);padding:9px 16px;min-width:196px;text-align:center}

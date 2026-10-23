@@ -581,7 +581,7 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
                 return False
         return "".join(
             f"<a class='pill diff {e(i['difficulty'])} mx{'' if 'prep' in i['files'] else ' nosim'}"
-            f"{' old' if stale(i) else ''}' "
+            f"{' old' if stale(i) and 'prep' in i['files'] else ''}' "  # one state a pill (review 6: dashed and amber)
             f"href='/view/{e(i['key'])}' title='{e(i['difficulty'].capitalize())} &middot; "
             f"{time.strftime('%d %b %H:%M', time.localtime(i['mtime']))}"
             f"{'' if 'prep' in i['files'] else ' &middot; no sim yet'}'>"
@@ -1346,11 +1346,11 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
         raid_ic = icons.img("inv_misc_groupneedmore", "medium", "goal-ic")
         goal_html = ('<section class="ob-step" data-step="goal"><h2><span class="vh">Step 1 of 4: </span>Your goal on this boss</h2>'
                      '<div class="goals">' + f"""<label class="goal"><input type="radio" name="goal" value="boss"><span><b>{boss_ic}Boss damage</b>
-<small>Progress: your raid lead wants everyone on the boss. Cooldowns and gear aim at the boss.</small></span></label>
+<small>everyone on the boss: cooldowns and gear for it</small></span></label>
 <label class="goal"><input type="radio" name="goal" value="total"><span><b>{pad_ic}Pad the adds</b>
-<small>Your job is the adds, or you farm for parses: cooldowns and gear for total damage.</small></span></label>
+<small>your job is the adds: cooldowns and gear for total damage</small></span></label>
 <label class="goal"><input type="radio" name="goal" value="auto" checked><span><b>{raid_ic}Let my raid decide</b>
-<small>The prep reads your raid's log: if the others already cover the adds, you stay on the boss.</small></span></label>
+<small>reads your raid's log: if the others cover the adds, you stay on the boss</small></span></label>
 """ + f'</div><div class="ob-actions">{nxt}</div></section>')
     est_badge = (f"<p class='est-badge' title='{e(est.lead)}'>&#9201; {e(est.badge)}</p>" if est else "")
     body = f"""<div class="boss-cols"><div class="boss-main"><h1>{e(enc.name)} {diff_pill(difficulty)}</h1>
