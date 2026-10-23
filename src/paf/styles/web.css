@@ -430,3 +430,5 @@ table.mx a.mx.nosim{border:1px dashed var(--muted);opacity:1;background:transpar
 .rl-boss h4 .rl-ok,.rl-boss h4 .rl-unread{display:inline-block;margin-left:10px;padding:1px 9px;border-radius:999px;border:1px solid var(--line);font:600 12px var(--font-body)}
 table.mx a.mx.old,.mx-legend .pill.old{border:1px solid var(--warn)} .mx-legend .pill.old::before{display:none}
 table.mx .mx-boss{background:#15121c}
+table.mx a.mx.nosim.old{border:1px dashed var(--warn)} /* no sim first, its age's amber kept */
+.rl-other{font:600 12.5px var(--font-body);padding:1px 9px;border-radius:6px;border:1px solid var(--warn);color:var(--fg)}

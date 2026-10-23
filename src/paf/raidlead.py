@@ -286,6 +286,13 @@ def lust_spot(sh: dict):
         next(iter(sh.get("lust") or []), None)
 
 
+OTHER_BUILD = 6  # talents moved past which a player is on another build (a hero tree), not a few swaps away
+
+
+def _moved(b: dict) -> int:
+    return len(b["take"]) + len(b["drop"]) + b.get("more", 0)
+
+
 def _talents_h4(sh: dict, total: int) -> str:
     """The heading with its counts, whatever the list below: on their build, no pad/boss build (tanks, healers), not
     read (a review: on a boss with changes, who was not checked vanished)."""
@@ -328,7 +335,8 @@ def text(sh: dict, difficulty: str, mrt: bool = False) -> str:
             lines.append(f"{t['name']}: {', '.join(t['players'])}")
     for b in sh["builds"]:
         what = "padding talents" if b["side"] == "pad" else "boss talents"
-        change = (f"take {', '.join(b['take'])}" if b["take"] else "") + (
+        change = (f"another build ({_moved(b)} talents apart): play the top players' {b['side']} build"
+                  if _moved(b) > OTHER_BUILD else "") or (f"take {', '.join(b['take'])}" if b["take"] else "") + (
             (" / " if b["take"] and b["drop"] else "") + f"drop {', '.join(b['drop'])}" if b["drop"] else "")
         lines.append(f"{b['name']} ({what}): {change}")
     if len(lines) == 1 + (lust_spot(sh) is not None):
@@ -425,9 +433,13 @@ def page_body(difficulty: str) -> str:
             f"<li class='rl-b'>{_ic(b['spec'])}<b>{e(b['name'])}</b><small>{e(pretty(b['spec']))}</small>"
             f"<span class='rl-side {'pad' if b['side'] == 'pad' else 'boss'}'>"
             f"{'pad build &middot; on an add' if b['side'] == 'pad' else 'boss build'}</span>"
-            + "<span class='rl-ts'>" + "".join(f"<span class='rl-t take'>+ {e(t)}</span>" for t in b["take"])
-            + "".join(f"<span class='rl-t drop'>&minus; {e(t)}</span>" for t in b["drop"])
-            + (f"<span class='rl-more'>+{b['more']} more in the build</span>" if b.get("more") else "")
+            + "<span class='rl-ts'>" + (
+                # another build altogether (a hero tree): one badge, not 6 chips of 44 (a review: half a build)
+                f"<span class='rl-other'>another build: {_moved(b)} talents apart &middot; play the top players' "
+                f"{'pad' if b['side'] == 'pad' else 'boss'} build</span>" if _moved(b) > OTHER_BUILD else
+                "".join(f"<span class='rl-t take'>+ {e(t)}</span>" for t in b["take"])
+                + "".join(f"<span class='rl-t drop'>&minus; {e(t)}</span>" for t in b["drop"])
+                + (f"<span class='rl-more'>+{b['more']} more in the build</span>" if b.get("more") else ""))
             + "</span></li>"
             for b in sh["builds"])
         cards += (f"<article class='rl-boss' id='boss-{x.id}'><header><h3>{e(x.name)}</h3>"
