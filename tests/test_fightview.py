@@ -138,7 +138,10 @@ def test_a_boss_row_says_what_the_journal_tells_damage_dealers(monkeypatch):
 def test_two_adds_of_one_wave_are_one_kill_row(monkeypatch):
     # Subtlety Rogue, Vashnik (DPS round 10): "Kill Burning Venom" and "Kill Shrouded Venom", both at 0:24
     d = sheet(monkeypatch)
-    d.waves = [(24.0, 2, 19.0, "Burning Venom"), (24.0, 5, 8.0, "Shrouded Venom")]
-    d.actions = [Action("kill", "Burning Venom", ""), Action("kill", "Shrouded Venom", "")]
+    d.waves = [(24.0, 2, 19.0, "Burning Venom"), (24.1, 5, 8.0, "Shrouded Venom")]  # the logs' 24.0 and 24.1
+    d.actions = [Action("kill", "Burning Venom", "Kill the Burning Venom (~6 per kill)"),
+                 Action("kill", "Shrouded Venom", "Kill the Shrouded Venom (~15 per kill)")]
     you = [it.text for t, it in fightview.items(d) if t == 24.0 and it.side == "you"]
     assert you == ["Kill Burning Venom and Shrouded Venom"]
+    job = fightview.job_html(d)
+    assert "Kill the Burning Venom and the Shrouded Venom at 0:24" in re.sub("<[^>]+>", "", job)

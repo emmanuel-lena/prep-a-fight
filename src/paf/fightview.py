@@ -221,7 +221,7 @@ def items(d) -> list[tuple[float, Item]]:
             add(t, Item("boss", "tank" if tank else "cast", name, f"{name} (tank)" if tank else name, _icon(d, name)))
             if name in act:
                 add(t, Item("you", "do", name, act[name].format(name), _icon(d, name)))
-    kills: dict[float, list[tuple[str, str]]] = {}  # one "you" row a wave moment (DPS round 10: "Kill Burning
+    kills: dict[int, list[tuple[str, str, float]]] = {}  # one "you" row a wave moment (DPS round 10: "Kill Burning
     # Venom at 0:24" and "Kill Shrouded Venom at 0:24", two rows for one wave)
     for t, count, life, name in d.waves:
         if not count:
@@ -234,8 +234,9 @@ def items(d) -> list[tuple[float, Item]]:
                 stop = min(stop, w.start + w.duration)
         add(t, Item("boss", "adds", name, label, _icon(d, name), float(min(life or 0, max(0.0, stop - t)))))
         if name not in skip and _clean(name) not in skip:
-            kills.setdefault(t, []).append((name, shown))
-    for t, ns in kills.items():
+            kills.setdefault(round(t), []).append((name, shown, t))  # by the second shown: 24.0 and 24.1 are one
+    for _s, got in kills.items():
+        t, ns = got[0][2], [(n, sh) for n, sh, _t in got]
         verbs = {act.get(n, "Kill {}") for n, _s in ns}
         if len(ns) > 1 and verbs == {"Kill {}"}:
             add(t, Item("you", "do", ns[0][0], "Kill " + " and ".join(sh for _n, sh in ns), _icon(d, ns[0][0])))
@@ -410,6 +411,12 @@ def job_html(d) -> str:
         return f" at {', '.join(_mmss(t) for t in ts)}" if ts else ""
     rows = [(a.name, f"<b>{e(a.text.split(':')[0].split(' (')[0])}</b>{at(a.name)}") for a in d.actions
             if a.kind in ("kill", "contact") or (a.kind == "interrupt" and a.text.startswith("Interrupt"))][:2]
+    kills = [a for a in d.actions if a.kind == "kill"][:2]
+    if len(kills) == 2 and at(kills[0].name) and at(kills[0].name) == at(kills[1].name):  # one wave, two units:
+        # one line (DPS round 11: "Kill the Shrouded Venom at 0:24, 1:48, 3:12", then the Burning Venom's same)
+        both = " and ".join(e(a.text.split(':')[0].split(' (')[0]) for a in kills).replace(" and Kill ", " and ")
+        rows = [r for r in rows if r[0] not in {a.name for a in kills}]
+        rows.insert(0, (kills[0].name, f"<b>{both}</b>{at(kills[0].name)}"))
     hints = {it.name: it.hint for _t, it in items(d) if it.hint}
     said = {_clean(a.name) for a in d.actions}
     skip = {a.name for a in d.actions if a.kind == "ignore"}
