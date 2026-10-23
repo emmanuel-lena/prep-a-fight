@@ -490,7 +490,8 @@ def _ctx(t: float, its: list[tuple[float, Item]]) -> str:
         return "just after the pull"
     # a press answers an add wave, an immunity or a stage up to 8 s after it starts, a boss cast only within 3 s
     near = [x for at, x in its if x.side == "boss" and x.kind in ANCHORS
-            and t - (3 if x.kind == "cast" else 8) <= at <= t + 1]
+            and t - (3 if x.kind == "cast" else 8) <= at <= t + (2 if x.kind == "adds" else 1)]  # pressed as the
+    # wave lands (0:51 for a 0:52.7 wave: its hold rule said nothing there; a review)
     if near:
         order = ("adds", "cast", "immune", "phase")  # what you press it for, the most concrete first
         x = min(near, key=lambda x: (order.index(x.kind), abs(x.t - t)))
