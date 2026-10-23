@@ -272,6 +272,7 @@ def sentences(b: dict, player: str) -> list[str]:
             row = h.get("row") or _row_of(h["text"])  # a result read before the rows: from its sentence
             out.append({"cmp": [_you(row[0], player), *row[1:]], "kind": h.get("kind", ""),
                         "pulls": [_pull_label(d.get("b")), _pull_label(d.get("a"))],
+                        "fights": [(d.get("b") or {}).get("fight"), (d.get("a") or {}).get("fight")],
                         "text": _ab(h["text"], player)} if row else _ab(h["text"], player))
     return out
 
@@ -339,17 +340,25 @@ def _signed_word(gap: str, kind: str | None) -> str:
     return gap
 
 
-def _cmp_table(rows: list[dict]) -> str:
+def _cmp_table(rows: list[dict], report: str = "") -> str:
     """The best pull against the weaker one, a measure a row, the better value marked (good or bad for you)."""
     if not rows:
         return ""
     lab = rows[0].get("pulls") or ["", ""]  # which pulls: "Pull 27 (2:38)", so an expert can check them
     if any(r["cmp"][0].startswith("Boss health left") for r in rows):  # the health is a row: the header
         lab = [re.sub(r"^wipe at \d+% after ", "", x) for x in lab]  # keeps the time (app round 16: said twice)
+    fights = rows[0].get("fights") or [None, None]
+
+    def head(word: str, i: int) -> str:  # its length, and its fight in the log to check it (app confirm round 6)
+        clock = "&#9201;&nbsp;" if re.fullmatch(r"\d+:\d\d", lab[i] or "") else ""  # a length, not a moment
+        t = f" <small>{clock}{e(lab[i])}</small>" if lab[i] else ""
+        if report and fights[i]:
+            t += (f" <a class='small' href='https://www.warcraftlogs.com/reports/{e(report)}#fight={fights[i]}' "
+                  f"target='_blank' rel='noopener'>fight {fights[i]}</a>")
+        return f"<th>{word}{t}</th>"
     # the comparison's own pulls: its best and worst without a death (paf.pulldiff), not the night's best pull
     return ("<table class='lr-cmp fit'><thead><tr><th></th>"
-            f"<th>Better no-death{' <small>' + e(lab[0]) + '</small>' if lab[0] else ''}</th>"  # not the night's
-            f"<th>Weaker no-death{' <small>' + e(lab[1]) + '</small>' if lab[1] else ''}</th><th>Gap</th></tr>"
+            + head("Better no-death", 0) + head("Weaker no-death", 1) + "<th>Gap</th></tr>"  # not the night's best
             "</thead><tbody>"
             + "".join(f"<tr class='{e(r.get('kind', ''))}'><td>{e(r['cmp'][0])}</td><td><b>{e(r['cmp'][1])}</b></td>"
                       f"<td>{e(r['cmp'][2])}</td><td class='gap'>{e(_signed_word(_delta(r['cmp'][1], r['cmp'][2]), r.get('kind')))}"
@@ -444,7 +453,7 @@ def card(slug: str, heading: bool = True) -> str:
         says = ([x for x in boss_says if _key(x) not in skip and not (isinstance(x, dict) and x.get("cmp"))][:3]
                 + [x for x in boss_says if isinstance(x, dict) and x.get("cmp")][:6])  # a table: more rows fit
         links = "".join(f"<a href='/job/{e(jid)}'>{label}</a>" for kind, label in
-                        (("rotation", "Your rotation"), ("wipe", "Why it did not die"), ("diff", "These two pulls, side by side"))
+                        (("rotation", "Your rotation"), ("wipe", "Why it did not die"), ("diff", "Compare these two pulls"))
                         if (jid := b["jobs"].get(kind)) and not _failed(jid))
         prep = "The prep"
         if not b["kill"] and (_failed(b["jobs"].get("wipe")) or not b["jobs"].get("wipe")):  # needs the boss prepared:
@@ -454,7 +463,7 @@ def card(slug: str, heading: bool = True) -> str:
         else:
             rest = [x for x in says if not (isinstance(x, dict) and x.get("cmp"))]
             body = (("<ul>" + "".join(_li(s) for s in rest) + "</ul>" if rest else "")
-                    + _cmp_table([x for x in says if isinstance(x, dict) and x.get("cmp")])) if says else \
+                    + _cmp_table([x for x in says if isinstance(x, dict) and x.get("cmp")], cur.get("report", ""))) if says else \
                 "<p class='muted small'>Nothing stands out.</p>"
         card_html = (f"<article class='lr-boss{' kill' if b['kill'] else ''}'><header><b>{e(b['name'])}</b>"
                  f"{diff_pill(b['difficulty'])}" + (f"<span class='lr-state'>{state_txt}</span>" if state_txt else "") + "</header>"
