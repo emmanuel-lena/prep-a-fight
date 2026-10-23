@@ -143,7 +143,7 @@ SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
     ("Advanced", True, [
         ("corpus_size", "Kills read per boss", "The top kills a prep reads, then keeps reading in the background."),
         ("corpus_points", "Quota for background reading",
-         "Warcraft Logs points per hour (of 3600) the reading in the background may use; a prep you wait for "
+         "Warcraft Logs points per hour (of 3,600) the reading in the background may use; a prep you wait for "
          "uses the whole quota."),
         ("region", "Rankings from one region only", ""),
         ("cache_max_mb", "Disk cache cap (MB)", "Sim results and Warcraft Logs answers; the oldest go first."),

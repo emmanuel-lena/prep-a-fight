@@ -120,3 +120,10 @@ def test_a_stage_heading_says_when_it_starts():
     out = abilities_html([one, two], phases=[("Stage One", 0.0), ("Intermission", 110.0)])
     assert "Stage One: Soulcoiler Initiation <span class='muted small'>from the pull</span>" in out
     assert "Intermission: Ritual of Awakening <span class='muted small'>from about 1:50</span>" in out
+
+
+def test_journal_times_round_as_the_page_header():
+    # app round 14: "Restless Amani around 0:52" under a header and plan box saying 0:53 (52.7 s)
+    from paf import bossguide
+
+    assert bossguide._when([52.7, 167.0]) == "0:53, 2:47"

@@ -124,7 +124,9 @@ def modernize(html: str, difficulty: str = "heroic") -> str:
 
 
 def _mmss(t: float) -> str:
-    return f"{int(t // 60)}:{int(t % 60):02d}"
+    from paf.plan import mmss  # rounded, as the page's header and plan box (app round 14: 0:52 under 0:53)
+
+    return mmss(t)
 
 
 def _when(times: list[float]) -> str:
@@ -300,8 +302,9 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
                 rows.append(_ability(s, depth, ctx))
             elif s.kind == "creature":  # a unit told before: its name, then only what changed under it
                 told = seen.get(key(s), top.title) != top.title
-                ts = ctx["timings"].get(s.title.lower())  # when it comes, as the abilities (app round 13: the
-                at = f" <span class='muted small'>around {_when(ts)}</span>" if ts else ""  # adds had no time)
+                ts = None if told else ctx["timings"].get(s.title.lower())  # when it comes, at its first stage
+                at = f" <span class='muted small'>around {_when(ts)}</span>" if ts else ""  # only (app rounds 13-14:
+                # the adds had no time, then the intermission's repeat gave the Stage One spawns)
                 rows.append(f'<div class="unit" style="margin-left:{min(depth, 1) * 14}px">{e(s.title)}{at}</div>'
                             + (f"<p class='small muted unit-d' style='margin-left:{min(depth, 1) * 14}px'>"
                                + (f"As in {e(seen[key(s)])}; what changes:" if told

@@ -54,6 +54,6 @@ def test_a_recent_quota_read_answers_a_page(tmp_path, monkeypatch):
         def rate_limit(self):
             raise AssertionError("asked Warcraft Logs")
 
-    assert wcl.quota_line(Refuses()) == "120 / 3600 points used this hour (reset in 12 min)"
+    assert wcl.quota_line(Refuses()) == "120 / 3,600 points used this hour (reset in 12 min)"
     left, _ = wcl.quota_left(Refuses())
     assert left == 3480

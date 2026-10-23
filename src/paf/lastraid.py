@@ -437,7 +437,7 @@ def card(slug: str, heading: bool = True) -> str:
         rot = _result(b["jobs"].get("rotation")) if b["kill"] else None
         reviewed = f" &middot; reviewed: the kill, {_mmss(rot['duration'])}" if rot and rot.get("duration") else ""
         state_txt = (f"killed in {b['pulls']} {'pull' if b['pulls'] == 1 else 'pulls'}{reviewed}" if b["kill"] else
-                     f"not killed: best pull with the boss at {b['best']:.0f}% health, {_pulls(b['pulls'])}")
+                     f"best pull with the boss at {b['best']:.0f}% health, {_pulls(b['pulls'])}")
         says = ([x for x in boss_says if _key(x) not in skip and not (isinstance(x, dict) and x.get("cmp"))][:3]
                 + [x for x in boss_says if isinstance(x, dict) and x.get("cmp")][:6])  # a table: more rows fit
         links = "".join(f"<a href='/job/{e(jid)}'>{label}</a>" for kind, label in
