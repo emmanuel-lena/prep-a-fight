@@ -294,7 +294,7 @@ def _moved(b: dict) -> int:
     return len(b["take"]) + len(b["drop"]) + b.get("more", 0)
 
 
-def _talents_h4(sh: dict, total: int) -> str:
+def _talents_h4(sh: dict, total: int, said: int = -1) -> str:
     """The heading with its counts, whatever the list below: on their build, no pad/boss build (tanks, healers), not
     read (a review: on a boss with changes, who was not checked vanished)."""
     changing, unread_, other = len(sh["builds"]), sh.get("unread") or [], sh.get("no_split", 0)
@@ -302,7 +302,7 @@ def _talents_h4(sh: dict, total: int) -> str:
         return "<h4>Talents to change <span class='rl-unread'>no pad/boss build on this boss</span></h4>"
     ok = total - changing - len(unread_) - other
     parts = [f"<span class='rl-ok'>&#10003; {ok} on their build</span>"] if ok > 0 else []  # always counted
-    if other:
+    if other and other != said:  # the roster says the tanks and healers once (fresh app review 4: nine times a page)
         parts.append(f"<span class='rl-unread' title='no pad or boss build for these roles'>{other} tanks and "
                      "healers</span>")  # short, nine times a page (fresh app review: the page grew)
     if unread_:
@@ -415,7 +415,13 @@ def page_body(difficulty: str) -> str:
         for n, s, _d in sorted(state["players"], key=lambda p: p[1]))
     day = state.get("report_day")
     when = time.strftime(" (%a %d %b)", time.localtime(day / 1000)) if day else ""
-    roster = (f"<section class='rl-roster'><h2>Your roster</h2><p class='small muted'>From {e(state.get('roster_from', ''))}{when} "
+    from paf.raidreview import _damage_spec
+
+    in_raid = [s for n, s, _d in state["players"] if n not in bench]
+    said = sum(1 for s in in_raid if not _damage_spec(s))  # no pad/boss build to compare: said here, not per boss
+    roster = (f"<section class='rl-roster'><h2>Your roster <small class='muted'>{len(in_raid)} players"
+              + (f" &middot; {said} tanks and healers, no build to compare" if said else "") + "</small></h2>"
+              f"<p class='small muted'>From {e(state.get('roster_from', ''))}{when} "
               f"&middot; <a href='https://www.warcraftlogs.com/reports/{e(state['report'])}' target='_blank' rel='noopener'>"
               f"the log &#8599;</a></p><div class='rl-chips'>{chips}</div>"
               f"<form method='post' action='/raidlead/read'><input type='hidden' name='difficulty' value='{e(difficulty)}'>"
@@ -440,7 +446,8 @@ def page_body(difficulty: str) -> str:
             # "best specs in the top raids" said once, in the header)
             f"<tr><td><b>{e(t['name'])}</b>"
             + (" <span class='rl-side'>a second boss</span>" if t["second_boss"] else "") + "</td><td>" + (
-                "everyone" if t["whole_raid"] and not t["players"] else
+                f"<span class='rl-all' title='the whole raid'>&#128101; all {len(in_raid)}</span>"
+                if t["whole_raid"] and not t["players"] else
                 ("".join(f"<span class='rl-n'>{_ic(spec_of.get(n, ''))}{e(n)}</span>" for n in t["players"])
                  if t["players"] else "<span class='muted'>nobody fits</span>"))
             + "</td><td>" + " ".join(f"<span class='rl-best'>{_ic(b)}{e(pretty(b))}</span>" for b in t["best"])
@@ -464,7 +471,7 @@ def page_body(difficulty: str) -> str:
                   f"{copy_button(text(sh, difficulty), 'Copy for Discord')}"
                   f"{copy_button(text(sh, difficulty, mrt=True), 'Copy MRT note')}</header>"
                   f"<h4>Who hits what</h4>{tg or '<p>Everyone on the boss: no add to assign.</p>'}"
-                  + _talents_h4(sh, len(state["players"]) - len(bench)) + (f"<ul>{bd}</ul>" if bd else "")
+                  + _talents_h4(sh, len(state["players"]) - len(bench), said) + (f"<ul>{bd}</ul>" if bd else "")
                   + lust_block(sh, difficulty) + "</article>")
     allbtn = (copy_button("\n\n".join(text(sh, difficulty) for sh in everything), "Copy every boss for Discord")
               if everything else "")

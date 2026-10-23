@@ -269,7 +269,9 @@ def settings_page(message: str = "") -> str:
     from paf.web import connect_block
 
     cid = os.environ.get("WCL_CLIENT_ID", "")
-    current = (f"Current key: client <code>{e(cid[:8])}…</code>" if cid else
+    # the saved key shown in its own field, so empty fields never read as "no key" (fresh app review 4)
+    key_ph = f' placeholder="{e(cid[:8])}… saved"' if cid else ""
+    current = ("" if cid else
                "Not used: the app goes through your Warcraft Logs login." if wcllogin.logged_in() else
                "<span class='neg'>No key yet.</span>")
     if wcllogin.logged_in():
@@ -299,10 +301,10 @@ by step.</p>
 <p class="small measure">{current} <a href="https://www.warcraftlogs.com/api/clients"
 target="_blank" rel="noopener">Use another key &#8599;</a></p>
 <form method="post" action="/credentials" class="row"><input type="hidden" name="back" value="settings">
-<label class="key-l">Client ID<input name="id" class="key-in" required></label>
-<label class="key-l">Client Secret<input name="secret" class="key-in" type="password" required
-autocomplete="off"></label>
-<button class="btn ghost">Save and test</button></form>
+<label class="key-l">{"New client ID" if cid else "Client ID"}<input name="id" class="key-in" required{key_ph}></label>
+<label class="key-l">{"New client secret" if cid else "Client Secret"}<input name="secret" class="key-in"
+type="password" required autocomplete="off"{' placeholder="saved"' if cid else ''}></label>
+<button class="btn ghost">{"Replace and test" if cid else "Save and test"}</button></form>
 <p class="tiny muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p>{alt}</div>
 <h2>Status</h2><div class="set-status"><table class="status">
 <tr><td>{ok_simc}SimulationCraft</td><td class="small"><div class="val">{simc}

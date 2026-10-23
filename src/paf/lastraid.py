@@ -356,10 +356,10 @@ def _cmp_table(rows: list[dict], report: str = "") -> str:
             t += (f"<br><a href='https://www.warcraftlogs.com/reports/{e(report)}#fight={fights[i]}' "
                   f"target='_blank' rel='noopener' title='fight {fights[i]} in the log (its ids count trash too)'>in the log "
                   "&#8599;</a>")  # leaves the app: marked; no "fight 14" read as the 14th pull (app confirm round 9)
-        return f"<th>{word}{t}</th>"
+        return f"<th title='no death in the pull'>{word}{t}</th>"
     # the comparison's own pulls: its best and worst without a death (paf.pulldiff), not the night's best pull
     return ("<table class='lr-cmp fit'><thead><tr><th></th>"
-            + head("Better no-death", 0) + head("Weaker no-death", 1) + "<th>Gap</th></tr>"  # not the night's best
+            + head("Best clean pull", 0) + head("Weakest clean pull", 1) + "<th>Gap</th></tr>"  # not the night's best
             "</thead><tbody>"
             + "".join(f"<tr class='{e(r.get('kind', ''))}'><td>{e(r['cmp'][0])}</td><td><b>{e(r['cmp'][1])}</b></td>"
                       f"<td>{e(r['cmp'][2])}</td><td class='gap'>{e(_signed_word(_delta(r['cmp'][1], r['cmp'][2]), r.get('kind')))}"

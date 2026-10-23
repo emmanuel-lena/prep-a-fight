@@ -564,14 +564,12 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
         return ""
     spec_of = {x["key"]: (x.get("spec") or "Your sheet") for x in items}
     specs = sorted({spec_of[x["key"]] for x in items}, key=lambda s: (s.lower() != mine.lower(), s))
-    by_name = {x.name: x for x in encs}
     names = [x.name for x in encs if any(i["name"] == x.name for i in items)]
     names += sorted({i["name"] for i in items} - set(names))
     order = ("mythic", "heroic", "normal")
     head = "".join(
-        f"<th title='{e(n)}'>" + (f"<img class='mx-boss' src='/bossimg/{by_name[n].id}.png' alt='' loading='lazy' "
-                                   "onerror=\"this.remove()\">" if n in by_name else "")
-        + f"<span>{e(n)}</span></th>" for n in names)
+        f"<th title='{e(n)}'><span>{e(n)}</span></th>" for n in names)  # names only: the faces are the row above
+    # (fresh app review 4: the same portraits twice)
 
     def cell(sp: str, n: str) -> str:
         xs = sorted((i for i in items if i["name"] == n and spec_of[i["key"]] == sp),
@@ -586,7 +584,8 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
             f"{' old' if stale(i) else ''}' "
             f"href='/view/{e(i['key'])}' title='{e(i['difficulty'].capitalize())} &middot; "
             f"{time.strftime('%d %b %H:%M', time.localtime(i['mtime']))}"
-            f"{'' if 'prep' in i['files'] else ' &middot; no sim yet'}'>{short_ago(i['mtime'])}"
+            f"{'' if 'prep' in i['files'] else ' &middot; no sim yet'}'>"
+            f"{short_ago(i['mtime']) if 'prep' in i['files'] else 'no sim'}"  # a date reads as done (fresh review 4)
             "</a>" for i in xs)  # no sim: the dashed outline, in the legend (never colour alone)
 
     def who(sp: str) -> str:
@@ -1338,13 +1337,19 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
                      '<p>No adds on this boss: the prep plays for <b>boss damage</b>.</p>'
                      '<input type="hidden" name="goal" value="boss">'
                      f'<div class="ob-actions">{nxt}</div></section>')
-    else:
+    else:  # each goal its glyph: the boss's face, a whirlwind for the adds, the raid's (fresh app review 4)
+        from paf import icons
+
+        boss_ic = (f"<img class='goal-ic' src='/bossimg/{enc.id}.png' alt='' "
+                   "onerror=\"this.style.visibility='hidden'\">")
+        pad_ic = icons.img("ability_warrior_bladestorm", "medium", "goal-ic")
+        raid_ic = icons.img("inv_misc_groupneedmore", "medium", "goal-ic")
         goal_html = ('<section class="ob-step" data-step="goal"><h2><span class="vh">Step 1 of 4: </span>Your goal on this boss</h2>'
-                     '<div class="goals">' + """<label class="goal"><input type="radio" name="goal" value="boss"><span><b>Boss damage</b>
+                     '<div class="goals">' + f"""<label class="goal"><input type="radio" name="goal" value="boss"><span><b>{boss_ic}Boss damage</b>
 <small>Progress: your raid lead wants everyone on the boss. Cooldowns and gear aim at the boss.</small></span></label>
-<label class="goal"><input type="radio" name="goal" value="total"><span><b>Pad the adds</b>
+<label class="goal"><input type="radio" name="goal" value="total"><span><b>{pad_ic}Pad the adds</b>
 <small>Your job is the adds, or you farm for parses: cooldowns and gear for total damage.</small></span></label>
-<label class="goal"><input type="radio" name="goal" value="auto" checked><span><b>Let my raid decide</b>
+<label class="goal"><input type="radio" name="goal" value="auto" checked><span><b>{raid_ic}Let my raid decide</b>
 <small>The prep reads your raid's log: if the others already cover the adds, you stay on the boss.</small></span></label>
 """ + f'</div><div class="ob-actions">{nxt}</div></section>')
     body = f"""<div class="boss-cols"><div class="boss-main"><h1>{e(enc.name)} {diff_pill(difficulty)}</h1>
