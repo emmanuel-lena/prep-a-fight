@@ -286,7 +286,7 @@ def items(d) -> list[tuple[float, Item]]:
                 it.t = s
                 out[k] = (s, it)
     for t, it in out:
-        if it.kind in ("cd", "pot") and t >= 5 and not _ctx(t, out):
+        if it.kind in ("cd", "pot") and t >= 5 and not _ctx(t, out, it.kind):
             it.why = _why(d, it.name, t, order.get(it.name, []))
     hints = journal_hints(d, {_clean(it.name) for _t, it in out if it.side == "boss"})
     told: set[str] = set()
@@ -403,6 +403,22 @@ def _row(m: Moment, i: int, gap: float = 0.0) -> str:
             f"<div class='you'>{'<span class=vh>You: </span>' + you if you else ''}</div></div>")
 
 
+def _cadence(ts: list[float]) -> str:
+    """Press times as a player reads them: up to five listed; more, the run at one cadence then the rest listed
+    (DPS round 17: "every 31 s (8 times)" hid the press held to 2:47 for the wave)."""
+    shown = [_mmss(t) for t in ts]
+    if len(ts) <= 5:
+        return ", ".join(shown)
+    gaps = [b - a for a, b in zip(ts, ts[1:], strict=False)]
+    step = sorted(gaps)[len(gaps) // 2]
+    run = next((i for i, g in enumerate(gaps) if abs(g - step) > 3), len(gaps))  # the first gap off the cadence
+    if run < 3:  # no steady start: every time
+        return ", ".join(shown)
+    rest = shown[run + 1:]
+    return (f"{shown[0]}, then about every {step:.0f} s to {shown[run]}"
+            + (f"; then {', '.join(rest)}" if rest else ""))
+
+
 def job_html(d) -> str:
     """Your job on this boss, a dozen lines at most: what kills a raid first, then your cooldowns and when."""
     from paf.prep_report import rule_phrase
@@ -476,10 +492,7 @@ def job_html(d) -> str:
     for n in sorted((n for n in names if n in order), key=lambda n: min(order[n])):  # in the order you first press them
         pre = [t for t in order[n] if t < 0.5 and (n in d.precast or "potion" in n.lower())]
         rest = [_mmss(t) for t in order[n] if t not in pre]
-        secs = [t for t in order[n] if t not in pre]
-        gaps = sorted(b - a for a, b in zip(secs, secs[1:], strict=False))
-        when = (", ".join(rest) if len(rest) <= 5 else  # a long list: its cadence, never cut with "…" (DPS round 16)
-                f"{rest[0]}, then about every {gaps[len(gaps) // 2]:.0f} s ({len(rest)} times)")
+        when = _cadence([t for t in order[n] if t not in pre])  # a long list: its cadence, never cut (DPS 16-17)
         if pre:
             when = "before the pull" + (f", then {when}" if rest else "")
         elif rest:
@@ -508,8 +521,9 @@ def _and_names(names: list[str]) -> str:
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
-def _ctx(t: float, its: list[tuple[float, Item]]) -> str:
-    """What a press is for, in a few words: on the pull, on the boss event it answers, inside Bloodlust."""
+def _ctx(t: float, its: list[tuple[float, Item]], kind: str = "def") -> str:
+    """What a press is for, in a few words: on the pull, on the boss event it answers, inside Bloodlust. A boss cast
+    is a reason for a defensive only (DPS round 17: "Shadow Blades - on Malignant Catalyst", a raid-wide hit)."""
     if t < 0:
         return "before the pull"
     if t < 1:
@@ -517,7 +531,7 @@ def _ctx(t: float, its: list[tuple[float, Item]]) -> str:
     if t < 5:
         return "just after the pull"
     # a press answers an add wave, an immunity or a stage up to 8 s after it starts, a boss cast only within 3 s
-    near = [x for at, x in its if x.side == "boss" and x.kind in ANCHORS
+    near = [x for at, x in its if x.side == "boss" and x.kind in ANCHORS and (x.kind != "cast" or kind == "def")
             and t - (3 if x.kind == "cast" else 8) <= at <= t + (2 if x.kind == "adds" else 1)]  # pressed as the
     # wave lands (0:51 for a 0:52.7 wave: its hold rule said nothing there; a review)
     if near:
@@ -546,7 +560,8 @@ def data(d, ms: list[Moment], dur: float) -> dict:
 
     phase_starts = [s for _n, s, _e in phases[1:]]
     acts = [{"t": _t1(t), "n": x.text, "k": x.kind, "ic": x.icon, "d": round(x.dur, 1),
-             "c": "" if x.kind == "move" else (_ctx(t, its) or ("default list timing" if x.kind == "cd" else "")),
+             "c": "" if x.kind == "move" else (_ctx(t, its, x.kind)
+                                               or ("default list timing" if x.kind == "cd" else "")),
              "w": x.why}
             for t, x in its if x.side == "you"]
     acts.sort(key=lambda a: (a["t"], YOU_ORDER.index(a["k"])))
@@ -592,7 +607,7 @@ def note_lines(d, kinds: tuple[str, ...] = ("cd", "pot", "def", "move")) -> list
     for t, it in its:
         if it.side != "you" or it.kind not in kinds:
             continue
-        c = _ctx(t, its)
+        c = _ctx(t, its, it.kind)
         said = c.replace("on the ", "").replace("on ", "") if c else ""
         why = " - " + c if c and c not in ("on the pull", "just after the pull") and said not in it.text else ""
         lines.append(f"{{time:{_mmss(max(0.0, t))}}} {it.text}{why}")

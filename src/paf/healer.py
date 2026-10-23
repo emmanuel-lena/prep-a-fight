@@ -1518,7 +1518,7 @@ def _tidy(html: str) -> str:
     html = re.sub(r"\((\d+ kills going)\) \(([^()]*)\)", r"(\1; \2)", html)
     # "back from cooldown" on a chip: the glyph the legend defines (a review: said twice in one chip, 16 sheets)
     html = re.sub(r" ?(?:&middot;|,) back from cooldown for about half", " &middot; &#10226;&nbsp;about half", html)
-    return re.sub(r" ?(?:&middot;|,) back from cooldown", " &middot; &#10226;", html)
+    return re.sub(r" ?(?:&middot;|,) back from cooldown", "&nbsp;&middot;&nbsp;&#10226;", html)  # never alone on a line
 
 
 def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict | None = None,

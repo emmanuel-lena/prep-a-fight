@@ -145,3 +145,18 @@ def test_two_adds_of_one_wave_are_one_kill_row(monkeypatch):
     assert you == ["Kill Burning Venom and Shrouded Venom"]
     job = fightview.job_html(d)
     assert "Kill Burning Venom and Shrouded Venom at 0:24" in re.sub("<[^>]+>", "", job)
+
+
+def test_a_long_press_list_reads_as_its_cadence_then_its_exceptions():
+    # Elemental, Nek'zali (DPS rounds 16-17): "every 31 s (8 times)" hid the press held for the 2:47 wave
+    assert fightview._cadence([0, 31.4, 62.9, 93.7, 123.7, 168.0, 204.9, 235.2]) == (
+        "0:00, then about every 31 s to 2:03; then 2:48, 3:24, 3:55")
+    assert fightview._cadence([10.0, 60.0, 90.0]) == "0:10, 1:00, 1:30"
+
+
+def test_a_boss_cast_is_a_reason_for_a_defensive_only():
+    # Subtlety Rogue, Vashnik (DPS round 17): "Shadow Blades - on Malignant Catalyst", a raid-wide hit
+    cast = fightview.Item("boss", "cast", "Malignant Catalyst", "Malignant Catalyst")
+    its = [(198.0, cast)]
+    assert fightview._ctx(200.0, its, "cd") == ""
+    assert fightview._ctx(200.0, its, "def") == "on Malignant Catalyst"

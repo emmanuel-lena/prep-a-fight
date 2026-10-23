@@ -214,9 +214,9 @@ def test_a_press_back_from_cooldown_in_a_hit_is_said_and_drawn_as_none():
     h = healer.HealerPrep("Boss", "heroic", "Restoration Druid", 10, 240.0, [100.0] * 48, found, cds, [], [], [], [])
     sheet = healer.render_sheet(h)
     assert "100% press Tranquility (about 0:42)" in sheet
-    assert ("<span class='none'>None kept</span> (100% press Tranquility in its window, about 2:45 &middot; "
+    assert ("<span class='none'>None kept</span> (100% press Tranquility in its window, about 2:45&nbsp;&middot;&nbsp;"
             "&#10226;)") in sheet  # the 2:40 hit's row, the legend's glyph as the chips
-    assert "2:45 &middot; 5 s after the 2:40 hit starts &middot; 100% &middot; &#10226;</span>" in sheet
+    assert "2:45 &middot; 5 s after the 2:40 hit starts &middot; 100%&nbsp;&middot;&nbsp;&#10226;</span>" in sheet
     assert "class='cp off'><title>Tranquility 2:45" in sheet and "class='cp'><title>Tranquility 0:42" in sheet
 
 
@@ -256,7 +256,7 @@ def test_a_ramp_answers_the_hit_after_it(monkeypatch):
     assert "100% press Evangelism (about 0:24, a ramp ahead of it)" in sheet
     assert "pressed again as soon as it is back" not in sheet  # its rhythm line says it (round 30)
     assert "0:24 &middot; 16 s before the 0:40 hit" in sheet
-    assert "1:42 &middot; 28 s before the 2:10 hit &middot; 100% &middot; &#10226;</span>" in sheet
+    assert "1:42 &middot; 28 s before the 2:10 hit &middot; 100%&nbsp;&middot;&nbsp;&#10226;</span>" in sheet
 
 
 def test_back_from_cooldown_is_read_per_player():

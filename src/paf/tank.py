@@ -758,12 +758,12 @@ def render_sheet(p: TankPrep) -> str:
         fight.append(f"<h2>Consumables</h2><ul class='hl2'>{cooldowns_html(used, set())}</ul>")
     if p.presence:
         if have and have.share >= 0.99:  # the corpus is this spec's kills
-            line = f"These are the top {e(p.spec)}s' kills; the table tells which tanks play beside them."
+            line = ""  # the lead says who plays beside them (heal round 18: said twice)
         elif have:
             line = f"{have.share:.0%} of the top kills bring a {e(p.spec)} ({have.per_kill:.1f} a kill when they do)."
         else:
             line = f"Few top raids bring a {e(p.spec)} on this boss."
-        deeper.append(f"<h2>The top raids' tanks</h2><p>{line}</p>{presence_table(p.presence, p.spec, 'Tank')}"
+        deeper.append(f"<h2>The top raids' tanks</h2>{f'<p>{line}</p>' if line else ''}{presence_table(p.presence, p.spec, 'Tank')}"
                       + comps_table(p.comps, p.kills).replace("Healers", "Tanks"))
         deaths = any(x.deaths_with is not None for x in p.presence)
         # every sample of the sheet, once, as the healers' sheets (round 38: no map on the tank's)
