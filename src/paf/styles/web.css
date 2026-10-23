@@ -445,3 +445,4 @@ table.mx a.mx.nosim.old{border:1px dashed var(--warn)} /* no sim first, its age'
 .rl-chips button[title]:hover::after{content:attr(title);margin-left:6px;font-size:11px;font-weight:600;color:var(--muted)} /* bench, said where you point */
 .home-hero .rq:not(.on) .rq-txt:not(:has(small)){display:none} /* an empty text box held the button 256 px right */
 textarea.fit-rows{height:auto;min-height:0} /* sized to its lines (rows), not a fixed box */
+table.lr-cmp th a,table.lr-cmp th small{text-transform:none;letter-spacing:0;font:500 12px var(--font-data)} /* a link reads as one */

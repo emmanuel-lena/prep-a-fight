@@ -353,8 +353,8 @@ def _cmp_table(rows: list[dict], report: str = "") -> str:
         clock = "&#9201;&nbsp;" if re.fullmatch(r"\d+:\d\d", lab[i] or "") else ""  # a length, not a moment
         t = f" <small>{clock}{e(lab[i])}</small>" if lab[i] else ""
         if report and fights[i]:
-            t += (f" <a class='small' href='https://www.warcraftlogs.com/reports/{e(report)}#fight={fights[i]}' "
-                  f"target='_blank' rel='noopener'>fight {fights[i]}</a>")
+            t += (f"<br><a href='https://www.warcraftlogs.com/reports/{e(report)}#fight={fights[i]}' "
+                  f"target='_blank' rel='noopener'>fight {fights[i]} &#8599;</a>")  # leaves the app: marked
         return f"<th>{word}{t}</th>"
     # the comparison's own pulls: its best and worst without a death (paf.pulldiff), not the night's best pull
     return ("<table class='lr-cmp fit'><thead><tr><th></th>"
@@ -437,7 +437,7 @@ def card(slug: str, heading: bool = True) -> str:
     when = datetime.fromtimestamp(cur["date"]).strftime("%A %d %B") if cur.get("date") else ""
     night = f"<a href='/job/{e(cur['night'])}'>the night, pull by pull</a> &middot; " if cur.get("night") else ""
     head = (("<h2>Your last raid</h2>" if heading else "") + f"<p class='lr-sub'>{e(when)} &middot; {_pulls(cur['pulls'])} &middot; {night}"
-            f"<a href='{e(URL.format(cur['report']))}' target='_blank' rel='noopener'>the log</a></p>")
+            f"<a href='{e(URL.format(cur['report']))}' target='_blank' rel='noopener'>the log &#8599;</a></p>")
     if not cur["bosses"]:
         return f"<section class='lr' id='lastraid'>{head}<p>No boss of the current raid in this log.</p></section>"
     rows, folded = "", ""

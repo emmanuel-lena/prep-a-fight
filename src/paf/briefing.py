@@ -355,6 +355,22 @@ def spec_gaps(s: dict) -> list[tuple[str, float | None, str]]:
     return out
 
 
+def _short_note(missing: set, specs: list, mine: str) -> str:
+    """The line under the spec tiles when some were simmed one item short (too new for SimC)."""
+    if not missing:
+        return ""
+    item = e(", ".join(sorted(missing)))
+    if mine in specs:  # your own: every gap is measured against it
+        return (f"<p class='small muted'>Every gap is only roughly right: {e(_and_specs(specs))} simmed without "
+                f"{item} (too new for SimC).</p>")
+    return (f"<p class='small muted'>&dagger; simmed without {item} (too new for SimC): "
+            f"{'that tile' if len(specs) == 1 else 'those tiles'} only roughly right.</p>")
+
+
+def _and_specs(specs: list) -> str:
+    return specs[0] if len(specs) == 1 else ", ".join(specs[:-1]) + " and " + specs[-1]
+
+
 def spec_html(d) -> str:
     """We simmed your character in each damage spec of your class (paf.specgear): one tile per spec with its gap on
     you, for your role and assignments on this fight. Advice for you only, never about another player."""
@@ -372,8 +388,11 @@ def spec_html(d) -> str:
         item = next((i.get("name") for i in row.get("items") or [] if i.get("slot") == m[1]), "")
         what = item or re.sub(r"\d$", "", m[1]).replace("_", " ")
         missing.add(what)
-        return "<small> &dagger;</small>"  # the item said once, under the tiles (DPS confirm round 6)
-    missing: set[str] = set()
+        short_specs.append(name)
+        return "" if name == mine_label else "<small> &dagger;</small>"  # the item said once, under the tiles
+    missing: set[str] = set()  # (DPS confirm rounds 6-7: your own spec short makes every gap rough, no dagger)
+    short_specs: list[str] = []
+    mine_label = gaps[0][0]
     tiles = "".join(
         f"<div class='spt {kind}'><span class='spt-n'>{e(name)}</span><span class='spt-v'>"
         f"{'your spec' if gap is None else 'same' if kind == 'same' else f'{gap:+.0f}%'}{short(name)}</span></div>"
@@ -388,8 +407,7 @@ def spec_html(d) -> str:
     return (f"<div class='specs rv'><p class='specs-head'><b>We simmed your character in each damage spec of your class"
             f"</b> <span class='muted'>for {e(spec_role(s))}, on this fight</span></p>"
             f"<div class='spt-row'>{tiles}</div>"
-            + (f"<p class='small muted'>&dagger; simmed one item short: {e(', '.join(sorted(missing)))} (too new for "
-               "SimC), so that tile's gap is only roughly right.</p>" if missing else "") + "</div>")
+            + _short_note(missing, short_specs, mine_label) + "</div>")
 
 
 def confidence_pill(d) -> str:

@@ -630,7 +630,7 @@ def test_every_outline_gives_its_reason():
     sw = healer.Cooldown("Shield Wall", 2, 0.8, 2.0, [69.0, 231.0], ["", ""])
     assert healer._why_not(sw, 69.0, [hit]) == ": away from the big hits"
     assert healer._why_not(sw, 115.0, [hit]) == ": before the 2:10 hit's window"
-    assert healer._why_not(sw, 128.0, [hit]) == ": in the 2:10 hit's window, not kept for it"
+    assert healer._why_not(sw, 128.0, [hit]) == ": in the window of the 2:10 hit: not kept for it"
 
 
 def test_an_on_cooldown_button_says_so_on_hover():
@@ -833,9 +833,10 @@ def test_trinkets_and_split_talents_show_their_icons():
 def test_a_mark_named_for_a_window_says_that_window_on_hover():
     # heal confirm round 6: Tranquility drawn at 3:36 for the 3:35 hit, its hover "back from cooldown" alone;
     # Convoke 1:12 "about every minute" beside its chip "in the window of the 1:15 hit"
-    c = healer.Cooldown("Tranquility", 1, 1.0, 2.0, [218.0], [""], back=[218.0], window_of={218.0: 215.0})
-    assert healer._why_not(c, 218.0, []) == ": in the 3:35 hit's window, back from cooldown: not kept for it"
+    c = healer.Cooldown("Tranquility", 1, 1.0, 2.0, [218.0], [""], back=[218.0], window_of={218.0: 215.0}, cd=180.0,
+                        presses=[[36.0, 216.0]] * 10, n_all=10)  # each pressed again as soon as it is back
+    assert healer._why_not(c, 218.0, []) == ": in the window of the 3:35 hit, back from cooldown: not kept for it"
     v = healer.Cooldown("Convoke the Spirits", 2, 1.0, 4.0, [72.0], [""], why=healer.MINUTE, back=[72.0],
                         windowed=[72.0])
     assert healer._why_not(v, 72.0, [healer.Moment(75.0, 1.0, 1.6, "Rite")]) == (
-        ": in the 1:15 hit's window: not kept for it")
+        ": in the window of the 1:15 hit: not kept for it")

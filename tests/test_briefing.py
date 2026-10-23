@@ -71,4 +71,5 @@ def test_a_spec_simmed_one_item_short_is_marked_and_said_once():
                    "items": [{"slot": "finger2", "name": "Band of the Swarmcaller"}]}
                   for s_, v in (("Subtlety", 100.0), ("Assassination", 79.0), ("Outlaw", 94.0))]}
     out = briefing.spec_html(SimpleNamespace(specs=s))
-    assert out.count("&dagger;") == 3 and out.count("Band of the Swarmcaller") == 1
+    assert out.count("&dagger;") == 1 and out.count("Band of the Swarmcaller") == 1  # Assassination's only:
+    assert "Every gap is only roughly right: Subtlety and Assassination" in out  # yours short, every gap rough

@@ -541,7 +541,8 @@ def _stall(d, p) -> str:
     held = [d.cd_names.get(k, k) for k, r in p.choice.items() if r.name != "default"]
     boss = p.totals.get("boss") if p.objective != "boss" else p.gain
     if held and boss is not None and boss < -15:
-        return (f"The {-boss:.0f}% boss loss is mostly a sim artifact: SimC's default rotation ties other spells to "
+        return ("The boss loss is mostly a sim artifact: SimC's default rotation ties other spells to "  # no number:
+                # the card's line gives it, against the plan played (DPS confirm round 7: "21%" from another base)
                 f"{held[0]}, so they stop while it is held and pile up for the moment it is pressed. The real cost is "
                 f"lower and the gain likely overstated too: read this plan as a direction, not a number.")
     return ""
@@ -616,7 +617,8 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         played_p = simple_plan(d)
         if played_p is not None and played_p is not p and played_p.gain > 2 * played_p.error:  # the real cost
             rel = [f"{_goal(o)} damage {100 * ((1 + p.totals[o] / 100) / (1 + played_p.totals[o] / 100) - 1):+.1f}%"
-                   for o in ("boss", "total") if o in p.totals and o in played_p.totals]
+                   for o in dict.fromkeys((p.objective, "boss", "total"))  # its own gain on that base first
+                   if o in p.totals and o in played_p.totals]  # (DPS confirm round 7: +20.2% vs default beside it)
             if rel:  # the trade a player makes: against the plan played, the default list's numbers in Dig deeper
                 others = "vs the plan the sheet plays: " + ", ".join(rel)  # (DPS confirm round 6: four numbers)
         if others:

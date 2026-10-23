@@ -403,7 +403,7 @@ def page_body(difficulty: str) -> str:
     when = time.strftime(" (%a %d %b)", time.localtime(day / 1000)) if day else ""
     roster = (f"<section class='rl-roster'><h2>Your roster</h2><p class='small muted'>From {e(state.get('roster_from', ''))}{when} "
               f"of <a href='https://www.warcraftlogs.com/reports/{e(state['report'])}' target='_blank' rel='noopener'>"
-              f"this log</a>.</p><div class='rl-chips'>{chips}</div>"
+              f"this log &#8599;</a>.</p><div class='rl-chips'>{chips}</div>"
               f"<form method='post' action='/raidlead/read'><input type='hidden' name='difficulty' value='{e(difficulty)}'>"
               f"<button class='btn ghost'>Read the roster again</button></form></section>")
     spec_of = {n: sp for n, sp, _d in state["players"]}  # a player's class icon beside its name

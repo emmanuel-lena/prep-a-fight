@@ -1908,10 +1908,12 @@ def _why_not(c: Cooldown, t: float, found: list | None = None) -> str:
     hit_t = c.window_of.get(t)
     if hit_t is None and t in c.windowed and (m := hit_near(t)) is not None:
         hit_t = m.t
-    if hit_t is not None:  # the table's own words for it, first (heal confirm rounds 4-6: "about every minute",
-        back = ((", back from cooldown" + (" for about half" if t in c.back_half else ""))
-                if t in c.back and not (c.why or c.every) else "")  # as its chip says it (a rhythm: none)
-        return f": in the {_mmss(hit_t)} hit's window{back}: not kept for it"  # "back from cooldown" alone)
+    if hit_t is not None:  # the table's own words for it, first (heal confirm rounds 4-7: "about every minute",
+        b = None if c.why == MINUTE else _back_in(c, t, hit_t)  # "back from cooldown" alone; the chip's own
+        back = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"  # reading of it, its words)
+                + (" for about half" if b <= BACK_SHARE[1] else ""))
+        where = "ahead of" if c.ramp and t < hit_t - ANSWER[0] else "in the window of"
+        return f": {where} the {_mmss(hit_t)} hit{back}: not kept for it"
     if c.why:
         return f": {c.why}"
     if t <= PULL:
@@ -1924,16 +1926,17 @@ def _why_not(c: Cooldown, t: float, found: list | None = None) -> str:
         if us:  # a release on no hit: where it lands, as the others' (round 114: the 1:41 store "on cooldown")
             nx = next((m for m in found or [] if 0 < m.t - ANSWER[0] - st.median(us) <= RAMP[1]), None)
             return (f": its release, about {_about(us)}, "
-                    + (f"lands before the {_mmss(nx.t)} hit's window" if nx is not None else "lands on no hit"))
+                    + (f"mostly before the {_mmss(nx.t)} hit's window" if nx is not None else "lands on no hit"))
     if c.every:  # its card's word first: "on cooldown" (round 94: Avenging Wrath 2:05 read "back from cooldown")
         return ": held past its cooldown" if t in c.alt and t not in c.back else ": on cooldown"
     if t in c.back:  # in a hit's window: the window first, as the table says it (heal confirm round 5)
         m = hit_near(t)
-        return ((f": in the {_mmss(m.t)} hit's window, back from cooldown: not kept for it" if m is not None else
-                 ": back from cooldown") + (" for about half" if t in c.back_half else ""))
+        half = " for about half" if t in c.back_half else ""
+        return (f": in the window of the {_mmss(m.t)} hit, back from cooldown{half}: not kept for it" if m is not None
+                else f": back from cooldown{half}")
     m = hit_near(t)
-    if m is not None:
-        return f": in the {_mmss(m.t)} hit's window, not kept for it"
+    if m is not None:  # the chips' words and separator (heal confirm round 7)
+        return f": in the window of the {_mmss(m.t)} hit: not kept for it"
     m = next((m for m in found or [] if 0 < m.t - ANSWER[0] - t <= RAMP[1]), None)  # just ahead of a hit (round 97:
     mostly = m is not None and c.presses and any(m.t - ANSWER[0] <= x <= m.t + ANSWER[1] for ts in c.presses
                                                  for x in ts if abs(x - t) <= 15)  # some of its presses in it
