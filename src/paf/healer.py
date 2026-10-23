@@ -621,8 +621,10 @@ def cooldowns(tl, found: list[Moment], base: dict[int, tuple[float, int]] | None
         # of the top players read as a moment next to "no moment most of them share")
         # a quarter of those who press it, of the kills still going then: a late time's pressers are those whose kill
         # reaches it (round 104: Tranquility's 4:19, 22 of the 89 still going, read 22% of all 98 and refused)
-        def users_at(t: float, pl=pressed_lasts, alld=alld) -> float:
-            return sum(1 for d in pl if d >= t) / max(1, sum(1 for d in alld if d >= t))
+        raw_lasts = [p.get("duration") or tl.duration for p, ts in zip(tl.players, raw, strict=False) if ts]
+
+        def users_at(t: float, pl=raw_lasts, alld=alld) -> float:  # every caster, as "pressed by" and the share
+            return sum(1 for d in pl if d >= t) / max(1, sum(1 for d in alld if d >= t))  # beside a chip (r. 113)
         kept = [i for i, sp in enumerate(support) if sp >= 0.25 * users_at(times[i]) - 1e-9]
         times, near, support = [times[i] for i in kept], [near[i] for i in kept], [support[i] for i in kept]
         # a hit's window a quarter of those who press it press it in, of the kills reaching its end, with no time of
@@ -898,7 +900,10 @@ def _users_at(c: Cooldown, t: float | None) -> float:
     if t is None or not c.lasts or len(c.press_lasts) != len(c.presses):
         return c.users
     going = sum(1 for d in c.lasts if d >= t)
-    return sum(1 for d in c.press_lasts if d >= t) / going if going else c.users
+    if not going or going == len(c.lasts):  # every kill reaches it: the header's share (round 113: 33% of those who
+        return c.users                       # press it read against a header's 74%, timed presses only)
+    reach_ = sum(1 for d in c.press_lasts if d >= t) / max(1, len(c.press_lasts))  # every caster, as the header
+    return min(1.0, c.users * len(c.lasts) * reach_ / going)
 
 
 def _pressers(c: Cooldown, sp: float, t: float | None = None) -> str:
@@ -2540,10 +2545,8 @@ def render_sheet(h: HealerPrep) -> str:
                      f"{cooldowns_html(exts, answered, named)}</ul>{fewer(rare_ext)}"
                      + (f"<p class='small muted'>{buff_note.strip()}</p>" if buff_note else ""))
     elif rare_ext or exts:  # Pain Suppression at 34%: still an external, never filed with the defensives
-        def named_(cs: list, shared: bool) -> str:
-            return ", ".join(f"{e(c.name)} ({c.users:.0%}" + (f", {_and([_mmss(t) for t in c.times])}" if c.times
-                                                              else "" if shared else ", no shared moment") + ")"
-                             for c in cs)
+        def named_(cs: list, shared: bool) -> str:  # one form for every side line (round 113: "(34%, 3:39)")
+            return ", ".join(f"{e(c.name)} ({_times_line(c)})" for c in cs)
         # half or more at no shared moment, then those fewer than half press, each said as such (round 110: Blessing
         # of Sacrifice 28% listed beside Lay on Hands 66% as if both were staples)
         parts = ([f"The top {e(h.spec)}s cast these at no shared moment: {named_(exts, True)}"] if exts else []) + (
