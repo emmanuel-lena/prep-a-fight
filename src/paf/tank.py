@@ -416,9 +416,9 @@ def _none_for(note: str) -> str:
 # how to read the defensive cards, one term a line (the owner: less text; every rule kept, said once)
 TANK_HOW_TO_READ = (
     "<dl class='legend'><dt>N%</dt><dd>of the top players read; &ldquo;(N kills going)&rdquo;: of the kills still "
-    "going then (a hit's window: those lasting through it); &ldquo;of its users&rdquo;: of the top players who "
-    "press the button.</dd><dt>Tied to a hit</dt>"
-    "<dd>pressed in the hit's window (5 s before to 8 s after) by a quarter of its users; its share is the "
+    "going then (a moment's window: those lasting through it); &ldquo;of its users&rdquo;: of the top players who "
+    "press the button.</dd><dt>Tied to a moment</dt>"  # the table's word (review 36)
+    "<dd>pressed in the moment's window (5 s before to 8 s after) by a quarter of its users; its share is the "
     "window's.</dd><dt>A time</dt><dd>shared by a quarter of "
     "those who press the button; its share: the top players pressing within 8 s of it (&ldquo;of its users&rdquo; "
     "too, under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long."

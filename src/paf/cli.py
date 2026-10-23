@@ -861,7 +861,7 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     healroles.fetch_heal_roles(client, con, enc.id, diff)  # each kill's deaths (and its healers), as for a healer
     p.presence = healroles.presence(con, enc.id, diff, role=healroles.TANKS)
     p.comps = healroles.comps(con, enc.id, diff, role=healroles.TANKS)
-    also = {n: f"{s:.0%} of the damage the top tanks take" for n, s in hitters if s >= 0.05}  # another role's
+    also = {n: f"{s:.0%} of the damage the top tanks take" for n, s in hitters if round(s, 2) >= 0.05}  # another role's
     if p.swap_debuff in p.stacks:  # ability hitting the tanks too; the swap debuff as measured (the journal may say
         peak, secs = p.stacks[p.swap_debuff]  # "stacks" where heroic does not)
         hit = f"; {also[p.swap_debuff]}" if p.swap_debuff in also else ""

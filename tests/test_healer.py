@@ -747,7 +747,7 @@ def test_split_list_names_a_tie_at_its_cut():
 def test_hit_dot_has_a_hover():
     found = [healer.Moment(230.0, 300.0, 1.41, "Possession Barrage")]
     svg = healer.curve_svg([100.0] * 300, found, [("Stage Two", 178.0)], "x")
-    assert "<title>3:50 &middot; mostly Possession Barrage &middot; 1.41&times; the usual damage &middot; " \
+    assert "<title>3:50 &middot; Possession Barrage &middot; 1.41&times; the usual damage &middot; " \
            "Stage Two +0:52</title>" in svg
 
 
@@ -834,7 +834,7 @@ def test_a_mark_named_for_a_window_says_that_window_on_hover():
     # Convoke 1:12 "about every minute" beside its chip "in the window of the 1:15 hit"
     c = healer.Cooldown("Tranquility", 1, 1.0, 2.0, [218.0], [""], back=[218.0], window_of={218.0: 215.0}, cd=180.0,
                         presses=[[36.0, 216.0]] * 10, n_all=10)  # each pressed again as soon as it is back
-    assert healer._why_not(c, 218.0, []) == ": in the window of the 3:35 hit, back from cooldown, not kept for it"
+    assert healer._why_not(c, 218.0, []) == ": in the window of the 3:35 hit, back from cooldown"
     v = healer.Cooldown("Convoke the Spirits", 2, 1.0, 4.0, [72.0], [""], why=healer.MINUTE, back=[72.0],
                         windowed=[72.0])
     assert healer._why_not(v, 72.0, [healer.Moment(75.0, 1.0, 1.6, "Rite")]) == (

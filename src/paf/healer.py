@@ -890,8 +890,8 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
     guides = "".join(f"<line class='gd' x1='{x(m.t)}' x2='{x(m.t)}' y1='{y(m.dtps)}' y2='{H - 22}'/>"
                      for m in found) if rows else ""  # from each hit down through the lanes
     marks = guides + "".join(f"<circle cx='{x(m.t)}' cy='{y(m.dtps)}' r='4' class='mk'><title>{_mmss(m.t)}"
-                    + (f" &middot; {'' if m.boss_spell.startswith('mostly') else 'mostly '}{e(m.boss_spell)}"
-                       if m.boss_spell else "")
+                    + (f" &middot; {e(m.boss_spell)}" if m.boss_spell else "")  # the table's name as the table
+                    # says it (review 36: "mostly" on every hover, never in the table)
                     + f" &middot; {_x(m.ratio)}&times; the usual damage"  # each dot its hover (round 114)
                     + (f" &middot; {_stage_tag(m.t, phases)}" if _stage_tag(m.t, phases) else "") + "</title></circle>"
                     f"<text x='{float(x(m.t)) + 6:.1f}' y='{float(y(m.dtps)) - 8:.1f}' class='ml'>{_mmss(m.t)}</text>"
@@ -1942,7 +1942,7 @@ def _why_not(c: Cooldown, t: float, found: list | None = None, shown: float | No
         # mark's title shows, as its chip counts it (heal confirm round 9: 21 s on the chip, 22 on hover)
         where = (f"{gap} s before" if c.ramp and t < hit_t - ANSWER[0] else
                  "in the window of" if abs(gap) > 1 or gap < 0 else f"{gap} s before" if gap else "on")
-        return f": {where} the {_mmss(hit_t)} hit{back}, not kept for it"
+        return f": {where} the {_mmss(hit_t)} hit{back or ', not kept for it'}"  # never both: ⟲ says it (b3073d3)
     if c.why:
         return f": {c.why}"
     if t <= PULL:
@@ -1961,7 +1961,7 @@ def _why_not(c: Cooldown, t: float, found: list | None = None, shown: float | No
     if t in c.back:  # in a hit's window: the window first, as the table says it (heal confirm round 5); a ramp's
         m = None if c.ramp else hit_near(t)  # window is ahead of a hit, never on it (heal confirm round 8)
         half = " for about half" if t in c.back_half else ""
-        return (f": in the window of the {_mmss(m.t)} hit, back from cooldown{half}, not kept for it" if m is not None
+        return (f": in the window of the {_mmss(m.t)} hit, back from cooldown{half}" if m is not None
                 else f": back from cooldown{half}")
     m = hit_near(t)
     if m is not None:  # the chips' words and separator (heal confirm round 7)
