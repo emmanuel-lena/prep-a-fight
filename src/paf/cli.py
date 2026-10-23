@@ -1286,8 +1286,9 @@ def cmd_prep(args: argparse.Namespace) -> int:
     raw.save(template_path(enc.name, diff_name))
     pack_fight = pack.Fight.from_dict(pack.asdict(raw))  # for a new pack: the add scale is each player's own
     pack_fight.add_scale = 1.0
-    d.waves = [(w.time, max(1, round(w.count * fight.add_scale)) if w.scalable else w.count, w.lifetime, w.name)
-               for w in fight.add_waves]
+    # the logs' count, as the player sees it in game (the sim's own is scaled by add_scale: Nek'zali's 6 Restless
+    # Amani read "2 x" on the fight tab, 6 on Dig deeper's chart; a review)
+    d.waves = [(w.time, w.count, w.lifetime, w.name) for w in fight.add_waves]
     d.waves += [(v.start, 0, v.duration, f"{v.name}: boss takes x{v.multiplier:g} damage") for v in fight.vulnerable]
     d.waves.sort()
     described: list[str] = []
@@ -2101,8 +2102,7 @@ def _slow_sheet(d, slow: _Slow, con, enc, diff: int, diff_name: str, spec: str, 
     d2.fight, d2.duration, d2.lust, d2.kill_now = f, f.duration, f.lust_time, 1
     d2.kills = slow.cut.kills
     d2.phases = [(n, m) for n, _, m, _ in slow.report.phases]
-    d2.waves = [(w.time, max(1, round(w.count * f.add_scale)) if w.scalable else w.count, w.lifetime, w.name)
-                for w in f.add_waves]
+    d2.waves = [(w.time, w.count, w.lifetime, w.name) for w in f.add_waves]  # the logs' count (above)
     d2.lust_spots = [(sp, None, None) for sp in slow.spots]
     with slower_kills(slow.cut.min_duration):
         tl = build_timeline(con, enc.id, diff, boss, diff_name, spec)

@@ -18,3 +18,5 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
   one table (a spec a row, a boss a column).
 - Best gear from your bags no longer drops a dual-wielder's off-hand weapon: a Rogue's sets all simmed one-handed
   (about -54%). A set list where everything loses more than 5% now says it is a failed sim.
+- The fight tab says how many adds come as the logs count them (Nek'zali's 6, then 14 Restless Amani), not the
+  sim's own scaled number (2, then 4).
