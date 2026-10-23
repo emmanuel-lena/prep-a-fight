@@ -104,6 +104,8 @@ class Cooldown:
     unreleased: float = 0.0  # the share of stores with no release before the next store
     fates: list = field(default_factory=list)  # (each store, its release or None)
     hits: list = field(default_factory=list)  # the big hits' times, for a release chip's window
+    shown_at: dict = field(default_factory=dict)  # a mark's time as its card says it ("1:50 to 2:04"), for its hover
+    lead_back: dict = field(default_factory=dict)  # a time back from cooldown the lead says in a hit's window: its hit
 
 
 LEAD_HITS = 4  # the big moments the lead says at most: Nek'zali's two rites and Stage Two's two waves
@@ -792,7 +794,10 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
     pts = " ".join(f"{x(i * STEP)},{y(v)}" for i, v in enumerate(curve))
     guides = "".join(f"<line class='gd' x1='{x(m.t)}' x2='{x(m.t)}' y1='{y(m.dtps)}' y2='{H - 22}'/>"
                      for m in found) if rows else ""  # from each hit down through the lanes
-    marks = guides + "".join(f"<circle cx='{x(m.t)}' cy='{y(m.dtps)}' r='4' class='mk'/>"
+    marks = guides + "".join(f"<circle cx='{x(m.t)}' cy='{y(m.dtps)}' r='4' class='mk'><title>{_mmss(m.t)}"
+                    + (f" &middot; mostly {e(m.boss_spell)}" if m.boss_spell else "")
+                    + f" &middot; {_x(m.ratio)}&times; the usual damage"  # each dot its hover (round 114)
+                    + (f" &middot; {_stage_tag(m.t, phases)}" if _stage_tag(m.t, phases) else "") + "</title></circle>"
                     f"<text x='{float(x(m.t)) + 6:.1f}' y='{float(y(m.dtps)) - 8:.1f}' class='ml'>{_mmss(m.t)}</text>"
                     for m in found)
     lines = "".join(f"<line class='ph' x1='{x(t)}' x2='{x(t)}' y1='22' y2='{H - B}'/>"
@@ -816,7 +821,7 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
         f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(_shown(c.name).split(',')[0][:22])}</text>"
         + "".join(f"<rect x='{float(x((moved or {}).get((c.name, t), t))) - 4:.1f}' y='{H - B + 6 + 18 * i}' "
                   f"width='8' height='13' rx='2' "
-                  f"class='cp{'' if t in tied else ' off'}'><title>{e(c.name)} {_mmss((moved or {}).get((c.name, t), t))}"
+                  f"class='cp{'' if t in tied else ' off'}'><title>{e(c.name)} {c.shown_at.get(t) or _mmss((moved or {}).get((c.name, t), t))}"
                   f"{'' if t in tied else ' (tied to no hit' + _why_not(c, t, found) + ')'}</title></rect>"
                   for t in sorted([*c.times, *c.alt, *[pt for pt in [_pull_t(c)] if pt is not None]])
                   if t <= span  # in time order (round 84), the pull group the card shows too (round 99)
@@ -891,8 +896,12 @@ def _also_pressers(c: Cooldown, t: float, named: dict | None, n: str, sp: float)
         return _pressers(c, sp, t)                                # Shield Wall "3:52 · 24% · in the window…")
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None and shown == _base(
             c, hs, _secs(n.partition(" ")[0])):
-        return _pressers(c, hs, _secs(n.partition(" ")[0]) + ANSWER[1])  # the window's base: its kills reaching the
-    return ""  # window's end (round 109: "24% of those who press it" on a chip the window admitted at 25%)
+        end = _secs(n.partition(" ")[0]) + ANSWER[1]  # the window's base: its kills reaching the window's end
+        u = _users_at(c, end)  # (round 109: "24% of those who press it" on a chip the window admitted at 25%)
+        if hs and u and hs / u < 0.25 - 1e-9 and (ut := _users_at(c, t)):  # a kept time the window's share
+            return f" ({_pct(min(1.0, sp / ut))} of those who press it about {_mmss(t)})"  # reads under: its own
+        return _pressers(c, hs, end)  # (round 114: Aura Mastery 4:20 "24%", kept by its time at 28%)
+    return ""
 
 
 def _users_at(c: Cooldown, t: float | None) -> float:
@@ -904,6 +913,16 @@ def _users_at(c: Cooldown, t: float | None) -> float:
         return c.users                       # press it read against a header's 74%, timed presses only)
     reach_ = sum(1 for d in c.press_lasts if d >= t) / max(1, len(c.press_lasts))  # every caster, as the header
     return min(1.0, c.users * len(c.lasts) * reach_ / going)
+
+
+def _kept_by_time(c: Cooldown, t: float, hit: float, sp: float) -> str:
+    """A time kept by its own share of those who press it while its hit's window reads under a quarter of them: the
+    time's share said beside the window's (round 114: "23% press Aura Mastery" for 4:15, kept by 4:20 at 28%)."""
+    u = _users_at(c, hit + ANSWER[1])
+    if t not in c.times or not sp or not u or sp / u >= 0.25 - 1e-9 or len(c.support) != len(c.times):
+        return ""
+    ut = _users_at(c, t)
+    return f", shared by {_pct(min(1.0, c.support[c.times.index(t)] / ut))} of those who press it" if ut else ""
 
 
 def _pressers(c: Cooldown, sp: float, t: float | None = None) -> str:
@@ -1053,7 +1072,7 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
     # a tied habit keeps its moment's share; its hit's window count follows, as a named one's (round 64: "or 0:23
     # for 36%" beside a main "0:04 · 31%" mixed a window share with a moment's)
     def back(a: float) -> str:  # tagged as the main time is (Evangelism's 1:42 habit, round 29)
-        return f" &middot; back from cooldown{' for about half' if a in c.back_half else ''}"
+        return f" &middot; back from cooldown{' for about half' if a in c.back_half else ''}{_lead_back(c, a)}"
     def window(a: float, n: str = "") -> str:  # a habit the lead names or ties for a hit: its count, after the
         hit = (named or {}).get((c.name, a))      # habit's own tag, with its own back-from-cooldown reading
         if hit is None and n:                     # (rounds 51, 63, 64)
@@ -1250,6 +1269,24 @@ def _rank(named: list[str]):
     return key
 
 
+def _lead_back(c: Cooldown, t: float) -> str:
+    """A time back from cooldown the lead names in a hit's window: the lead's count said on it (round 114: "Shield
+    Wall 23% in its window" beside a chip saying "3:27 for 27%" only)."""
+    hit = c.lead_back.get(t)
+    if hit is None or (hs := hit_share(c, t, hit)) is None:
+        return ""
+    return f", in the {_mmss(hit)} hit's window:{_base(c, hs, hit).replace(' &middot;', '')}"
+
+
+def _or_then_untied(c: Cooldown, t: float, n: str, tied: str, answered, named, moved) -> str:
+    """A chip's "or" time, then why its time is not kept, led by that time: the reason after the "or" read as a third
+    reason glued to it (round 114: Obsidian Scales "… no raid answer, or 3:49 for 17%")."""
+    alt, why = _or(c, t, answered, named, moved), _untied_at(c, t, n, tied, named)
+    if alt and why.startswith(" &middot; not kept"):
+        return alt + why.replace(" &middot; not kept", f" &middot; {_mmss(t)} not kept", 1)
+    return why + alt
+
+
 def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict | None = None,
                    moved: dict | None = None) -> str:
     """The cooldown rows. answered: the (button, time) pairs the lead ties to a hit; a chip says its hit only for
@@ -1265,12 +1302,13 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
                                         + _also_pressers(c, t, named, tie(c, t, n), sp)
 
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
+                                           + _lead_back(c, t)
                                            if t in c.back and not (c.why or c.every)  # its line says it; its
                                            and "back from cooldown" not in _split(_named(c, t, named, tie(c, t, n), sp))[1]
                                            else "")  # window's reading alone, as an "or" time's (round 78)
                                         + _split(_named(c, t, named, tie(c, t, n), sp))[1]  # each time its own
-                                        + _untied_at(c, t, n, tie(c, t, n), named)
-                                        + f"{_or(c, t, answered, named, moved)}</span>"  # window, then the "or" (r. 68)
+                                        + _or_then_untied(c, t, n, tie(c, t, n), answered, named, moved)
+                                        + "</span>"  # window, then the "or" (r. 68)
                                         for k, (t, n, sp) in enumerate(zip(c.times, c.near,
                                                                            c.support or [0.0] * len(c.times),
                                                                            strict=False)))
@@ -1474,6 +1512,7 @@ def two_step(tl, cds: list[Cooldown], found: list[Moment]) -> None:
                   and min(groups, key=lambda x, s_=s_: abs(x - s_)) == g]
             if us:
                 marks.append((st.median(us), len(us) / n_all))
+                r.shown_at[st.median(us)] = _about(us)  # its hover as its chip (round 114: "1:55" vs "1:50 to 2:04")
         if marks:
             r.times, r.support = [t for t, _sp in marks], [sp for _t, sp in marks]
             r.near = [next((_mmss(m.t) for m in found if -ANSWER[0] <= t - m.t <= ANSWER[1]), "") for t in r.times]
@@ -1609,6 +1648,10 @@ def _why_not(c: Cooldown, t: float, found: list | None = None) -> str:
         m = hit_near(st.median(us)) if us else None
         if m is not None:
             return f": its release goes on the {_mmss(m.t)} hit"
+        if us:  # a release on no hit: where it lands, as the others' (round 114: the 1:41 store "on cooldown")
+            nx = next((m for m in found or [] if 0 < m.t - ANSWER[0] - st.median(us) <= RAMP[1]), None)
+            return (f": its release, about {_about(us)}, "
+                    + (f"lands before the {_mmss(nx.t)} hit's window" if nx is not None else "lands on no hit"))
     if c.every:  # its card's word first: "on cooldown" (round 94: Avenging Wrath 2:05 read "back from cooldown")
         return ": held past its cooldown" if t in c.alt and t not in c.back else ": on cooldown"
     if t in c.back:
@@ -1886,8 +1929,14 @@ def _many(split: list, wide: bool = True) -> str:
             return n
         sides = [re.sub(r" [0-9]+%.*$", "", x) for x in n.split(" / ")]
         return "the choice of " + " or ".join(sides)
+    def off(n: str, s: float) -> int:  # how far from half, in points: a pair by its first side ("A 61% / B 39%")
+        m = re.search(r"([0-9]+)%", n) if s < 0 else None
+        return round(abs((int(m.group(1)) / 100 if m else s) - 0.5) * 100)
+    k = 4  # a tie at the cut named too (round 114: Oppressing Roar 30% left out beside Scarlet Adaptation 30%)
+    while k < len(split) and off(*split[k]) == off(*split[3]):
+        k += 1
     return (f"their builds differ by many small choices, {'the most split' if wide else 'the closest to 50/50'} "
-            "being " + e(_and([said(n) for n, _s in split[:4]])))  # none near 50/50 in the wide list (round 44)
+            "being " + e(_and([said(n) for n, _s in split[:k]])))  # none near 50/50 in the wide list (round 44)
 
 
 def build_lead(builds: list, spec: str, players: int, split: list | None = None, wide: bool = True) -> str:
@@ -2396,7 +2445,7 @@ def render_sheet(h: HealerPrep) -> str:
                 hit, t, sp, c = ps[0]
                 return hit, (f"for the {_mmss(hit)} hit, {'another ' if _other_players(n, hit, t, c) else ''}"
                              f"{_pct(sp)} press {e(_shown(n))}{_reach_note(c, hit)} (about {_tw(c, t, hit)}"
-                             f"{ramp_of(c, t, hit)})" + (_other([(hit, t, sp, c)]) if ramp_of(c, t, hit) else
+                             f"{_kept_by_time(c, t, hit, sp)}{ramp_of(c, t, hit)})" + (_other([(hit, t, sp, c)]) if ramp_of(c, t, hit) else
                                                          _also(c, press, t, sp, hit)))
             c0 = ps[0][3]
             first = which(n, press, c0).startswith("their first") or round(c0.per_kill) <= 1
@@ -2546,7 +2595,8 @@ def render_sheet(h: HealerPrep) -> str:
                      + (f"<p class='small muted'>{buff_note.strip()}</p>" if buff_note else ""))
     elif rare_ext or exts:  # Pain Suppression at 34%: still an external, never filed with the defensives
         def named_(cs: list, shared: bool) -> str:  # one form for every side line (round 113: "(34%, 3:39)")
-            return ", ".join(f"{e(c.name)} ({_times_line(c)})" for c in cs)
+            return ", ".join(f"{e(c.name)} ({_times_line(c).removesuffix(', no shared moment') if shared else _times_line(c)})"
+                             for c in cs)  # its sentence says it already (round 114: said twice)
         # half or more at no shared moment, then those fewer than half press, each said as such (round 110: Blessing
         # of Sacrifice 28% listed beside Lay on Hands 66% as if both were staples)
         parts = ([f"The top {e(h.spec)}s cast these at no shared moment: {named_(exts, True)}"] if exts else []) + (
@@ -2598,7 +2648,8 @@ def render_sheet(h: HealerPrep) -> str:
         boss.append(f"<h2>What the top {e(h.spec)}s dispel here</h2><p>"
                     + _and([f"{e(n)} ({k:.1f} a kill" + ("" if n in inside else ", not in the Encounter Journal")
                             + ")" for n, k in h.dispelled])
-                    + f", on {h.dispel_kills} of their kills read.</p>")
+                    + f": means over {h.dispel_kills} of their kills read; the rates a minute on the other tabs are"
+                    " medians over every kill.</p>")  # (round 114: 6.0 a kill here beside "1.0 a minute")
     elif h.dispellable and not h.dispelled:  # where the dispels most likely go: the Journal's flags and the game data, not a measure
         boss.append("<h2>What you can dispel here</h2><p>Dispellable on this boss at this difficulty: "
                     + _and([f"{e(n)} ({e(t)})" for n, t in h.dispellable])

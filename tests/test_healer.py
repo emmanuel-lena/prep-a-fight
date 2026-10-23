@@ -725,3 +725,18 @@ def test_a_side_line_gives_each_time_its_share():
     # Holy Paladin, Nek'zali (round 111): "Divine Steed (71%, about 2:20)" read as 71% at 2:20, 29% press it there
     c = healer.Cooldown("Divine Steed", 1, 0.71, 2.0, [140.0], [""], support=[0.29])
     assert healer._times_line(c) == "pressed by 71%; 29% about 2:20"
+
+
+def test_split_list_names_a_tie_at_its_cut():
+    # round 114: Oppressing Roar at 30% left out beside Scarlet Adaptation at 30%, the fourth named
+    split = [("Stretch Time", 0.48), ("Extended Flight", 0.56), ("Foci of Life", 0.36),
+             ("Scarlet Adaptation", 0.30), ("Oppressing Roar", 0.30), ("Hover", 0.2)]
+    text = healer._many(split)
+    assert "Oppressing Roar" in text and "Hover" not in text
+
+
+def test_hit_dot_has_a_hover():
+    found = [healer.Moment(230.0, 300.0, 1.41, "Possession Barrage")]
+    svg = healer.curve_svg([100.0] * 300, found, [("Stage Two", 178.0)], "x")
+    assert "<title>3:50 &middot; mostly Possession Barrage &middot; 1.41&times; the usual damage &middot; " \
+           "Stage Two +0:52</title>" in svg

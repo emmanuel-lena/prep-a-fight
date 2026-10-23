@@ -544,11 +544,13 @@ def render_sheet(p: TankPrep) -> str:
         def more_back(a: tuple | None, x: Moment) -> str:  # a long defensive pressed there more than the answer,
             if a is None:                                  # back from cooldown: said, or the lead hides it (round
                 return ""                                  # 111: Rallying Cry 15% named, Shield Wall 23% unsaid)
-            got = max(((c.name, window(c.name, t, 0.0, x.t)) for c in defs for t in [*c.times, *c.alt]
+            got = max(((c.name, window(c.name, t, 0.0, x.t), c, t) for c in defs for t in [*c.times, *c.alt]
                        if c.name != a[0] and -ANSWER[0] - 3 <= t - x.t <= ANSWER[1] + 3 and t in c.back),
                       key=lambda y: y[1], default=None)
-            return (f"; {e(got[0])} {got[1]:.0%} in its window, back from cooldown" if got and got[1] > a[2]
-                    else "")
+            if not got or got[1] <= a[2]:
+                return ""
+            got[2].lead_back[got[3]] = x.t  # its chip says the same window count (round 114: 23% vs "3:27 for 27%")
+            return f"; {e(got[0])} {got[1]:.0%} in its window, back from cooldown"
 
         big = answer(m)  # the biggest moment and its answer first, then the other hits in time order
         lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({_x(m.ratio)}&times; the "

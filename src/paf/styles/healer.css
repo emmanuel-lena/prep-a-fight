@@ -13,6 +13,7 @@
 .hl2 a{color:var(--fg);text-decoration-color:var(--line)} .hcomp tr.few td{color:var(--muted)}
 .hl2 .alt{color:var(--muted);align-self:center;margin-left:4px}
 .hl2 .subrow{display:flex;flex-wrap:wrap;gap:6px;width:100%;align-items:center} .hl2 .subrow .alt{margin-left:0}
+.hl2 .subrow>.alt:first-child{flex-basis:100%} /* its label on a line of its own, whatever its first chip's length */
 .rd .pn{fill:var(--muted);font-size:11px}
 /* the healer and tank sheets in the briefing style (issue #10): serif sentence headings, ruled rows, no cards */
 .panel>h2{font:600 26px/1.2 var(--font-reading);letter-spacing:0;text-transform:none;color:var(--fg);margin:44px 0 14px}
