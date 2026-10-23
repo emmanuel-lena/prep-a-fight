@@ -456,7 +456,7 @@ def card(slug: str, heading: bool = True) -> str:
                     + _cmp_table([x for x in says if isinstance(x, dict) and x.get("cmp")])) if says else \
                 "<p class='muted small'>Nothing stands out.</p>"
         card_html = (f"<article class='lr-boss{' kill' if b['kill'] else ''}'><header><b>{e(b['name'])}</b>"
-                 f"{diff_pill(b['difficulty'])}<span class='lr-state'>{state_txt}</span></header>"
+                 f"{diff_pill(b['difficulty'])}" + (f"<span class='lr-state'>{state_txt}</span>" if state_txt else "") + "</header>"
                  f"{body}<nav class='lr-links'>{links}<a href='/boss?boss={b['boss']}&amp;difficulty={e(b['difficulty'])}'>"
                  f"The prep</a></nav></article>")
         if b["kill"]:

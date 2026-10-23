@@ -154,3 +154,13 @@ def test_the_comparison_headers_keep_the_time_when_the_health_is_a_row():
              "pulls": ["wipe at 66% after 2:38", "wipe at 69% after 2:44"]}]
     out = lastraid._cmp_table(rows)
     assert "Better <small>2:38</small>" in out and "wipe at 66%" not in out
+
+
+def test_a_one_boss_wipe_night_has_no_empty_state_line(home, monkeypatch):
+    # app confirm round 2: an orange dot alone under the boss name
+    monkeypatch.setattr(lastraid, "_result", lambda jid: {})
+    lastraid.save({"me": {"report": "abc", "player": "Me", "date": 1791500000, "pulls": 35, "night": "n1",
+                          "finished": 1791500100, "bosses": [
+                              {"boss": 1, "name": "Sszorak", "difficulty": "mythic", "kill": False, "pulls": 35,
+                               "best": 58.0, "jobs": {}}]}})
+    assert "lr-state" not in lastraid.card("me")
