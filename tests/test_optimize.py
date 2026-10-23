@@ -82,7 +82,7 @@ def test_large_gain_not_flagged_when_validated_robust_and_agreeing():
     assert sanity_flags(plan, [], validation=0.97) == []
     assert any("not validated" in f for f in sanity_flags(plan, [], validation=None))
     assert any("the sim does 89% of the top players" in f for f in sanity_flags(plan, [], validation=0.89))  # measured
-    assert any("not validated" in f for f in sanity_flags(plan, [], validation=0.74))
+    assert any("the sim does 74%" in f for f in sanity_flags(plan, [], validation=0.74))
 
 
 def test_adjust_alignment_uses_the_default_apl_as_baseline():
