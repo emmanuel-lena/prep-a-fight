@@ -415,11 +415,12 @@ def _none_for(note: str) -> str:
 
 # how to read the defensive cards, one term a line (the owner: less text; every rule kept, said once)
 TANK_HOW_TO_READ = (
-    "<dl class='legend'><dt>Tied to a hit</dt><dd>a quarter of those who press the button press it in the hit's window "
+    "<dl class='legend'><dt>N%</dt><dd>of the top players read; &ldquo;(N kills going)&rdquo;: of the kills still "
+    "going then; &ldquo;of its users&rdquo;: of the top players who press the button.</dd><dt>Tied to a hit</dt><dd>a quarter of those who press the button press it in the hit's window "
     "(5 s before to 8 s after it starts); its share is then the window's. A card on cooldown, a potion, a trinket or "
     "a magic-only defensive in a physical hit says why it is not tied.</dd><dt>A time</dt><dd>shared by a quarter of "
-    "those who press the button; its share: the top players pressing within 8 s of it (&ldquo;of those who press "
-    "it&rdquo; too, under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long."
+    "those who press the button; its share: the top players pressing within 8 s of it (&ldquo;of its users&rdquo; "
+    "too, under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long."
     "</dd><dt>Back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, "
     "not counted for it (&ldquo;for about half&rdquo;: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
     "time some top players press the same press at instead.</dd></dl>")
@@ -459,7 +460,7 @@ def render_sheet(p: TankPrep) -> str:
             return f"{_mmss(m.t)} hit" if m else ""
 
         def _of_pressers(x: float, u: float) -> str:  # under a quarter, also of those who press it (round 89)
-            return (f" ({_pct(min(1.0, x / u))} of those who press it)"
+            return (f" ({_pct(min(1.0, x / u))} of its users)"
                     if x and x < 0.25 and u and _pct(x / u) != _pct(x) else "")
 
         def why(n: str, t: float) -> str:  # untied in a hit's window: the reason said (round 88: Spell Reflection at

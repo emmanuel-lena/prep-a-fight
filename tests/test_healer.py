@@ -216,7 +216,7 @@ def test_a_press_back_from_cooldown_in_a_hit_is_said_and_drawn_as_none():
     assert "100% press Tranquility (about 0:42)" in sheet
     assert ("<span class='none'>None kept</span> (100% press Tranquility in its window, about 2:45, back from "
             "cooldown)") in sheet  # the 2:40 hit's row
-    assert ("2:45 &middot; 100% of the top players &middot; back from cooldown &middot; in the window of the 2:40 "
+    assert ("2:45 &middot; 100% &middot; back from cooldown &middot; in the window of the 2:40 "
             "hit") in sheet
     assert "class='cp off'><title>Tranquility 2:45" in sheet and "class='cp'><title>Tranquility 0:42" in sheet
 
@@ -257,7 +257,7 @@ def test_a_ramp_answers_the_hit_after_it(monkeypatch):
     assert "100% press Evangelism (about 0:24, a ramp ahead of it)" in sheet
     assert "pressed again as soon as it is back" not in sheet  # its rhythm line says it (round 30)
     assert "0:24 &middot; 16 s before the 0:40 hit" in sheet
-    assert "1:42 &middot; 100% of the top players &middot; back from cooldown &middot; ahead of the 2:10 hit" in sheet
+    assert "1:42 &middot; 100% &middot; back from cooldown &middot; ahead of the 2:10 hit" in sheet
 
 
 def test_back_from_cooldown_is_read_per_player():
@@ -401,14 +401,14 @@ def test_a_late_hits_share_is_of_the_kills_that_reach_it():
     c = healer.Cooldown("Shield Wall", 1, 0.9, 2.0, [231.0], presses=[[231.0]] * 19 + [[34.0]] * 70, n_all=100,
                         lasts=[300.0] * 58 + [200.0] * 42)
     assert round(healer.hit_share(c, 231.0, 235.0), 2) == 0.33
-    assert healer._reach_note(c, 235.0) == ", in the 58 kills still going after it"
+    assert healer._reach_note(c, 235.0) == " (58 kills going)"
 
 
 def test_a_late_tied_chip_says_its_base_and_a_named_time_is_its_presses():
-    # Protection Warrior, Nek'zali (round 53): "33% of the top players" for 19 of the 58 kills still going
+    # Protection Warrior, Nek'zali (round 53): "33%" for 19 of the 58 kills still going
     c = healer.Cooldown("Shield Wall", 1, 0.9, 2.0, [231.0], presses=[[234.0]] * 19 + [[34.0]] * 70, n_all=100,
                         lasts=[300.0] * 58 + [200.0] * 42)
-    assert healer._base(c, 19 / 58, 235.0) == " &middot; 33% of the top players, in the 58 kills still going"
+    assert healer._base(c, 19 / 58, 235.0) == " &middot; 33% (58 kills going)"
     m = healer.Moment(235.0, 1000.0, 1.5, "Hollowing Strikes")
     c.why, c.back, c.support = "", [231.0], [0.24]
     assert "about 3:54" in healer.landed_in(m, [c])  # the presses counted (3:54), not the moment (3:51)
@@ -440,7 +440,7 @@ def test_the_other_healers_chip_gives_the_share_the_bar_reads():
     rd = SimpleNamespace(spec="Restoration Druid", raid_cds=1, own_players=150,
                          cd_names=[("Tranquility", 1, [], 0.8, ([[74.0]] * 24 + [[200.0]] * 56, 100, 180.0))])
     out = healer.roles_more([rd], found=[healer.Moment(75.0, 1000.0, 1.6, "Soulcoil Rite")])
-    assert "Tranquility 1:14 &middot; 24% <small>(30% of those who press it)</small>" in out
+    assert "Tranquility 1:14 &middot; 24% <small>(30% of its users)</small>" in out
 
 
 def test_a_button_on_cooldowns_far_habit_is_dropped():
@@ -504,11 +504,11 @@ def test_a_two_step_button_says_its_release_and_what_it_stores():
                                                                    ("Hover", 0.25, 0.0)]
     c.stored = healer.stored_spells(con, 9, 4, "Stasis (Store)")
     out = healer.cooldowns_html([c])
-    assert ("released:</small><span class='chip'>3:36 &middot; 50% of the top players &middot; from the 3:20 store, "
-            "each a median 16 s after its own (nearly all released) &middot; in the window of the 3:35 hit: 50% of the "
-            "top players") in out
+    assert ("released:</small><span class='chip'>3:36 &middot; 50% &middot; from the 3:20 store, "
+            "each a median 16 s after its own (nearly all released) &middot; in the window of the 3:35 hit: 50%"
+            "") in out
     assert "and about 0.5 more releases a kill, of stores made at other times" in out  # the 1:40 stores
-    assert "in the 3:35 hit's window, from any store: 50% of the top players, a median 16 s after storing" in out
+    assert "in the 3:35 hit's window, from any store: 50%, a median 16 s after storing" in out
     # a store never released before the next store is not paired with the next one's release (round 83)
     tl.players = [{"casts": {1: [100.0, 200.0], 2: [216.0]}, "duration": 270.0}] * 4
     healer.two_step(tl, [c], [m])
@@ -531,14 +531,14 @@ def test_a_named_chip_with_one_share_shows_one_time():
     c = healer.Cooldown("Shield Wall", 1, 0.6, 2.0, [179.0], [""], support=[0.15],
                         presses=[[177.0]] * 15 + [[60.0]] * 45, n_all=100)
     out = healer.cooldowns_html([c], set(), {("Shield Wall", 179.0): 175.0})
-    assert ("2:57 &middot; 15% of the top players (25% of those who press it) &middot; in the window of the 2:55 hit"
+    assert ("2:57 &middot; 15% (25% of its users) &middot; in the window of the 2:55 hit"
             in out and "about" not in out)
 
 
 def test_a_share_under_a_quarter_gives_the_pressers_share():
     # Protection Warrior, Vashnik (round 83): "Shield Wall 2:57 · 15%" read as under the quarter rule
     c = healer.Cooldown("Shield Wall", 1, 0.6, 2.0, [177.0], [""], support=[0.15])
-    assert healer._pressers(c, 0.15) == " (25% of those who press it)"
+    assert healer._pressers(c, 0.15) == " (25% of its users)"
     assert healer._pressers(c, 0.3) == ""
     c.release_pairs = [(216.0, 13.0), (217.0, 12.0), (130.0, 30.0)]  # a hit's releases: their own stores' gap
     assert healer._gap_of(c, [216.0, 217.0]) == 12.5
@@ -586,7 +586,7 @@ def test_the_rest_leaves_out_a_named_line_and_a_tied_chip_gives_its_pressers():
     # Protection Warrior, Nek'zali: "0:34 · 1 s before the 0:35 hit · 23%" without the pressers' share
     sw = healer.Cooldown("Shield Wall", 1, 0.77, 2.0, [34.0], ["0:35 Soulcoil Rite"], support=[0.23],
                          presses=[[34.0]] * 23 + [[100.0]] * 54, n_all=100)
-    assert healer._also_pressers(sw, 34.0, {}, "0:35 Soulcoil Rite", 0.23) == " (30% of those who press it)"
+    assert healer._also_pressers(sw, 34.0, {}, "0:35 Soulcoil Rite", 0.23) == " (30% of its users)"
 
 
 def test_a_named_chip_with_two_shares_gives_its_pressers():
@@ -594,7 +594,7 @@ def test_a_named_chip_with_two_shares_gives_its_pressers():
     c = healer.Cooldown("Shield Wall", 1, 0.77, 2.0, [232.0], [""], support=[0.24],
                         presses=[[234.0]] * 16 + [[232.0]] * 8 + [[100.0]] * 53, n_all=100,
                         lasts=[300.0] * 58 + [200.0] * 42)
-    assert healer._also_pressers(c, 232.0, {("Shield Wall", 232.0): 235.0}, "", 0.24) == " (31% of those who press it)"
+    assert healer._also_pressers(c, 232.0, {("Shield Wall", 232.0): 235.0}, "", 0.24) == " (31% of its users)"
 
 
 def test_an_untied_time_in_a_hit_window_says_it_is_not_kept():
@@ -654,19 +654,19 @@ def test_a_quarter_not_kept_names_the_button_kept():
     # Mistweaver Monk, Nek'zali (round 95): Conduit "not kept for the 0:35 hit: 25%" beside the note's quarter bar
     named = {(healer.KEPT, 35.0): ("Revival / Restoral", 0.38)}
     assert (healer._not_kept(35.0, 0.25, named)
-            == " &middot; not kept for the 0:35 hit: 25% in its window, under Revival / Restoral's 38% of the top "
-            "players")
+            == " &middot; not kept for the 0:35 hit: 25% in its window, under Revival / Restoral's 38%"
+            "")
     assert healer._not_kept(35.0, 0.16, named) == (" &middot; not kept for the 0:35 hit: 16% in its window, under "
-                                                   "Revival / Restoral's 38% of the top players")  # round 105
+                                                   "Revival / Restoral's 38%")  # round 105
 
 
 def test_a_late_time_share_says_the_kills_still_going():
     # Protection Warrior, Nek'zali (round 98): "3:52 · 24%" of 100 beside "28% … in the 58 kills still going"
     c = healer.Cooldown("Shield Wall", 1, 0.77, 2.0, [232.0], [""], lasts=[300.0] * 58 + [200.0] * 42)
-    assert healer._still(c, 232.0) == ", in the 58 kills still going"
+    assert healer._still(c, 232.0) == " (58 kills going)"
     assert healer._still(c, 100.0) == ""
     c.lasts = [300.0] * 99 + [200.0]  # one kill ended: the share reads the same over all, nothing said (round 99)
-    assert healer._still(c, 232.0, 0.25) == "" and healer._still(c, 232.0) == ", in the 99 kills still going"
+    assert healer._still(c, 232.0, 0.25) == "" and healer._still(c, 232.0) == " (99 kills going)"
 
 
 def test_the_pull_group_a_card_shows_is_drawn():
@@ -700,11 +700,11 @@ def test_a_hit_window_a_quarter_press_in_gets_a_time():
 
 
 def test_the_pressers_share_uses_the_keep_tests_base():
-    # Holy Paladin, Nek'zali (round 108): "or 3:49 for 18% (24% of those who press it)" shown past the quarter bar
+    # Holy Paladin, Nek'zali (round 108): "or 3:49 for 18% (24% of its users)" shown past the quarter bar
     c = healer.Cooldown("Divine Protection", 1, 0.74, 2.0, [229.0], [""], presses=[[229.0]] * 74,
                         press_lasts=[300.0] * 70 + [200.0] * 4, lasts=[300.0] * 90 + [200.0] * 10)
-    assert healer._pressers(c, 0.18) == " (24% of those who press it)"  # over every kill
-    assert healer._pressers(c, 0.18, 229.0) == " (23% of those who press it)"  # of the kills still going: 70 of 90
+    assert healer._pressers(c, 0.18) == " (24% of its users)"  # over every kill
+    assert healer._pressers(c, 0.18, 229.0) == " (23% of its users)"  # of the kills still going: 70 of 90
 
 
 def test_the_other_share_counts_players_not_shares():

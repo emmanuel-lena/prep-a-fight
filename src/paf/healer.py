@@ -132,12 +132,13 @@ def _ic(c: Cooldown | None) -> str:
 
 # how to read the cards, one term a line (the owner: less text; every rule kept, said once)
 HOW_TO_READ = (
-    "<dl class='legend'><dt>Tied to a hit</dt><dd>a quarter of those who press the button press it in the hit's window "
+    "<dl class='legend'><dt>N%</dt><dd>of the top players read; &ldquo;(N kills going)&rdquo;: of the kills still "
+    "going then; &ldquo;of its users&rdquo;: of the top players who press the button.</dd><dt>Tied to a hit</dt><dd>a quarter of those who press the button press it in the hit's window "
     "(5 s before to 8 s after it starts; a ramp: 8 to 30 s ahead); its share is then the window's. The table keeps "
     "one button a hit (a second within the noise), else names the most pressed, &ldquo;only N%&rdquo; under a "
     "quarter. A card on cooldown, on another player, used moving, a trinket or a personal defensive says why it is "
     "not tied.</dd><dt>A time</dt><dd>shared by a quarter of those who press the button (at the pull: a fifth of the "
-    "top players); its share: the top players pressing within 8 s of it (&ldquo;of those who press it&rdquo; too, "
+    "top players); its share: the top players pressing within 8 s of it (&ldquo;of its users&rdquo; too, "
     "under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long.</dd>"
     "<dt>Back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, not "
     "counted for it (&ldquo;for about half&rdquo;: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
@@ -899,6 +900,7 @@ def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list
                                                                            if "hits:" in text else "")
         first = next((x for x in ts), None) or _mmss(_t)
         cell = re.sub(r"^for the \d+:\d\d hit, ", "", text)
+        cell = re.sub(r" \((\d+) kills going\) \(about ([^)]*)\)", r" (about \2; \1 kills going)", cell)  # one bracket
         icons = "".join(_ic(c) for n, c in by_icon.items() if f"{e(n)}" in cell and c is not None)
         said[first] = f"{icons}{cell[:1].upper() + cell[1:]}"
         for x in dict.fromkeys(ts):
@@ -946,7 +948,7 @@ def _not_kept(hit: float, hs: float, named: dict | None, c: Cooldown | None = No
     from paf.defensives import is_defensive
 
     why = (", a personal defensive, no raid answer" if c is not None and is_defensive(c.spell_id, c.name)  # round
-           else f", under {e(kept[0])}'s {_pct(kept[1])} of the top players"  # 104; the kept button whatever the
+           else f", under {e(kept[0])}'s {_pct(kept[1])}"  # 104; the kept button whatever the
            if kept and (c is None or kept[0] != _shown(c.name)) else "")  # window share (round 105: Yu'lon "16% in
     # its window" read as the reason, its time shared by 30%)
     return (f" &middot; not kept for the {_mmss(hit)} hit: {_pct(hs)} in its window"
@@ -967,7 +969,7 @@ def _also_pressers(c: Cooldown, t: float, named: dict | None, n: str, sp: float)
     """A chip's share under a quarter, also of those who press the button: the moment's, or a tied chip's hit share
     (round 89: Shield Wall "0:34 · 1 s before the 0:35 hit · 23%" said none)."""
     shown = _named(c, t, named, n, sp)
-    if "of those who press it" in shown:
+    if "of its users" in shown:
         return ""
     if _split(shown)[0] in (_share(sp), _share(sp) + _still(c, t, sp)):  # its own share, before a window clause (r. 90:
         return _pressers(c, sp, t)                                # Shield Wall "3:52 · 24% · in the window…")
@@ -976,7 +978,7 @@ def _also_pressers(c: Cooldown, t: float, named: dict | None, n: str, sp: float)
         end = _secs(n.partition(" ")[0]) + ANSWER[1]  # the window's base: its kills reaching the window's end
         u = _users_at(c, end)  # (round 109: "24% of those who press it" on a chip the window admitted at 25%)
         if hs and u and hs / u < 0.25 - 1e-9 and (ut := _users_at(c, t)):  # a kept time the window's share
-            return f" ({_pct(min(1.0, sp / ut))} of those who press it share its time)"  # reads under: its own
+            return f" ({_pct(min(1.0, sp / ut))} of its users share its time)"  # reads under: its own
         return _pressers(c, hs, end)  # (round 114: Aura Mastery 4:20 "24%", kept by its time at 28%)
     return ""
 
@@ -999,7 +1001,7 @@ def _kept_by_time(c: Cooldown, t: float, hit: float, sp: float) -> str:
     if t not in c.times or not sp or not u or sp / u >= 0.25 - 1e-9 or len(c.support) != len(c.times):
         return ""
     ut = _users_at(c, t)
-    return f", shared by {_pct(min(1.0, c.support[c.times.index(t)] / ut))} of those who press it" if ut else ""
+    return f", shared by {_pct(min(1.0, c.support[c.times.index(t)] / ut))} of its users" if ut else ""
 
 
 def _pressers(c: Cooldown, sp: float, t: float | None = None) -> str:
@@ -1008,12 +1010,12 @@ def _pressers(c: Cooldown, sp: float, t: float | None = None) -> str:
     u = _users_at(c, t)  # the keep test's own base, so a time shown never reads under the quarter (round 108:
     if not sp or sp >= 0.25 or not u or _pct(sp / u) == _pct(sp):  # "18% (24% of those who press it)")
         return ""
-    return f" ({_pct(min(1.0, sp / u))} of those who press it)"
+    return f" ({_pct(min(1.0, sp / u))} of its users)"
 
 
 def _share(sp: float) -> str:
     """How many of the top players press it then: a chip is no consensus ("1:16 · 28% of them")."""
-    return f" &middot; {_pct(sp)} of the top players" if sp else ""
+    return f" &middot; {_pct(sp)}" if sp else ""  # of the top players: the legend says it once
 
 
 def _times_line(c: Cooldown) -> str:
@@ -1116,7 +1118,7 @@ def reach(c: Cooldown, hit: float) -> int:
 def _reach_note(c: Cooldown, hit: float) -> str:
     n = reach(c, hit)
     # said whenever a kill ended before it: "51% of the top players" read as 51 of 100 for 48 of 95 (round 84)
-    return f", in the {n} kills still going after it" if c.lasts and n < len(c.lasts) else ""
+    return f" ({n} kills going)" if c.lasts and n < len(c.lasts) else ""  # the legend says what (the owner: less text)
 
 
 def _secs(mmss: str) -> float:
@@ -1394,7 +1396,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
                                     else "<small>timing varies: no shared moment</small>"))  # (round 91)
         + _pull_chip(c)
         + "".join(f"<span class='chip'>about {v[1] if isinstance(v[1], str) else _mmss(v[1])} &middot; in the "
-                  f"window of the {_mmss(k[1][1])} hit: {_pct(v[0])} of the top players{v[2]}"
+                  f"window of the {_mmss(k[1][1])} hit: {_pct(v[0])}{v[2]}"
                   f"{' &middot; ' + v[3] if len(v) > 3 and v[3] else ''}</span>"  # a chip of its own, led by its time
                   # (round 91: plain text after a chip read as that chip's continuation)
                   for k, v in (named or {}).items()
@@ -1468,7 +1470,7 @@ def _still(c: Cooldown, t: float, sp: float | None = None) -> str:
         return ""
     if sp is not None and _pct(sp) == _pct(sp * n / len(c.lasts)):
         return ""
-    return f", in the {n} kills still going"
+    return f" ({n} kills going)"
 
 
 def _pull_chip(c: Cooldown) -> str:
@@ -1669,12 +1671,12 @@ def _released(c: Cooldown) -> str:
             at = st.median(us)  # the chip's own time outside the window: those who release there said apart (round
             out = "" if h - ANSWER[0] <= at <= h + ANSWER[1] else (" release it later," if at < h else  # 99: "1:50 to
                                                                     " release it earlier,")  # 2:04" read in 2:10)
-            win = (f" &middot; of them, {_pct(inwin(h) / reach(r, h))} of the top players{_reach_note(r, h)} in the "
+            win = (f" &middot; of them, {_pct(inwin(h) / reach(r, h))}{_reach_note(r, h)} in the "
                    f"window of the {_mmss(h)} hit" if out else  # a part of this chip's releases, not more of them
                    # (round 108: "52% … 16% release it later" read as 68% of a 70% store)
                    f" &middot; in the window of the {_mmss(h)} hit: {_pct(inwin(h) / reach(r, h))} of the top "
                    f"players{_reach_note(r, h)}")
-        return (f"<span class='chip'>{_about(us)} &middot; {_pct(len(us) / n)} of the top players &middot; from the "
+        return (f"<span class='chip'>{_about(us)} &middot; {_pct(len(us) / n)} &middot; from the "
                 f"{_mmss(g)} store, each a median {gap:.0f} s after its own"
                 + (f" ({_pct(never)} of those stores never released)" if never >= 0.05 else " (nearly all released)")
                 + win + "</span>")
@@ -1685,8 +1687,8 @@ def _released(c: Cooldown) -> str:
         hs = hit_share(r, h, h)
         inside = _counted(r, h, h)
         if hs is not None and hs >= 0.1 and inside:  # from a tenth, as the chips (round 99: 19% in 0:40 unsaid)
-            chips += (f"<small class='alt'>in the {_mmss(h)} hit's window, from any store: {_pct(hs)} of the top "
-                      f"players{_reach_note(r, h)}"
+            chips += (f"<small class='alt'>in the {_mmss(h)} hit's window, from any store: {_pct(hs)}"
+                      f"{_reach_note(r, h)}"
                       + (f", a median {gap:.0f} s after storing" if (gap := _gap_of(c, inside)) else "") + "</small>")
     rest = [u for _s, u in other if u is not None]
     if chips and rest:
@@ -1756,9 +1758,8 @@ def _base(c: Cooldown, hs: float, hit: float) -> str:
     """A hit's share on a chip, of what the lead counts it of: "33% of the 58 kills still going" when a late hit's
     kills are fewer (round 53: "33% of the top players" read as 33 of 100, for 19 of 58)."""
     n = reach(c, hit)
-    of = ("of the top players, in the " + f"{n} kills still going" if c.lasts and n < len(c.lasts)
-          else "of the top players")  # a share of players (round 54: "24% of the 87 kills" read as 21 kills)
-    return f" &middot; {_pct(hs)} {of}"
+    of = f" ({n} kills going)" if c.lasts and n < len(c.lasts) else ""  # a share of players, the legend says
+    return f" &middot; {_pct(hs)}{of}"
 
 
 def _tied_share(c: Cooldown, t: float, n: str, sp: float) -> float:
@@ -2179,14 +2180,14 @@ def roles_more(roles: list, mine: str = "", found: list | None = None, staged: b
             per_hit.append((h, sorted(got, key=lambda x: -x[2])[:2], under))  # shared" read as "nothing pressed")
         chips = "".join(f"<span class='chip'>the {_mmss(h)} hit: "
                         + ("; ".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if rp else ''} &middot; {_pct(sp)}"
-                                     + (f" <small>({_pct(pp)} of those who press it)</small>"  # the share the
+                                     + (f" <small>({_pct(pp)} of its users)</small>"  # the share the
                                         if _pct(pp) != _pct(sp) else "")  # bar reads, rounded as the share (r. 76-77)
                                      for n, t, sp, rp, pp in got) if got
                            else "".join(f"{e(_shown(n))} {_mmss(t)}{' (a ramp)' if u[4] else ''} &middot; {_pct(sp)} "
-                                        + (f"<small>(under a quarter, also {int(pp * 100)}% of those who press it: "
+                                        + (f"<small>(under a quarter, also {int(pp * 100)}% of its users: "
                                            + ("all" if sp >= pp - 1e-9 else "nearly all") + " press it in the kill)</small>"  # round 79: "24% of
                                            if f"{int(pp * 100)}%" == _pct(sp) else  # them too" read as nonsense
-                                           f"<small>(under a quarter of those who press it: {int(pp * 100)}%)</small>")
+                                           f"<small>(under a quarter of its users: {int(pp * 100)}%)</small>")
                                         for u in under if len(u) > 4 and u[0] != "back" for n, t, sp, pp in [u[:4]])
                            or "".join(f"none held for it <small>({e(_shown(u[1]))} {_mmss(u[2])}"
                                       f"{' (a ramp)' if len(u) > 5 and u[5] else ''} &middot; {_pct(u[3])}, "
@@ -2209,9 +2210,9 @@ def roles_more(roles: list, mine: str = "", found: list | None = None, staged: b
             "press counts for a hit, can differ).<br><b>A hit's "
             "window:</b> 5 s before to 8 s after it starts; a ramp button, as Evangelism, 8 to 30 s "
             "ahead, never the pull's opener before 0:12.<br><b>A button shown:</b> a quarter of the spec's healers who "
-            "press it do so in the window; its share is of all that spec's healers, then of those who press it when "
+            "press it do so in the window; its share is of all that spec's healers, then of its users when "
             "that differs.<br><b>\"Under a quarter\":</b> no button reaches that; its most pressed one, if a tenth of "
-            "the spec's healers press it there, with the share of those who press it, or \"under a quarter, also of those who press it\" when (nearly) "
+            "the spec's healers press it there, with the share of its users, or \"under a quarter, also of its users\" when (nearly) "
             "all of them press it in the kill.<br><b>\"None held for it\":</b> its presses there come back from cooldown.<br><b>\"None "
             "shared\":</b> no button reaches a tenth.<br><b>\"Few players\":</b> under 100 of the spec's healers in "
             "these kills, a habit of a few.<br><b>Back from cooldown:</b> a button whose presses there come back from "
