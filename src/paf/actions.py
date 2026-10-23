@@ -115,7 +115,8 @@ def actions(con: sqlite3.Connection, encounter_id: int, difficulty: int, spec: s
             cost = f", ~{m.cost:g} s of movement when it is you" if m.cost else ""
             n = round(m.players_per_kill)
             out.append(Action("assignment", m.name, f"{m.name}: {n} player{'s' if n > 1 else ''} per kill, an "
-                                                    f"assignment{cost}. Tick it on the boss page if it is yours."))
+                                                    f"assignment{cost}."
+                                                    " If it is yours, tick it in the app (the boss's prep page)."))
         elif m.spec_share >= max(KICK_SHARE, 3 * RANDOM_SHARE):
             out.append(Action("mechanic", m.name, f"{m.name}: hits ~{m.players_per_kill:.0f} players per kill; "
                                                   f"{who} take it in {m.spec_share:.0%} of the kills: "

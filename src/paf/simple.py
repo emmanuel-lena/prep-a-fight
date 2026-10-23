@@ -158,7 +158,9 @@ def change_card(d) -> str:
                         f"your character in each spec: for {e(spec_role(s))}, on this boss. The top "
                         f"{e(best[0])} players are ahead too.</span></div></li>")
     plan = _plan(d)
-    if plan is not None and plan.gain > 2 * plan.error and any(r.name != "default" for r in plan.choice.values()):
+    if (plan is not None and plan.gain > 2 * plan.error and any(r.name != "default" for r in plan.choice.values())
+            and getattr(plan, "robust", True)):  # a gain a slower kill turns into a loss: no order before the pull
+        # (a review: +0.6%, -0.4% on a 5:16 kill, "recommended"); Dig deeper keeps it with its checks
         from paf.prep_report import cd_name
 
         held = [(cd_name(d, k), r.name) for k, r in plan.choice.items() if r.name != "default"]  # the game's name
