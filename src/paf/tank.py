@@ -421,7 +421,7 @@ TANK_HOW_TO_READ = (
     "window's.</dd><dt>A time</dt><dd>shared by a quarter of "
     "those who press the button; its share: the top players pressing within 8 s of it (&ldquo;of its users&rdquo; "
     "too, under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long."
-    "</dd><dt>Back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, "
+    "</dd><dt>&#10226; back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, "
     "not counted for it (&ldquo;for about half&rdquo;: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
     "time some top players press it instead.</dd></dl>")
 
@@ -681,7 +681,9 @@ def render_sheet(p: TankPrep) -> str:
               f"<h2>Trinkets the top {e(p.spec)}s play</h2><ul class='hl2'>"
               f"{trinkets_html(p.trinkets) or '<li>No gear yet.</li>'}</ul>",
               ]  # the lead says no sim weighs them
-    hit = "".join(f"<li><b>{e(n)}</b><small>{s:.0%} of the damage the top tanks take</small></li>"
+    top_share = max((s_ for _n, s_ in p.hitters), default=1.0) or 1.0
+    hit = "".join(f"<li><b>{e(n)}</b><span class='upbar' aria-hidden='true'><span style='width:"  # a bar each, the
+                  f"{s / top_share * 100:.0f}%'></span></span><small>{s:.0%}</small></li>"  # unit in the heading
                   for n, s in p.hitters)
     jr = "".join(f"<li>{e(plain(x))}</li>" for x in p.journal)
     # the tank's answer here: the swap (the fight tab's lead, its last sentence), else the journal's ask
@@ -694,7 +696,8 @@ def render_sheet(p: TankPrep) -> str:
     top_hit = (f"<p class='lead'>What hits the top tanks the most: "
                f"{_and([f'{e(n)} ({s:.0%})' for n, s in top3])} of their damage taken.</p>"
                if p.hitters else journal_lead(p.journal, "tanks"))
-    boss = [top_hit, f"<h2>The abilities that hit the top tanks the most</h2><ul class='hl2'>{hit or '<li>Not measured yet.</li>'}</ul>"]
+    boss = [top_hit, f"<h2>The abilities that hit the top tanks the most <small class='muted'>(% of the damage they "
+                     f"take)</small></h2><ul class='hl2'>{hit or '<li>Not measured yet.</li>'}</ul>"]
     boss += [f"<p class='small muted'>Taunts stop working with {e(n)} (the Encounter Journal), never reached in the "
              f"{k} top kills read.</p>" for n, _t, hit, k in p.no_taunt if not hit and k]
     if jr:

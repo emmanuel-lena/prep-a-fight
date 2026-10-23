@@ -216,7 +216,7 @@ def test_a_press_back_from_cooldown_in_a_hit_is_said_and_drawn_as_none():
     assert "100% press Tranquility (about 0:42)" in sheet
     assert ("<span class='none'>None kept</span> (100% press Tranquility in its window, about 2:45, back from "
             "cooldown)") in sheet  # the 2:40 hit's row
-    assert ("2:45 &middot; 100% &middot; back from cooldown &middot; in the window of the 2:40 "
+    assert ("2:45 &middot; 100% &middot; &#10226; &middot; in the window of the 2:40 "
             "hit") in sheet
     assert "class='cp off'><title>Tranquility 2:45" in sheet and "class='cp'><title>Tranquility 0:42" in sheet
 
@@ -257,7 +257,7 @@ def test_a_ramp_answers_the_hit_after_it(monkeypatch):
     assert "100% press Evangelism (about 0:24, a ramp ahead of it)" in sheet
     assert "pressed again as soon as it is back" not in sheet  # its rhythm line says it (round 30)
     assert "0:24 &middot; 16 s before the 0:40 hit" in sheet
-    assert "1:42 &middot; 100% &middot; back from cooldown &middot; ahead of the 2:10 hit" in sheet
+    assert "1:42 &middot; 100% &middot; &#10226; &middot; ahead of the 2:10 hit" in sheet
 
 
 def test_back_from_cooldown_is_read_per_player():
@@ -464,7 +464,7 @@ def test_a_chip_says_back_from_cooldown_once():
                         presses=[[50.0, 234.0]] * 10 + [[234.0]] * 9 + [[34.0]] * 70, n_all=100,
                         lasts=[300.0] * 58 + [200.0] * 42, back=[231.0], back_half=[231.0], support=[0.24])
     out = healer.cooldowns_html([c], set(), {("Shield Wall", 231.0): 235.0})
-    assert out.count("back from cooldown") == 1, out
+    assert out.count("&#10226;") == 1, out  # the glyph the legend defines
 
 
 def test_a_cadence_names_its_group_beside_a_held_habit():

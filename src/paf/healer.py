@@ -158,7 +158,7 @@ HOW_TO_READ = (
     "its share is the window's. One button a hit (a second within the noise), else the most pressed, &ldquo;only "
     "N%&rdquo; under a quarter.</dd><dt>A time</dt><dd>shared by a quarter of those who press the button; its share: the top players pressing within 8 s of it (&ldquo;of its users&rdquo; too, "
     "under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long.</dd>"
-    "<dt>Back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, not "
+    "<dt>&#10226; back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, not "
     "counted for it (&ldquo;for about half&rdquo;: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
     "time some top players press it instead.</dd></dl>")
 
@@ -1396,7 +1396,7 @@ def _or_then_untied(c: Cooldown, t: float, n: str, tied: str, answered, named, m
     return why + alt
 
 
-LEGEND_USE = {"On cooldown": "on cooldown", "Back from cooldown": "back from cooldown", "&ldquo;or&rdquo;": ", or ",
+LEGEND_USE = {"On cooldown": "on cooldown", "&#10226; back from cooldown": "&#10226;", "&ldquo;or&rdquo;": ", or ",
               "of its users": "of its users"}
 
 
@@ -1444,7 +1444,10 @@ def _src_chip(x: str) -> str:
 
 def _tidy(html: str) -> str:
     """Two brackets in a row on a chip, one: "(99 kills going) (29% of its users)" -> "(99 kills going; 29% ...)"."""
-    return re.sub(r"\((\d+ kills going)\) \(([^()]*)\)", r"(\1; \2)", html)
+    html = re.sub(r"\((\d+ kills going)\) \(([^()]*)\)", r"(\1; \2)", html)
+    # "back from cooldown" on a chip: the glyph the legend defines (a review: said twice in one chip, 16 sheets)
+    html = re.sub(r"(?:&middot;|,) back from cooldown for about half", "&middot; &#10226;&nbsp;about half", html)
+    return re.sub(r"(?:&middot;|,) back from cooldown", "&middot; &#10226;", html)
 
 
 def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict | None = None,
