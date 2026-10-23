@@ -384,7 +384,8 @@ def confidence_pill(d) -> str:
     gap = abs(med - 1)
     level = "high" if gap <= 0.05 else "medium" if gap <= 0.12 else "low"
     say = {"high": "the top players' own characters, simmed on this fight, do "
-                   f"{med:.0%} of their real damage: trust the numbers.",
+                   f"{med:.0%} of their real damage: trust the numbers"
+                   + (", the boss figure and the gaps more than the total (above)." if overshoot(d) else "."),
            "medium": f"the sim does {med:.0%} of the damage the best players really did: trust which option wins "
                      f"more than the exact %.",
            "low": f"the sim does {med:.0%} of the damage the best players really did: read the numbers as hints."}[level]
