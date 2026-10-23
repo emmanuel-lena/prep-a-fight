@@ -302,7 +302,9 @@ def _why(d, name: str, t: float, presses: list[float]) -> str:
     keys = {v: k for k, v in d.cd_names.items()}
     rule = plan.choice.get(keys.get(name, _key(name))) if plan is not None else None
     if rule is not None and rule.name not in ("default", "on_cooldown"):
-        why = rule_phrase(d, rule.name)
+        # the rule said on its first press after the pull only: the same words seven times read as noise (the
+        # owner: less text)
+        why = rule_phrase(d, rule.name) if not [x for x in presses if 5 <= x < t - 1] else ""
     else:
         before = [x for x in presses if x < t - 1]
         gaps = [b - a for a, b in zip(presses, presses[1:], strict=False)]
@@ -316,7 +318,7 @@ def _why(d, name: str, t: float, presses: list[float]) -> str:
             why += f"; {there[0]:.0%} of the top players {when} {_mmss(there[1])}"
         elif here >= 0.5:
             why += f", like {here:.0%} of the top players"
-    return why
+    return why.lstrip(";, ")  # a later press with no rule said: its top players' part alone
 
 
 def moments(d) -> list[Moment]:
