@@ -877,15 +877,15 @@ def characters_strip() -> str:
     return f'<div class="chars">{chips}{add}</div>'
 
 
-ADD_FORM = ('<form method="post" action="/profile" class="add-form"><p class="add-help">In game, on that character: '
-            'type <code>/simc</code>, then Ctrl+A, Ctrl+C, and paste here. Paste it again after a gear change to '
-            'update it.</p><textarea name="simc" id="simc-box" required placeholder="Paste the /simc export here"></textarea>'
+ADD_FORM = ('<form method="post" action="/profile" class="add-form"><textarea name="simc" id="simc-box" required '
+            'placeholder="In game, on that character: /simc, then Ctrl+A, Ctrl+C, and paste here"></textarea>'
             '<p><button class="btn go">Add or update this character</button></p></form>')
 
 
 def characters_page() -> str:
     """All your characters: play one, update its export, remove it; and add a new one."""
     from paf import characters, icons, lastraid
+    from paf.characters import stale_days
 
     auto = lastraid.ticked()
     cards = ""
@@ -893,11 +893,13 @@ def characters_page() -> str:
         logs = (f'<form method="post" action="/character/autologs" class="cc-logs"><input type="hidden" name="slug" '
                 f'value="{e(c.slug)}"><input type="hidden" name="on" value="{"0" if c.slug in auto else "1"}">'
                 f'<label><input type="checkbox"{" checked" if c.slug in auto else ""} onchange="this.form.submit()"> '
-                f'<span>Read its last raid when the app starts (<a href="/reclear">Reclear</a>)</span>'
+                f'<span>Auto-read its last raid (<a href="/reclear">Reclear</a>)</span>'
                 f'</label></form>')
         ic = icons.img(icons.CLASS_ICON.format(cls=c.class_name.lower()), "large", "cc-ic")
         badge = ('<span class="muted small">from a log: no bags</span>' if c.imported else
                  f'<span class="muted small">{c.bags} items in bags</span>')
+        updated = ("" if stale_days(c) else  # the age badge says it (fresh app review 5: the dates twice)
+                   f"<span class='muted small'>&middot; updated <span>{ago(c.mtime)}</span></span>")
         rg, _, sv = c.realm.partition("/")
         refresh = (f"<form method='post' action='/character/import'><input type='hidden' name='name' value='{e(c.name)}'>"
                    f"<input type='hidden' name='server' value='{e(sv)}'><input type='hidden' name='region' "
@@ -910,7 +912,7 @@ def characters_page() -> str:
                   f'{(" <small class=muted>" + e(c.realm) + "</small>") if c.realm else ""}</b>'
                   f'<span class="cc-spec">{e(c.spec.title())} {e(c.class_name.title())}'
                   f'{f" <span class=cc-ilvl>ilvl {c.ilvl}</span>" if c.ilvl else ""}</span><span>{badge} '
-                  f'<span class="muted small">&middot; updated <span>{ago(c.mtime)}</span></span></span>{stale_badge(c, "#simc-box")}</div><div class="cc-act">{play}{refresh}'
+                  f'{updated}</span>{stale_badge(c, "#simc-box")}</div><div class="cc-act">{play}{refresh}'
                   f'<a class="btn ghost" href="#simc-box" onclick="setTimeout(function(){{document.getElementById(\'simc-box\').focus()}},50)">Paste a new export</a>'
                   f'<details class="rm"><summary class="btn ghost cc-rm">Remove</summary><div class="rm-ask">'
                   f'<span>Remove this character? Its /simc export is deleted.</span>'
