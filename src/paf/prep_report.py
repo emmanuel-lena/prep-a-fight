@@ -639,7 +639,8 @@ def suggestions(d: PrepData) -> list[Suggestion]:
                 "secondary": f"to burst {burst_names(d)[1] or 'the secondary targets'}"}.get(p.objective, p.objective)
         tag = ""
         if want is not None and p.objective == want and not p.robust and getattr(p, "default_timeline", None):
-            tag = " <span class='pill near'>not played: not robust</span>"  # the fight tab plays the default list
+            tag = " <span class='pill near'>not played</span>"  # the fight tab plays the default list; its "not
+            # robust" line below says why, with its numbers (DPS round 15: said twice)
         elif want is not None and p.objective == want:
             tag = (" <span class='pill gold'>your choice</span>" if d.goal in ("boss", "total")
                    else " <span class='pill gold'>recommended for your raid</span>")
@@ -1415,9 +1416,10 @@ its target_error): a gap under that is noise. A build can lose on the dummy and 
             if off := off_tops(d, p):
                 checks += ("<p class='small warn'>&#9888; Not when the top players press it: " + e(" ".join(off))
                            + "</p>")
-            if p.flags:
+            flags = [f for f in p.flags if not (p.sensitivity and f.startswith("not robust"))]  # the sensitivity
+            if flags:  # line above says it, with its numbers (DPS round 15: "not robust" three lines in a row)
                 checks += "<ul class='small'>" + "".join(f"<li class='warn'>&#9888; {e(re.sub(r'[-+]0[.]0%', 'about 0%', f))}</li>"
-                                                         for f in p.flags) + "</ul>"
+                                                         for f in flags) + "</ul>"
             blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, 1, err=1e9 if p.objective == "secondary" or _stall(d, p) else 0.0)}
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span>{(" <span class='pill near'>not played: not robust</span>" if _fallen(p) else " <span class='pill gold'>the sheet plays this plan</span>") if p.objective == first else ""}</h3>
 {("<p class='small'>Played because " + ("your raid pads the adds" if p.objective == "total" else "your raid stays on the boss" if p.objective == "boss" else "it is your choice") + " (see Your raid and the adds, below)." + (" When the plan presses a burst while the boss is immune, the fight tab moves it onto the adds that spawn then." if d.fight is not None and d.fight.invulnerable else "") + "</p>") if p.objective == first and p.objective in ("boss", "total") and not _fallen(p) else ""}
@@ -1436,6 +1438,7 @@ its target_error): a gap under that is noise. A build can lose on the dummy and 
 
     if d.alignment and (d.alignment[0].adds_cover or d.alignment[0].units_cover):  # no adds: nothing to hold for
         a0 = d.alignment[0]
+        units = bool(a0.units_cover)  # no burst target here: no column of zeros (DPS round 15)
         rows = ""
         tested = {cd_name(d, k) for p in d.optimized for k in p.choice}  # the cooldowns the plans hold or release
         for a in d.alignment:
@@ -1451,14 +1454,17 @@ its target_error): a gap under that is noise. A build can lose on the dummy and 
             elif a.units_cover and a.in_units > a.units_cover * 1.25 and a.in_units - a.units_cover > 0.1:
                 held.append("leans to burst targets")
             rows += (f"<tr><td>{icons.img(d.icons.get(a.ability, ''), 'small')} {lk(a.ability)}</td>"
-                     f"<td class='n'>{a.in_adds:.0%}</td><td class='n'>{a.in_units:.0%}</td>"
+                     f"<td class='n'>{a.in_adds:.0%}</td>" + (f"<td class='n'>{a.in_units:.0%}</td>" if units else "") + ""
                      f"<td>{e(' / '.join(held) or 'no clear hold')}</td></tr>")
+        burst = f" ({e(burst_names(d)[1])})" if burst_names(d)[1] else ""
+        burst_said = f", and on the burst targets{burst}, which cover {a0.units_cover:.0%}" if units else ""
+        burst_note = (" SimC does not know that a burst target must die fast, so compare with the simulated plans "
+                      "above." if units else "")
+        burst_th = '<th class="n">On burst targets</th>' if units else ""
         tabs["cooldowns"].append(f"""<h2>What the top players do with their cooldowns</h2><div class="card scroll">
-<p class="small">Share of their casts (after the opener) during add waves, which cover {a0.adds_cover:.0%} of the fight in the top kills,
-and on the burst targets{f" ({e(burst_names(d)[1])})" if burst_names(d)[1] else ""}, which cover {a0.units_cover:.0%}. Much more
-than the coverage means they hold the cooldown. SimC does not know that a burst target must die fast, so compare with
-the simulated plans above.</p>
-<table><tr><th>Cooldown</th><th class="n">During adds</th><th class="n">On burst targets</th><th>Reading</th></tr>{rows}</table></div>""")
+<p class="small">Share of their casts (after the opener) during add waves, which cover {a0.adds_cover:.0%} of the fight in the top kills{burst_said}. Much more
+than the coverage means they hold the cooldown.{burst_note}</p>
+<table><tr><th>Cooldown</th><th class="n">During adds</th>{burst_th}<th>Reading</th></tr>{rows}</table></div>""")
 
     # gear
     if d.gear:
