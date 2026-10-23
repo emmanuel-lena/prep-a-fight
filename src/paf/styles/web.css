@@ -389,7 +389,7 @@ table.mx a.mx:hover{border-color:var(--fg)} table.mx a.mx.nosim{border-style:das
 .rl-side{font:600 11px var(--font-display);letter-spacing:.04em;padding:1px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
 .rl-side.pad{border-color:color-mix(in srgb,var(--warn) 50%,var(--line));color:var(--warn)}
 .rl-t{font-size:13px;padding:1px 8px;border-radius:6px} .rl-t.take{background:color-mix(in srgb,var(--pos) 14%,transparent);color:var(--fg)}
-.rl-t.drop{background:color-mix(in srgb,var(--neg) 12%,transparent);color:var(--fg)} /* the sign says it: no strike (read aloud) */
+.rl-t.drop{background:var(--surface-2);color:var(--fg);border:1px solid var(--line)} /* the sign says it: no strike (read aloud) */
 .rl-ok{font:600 12px var(--font-body);color:var(--pos);margin-left:8px}
 .rl-n{display:inline-flex;align-items:center;gap:3px;margin:0 6px 0 0} .rl-boss li small .ics{width:14px;height:14px;vertical-align:-2px;margin:0 2px}
 /* Reclear: the best pull against the weaker one, a measure a row */
@@ -423,3 +423,5 @@ table.rl-tg{table-layout:fixed} table.rl-tg th:nth-child(1),table.rl-tg td:nth-c
 .rb-boss.st-nosim .rb-face{outline:2px dashed var(--muted);outline-offset:2px;border-radius:50%}
 .rb-boss.grey.st-old .rb-face{filter:brightness(.8)} /* a sheet to redo: in colour, darker, its amber ring seen */
 .mx-legend .pill.nosim::before{display:none}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .pill.diff.normal::before{background:#1a9e00}}
+:root[data-theme="light"] .pill.diff.normal::before{background:#1a9e00}

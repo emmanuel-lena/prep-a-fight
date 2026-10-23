@@ -957,10 +957,9 @@ def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list
                     + "".join(f"<span class='tag'>{x}</span>" for x in (tags or {}).get(k, [])) + "</td>"
                     f"<td class='sz'><span class='track'><span class='bar' style='width:{max(8, round((m.ratio - 1) / max(0.01, top - 1) * 100))}%'></span></span>"
                     f"<b>{_x(m.ratio)}&times;</b></td><td class='ans'>{ans}</td></tr>")
-    return ("<table class='hits'><thead><tr><th>When</th><th>What hits</th><th>Size <small>(&times; the usual "
-            f"{usual})</small></th><th>What the top players press</th></tr></thead><tbody>" + "".join(rows)
-            + f"</tbody></table><p class='small muted hits-rule'>{rule + '. ' if rule else ''}Bars: from 1&times; to the "
-            "biggest hit.</p>")
+    return ("<table class='hits'><thead><tr><th>When</th><th>What hits</th><th>Size &times;</th><th>What the top players press</th></tr></thead><tbody>" + "".join(rows)
+            + f"</tbody></table><p class='small muted hits-rule'>{rule + '. ' if rule else ''}Size: &times; the usual "
+            f"{usual}; bars from 1&times; to the biggest hit.</p>")
 
 
 def _stage_tag(t: float, phases: list | None) -> str:
