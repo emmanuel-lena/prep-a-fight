@@ -818,3 +818,12 @@ def test_a_main_time_with_its_reason_then_its_or():
                         presses=[[257.0]] * 22 + [[229.0]] * 17 + [[100.0]] * 51)
     out = healer.cooldowns_html([c], set())
     assert "4:17 &middot; not kept for the 4:15 hit: 22% in its window, or 3:49 &middot; 17%" in out
+
+
+def test_trinkets_and_split_talents_show_their_icons():
+    # heal rounds 12-15: the Change tab had no icon at all
+    out = healer.trinkets_html([("Soulcoiler Ritual Vessel", 1, 0.8)], {"Soulcoiler Ritual Vessel": "inv_x"})
+    assert "inv_x" in out and "80% equip it" in out
+    split = healer.split_html([("Lightburst", 0.48), ("Bloodborne 48% / Sudden Death 43%", -1.0)], 100, "X",
+                              icons={"Lightburst": "spell_a", "Sudden Death": "spell_b"})
+    assert "spell_a" in split and "spell_b" in split

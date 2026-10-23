@@ -693,9 +693,10 @@ def render_sheet(p: TankPrep) -> str:
                   for n, t, hit, k in p.no_taunt if hit or not k)]  # never reached: one line on the boss tab
     change = [build_lead(p.builds, p.spec, p.split_players or p.kills, p.split, p.split_wide),
               talents_html(p.builds, p.split_players or p.kills, f"{p.spec}s", p.hero),
-              split_html(p.split, p.split_players, p.spec, p.split_wide) if p.split else "",
+              split_html(p.split, p.split_players, p.spec, p.split_wide, getattr(p, "talent_icons", None))
+              if p.split else "",
               f"<h2>Trinkets the top {e(p.spec)}s play</h2><ul class='hl2 bars'>"
-              f"{trinkets_html(p.trinkets) or '<li>No gear yet.</li>'}</ul>",
+              f"{trinkets_html(p.trinkets, getattr(p, 'item_icons', None)) or '<li>No gear yet.</li>'}</ul>",
               ]  # the lead says no sim weighs them
     top_share = max((s_ for _n, s_ in p.hitters), default=1.0) or 1.0
     hit = "".join(f"<li><b>{e(n)}</b><span class='upbar' aria-hidden='true'><span style='width:"  # a bar each, the

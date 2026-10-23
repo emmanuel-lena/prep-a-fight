@@ -131,6 +131,21 @@ def add_icons(prep) -> None:
     except Exception:  # noqa: BLE001 - offline
         got = {}
     prep.role_icons = got
+    # the trinkets (by item) and the split talents (by name) of the Change tab (heal rounds 12-15: no icon there)
+    try:
+        prep.item_icons = icons_for({n: f"item={i}" for n, i, _s in getattr(prep, "trinkets", []) or []})
+    except Exception:  # noqa: BLE001 - offline
+        prep.item_icons = {}
+    talents = {re.sub(r" [0-9]+%.*$", "", x) for n, sh in getattr(prep, "split", []) or []
+               for x in (n.split(" / ") if sh < 0 else [n])}
+    if talents:
+        try:
+            from paf.gamedata import same_name_spells
+
+            same = same_name_spells()
+            prep.talent_icons = icons_for({n: f"spell={same[n][0]}" for n in talents if same.get(n)})
+        except Exception:  # noqa: BLE001 - offline
+            prep.talent_icons = {}
     # a tank's short defensives and active mitigation, known by name only (Spell Reflection): their spell's icon
     named = [n for n, *_r in getattr(prep, "short_defs", []) or []] + [n for n, _u in getattr(prep, "mitigation", []) or []]
     if named:
@@ -2047,9 +2062,16 @@ def _bar(share: float) -> str:
     return f"<span class='sbar' aria-hidden='true'><span style='width:{round(max(0.0, min(1.0, share)) * 100)}%'></span></span>"
 
 
-def trinkets_html(trinkets: list[tuple[str, int, float]]) -> str:
-    return "".join(f"<li><a href='https://www.wowhead.com/item={i}' target='_blank' rel='noopener'>{e(n)}</a>"
-                   f"{_bar(s)}<small>{s:.0%} equip it</small></li>" for n, i, s in trinkets)
+def _pic(icons: dict | None, name: str) -> str:
+    from paf.icons import img
+
+    got = (icons or {}).get(name, "")
+    return img(got, "small", "ics", "") if got else ""
+
+
+def trinkets_html(trinkets: list[tuple[str, int, float]], icons: dict | None = None) -> str:
+    return "".join(f"<li><a href='https://www.wowhead.com/item={i}' target='_blank' rel='noopener'>{_pic(icons, n)}"
+                   f"{e(n)}</a>{_bar(s)}<small>{s:.0%} equip it</small></li>" for n, i, s in trinkets)
 
 
 def page(title: str, body: str) -> str:
@@ -2219,7 +2241,7 @@ def _side(x: str) -> str:
     return f"<b>{e(m.group(1))}</b> <small>{m.group(2)}{e(m.group(3) or '')}</small>"
 
 
-def split_html(split: list, players: int, spec: str, wide: bool = False) -> str:
+def split_html(split: list, players: int, spec: str, wide: bool = False, icons: dict | None = None) -> str:
     """The talents the top players split on, with how often each is picked: what the builds above hide. wide: none
     or one is taken by 35 to 65% of them (Holy Paladin, Holy Priest), so the talents they differ on most, 15 to 85%."""
     return ((f"<h2>The talents the top {e(spec)}s differ on most</h2><p>{(f'Only {e(near[0])} splits' if (near := [n for n, x in split if 0.35 <= x <= 0.65]) else 'No talent splits')} "
@@ -2227,18 +2249,18 @@ def split_html(split: list, players: int, spec: str, wide: bool = False) -> str:
              f"{players} players read take, closest to half first:</p>" if wide else
              f"<h2>The talents the top {e(spec)}s split on</h2><p>The share of the {players} players read "
              "who take each, closest to half first:</p>") + "<ul class='hl2 split'>"
-            + "".join(f"<li><b>{e(n)}</b>{_bar(s)}<small>{s:.0%}</small></li>" if s >= 0 else _pair(n)
+            + "".join(f"<li><b>{_pic(icons, n)}{e(n)}</b>{_bar(s)}<small>{s:.0%}</small></li>" if s >= 0 else _pair(n, icons)
                       for n, s in split) + "</ul>")
 
 
-def _pair(n: str) -> str:
+def _pair(n: str, icons: dict | None = None) -> str:
     """A choice node's row: both names, one stacked bar (each side's share, the rest taking neither), as the other
     rows (heal round 11: no bar, a lone "/" in the bar column)."""
     sides = [re.match(r"^(.*?) ([0-9]+)%", x) for x in n.split(" / ")]
     if not all(sides):
         return "<li>" + " / ".join(_side(x) for x in n.split(" / ")) + "</li>"
     neither = re.search(r"\(([0-9]+)% take neither\)", n)
-    names = " <small>or</small> ".join(f"<b>{e(m.group(1))}</b>" for m in sides)
+    names = " <small>or</small> ".join(f"<b>{_pic(icons, m.group(1))}{e(m.group(1))}</b>" for m in sides)
     bar = "".join(f"<span class='p{i}' style='width:{int(m.group(2))}%'></span>" for i, m in enumerate(sides))
     nums = " / ".join(f"{m.group(2)}%" for m in sides) + (f" &middot; {neither.group(1)}% neither" if neither else "")
     return f"<li class='pair'><span>{names}</span><span class='sbar pair' aria-hidden='true'>{bar}</span><small>{nums}</small></li>"
@@ -2867,8 +2889,8 @@ def render_sheet(h: HealerPrep) -> str:
     change = [build_lead(h.builds, h.spec, h.split_players or h.kills, h.split, h.split_wide)]
     change.append(talents_html(h.builds, h.split_players or h.kills, f"{h.spec}s", h.hero))
     if h.split:
-        change.append(split_html(h.split, h.split_players, h.spec, h.split_wide))
-    trk = trinkets_html(h.trinkets) or "<li>No gear yet.</li>"
+        change.append(split_html(h.split, h.split_players, h.spec, h.split_wide, getattr(h, "talent_icons", None)))
+    trk = trinkets_html(h.trinkets, getattr(h, "item_icons", None)) or "<li>No gear yet.</li>"
     change.append(f"<h2>Trinkets the top {e(h.spec)}s play</h2><ul class='hl2 bars'>{trk}</ul>"
                   f"<p class='small muted'>"
                   f"To weigh a talent or an item for your character, use <a href=\"{QE_LIVE}\" target=\"_blank\" "
