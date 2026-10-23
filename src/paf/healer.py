@@ -1032,7 +1032,7 @@ def _window_said(c: Cooldown, t: float, n: str, tied: str, named: dict | None, s
     if _untied_at(c, t, n, tied, named) or _split(_named(c, t, named, tied, sp))[1]:
         return True  # a window clause on the chip: its share is the one (heal round 12: "3:49 · 30% · in the
         # window of the 3:50 hit: 22%")
-    return t in c.back and not (c.why or c.every) and bool(_lead_back(c, t))
+    return t in c.back and not (c.why or c.every) and bool(_lead_back(c, t))  # (its window's share follows)
 
 
 def _also_pressers(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
@@ -1235,13 +1235,16 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
         if n and not (named or {}).get((c.name, a)):  # tied: its chip names the hit already; one share when equal
             return "" if _pct(hs) == _pct(sp_of[a]) else f" &middot; in its window:{_base(c, hs, hit).replace(' &middot;', '')}"
         where = "ahead of" if c.ramp and a < hit - ANSWER[0] else "in the window of"
-        inside = _counted(c, a, hit)
         b = None if c.why == MINUTE else _back_in(c, a, hit)
         tag = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"
                + (" for about half" if b <= BACK_SHARE[1] else ""))
-        return (f" &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
-                + (f", about {_about(inside)}" if inside else "") + tag)
+        return f" &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}" + tag
     sp_of = {a: sp for a, sp, _n in near}
+
+    def at(a: float) -> float:  # an "or" time named for a hit's window: shown at the window's own time
+        hit = (named or {}).get((c.name, a))
+        inside = _counted(c, a, hit) if hit is not None and hit_share(c, a, hit) is not None else []
+        return _center(inside) if inside else (moved or {}).get((c.name, a), a)
 
     def one(a: float, sp: float, n: str) -> str:  # one share a press: its window's when one is said (heal round 11:
         w, u = window(a, n), untied(a, n)          # "for 29% · in its window: 26%", "for 27% · ⟲, … window: 23%")
@@ -1250,9 +1253,9 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
                else " for some")  # after an offset, as a main chip ("· 26%"), never "for 28%" beside it
         if w.startswith(" &middot; in its window:"):  # tied: the window's share is the chip's
             own, w = " &middot;" + w[len(" &middot; in its window:"):], ""
-        elif u or "hit's window:" in bk:
-            own = ""
-        return f"{_chip((moved or {}).get((c.name, a), a), n)}{own}{bk}{w}{u}"
+        elif u or w or "in the window of" in bk:  # a window's share said: the only one (heal round 12: "or 2:10 for
+            own = ""                            # 32% · in the window of the 2:10 hit: 25%")
+        return f"{_chip(at(a), n)}{own}{bk}{w}{u}"
     return ", or " + ", ".join(one(a, sp, n) for a, sp, n in near)
 
 
@@ -1435,7 +1438,7 @@ def _lead_back(c: Cooldown, t: float) -> str:
     hit = c.lead_back.get(t)
     if hit is None or (hs := hit_share(c, t, hit)) is None:
         return ""
-    return f", in the {_mmss(hit)} hit's window:{_base(c, hs, hit).replace(' &middot;', '')}"
+    return f" &middot; in the window of the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"  # one form
 
 
 def _or_then_untied(c: Cooldown, t: float, n: str, tied: str, answered, named, moved) -> str:
@@ -1542,12 +1545,14 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
                                         for k, (t, n, sp) in enumerate(zip(c.times, c.near,
                                                                            c.support or [0.0] * len(c.times),
                                                                            strict=False)))
-                                or "<span class='vary'>no shared time</span>")  # a badge where the chips go,
+                                or ("" if any(k[0] == c.name and isinstance(k[1], tuple) for k in (named or {}))
+                                    else "<span class='vary'>no shared time</span>"))  # a badge where the chips go
+        # (none when a window chip follows: heal round 12, Spirit Link Totem's 2:13 under "no shared time"),
         # a named line may follow (round 91; heal round 10: "timing varies: no shared moment" three times a sheet)
         + _pull_chip(c)
         + "".join(f"<span class='chip'>about {v[1] if isinstance(v[1], str) else _mmss(v[1])} &middot; in the "
                   f"window of the {_mmss(k[1][1])} hit: {_pct(v[0])}{v[2]}"
-                  f"{' &middot; ' + v[3] if len(v) > 3 and v[3] else ''}</span>"  # a chip of its own, led by its time
+                  f"{' &middot; ' + v[3] if len(v) > 3 and v[3] and not (c.every and v[3] == 'on cooldown') else ''}</span>"  # a chip of its own, led by its time
                   # (round 91: plain text after a chip read as that chip's continuation)
                   for k, v in (named or {}).items()
                   if k[0] == c.name and isinstance(k[1], tuple))
@@ -1585,10 +1590,10 @@ def _named_at(c: Cooldown, t: float, named: dict | None, sp: float) -> float:
     """A chip's time: a press the lead names for a hit kept for none, its window counting the same share as its
     moment, is shown at the lead's time (its counted presses'), said once."""
     hit = (named or {}).get((c.name, t))
-    if hit is None or (hs := hit_share(c, t, hit)) is None or _pct(hs) != _pct(sp):
+    if hit is None or hit_share(c, t, hit) is None:
         return t
-    inside = _counted(c, t, hit)
-    return _center(inside) if inside else t
+    inside = _counted(c, t, hit)  # its window's time whenever its window's share is said (heal round 12: "3:43 ·
+    return _center(inside) if inside else t  # in the window of the 3:35 hit: 34%, about 3:35", two times)
 
 
 def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
@@ -1597,7 +1602,6 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
     hit = (named or {}).get((c.name, t))
     if hit is not None and (hs := hit_share(c, t, hit)) is not None:
         where = "ahead of" if c.ramp and t < hit - ANSWER[0] else "in the window of"  # a ramp: around its own time
-        inside = _counted(c, t, hit)  # its own moment, then the lead's count with its own time (round 54)
         b = None if c.why == MINUTE else _back_in(c, t, hit)  # its own reading (round 63); a minute button's
         # reason is the lead's, not "back from cooldown" (round 64: Convoke)
         tag = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"
@@ -1608,7 +1612,7 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
             return (_offset(_named_at(c, t, named, sp), _mmss(hit)) + _base(c, hs, hit) + _pressers(c, sp, t)
                     + tag)
         return (f"{_share(sp)}{_still(c, t, sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
-                + (f", about {_about(inside)}" if inside and _about(inside) != _mmss(t) else "") + tag)  # the lead's time (round 67)
+                + tag)  # the chip's time is the window's (_named_at): one time a chip (heal round 12)
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
         return _base(c, hs, _secs(n.partition(" ")[0]))
     return _share(sp) + _still(c, t, sp)
@@ -2370,7 +2374,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None, staged: b
             if low:
                 n, t, sp, pp = low[0][:4]
                 return (f"<span class='under'>{btn(n, t, low[0][4])} &middot; {_pct(sp)}"
-                        + (f"<small> / {int(pp * 100)}%</small>" if f"{int(pp * 100)}%" != _pct(sp)
+                        + (f" <small>({int(pp * 100)}% of its users)</small>" if f"{int(pp * 100)}%" != _pct(sp)
                            else "") + "</span>")
             back = [u for u in under if u[0] == "back"]
             if back:
