@@ -1449,7 +1449,10 @@ the simulated plans above.</p>
             items = "".join(f"<div>{lk(c)}</div>" for c in ch.split("; "))
             body += (f"<tr class='{'noise' if noise else ''}'><td class='small gearset'>{items}"
                      + f"</td><td class='n'>{_pct(w)}" + (" <span class='pill near'>&asymp; best</span>" if noise else
-                                                          " <span class='pill near'>best</span>" if not i and w > 0 else "")
+                                                          " <span class='pill near'>best</span>"
+                                                          if not i and w > 2 * d.gear_error else
+                                                          " <span class='pill near'>&asymp; keep yours</span>"
+                                                          if not i else "")  # the verdict's own rule (a review)
                      + "</td>"
                      + ("".join(f"<td class='n'>{_pct(per.get(f))}</td>" for f in d.gear_fights) if many else "")
                      + "</tr>")

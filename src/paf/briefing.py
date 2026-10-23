@@ -33,7 +33,8 @@ def lede_html(d) -> str:
     waves = [w for w in d.waves if w[1] and not any(u.startswith(w[3]) or w[3].startswith(u) for u in units)]
     parts = [f"A {_mmss(dur)} fight" if dur else "This fight"]
     if waves:  # the add waves; a boss unit played as a wave (an Echo) is not one of them
-        parts.append(f"with {len(waves)} waves of adds" if len(waves) > 1 else "with one wave of adds")
+        n = len({round(w[0]) for w in waves})  # a wave is a moment: two types at one Imbibe are one (a review: 6)
+        parts.append(f"with {n} waves of adds" if n > 1 else "with one wave of adds")
     lust = ""
     if d.lust is not None:
         lust = "with Bloodlust at the pull" if d.lust < 15 else f"with Bloodlust around {_mmss(d.lust)}"
@@ -97,7 +98,7 @@ def _moves(d) -> list[tuple[float, str, str, str]]:
         if w > 2 * d.gear_error:
             out.append((w, "Swap some gear from your bags.", "; ".join(linkify(c, d.links) for c in changes.split("; ")), ""))
         else:
-            out.append((0.0, "Keep the gear you wear: nothing in your bags beats it here.", "", ""))
+            out.append((0.0, "Keep the gear you wear: nothing in your bags beats it beyond the sims' noise here.", "", ""))
     return sorted(out, key=lambda m: -m[0])
 
 
