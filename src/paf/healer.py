@@ -1888,9 +1888,14 @@ def builds_html(builds: list) -> str:
                    + "</li>" for i, b in enumerate(builds))
 
 
+def _bar(share: float) -> str:
+    """A share as a small bar with a tick at half (the owner: a number a bar says better)."""
+    return f"<span class='sbar' aria-hidden='true'><span style='width:{round(max(0.0, min(1.0, share)) * 100)}%'></span></span>"
+
+
 def trinkets_html(trinkets: list[tuple[str, int, float]]) -> str:
     return "".join(f"<li><a href='https://www.wowhead.com/item={i}' target='_blank' rel='noopener'>{e(n)}</a>"
-                   f"<small>equipped by {s:.0%} of the top players</small></li>" for n, i, s in trinkets)
+                   f"{_bar(s)}<small>{s:.0%} equip it</small></li>" for n, i, s in trinkets)
 
 
 def page(title: str, body: str) -> str:
@@ -2033,14 +2038,14 @@ def build_lead(builds: list, spec: str, players: int, split: list | None = None,
         most = builds[0][0] if builds else 0
         return (f"<p class='lead'>No build is shared among the top {e(spec)}s; none is played by more than {most} of the "
                 f"{players} players read"
-                + (f": {_many(split, wide)}" if split else "") + f".{NOT_ADVICE}</p>")
+                + (": they split on the talents listed below" if split else "") + f".{NOT_ADVICE}</p>")
     builds = shown
     top = builds[0]
     total = sum(b[0] for b in builds)
     if split and top[0] < players / 5:  # no build a fifth of them play: the answer is in the split talents
         return (f"<p class='lead'>The most played build, below, is played by only {top[0]} of the {players} top "
                 f"{e(spec)}s read: "
-                + _many(split, wide) + f".{NOT_ADVICE}</p>")
+                + "they split on the talents listed below" + f".{NOT_ADVICE}</p>")
     return (f"<p class='lead'>The most played build of the top {e(spec)}s"
             + ("" if len(builds) == 1 else f", {e(top[1])},") + f" is played by {top[0]} of the "
             f"{players} players read" + (f"; the {len(builds)} builds below cover {total} of them, the other "
@@ -2048,7 +2053,7 @@ def build_lead(builds: list, spec: str, players: int, split: list | None = None,
             + f".{NOT_ADVICE}</p>")
 
 
-NOT_ADVICE = " Their choices, not a recommendation: no sim weighs them."
+NOT_ADVICE = " Their choices, not simmed."
 
 
 def _side(x: str) -> str:
@@ -2068,7 +2073,7 @@ def split_html(split: list, players: int, spec: str, wide: bool = False) -> str:
              f"{players} players read take, closest to half first:</p>" if wide else
              f"<h2>The talents the top {e(spec)}s split on</h2><p>The share of the {players} players read "
              "who take each, closest to half first:</p>") + "<ul class='hl2 split'>"
-            + "".join(f"<li><b>{e(n)}</b><small>{s:.0%}</small></li>" if s >= 0 else
+            + "".join(f"<li><b>{e(n)}</b>{_bar(s)}<small>{s:.0%}</small></li>" if s >= 0 else
                       "<li>" + " / ".join(_side(x) for x in n.split(" / ")) + "</li>"
                       for n, s in split) + "</ul>")
 
@@ -2749,11 +2754,10 @@ def render_sheet(h: HealerPrep) -> str:
             stages = stages.replace(f"<b>{e(name)}</b>", f"<b>{e(name)}</b> <small class=\"muted\">(the top "
                                     f"{e(h.spec)}s dispel it {k:.1f} times a kill)</small>", 1)
         boss.append(f"<h2>Every ability{', phase by phase' if '<h3>' in stages else ''}</h2>"  # Vashnik: one phase
-                    f"<p class='small muted'>The times{' and stage starts' if len(h.phases) > 1 else ''} are the boss's in the {h.kills} top "
-                    f"{e(h.spec)} kills (median {_mmss(h.duration)}): a slower or faster raid sees the later ones "
-                    f"shift, and another spec's sheet, read on its own kills, can say other times"
-                    + ("; the fight tab's hits and stage lines are in stage time, so they can sit a few seconds off "
-                       "these" if getattr(h, "staged", False) else "") + ".</p>"
+                    f"<p class='small muted'>Pull times in the {h.kills} top {e(h.spec)} kills (median "
+                    f"{_mmss(h.duration)}): they shift with your raid's pace, and another spec's sheet can differ"
+                    + ("; the fight tab's, in stage time, can sit a few seconds off" if getattr(h, "staged", False)
+                       else "") + ".</p>"
                     f"<div class='stages'>{stages}</div>")
     # every spec the pool reads (paf.healroles.POOL_PLAYERS): the Disc Priest, 3 in a Holy Priest's kills, has 43
     # in the pool; its casts unread here are said so in its cells

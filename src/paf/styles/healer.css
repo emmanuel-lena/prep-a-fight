@@ -56,3 +56,7 @@ p.sources{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:baseline;max-width
 p.sources .src-lab{font:600 12px var(--font-display);letter-spacing:.06em;text-transform:uppercase;margin-right:4px}
 p.sources .src{padding:2px 10px;border:1px solid var(--line);border-radius:999px} p.sources .src b{color:var(--fg);font-weight:600}
 table.jobs td small{color:var(--muted)}
+/* a share as a bar, a tick at half */
+.sbar{position:relative;display:inline-block;width:120px;height:8px;border-radius:4px;background:color-mix(in srgb,var(--accent) 12%,transparent);align-self:center}
+.sbar>span{display:block;height:100%;border-radius:4px;background:var(--accent)}
+.sbar::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--muted)}
