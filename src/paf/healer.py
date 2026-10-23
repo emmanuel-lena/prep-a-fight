@@ -1777,9 +1777,9 @@ def _released(c: Cooldown) -> str:
         hs = hit_share(r, h, h)
         inside = _counted(r, h, h)
         if hs is not None and hs >= 0.1 and inside:  # from a tenth, as the chips (round 99: 19% in 0:40 unsaid)
-            chips += (f"<small class='alt'>in the {_mmss(h)} hit's window, from any store: {_pct(hs)}"
-                      f"{_reach_note(r, h)}"
-                      + (f", a median {gap:.0f} s after storing" if (gap := _gap_of(c, inside)) else "") + "</small>")
+            chips += (f"<span class='chip any'>any store &rarr; {_mmss(h)} hit &middot; {_pct(hs)}"  # a chip, as the
+                      f"{_reach_note(r, h)}"                                                   # stores' (less text)
+                      + (f" &middot; held {gap:.0f} s" if (gap := _gap_of(c, inside)) else "") + "</span>")
     rest = [u for _s, u in other if u is not None]
     if chips and rest:
         chips += (f"<small class='alt'>and about {len(rest) / n:.1f} more releases a kill, of stores made at other "

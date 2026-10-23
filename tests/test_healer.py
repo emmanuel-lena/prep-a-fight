@@ -513,7 +513,7 @@ def test_a_two_step_button_says_its_release_and_what_it_stores():
             "each a median 16 s after its own (nearly all released) &middot; in the window of the 3:35 hit: 50%"
             "") in out
     assert "and about 0.5 more releases a kill, of stores made at other times" in out  # the 1:40 stores
-    assert "in the 3:35 hit's window, from any store: 50%, a median 16 s after storing" in out
+    assert "any store &rarr; 3:35 hit &middot; 50% &middot; held 16 s</span>" in out
     # a store never released before the next store is not paired with the next one's release (round 83)
     tl.players = [{"casts": {1: [100.0, 200.0], 2: [216.0]}, "duration": 270.0}] * 4
     healer.two_step(tl, [c], [m])
