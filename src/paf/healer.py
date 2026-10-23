@@ -961,7 +961,11 @@ def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list
     lead = {_mmss(m.t) for m in shown}
     # one reason on several rows: said once under the table (heal round 10: "None kept (no long defensive of theirs
     # pressed by a tenth of them in it)" twice under a lead saying none is kept)
-    common = Counter(v for k, v in bare.items() if k not in said).most_common(1)
+    # its kills-going count left out: nobody pressed, so it says nothing (heal round 11: "; 89 kills going" kept
+    # the 3:35 row apart from the 2:10's)
+    def bare_of(v: str) -> str:
+        return re.sub(r"; \d+ kills going\)$", ")", v) if re.fullmatch(r" \(no [^()]*\)", v) else v
+    common = Counter(bare_of(v) for k, v in bare.items() if k not in said).most_common(1)
     same = common[0][0] if common and common[0][1] >= 2 and re.fullmatch(r" \(no [^()]*\)", common[0][0]) else None
     rows = []
     for m in sorted(moments, key=lambda m: m.t):
@@ -969,7 +973,7 @@ def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list
         if k in said:
             ans = said[k]
         elif k in bare:
-            ans = f"<span class='none'>None kept</span>{'' if bare[k] == same else _unnest(bare[k])}"
+            ans = f"<span class='none'>None kept</span>{'' if bare_of(bare[k]) == same else _unnest(bare[k])}"
         else:  # a big moment past the lead's four
             ans = "<span class='muted'>not among the highest, the table reads four</span>" if k not in lead else ""
         tag = _stage_tag(m.t, phases)
@@ -2202,9 +2206,21 @@ def split_html(split: list, players: int, spec: str, wide: bool = False) -> str:
              f"{players} players read take, closest to half first:</p>" if wide else
              f"<h2>The talents the top {e(spec)}s split on</h2><p>The share of the {players} players read "
              "who take each, closest to half first:</p>") + "<ul class='hl2 split'>"
-            + "".join(f"<li><b>{e(n)}</b>{_bar(s)}<small>{s:.0%}</small></li>" if s >= 0 else
-                      "<li>" + " / ".join(_side(x) for x in n.split(" / ")) + "</li>"
+            + "".join(f"<li><b>{e(n)}</b>{_bar(s)}<small>{s:.0%}</small></li>" if s >= 0 else _pair(n)
                       for n, s in split) + "</ul>")
+
+
+def _pair(n: str) -> str:
+    """A choice node's row: both names, one stacked bar (each side's share, the rest taking neither), as the other
+    rows (heal round 11: no bar, a lone "/" in the bar column)."""
+    sides = [re.match(r"^(.*?) ([0-9]+)%", x) for x in n.split(" / ")]
+    if not all(sides):
+        return "<li>" + " / ".join(_side(x) for x in n.split(" / ")) + "</li>"
+    neither = re.search(r"\(([0-9]+)% take neither\)", n)
+    names = " <small>or</small> ".join(f"<b>{e(m.group(1))}</b>" for m in sides)
+    bar = "".join(f"<span class='p{i}' style='width:{int(m.group(2))}%'></span>" for i, m in enumerate(sides))
+    nums = " / ".join(f"{m.group(2)}%" for m in sides) + (f" &middot; {neither.group(1)}% neither" if neither else "")
+    return f"<li class='pair'><span>{names}</span><span class='sbar pair' aria-hidden='true'>{bar}</span><small>{nums}</small></li>"
 
 
 def journal_lead(lines: list[str], who: str) -> str:
@@ -2330,7 +2346,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None, staged: b
                 return f"{ic}<b>{e(_shown(n))}</b> {_mmss(t)}{' <small>(a ramp)</small>' if rp else ''}"
             if got:
                 return "<br>".join(f"{btn(n, t, rp)} &middot; {_pct(sp)}"
-                                   + (f"<small> / {_pct(pp)}</small>" if _pct(pp) != _pct(sp) else "")
+                                   + (f" <small>({_pct(pp)} of its users)</small>" if _pct(pp) != _pct(sp) else "")  # the
+                                   # fight tab's form: "/" also joins a choice node's names (heal round 11)
                                    for n, t, sp, rp, pp in got)  # all its healers / its users (the legend)
             low = [u for u in under if len(u) > 4 and u[0] != "back"]
             if low:
@@ -2359,8 +2376,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None, staged: b
             + (" whose stage starts are read (presses in stage time, as the curve)" if staged else "")
             + ", every player of each spec; that spec's own sheet reads its top players, so it can differ.</dd>"
             "<dt>A button</dt><dd>a quarter of the spec's healers who press it do so in the hit's window (5 s before "
-            "to 8 s after; a ramp: 8 to 30 s ahead, never the opener before 0:12); N% / M%: of all that spec's healers "
-            "/ of those who press the button, when it differs.</dd><dt>Faded</dt><dd>under a quarter: its most pressed button, when "
+            "to 8 s after; a ramp: 8 to 30 s ahead, never the opener before 0:12); its share: of all that spec's healers "
+            "(and of those who press the button, when it differs).</dd><dt>Faded</dt><dd>under a quarter: its most pressed button, when "
             "a tenth of the spec's healers press it there.</dd><dt>&#10226; none held</dt><dd>its presses there come "
             "back from cooldown (over 40% of them): no answer, as on the fight tab.</dd><dt>&mdash; none shared</dt>"
             "<dd>no button reaches a tenth.</dd><dt>Few players</dt><dd>under 100 of the spec's healers in these "

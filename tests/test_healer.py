@@ -444,7 +444,7 @@ def test_the_other_healers_chip_gives_the_share_the_bar_reads():
     rd = SimpleNamespace(spec="Restoration Druid", raid_cds=1, own_players=150,
                          cd_names=[("Tranquility", 1, [], 0.8, ([[74.0]] * 24 + [[200.0]] * 56, 100, 180.0))])
     out = healer.roles_more([rd], found=[healer.Moment(75.0, 1000.0, 1.6, "Soulcoil Rite")])
-    assert "<b>Tranquility</b> 1:14 &middot; 24%<small> / 30%</small>" in out
+    assert "<b>Tranquility</b> 1:14 &middot; 24% <small>(30% of its users)</small>" in out
 
 
 def test_a_button_on_cooldowns_far_habit_is_dropped():
@@ -757,7 +757,8 @@ def test_one_none_kept_reason_on_several_rows_is_said_once():
     # them in it)" on two rows under a lead saying none is kept
     found = [healer.Moment(t, 1000.0, 5.0, "Crush") for t in (60.0, 120.0, 175.0)]
     why = " (no long defensive of theirs pressed by a tenth of them in it)"
-    out = healer.hits_table(found, found, [], {"1:00": why, "2:00": why, "2:55": " (12% press Shield Wall)"},
+    late = why[:-1] + "; 89 kills going)"  # Holy Paladin, Vashnik (heal round 11): the count kept it apart
+    out = healer.hits_table(found, found, [], {"1:00": why, "2:00": late, "2:55": " (12% press Shield Wall)"},
                             None, {}, "")
     assert out.count("pressed by a tenth") == 1 and "None kept: no long defensive of theirs" in out
     assert "<span class='none'>None kept</span> (12% press Shield Wall)" in out
@@ -775,3 +776,9 @@ def test_a_release_kept_for_two_hits_is_named_once_in_the_lead():
                           [], [])
     sheet = healer.render_sheet(h)
     assert sheet.count("release</b>") == 1
+
+
+def test_a_choice_node_is_one_row_with_one_stacked_bar():
+    # Protection Warrior (heal round 11): "Bloodborne 48% / Sudden Death 43% (9% take neither)" drawn with no bar
+    row = healer.split_html([("Bloodborne 48% / Sudden Death 43% (9% take neither)", -1.0)], 100, "Protection Warrior")
+    assert "<li class='pair'>" in row and "width:48%" in row and "width:43%" in row and "9% neither" in row
