@@ -447,3 +447,5 @@ table.mx a.mx.nosim.old{border:1px dashed var(--warn)} /* no sim first, its age'
 textarea.fit-rows{height:auto;min-height:0} /* sized to its lines (rows), not a fixed box */
 table.lr-cmp th small{text-transform:none;letter-spacing:0;font:500 12px var(--font-data)} table.lr-cmp th a{text-transform:none;letter-spacing:0;font:500 13px var(--font-body)} /* a link reads as one */
 .mx-legend .pill.nosim{border:1px dashed var(--muted)} /* the cells' own dashed outline (fresh app review) */
+.mx-legend .pill{text-transform:none;letter-spacing:0} /* the cells' own case (fresh app review 2) */
+section.adv textarea{max-width:920px} /* the content column, never to the window's edge */
