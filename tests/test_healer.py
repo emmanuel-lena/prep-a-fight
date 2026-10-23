@@ -510,8 +510,7 @@ def test_a_two_step_button_says_its_release_and_what_it_stores():
     c.stored = healer.stored_spells(con, 9, 4, "Stasis (Store)")
     out = healer.cooldowns_html([c])
     assert ("released:</small><span class='chip'>3:36 &middot; 50% &middot; from the 3:20 store, "
-            "each a median 16 s after its own (nearly all released) &middot; in the window of the 3:35 hit: 50%"
-            "") in out
+            "each a median 16 s after its own (nearly all released)</span>") in out  # the any-store chip says the hit
     assert "and about 0.5 more releases a kill, of stores made at other times" in out  # the 1:40 stores
     assert "any store &rarr; 3:35 hit &middot; 50% &middot; held 16 s</span>" in out
     # a store never released before the next store is not paired with the next one's release (round 83)
@@ -572,7 +571,7 @@ def test_a_ramp_played_back_from_cooldown_stays_a_ramp(monkeypatch):
 
 def test_a_chip_offset_is_the_shown_times_difference():
     # round 87: "0:40 · 1 s before the 0:40 hit" (39.6 s shown rounded, the gap from the truncated 39)
-    assert healer._chip(39.6, "0:40 Caustic Surge") == "0:40 &middot; as the 0:40 hit starts"
+    assert healer._chip(39.6, "0:40 Caustic Surge") == "0:40 &middot; on the hit"
     assert healer._chip(33.5, "0:35 Soulcoil Rite") == "0:34 &middot; 1 s before the 0:35 hit"
 
 

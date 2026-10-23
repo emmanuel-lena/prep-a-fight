@@ -1757,15 +1757,17 @@ def _released(c: Cooldown) -> str:
             return sum(1 for u in us if m - ANSWER[0] <= u <= m + ANSWER[1])
         h = max(c.hits, key=inwin, default=None)
         win = ""
-        if h is not None and inwin(h) / reach(r, h) >= 0.1:
+        any_chip = h is not None and (x := hit_share(r, h, h)) is not None and x >= 0.1 and bool(_counted(r, h, h))
+        if h is not None and inwin(h) / reach(r, h) >= 0.1 and not any_chip:  # the any-store chip says that hit
+            # (a review: "of them, 16%" beside "any store -> 0:35 hit 17%", two shares for one moment)
             at = st.median(us)  # the chip's own time outside the window: those who release there said apart (round
             out = "" if h - ANSWER[0] <= at <= h + ANSWER[1] else (" release it later," if at < h else  # 99: "1:50 to
                                                                     " release it earlier,")  # 2:04" read in 2:10)
             win = (f" &middot; of them, {_pct(inwin(h) / reach(r, h))}{_reach_note(r, h)} in the "
                    f"window of the {_mmss(h)} hit" if out else  # a part of this chip's releases, not more of them
                    # (round 108: "52% … 16% release it later" read as 68% of a 70% store)
-                   f" &middot; in the window of the {_mmss(h)} hit: {_pct(inwin(h) / reach(r, h))} of the top "
-                   f"players{_reach_note(r, h)}")
+                   f" &middot; in the window of the {_mmss(h)} hit: {_pct(inwin(h) / reach(r, h))}"
+                   f"{_reach_note(r, h)}")
         return (f"<span class='chip'>{_about(us)} &middot; {_pct(len(us) / n)} &middot; from the "
                 f"{_mmss(g)} store, each a median {gap:.0f} s after its own"
                 + (f" ({_pct(never)} of those stores never released)" if never >= 0.05 else " (nearly all released)")
@@ -1877,7 +1879,7 @@ def _chip(t: float, n: str) -> str:
     gap = int(round(t)) - (int(m) * 60 + int(sec))  # from the seconds shown, rounded as they are (round 87: "0:40 ·
     # 1 s before the 0:40 hit" after the times were rounded and the gap not)
     # said with its offset from the hit's start: "4 s into" its 5 s window, "3 s before", "2 s after" it
-    return _mmss(t) + (f" &middot; as the {e(hit)} hit starts" if gap == 0 else  # one form, from its start (a hit
+    return _mmss(t) + (" &middot; on the hit" if gap == 0 else  # one form, from its start (a hit
                        f" &middot; {-gap} s before the {e(hit)} hit" if gap < 0 else  # is a 5 s window: "6 s into"
                        f" &middot; {gap} s after the {e(hit)} hit starts")  # it read as past it)
 
@@ -2507,7 +2509,7 @@ def render_sheet(h: HealerPrep) -> str:
         hits += f": {ratios} the usual damage"
         rule = ""
         if any(m.ratio < SPIKE for m in shown):  # said, not left to a reader of the 1.5x rule (round 29)
-            rule = (" (none reaches 1.5&times;: the highest waves)"  # the rule moments() applied, not the rounded
+            rule = (" (none reaches 1.5&times;: the 3 highest waves)"  # the rule moments() applied, not the rounded
                     if max(m.ratio for m in h.moments) < SPIKE else  # figures (1.45 shows 1.5)
                     f" (big from {_x(max(SPIKE * 0.9, RELATIVE * max(m.ratio for m in h.moments)))}&times; here: "
                     "0.85 of the highest)")  # the bar applied (round 101: 1.35x said, 1.42x applied)
