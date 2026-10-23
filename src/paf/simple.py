@@ -165,7 +165,8 @@ def change_card(d) -> str:
 
         held = [(cd_name(d, k), r.name) for k, r in plan.choice.items() if r.name != "default"]  # the game's name
         rows.append(f"<li>{_ic(d, held[0][0])}<div><b>Play your cooldowns this way</b><span class='sz "
-                    f"{_size(plan.gain)}'>{SIZE_WORDS[_size(plan.gain)]}, {plan.gain:+.1f}% vs SimC's default list</span><span class='what'>"
+                    f"{_size(plan.gain)}'>{SIZE_WORDS[_size(plan.gain)]}, {plan.gain:+.1f}% vs SimC's default list, with your "
+                    f"current talents</span><span class='what'>"
                     f"{e(held[0][0])}{' and more' if len(held) > 1 else ''}: its rules and its MRT note just below; the fight "
                     f"tab calls them at their times."
                     + ("" if getattr(plan, "robust", True) else " Not robust: the gain can vanish on a harder fight "
