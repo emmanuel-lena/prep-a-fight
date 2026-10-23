@@ -13,3 +13,6 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
   picture in the side bar, with a link to update it. (#32)
 - A prep done while you play: its notification now waits in the Windows notification center until you come back
   (Windows holds notifications back during a game), and the app's taskbar button lights up. (#33)
+- Less to read, more to see: the healer and tank sheets show the big hits as a table with spell icons and size bars,
+  shorter cards with one legend, and the other healers' answers as one table; the home page shows every sheet in
+  one table (a spec a row, a boss a column).

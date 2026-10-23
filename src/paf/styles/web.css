@@ -317,7 +317,7 @@ body.has-side>main .hero-week h2{font-size:30px;line-height:1.15;margin:4px 0 6p
 body.has-side>main .sheets+h2{margin-top:24px}
 form.settings .set-group>legend{line-height:1.25} form.settings{padding-top:10px}
 /* round 7 */
-main a:not(.btn):not(.bcard):not(.ws-card):not(.rb-d):not(.stale){text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+main a:not(.btn):not(.bcard):not(.ws-card):not(.rb-d):not(.stale):not(.mx){text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
 .set-wcl{margin:10px 0}
 .status .path{font:400 13px var(--font-data)} .status td.small{font-size:13px} /* paths in mono, the rest in the body face */
 .status .btn{font:600 15px var(--font-display);padding:9px 16px;min-width:196px;text-align:center}
@@ -373,3 +373,13 @@ body.has-side>main .hero-week.lr h2{font-size:30px;line-height:1.15;margin:4px 0
 .stale-dot{width:8px;height:8px;border-radius:50%;background:var(--warn);flex:none}
 .who>summary{position:relative} .who-dot{position:absolute;left:20px;top:0;box-shadow:0 0 0 2px var(--surface)}
 .cc-txt .stale{margin-left:0;align-self:flex-start}
+/* every sheet in one table: a spec a row, a boss a column (the owner: less text) */
+.mx-wrap{overflow-x:auto;max-width:100%}
+table.mx{width:auto;border-collapse:collapse} table.mx th,table.mx td{padding:6px 8px;border-top:1px solid var(--line);text-align:left;vertical-align:middle}
+table.mx thead th{border-top:0;font:600 11px/1.25 var(--font-display);text-transform:none;letter-spacing:0;color:var(--muted);text-align:center;width:84px;vertical-align:bottom}
+table.mx thead th span{display:block;max-width:84px;margin:0 auto}
+table.mx .mx-boss{display:block;width:34px;height:34px;border-radius:50%;margin:0 auto 4px;object-fit:cover}
+table.mx tbody th{font:500 14px var(--font-body);text-transform:none;letter-spacing:0;color:var(--fg);white-space:nowrap;padding-right:14px} table.mx tbody th .ics{margin-right:6px;vertical-align:-3px}
+table.mx tr.mine th{font-weight:700} table.mx td{text-align:center}
+table.mx a.mx{display:inline-flex;white-space:nowrap;margin:2px;font:500 11px var(--font-data);text-decoration:none;color:var(--fg)}
+table.mx a.mx:hover{border-color:var(--fg)} table.mx a.mx.nosim{border-style:dashed;opacity:.75}

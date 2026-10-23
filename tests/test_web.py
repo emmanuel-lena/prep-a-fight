@@ -298,9 +298,9 @@ def test_simple_home_once_set_up(tmp_path, monkeypatch):
     (rep / "prep-the-altar-heroic-elemental-shaman.html").write_text("<title>The Altar prep</title>")
     page = web.home().decode()
     assert "Prepare a boss</h1>" in page and 'class="go-boss"' in page and 'name="difficulty" value="mythic"' in page
-    assert "Your sheets as Elemental Shaman" in page and "The Altar" in page and "just now" in page
+    assert "<h2>Your sheets</h2>" in page and "The Altar" in page and ">1 min</a>" in page  # one table, its age
     assert "Change your character" not in page  # the character, the raid and the key live in Characters and Settings
-    assert "%" not in page.split("Your sheets as", 1)[1].split("</section>", 1)[0]  # no numbers on the rows
+    assert "%" not in page.split("<h2>Your sheets</h2>", 1)[1].split("</table>", 1)[0]  # no numbers in the cells
 
 
 def test_ago():

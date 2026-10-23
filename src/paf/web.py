@@ -542,6 +542,53 @@ def boss_cards(items: list[dict], order: tuple[str, ...] = (), spec: bool = True
                    f'</div></section>' for n in names)
 
 
+def short_ago(mtime: float, now: float | None = None) -> str:
+    """A sheet's age in a few characters, for a table cell ("24 min", "3 h", "20 Oct")."""
+    s = max(0.0, (now or time.time()) - mtime)
+    if s < 3600:
+        return f"{max(1, int(s // 60))} min"
+    if s < 86400:
+        return f"{int(s // 3600)} h"
+    return time.strftime("%d %b", time.localtime(mtime))
+
+
+def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
+    """Every prepared sheet in one table: a spec a row (yours first), a boss a column (the raid's order, its
+    portrait), a cell a link per difficulty, its rarity shape and age (the owner: less text; the date in full on
+    hover)."""
+    from paf import icons
+
+    if not items:
+        return ""
+    spec_of = {x["key"]: (x.get("spec") or "Your sheet") for x in items}
+    specs = sorted({spec_of[x["key"]] for x in items}, key=lambda s: (s.lower() != mine.lower(), s))
+    by_name = {x.name: x for x in encs}
+    names = [x.name for x in encs if any(i["name"] == x.name for i in items)]
+    names += sorted({i["name"] for i in items} - set(names))
+    order = ("mythic", "heroic", "normal")
+    head = "".join(
+        f"<th title='{e(n)}'>" + (f"<img class='mx-boss' src='/bossimg/{by_name[n].id}.png' alt='' loading='lazy' "
+                                   "onerror=\"this.remove()\">" if n in by_name else "")
+        + f"<span>{e(n)}</span></th>" for n in names)
+
+    def cell(sp: str, n: str) -> str:
+        xs = sorted((i for i in items if i["name"] == n and spec_of[i["key"]] == sp),
+                    key=lambda i: order.index(i["difficulty"]) if i["difficulty"] in order else 9)
+        return "".join(
+            f"<a class='pill diff {e(i['difficulty'])} mx{'' if 'prep' in i['files'] else ' nosim'}' "
+            f"href='/view/{e(i['key'])}' title='{e(i['difficulty'].capitalize())} &middot; "
+            f"{time.strftime('%d %b %H:%M', time.localtime(i['mtime']))}"
+            f"{'' if 'prep' in i['files'] else ' &middot; no sim yet'}'>{short_ago(i['mtime'])}</a>" for i in xs)
+
+    def who(sp: str) -> str:
+        cls = sp.split(" ")[-1].lower()
+        return (icons.img(icons.CLASS_ICON.format(cls=cls), "small", "ics") if cls else "") + e(sp)
+    rows = "".join(f"<tr{' class=mine' if sp.lower() == mine.lower() else ''}><th scope='row'>{who(sp)}</th>"
+                   + "".join(f"<td>{cell(sp, n)}</td>" for n in names) + "</tr>" for sp in specs)
+    return (f"<h2>Your sheets</h2><div class='mx-wrap'><table class='mx'><thead><tr><th></th>{head}</tr></thead>"
+            f"<tbody>{rows}</tbody></table></div>")
+
+
 TABS = (("prep", "Prep sheet"), ("timeline", "Top players' timelines"))
 # a report shown in the app: its own brand bar goes (the sidebar carries the brand)
 NO_TOPBAR = "try{var b=this.contentDocument.querySelector('.topbar');if(b)b.remove()}catch(x){}"
@@ -942,7 +989,7 @@ def queue_strip(difficulty: str) -> str:
                 if q.get("paused") == "character" else
                 "<small>Stopped: prepare again to go on, the bosses already prepared stay.</small>")
     return (f"<div class='rq' id='raidq'><div class='rq-txt'><span class='rq-head'>Prepare the whole raid in one "
-            f"go</span><span class='rq-now'>Every boss, one after the other, while you do something else.</span>"
+            f"go</span><span class='rq-now'>Every boss in turn, in the background.</span>"
             f"{note}</div><a class='btn ghost' href='/raid/prepare?difficulty={e(difficulty)}'>Prepare the whole raid</a>"
             "</div>")
 
@@ -1119,8 +1166,8 @@ def raid_board(encs, class_name: str, spec: str) -> str:
                   f"<div class='rb-pop' role='group' aria-label='{e(x.name)}'><b class='rb-title'>{e(x.name)}</b>"
                   f"<div class='rb-ds'>{states}</div></div></div>")
     return (f"<h2 class='h-mine'>Your raid, boss by boss</h2>"
-            f"<p class='rb-legend'>Under each boss, where it stands in {e(DIFF_LABELS.get(settings.get('difficulty'), ''))} "
-            "this week. Click a boss for its three difficulties, then open a sheet or start a prep.</p>"
+            f"<p class='rb-legend'>{e(DIFF_LABELS.get(settings.get('difficulty'), ''))} this week; click a boss for "
+            "its sheets and preps.</p>"
             f"<div class='rb-row'>{items}</div>{QUEUE_JS}{RB_JS}")  # the queue strip: in the hero, this week
 
 
@@ -1141,7 +1188,7 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
     if nxt is not None:  # the next boss to prepare: no list to scroll, the board below picks another one
         pick = (f'<input type="hidden" name="boss" value="{nxt.id}"><p class="start-next">'
                 + (f'{len(ready)} of {len(encs)} bosses ready this week. ' if ready else '')
-                + f'Next to prepare: <b>{e(nxt.name)}</b>.</p><p class="start-say">For another boss, click it in your raid below.</p>')
+                + f'Next to prepare: <b>{e(nxt.name)}</b>.</p>')  # another: the board below (its portraits are links)
     else:
         pick = ((f'<p class="start-say">Every boss is ready this week in {where}: pick one to prepare again.</p>'
                  if encs else "") + f'<select name="boss" aria-label="Boss" class="big">{options}</select>')
@@ -1163,13 +1210,7 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
             last = last + lastraid.CARD_JS if last else ""
     except Exception:  # noqa: BLE001 - the home always shows
         last = ""
-    me = f"{loaded.spec}-{loaded.class_name}".lower().replace(" ", "-")
-    order = tuple(x.name for x in encs)
-    own = [x for x in items if x["key"].endswith("-" + me)]  # the active character's spec first, the others after
-    rest = [x for x in items if x not in own]
-    mine = ((f'<h2>Your sheets as {e(loaded.spec.title())} {e(loaded.class_name.title())}</h2>'
-             f'<div class="sheets">{boss_cards(own, order, spec=False)}</div>' if own else "")
-            + (f'<h2>Your other specs&#39; sheets</h2><div class="sheets">{boss_cards(rest, order)}</div>' if rest else ""))
+    mine = sheets_matrix(items, encs, f"{loaded.spec.title()} {loaded.class_name.title()}")  # every sheet, one table
     g = settings.get("guild")
     try:
         from paf import characters as chars_
