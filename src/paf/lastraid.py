@@ -447,7 +447,10 @@ def card(slug: str, heading: bool = True) -> str:
                         (("rotation", "Your rotation"), ("wipe", "Why it did not die"), ("diff", "These two pulls, in detail"))
                         if (jid := b["jobs"].get(kind)) and not _failed(jid))
         if not b["kill"] and (_failed(b["jobs"].get("wipe")) or not b["jobs"].get("wipe")):  # needs the boss prepared
-            says = [*says, f"Prepare {b['name']} to see why it did not die, then read the log again."][:3]
+            plain = [x for x in says if not (isinstance(x, dict) and x.get("cmp"))]  # the sentences, never the
+            table = [x for x in says if isinstance(x, dict) and x.get("cmp")]       # table's rows, make room
+            says = [*plain[:2], f"Prepare {b['name']} to see why it did not die, then read the log again.", *table]
+            # (app confirm round 3: three table rows filled the cut and dropped the only route to the wipe analysis)
         if not says and not cur["finished"]:
             body = "<p class='lr-wait'><span class='pl-spin'></span> Reading&hellip;</p>"
         else:

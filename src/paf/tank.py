@@ -660,14 +660,20 @@ def render_sheet(p: TankPrep) -> str:
     lane = [Cooldown("Tank swaps", SWAP_LANE, 1.0, len(p.swaps), p.swaps, [""] * len(p.swaps))] if p.swaps else []
     if not p.moments:
         answered = set()
+    window_named = {c.name for c in defs if any(f"press {e(c.name)} in its window" in v
+                                                for v in (bare.values() if p.moments else []))}  # its lane (heal
+    # confirm round 3: "only 15% press Shield Wall in its window", no mark on the chart)
     svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight, their defensives and "
-                    "the swaps", [*defs, *shorts, *lane], {"Tank swaps", *(n for n, _t in answered)}, answered,
+                    "the swaps", [*defs, *shorts, *lane], {"Tank swaps", *(n for n, _t in answered), *window_named},
+                    answered,
                     moved_t)  # its marks at the lead's times (round 71)
     # the marks said are the ones drawn (heal round 10: "the table's answers" over a chart of swaps alone)
-    outline = any((c.name, t) not in answered for c in [*defs, *shorts] if c.name in {n for n, _t in answered}
-                  for t in c.times)
-    marks = [*(["the table's answers" + (" (an outline: another press of the same button)" if outline else "")]
-               if answered else []), *(["the swaps"] if lane else [])]
+    outline = any((c.name, t) not in answered for c in [*defs, *shorts]
+                  if c.name in {n for n, _t in answered} | window_named for t in c.times)
+    marks = [*(["the table's answers" + (" (an outline: another press, or one in a hit's window that is not its "
+                                          "answer)" if outline else "")]
+               if answered else ["an outline: a press in a hit's window, not its answer"] if window_named else []),
+             *(["the swaps"] if lane else [])]
     marks = f"Marks: {' and '.join(marks)}. " if marks else ""
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + ([table] if table else []) + [
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Median damage per "

@@ -188,7 +188,9 @@ def change_card(d) -> str:
                     f"current talents</span><span class='what'>"
                     + ("Simmed apart from the talents above: the two gains do not add up." if talents_said else "")
                     + ("" if getattr(plan, "robust", True) else " Not robust: the gain can vanish on a harder fight "
-                       "(see its checks in Dig deeper).") + "</span></div></li>")
+                       "(see its checks in Dig deeper).") + "</span></div></li>"
+                    + (f"<li class='sw-copy'>{copy_button(d.mrt[plan.objective], 'Copy the MRT note')}</li>"
+                       if d.mrt.get(plan.objective) else ""))  # acted on here, as the talents (DPS confirm round 3)
     if getattr(d, "imported", False):  # no bags: the best gear and the loot need the /simc export
         rows.append("<li><span class='ok bad' aria-hidden='true'>!</span><div><b>Paste your /simc export</b>"
                     "<span class='what'>Your character was read from a log, without your bags: with /simc the "

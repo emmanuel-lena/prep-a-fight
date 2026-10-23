@@ -164,3 +164,15 @@ def test_a_one_boss_wipe_night_has_no_empty_state_line(home, monkeypatch):
                               {"boss": 1, "name": "Sszorak", "difficulty": "mythic", "kill": False, "pulls": 35,
                                "best": 58.0, "jobs": {}}]}})
     assert "lr-state" not in lastraid.card("me")
+
+
+def test_the_prepare_line_survives_a_full_comparison_table(home, monkeypatch):
+    # app confirm round 3: three table rows filled the [:3] cut, the "Prepare … to see why" line was dropped
+    rows = [{"row": [f"Row {i}", "1", "2"], "kind": "good", "text": f"Row {i}"} for i in range(3)]
+    monkeypatch.setattr(lastraid, "_result", lambda jid: {"highlights": rows} if jid == "d1" else None)
+    lastraid.save({"me": {"report": "abc", "player": "Me", "date": 1791500000, "pulls": 35, "night": "n1",
+                          "finished": 1791500100, "bosses": [
+                              {"boss": 1, "name": "Sszorak", "difficulty": "mythic", "kill": False, "pulls": 35,
+                               "best": 58.0, "jobs": {"diff": "d1"}}]}})
+    html = lastraid.card("me")
+    assert "Prepare Sszorak to see why it did not die" in html and "lr-cmp" in html  # both, the table too

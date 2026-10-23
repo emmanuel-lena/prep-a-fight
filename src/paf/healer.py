@@ -2842,6 +2842,13 @@ def render_sheet(h: HealerPrep) -> str:
             at = _named_at(c, t, named, 0.0)
             if (c.name, t) not in moved and _mmss(at) != _mmss(t):
                 moved[(c.name, t)] = at
+    from dataclasses import replace as _rep
+
+    for (n, key), v in list(named.items()):  # a window line ("about 2:13"): its time drawn as an outline too
+        if isinstance(key, tuple) and isinstance(v, tuple) and isinstance(v[1], str) and re.fullmatch(r"\d+:\d\d", v[1]):
+            t_line = float(_secs(v[1]))
+            drawn = [_rep(c, alt=[*c.alt, t_line], alt_near=[*(c.alt_near or [""] * len(c.alt)), ""])
+                     if c.name == n and t_line not in c.alt else c for c in drawn]
     lanes = set(lead_names) | {k[0] for k in named if k[0] != KEPT}  # a button the table names in a hit's window
     # gets its lane and its outline there (heal confirm round 2: Convoke 60% in the 1:15 window, no mark)
     svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight, and the top players' healing "
