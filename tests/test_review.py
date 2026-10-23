@@ -49,3 +49,21 @@ def test_a_namesake_of_another_class_is_not_you():
     tops = (0.9, 0.3, [])
     assert review.review(Client(), url, 9, 4, "Ixuu", ["P1"], tops, "rogue") is not None
     assert review.review(Client(), url, 9, 4, "Ixuu", ["P1"], tops, "shaman") is None
+
+
+def test_your_other_spec_in_the_raid_log_is_read_as_the_one_you_prepare(monkeypatch):
+    # Subtlety sheet, Vashnik (DPS round 10): Ixuu logged as Assassination, "with you (Assassination Rogue)" and
+    # judged single target, unflagged
+    from types import SimpleNamespace
+
+    from paf import cli, raidneed
+
+    rc = raidneed.RaidComp("AbCd", "kill", [("Ixuu", "Assassination Rogue", 103000.0), ("Ann", "Arcane Mage", 90000.0)])
+    monkeypatch.setattr(raidneed, "raid_from_report", lambda *a, **k: rc)
+    monkeypatch.setattr(raidneed, "spec_profiles", lambda *a, **k: {})
+    profile = SimpleNamespace(name="Ixuu", class_name="rogue")
+    r = cli._raid_verdict(None, None, SimpleNamespace(id=9), 4, "u", profile, "Subtlety", types=[])
+    assert r.you == ("Subtlety Rogue", 103000.0) and r.you_found and r.logged_as == "Assassination Rogue"
+    from paf.prep_report import raid_section
+
+    assert "your log: Assassination Rogue" in raid_section(r)

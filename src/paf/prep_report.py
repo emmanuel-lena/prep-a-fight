@@ -43,6 +43,7 @@ class RaidInfo:
     your_archetype: str = ""
     your_profile: object | None = None  # paf.raidneed.SpecProfile of your spec (total vs boss DPS rankings)
     estimated: list = field(default_factory=list)  # specs whose share on the adds is estimated from the rankings
+    logged_as: str = ""  # your spec in that log when it is another one ("Assassination Rogue")
 
 
 @dataclass
@@ -410,7 +411,8 @@ def simmed_note(d: PrepData) -> str:
 
 
 def raid_section(r: RaidInfo, gear: bool = True) -> str:
-    you = (f"you ({e(r.you[0])}, {r.you[1] / 1000:,.0f}k DPS)" if r.you_found else
+    you = (f"you ({e(r.you[0])}, {r.you[1] / 1000:,.0f}k DPS"
+           + (f" <span class='pill'>your log: {e(r.logged_as)}</span>" if r.logged_as else "") + ")" if r.you_found else
            f"{'an' if r.you[0][:1].lower() in 'aeiou' else 'a'} {e(r.you[0])} at your raid's median DPS ({r.you[1] / 1000:,.0f}k; you are not in that log as {e(r.you[0])})")  # another spec of yours may be
     head = (f"<p class='small'>From your raid's log <a href='https://www.warcraftlogs.com/reports/{e(r.report)}' "
             f"target='_blank' rel='noopener'>{e(r.report)}</a> ({e(r.fight)}, {r.players} players), with {you}.</p>")

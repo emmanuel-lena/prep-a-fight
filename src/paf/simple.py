@@ -332,8 +332,10 @@ def review_card(d) -> str:
     longest = "Your longest pause" if len(r.gaps) == 1 else "Your longest pauses"
     pauses = (f"<p class='what pauses'>{longest} without casting:</p><div class='times'>{gaps}</div>"
               if gaps else "")
+    logged = getattr(getattr(d, "raid", None), "logged_as", "")  # played as another spec: said (DPS round 10)
     return (f"<article class='card s-review'><h2>Your last pull</h2><p class='what'>{e(r.fight)}, from your raid's "
-            f"log.</p><div class='cmps'>{_bars('Casting', r.active, r.tops_active, True)}"
+            f"log." + (f" <span class='pill'>as {e(logged)}</span>" if logged else "") + "</p>"
+            f"<div class='cmps'>{_bars('Casting', r.active, r.tops_active, True)}"
             f"{_bars('Moving', r.moving, r.tops_moving, False)}</div>"
             + "".join(f"<p class='say'>{e(s)}</p>" for s in says) + pauses + "</article>")
 

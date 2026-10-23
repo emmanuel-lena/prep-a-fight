@@ -2343,6 +2343,12 @@ def _raid_verdict(client, con, enc, diff: int, url: str, profile, spec: str, fil
     # you play one character in the raid: a namesake of another class is your other character, swapped out for
     # this one, never counted beside it (a review: the Subtlety Ixuu kept, an Elemental added: 15 players for 14)
     others = [(s, dps) for n, s, dps in rc.players if not (profile.name and n.lower() == profile.name.lower())]
+    logged = ""
+    if me is not None and spec and not me[1].startswith(f"{spec} "):  # logged as another spec of yours (your
+        # Assassination for this Subtlety sheet, DPS round 10): your DPS, read with the spec you prepare, said so
+        logged, label = me[1], f"{spec} {me[1].rpartition(' ')[2]}"
+        rc.players = [(n, label if (n, s) == me[:2] else s, dps) for n, s, dps in rc.players]
+        me = (me[0], label, me[2])
     if me is not None:
         you, found = (me[1], me[2]), True
     else:  # not in that log: a damage dealer of your spec at the raid's median DPS among damage dealers
@@ -2372,7 +2378,7 @@ def _raid_verdict(client, con, enc, diff: int, url: str, profile, spec: str, fil
     return RaidInfo(rc.report, rc.fight, len(rc.players), you, found, vs, raidneed.overall(vs),
                     raidneed.best_cleavers(types, rc.players), raidneed.archetypes(types, rc.players),
                     raidneed.archetype(types[0], you[0]) if types else "", profiles.get(you[0]),
-                    sorted(types[0].estimated) if types else [])
+                    sorted(types[0].estimated) if types else [], logged)
 
 
 def _fight_with_plan(enc, diff_name: str, described: list[str] | None = None):
