@@ -439,3 +439,6 @@ table.mx a.mx.nosim.old{border:1px dashed var(--warn)} /* no sim first, its age'
 .rb-boss.grey .rb-face{filter:grayscale(1) opacity(.65)} /* not prepared: grey, still recognisable */
 .rl-lusts{max-width:560px}
 .rl-boss li.rl-b{grid-template-columns:20px 120px 150px 1fr} .rl-boss li.rl-b .rl-ts{grid-column:2/-1} /* the chips on their own line, all from one x */
+.rl-boss li.rl-b .rl-side{justify-self:start} /* a pill its own width, never a stretched empty field */
+.rl-side.boss::before{content:"\25CF\00a0";font-size:9px;vertical-align:1px} .rl-side.pad::before{content:"\2234\00a0"} /* one target / many */
+.rl-boss ul+h4,.rl-boss .rl-tg+h4{margin-top:20px}

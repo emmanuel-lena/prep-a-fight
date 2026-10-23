@@ -66,3 +66,13 @@ def test_the_page_opens_on_the_answer(tmp_path, monkeypatch):
     page = raidlead.page_body("heroic")
     assert "1 boss to copy for Discord, for the 4 players of your raid.</p>" in page
     assert "everyone stays on the boss" not in page and "Frosty, Ssamii, Tristy" in page
+
+
+def test_a_few_swaps_stay_chips_another_build_is_one_badge():
+    # app round 11: Ssamii 8 talents apart read "another build: play the top players' pad build"
+    few = {"name": "Ssamii", "spec": "Balance Druid", "side": "pad", "take": [f"T{i}" for i in range(4)],
+           "drop": [f"D{i}" for i in range(4)], "more": 0}
+    many = dict(few, name="Hilander", take=[f"T{i}" for i in range(20)], drop=[f"D{i}" for i in range(18)])
+    sh = {"boss": "Nek'zali", "targets": [], "builds": [few, many]}
+    lines = raidlead.text(sh, "heroic").splitlines()
+    assert lines[1].startswith("Ssamii (padding talents): take T0") and "another build (38 talents apart)" in lines[2]

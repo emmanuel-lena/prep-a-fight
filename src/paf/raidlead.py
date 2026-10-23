@@ -286,7 +286,8 @@ def lust_spot(sh: dict):
         next(iter(sh.get("lust") or []), None)
 
 
-OTHER_BUILD = 6  # talents moved past which a player is on another build (a hero tree), not a few swaps away
+OTHER_BUILD = 12  # talents moved past which a player is on another build, not a few swaps away (app round 11:
+# 8 apart read as "re-spec entirely"; 38 to 46 is another hero tree)
 
 
 def _moved(b: dict) -> int:
