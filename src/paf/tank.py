@@ -416,13 +416,14 @@ def _none_for(note: str) -> str:
 # how to read the defensive cards, one term a line (the owner: less text; every rule kept, said once)
 TANK_HOW_TO_READ = (
     "<dl class='legend'><dt>N%</dt><dd>of the top players read; &ldquo;(N kills going)&rdquo;: of the kills still "
-    "going then; &ldquo;of its users&rdquo;: of the top players who press the button.</dd><dt>Tied to a hit</dt>"
+    "going then (a hit's window: those lasting through it); &ldquo;of its users&rdquo;: of the top players who "
+    "press the button.</dd><dt>Tied to a hit</dt>"
     "<dd>pressed in the hit's window (5 s before to 8 s after) by a quarter of its users; its share is the "
     "window's.</dd><dt>A time</dt><dd>shared by a quarter of "
     "those who press the button; its share: the top players pressing within 8 s of it (&ldquo;of its users&rdquo; "
     "too, under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long."
     "</dd><dt>&#10226; back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, "
-    "not counted for it (&ldquo;for about half&rdquo;: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
+    "not counted for it (&#10226;&nbsp;about half: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
     "time some top players press it instead.</dd></dl>")
 
 
@@ -592,7 +593,9 @@ def render_sheet(p: TankPrep) -> str:
             if inside and _mmss(st.median(inside)) != _mmss(a[1]):
                 moved_t[(a[0], a[1])] = st.median(inside)
         bare = {_mmss(x.t): landed_in(x, defs, named, 'long defensive') for x in p.moments if x.t not in cells}
-        names = list(dict.fromkeys(n for n, _t in answered))
+        names = sorted(dict.fromkeys(n for n, _t in answered),  # the most pressed first (a review: 15% before 38%)
+                       key=lambda n: -max(v for (k, _t), v in tied.items() if k == n) if any(k == n for k, _t in tied)
+                       else 0)
         from types import SimpleNamespace
 
         by_icon = {c.name: c for c in defs}  # the short defensives too (Spell Reflection), by name

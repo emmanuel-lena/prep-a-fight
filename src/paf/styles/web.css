@@ -405,3 +405,9 @@ table.lr-cmp tr.good td.gap{color:var(--pos)} table.lr-cmp tr.bad td.gap{color:v
 .rl-boss li small .rl-best{white-space:nowrap}
 table.lr-cmp td.gap{white-space:nowrap} table.lr-cmp td:first-child{min-width:220px} .lr-cmp-cap{font-size:13px;color:var(--muted);margin:8px 0 0}
 .meter{min-width:90px} td:has(>.meter){white-space:nowrap}
+.rl-unread{font:600 12px var(--font-body);color:var(--muted);margin-left:8px}
+/* raid lead: who hits what, a target a row (the header says what the specs are) */
+table.rl-tg{width:100%;margin:4px 0 8px;font-size:14px} table.rl-tg th{font:600 11px var(--font-display);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:left;padding:4px 10px 4px 0}
+table.rl-tg td{padding:6px 10px 6px 0;border-top:1px solid var(--line);vertical-align:top} table.rl-tg td:first-child{width:28%}
+table.rl-tg .rl-best{display:inline-flex;align-items:center;gap:3px;margin-right:8px;white-space:nowrap;font-size:13px;color:var(--muted)}
+.rl-boss li.rl-b{flex-wrap:nowrap;align-items:flex-start} .rl-boss li.rl-b .rl-ts{display:flex;flex-wrap:wrap;gap:4px 6px;flex:1} /* chips wrap in their own column */

@@ -342,7 +342,7 @@ def _cmp_table(rows: list[dict]) -> str:
             "</thead><tbody>"
             + "".join(f"<tr class='{e(r.get('kind', ''))}'><td>{e(r['cmp'][0])}</td><td><b>{e(r['cmp'][1])}</b></td>"
                       f"<td>{e(r['cmp'][2])}</td><td class='gap'>{e(_delta(r['cmp'][1], r['cmp'][2]))}"
-                      f"{' &#10003;' if r.get('kind') == 'good' else ' &#10007;' if r.get('kind') == 'bad' else ''}</td>"
+                      f"{' &#10007;' if r.get('kind') == 'bad' else ''}</td>"  # a mark where it goes the wrong way only
                       "</tr>" for r in rows) + "</tbody></table>")
 
 
@@ -432,7 +432,7 @@ def card(slug: str, heading: bool = True) -> str:
         says = ([x for x in boss_says if _key(x) not in skip and not (isinstance(x, dict) and x.get("cmp"))][:3]
                 + [x for x in boss_says if isinstance(x, dict) and x.get("cmp")][:6])  # a table: more rows fit
         links = "".join(f"<a href='/job/{e(jid)}'>{label}</a>" for kind, label in
-                        (("rotation", "Your rotation"), ("wipe", "Why it did not die"), ("diff", "Your best pull vs your weaker"))
+                        (("rotation", "Your rotation"), ("wipe", "Why it did not die"), ("diff", "These two pulls, in detail"))
                         if (jid := b["jobs"].get(kind)) and not _failed(jid))
         if not b["kill"] and (_failed(b["jobs"].get("wipe")) or not b["jobs"].get("wipe")):  # needs the boss prepared
             says = [*says, f"Prepare {b['name']} to see why it did not die, then read the log again."][:3]

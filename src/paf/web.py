@@ -545,7 +545,7 @@ def boss_cards(items: list[dict], order: tuple[str, ...] = (), spec: bool = True
 def short_ago(mtime: float, now: float | None = None) -> str:
     """A sheet's age in a few characters, for a table cell ("24 min", "3 h", "20 Oct")."""
     s = max(0.0, (now or time.time()) - mtime)
-    if s < 300:
+    if s < 120:  # as ago() (the board): one sheet, one age
         return "now"
     if s < 3600:
         return f"{int(s // 60)} min ago"  # an age, not a duration (a review: "12 min" read as how long)
@@ -581,7 +581,7 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
             f"href='/view/{e(i['key'])}' title='{e(i['difficulty'].capitalize())} &middot; "
             f"{time.strftime('%d %b %H:%M', time.localtime(i['mtime']))}"
             f"{'' if 'prep' in i['files'] else ' &middot; no sim yet'}'>{short_ago(i['mtime'])}"
-            f"{'' if 'prep' in i['files'] else ' &middot; no sim'}</a>" for i in xs)  # said, never colour alone
+            "</a>" for i in xs)  # no sim: the dashed outline, in the legend (never colour alone)
 
     def who(sp: str) -> str:
         cls = sp.split(" ")[-1].lower()
@@ -590,7 +590,7 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
                    + "".join(f"<td>{cell(sp, n)}</td>" for n in names) + "</tr>" for sp in specs)
     return (f"<h2>Your sheets</h2><div class='mx-wrap'><table class='mx'><thead><tr><th></th>{head}</tr></thead>"
             f"<tbody>{rows}</tbody></table></div><p class='mx-legend'>{diff_pill('normal')} {diff_pill('heroic')} "
-            f"{diff_pill('mythic')} <span>a sheet a difficulty, its age; click to open it</span></p>")
+            f"{diff_pill('mythic')} <span class='pill diff mx nosim'>dashed: no sim yet</span></p>")
 
 
 TABS = (("prep", "Prep sheet"), ("timeline", "Top players' timelines"))

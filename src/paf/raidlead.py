@@ -195,6 +195,17 @@ def builds(state: dict, enc_id: int, diff: int, roles: dict[str, str], names: di
     return out
 
 
+def unread(state: dict, enc_id: int, diff: int) -> list[str]:
+    """The players builds() could not check (no talents read, or no build split for their spec): "nobody to
+    change" never covers them (a review: Veoxic on an add, unread, under a green "nobody")."""
+    out = []
+    for name, spec, _dps in state.get("players") or []:
+        split = (state.get("splits") or {}).get(f"{enc_id}|{diff}|{spec}") or {}
+        if name not in set(state.get("bench") or []) and (not split or not state.get("talents", {}).get(name)):
+            out.append(name)
+    return out
+
+
 @by_corpus
 def _references(con, encounter_id: int, diff: int, boss: str) -> list:
     """The top raids' targets and who hits them: the corpus only, so kept while it is unchanged (issue #30)."""
@@ -237,6 +248,7 @@ def sheet(state: dict, enc, diff: int) -> dict | None:
                                            "players": [n for n, _s in a.proposed],
                                            "best": [s for s, _d, _n in a.ranking[:3]]} for a in rows],
             "builds": builds(state, enc.id, diff, roles, names),
+            "unread": unread(state, enc.id, diff),
             "enc": enc.id, "diff": diff, "lust": spots, "lust_pick": pick if any(x.label == pick for x in spots) else "",
             "lust_kills": con.execute("SELECT COUNT(*) FROM raid_lust l JOIN fight f USING(report, fight_id) "
                                       "WHERE f.encounter_id=? AND f.difficulty=? AND f.status='done'",
@@ -374,28 +386,33 @@ def page_body(difficulty: str) -> str:
             missing.append(x.name)
             continue
         everything.append(sh)
-        tg = "".join(
-            f"<li><b>{e(t['name'])}</b>: " + (
+        tg = "".join(  # a row a target: who in your raid, the specs the top raids put on it (the owner: less text;
+            # "best specs in the top raids" said once, in the header)
+            f"<tr><td><b>{e(t['name'])}</b></td><td>" + (
                 "everyone" if t["whole_raid"] and not t["players"] else
                 ("".join(f"<span class='rl-n'>{_ic(spec_of.get(n, ''))}{e(n)}</span>" for n in t["players"])
                  if t["players"] else "<span class='muted'>nobody fits</span>"))
-            + (" <span class='rl-side'>a second boss</span>" if t["second_boss"] else
-               " <small>best specs in the top raids: " + ", ".join(f"<span class='rl-best'>{_ic(b)}{e(pretty(b))}</span>"
-                                                 for b in t["best"]) + "</small>")
-            + "</li>" for t in sh["targets"])
+            + "</td><td>" + ("<span class='rl-side'>a second boss</span>" if t["second_boss"] else
+                             " ".join(f"<span class='rl-best'>{_ic(b)}{e(pretty(b))}</span>" for b in t["best"]))
+            + "</td></tr>" for t in sh["targets"])
+        tg = (f"<table class='rl-tg'><thead><tr><th>Target</th><th>Your raid</th><th>Best specs in the top raids</th>"
+              f"</tr></thead><tbody>{tg}</tbody></table>") if tg else ""
         bd = "".join(  # one line a player: who, which build, then each talent to take (+) or drop (-)
             f"<li class='rl-b'>{_ic(b['spec'])}<b>{e(b['name'])}</b><small>{e(pretty(b['spec']))}</small>"
             f"<span class='rl-side {'pad' if b['side'] == 'pad' else 'boss'}'>"
-            f"{'padding &middot; on an add' if b['side'] == 'pad' else 'boss build'}</span>"
-            + "".join(f"<span class='rl-t take'>+ {e(t)}</span>" for t in b["take"])
-            + "".join(f"<span class='rl-t drop'>&minus; {e(t)}</span>" for t in b["drop"]) + "</li>"
+            f"{'pad build &middot; on an add' if b['side'] == 'pad' else 'boss build'}</span>"
+            + "<span class='rl-ts'>" + "".join(f"<span class='rl-t take'>+ {e(t)}</span>" for t in b["take"])
+            + "".join(f"<span class='rl-t drop'>&minus; {e(t)}</span>" for t in b["drop"]) + "</span></li>"
             for b in sh["builds"])
         cards += (f"<article class='rl-boss' id='boss-{x.id}'><header><h3>{e(x.name)}</h3>"
                   f"{copy_button(text(sh, difficulty), 'Copy for Discord')}"
                   f"{copy_button(text(sh, difficulty, mrt=True), 'Copy MRT note')}</header>"
-                  f"<h4>Who hits what</h4><ul>{tg or '<li>Everyone on the boss: no add to assign.</li>'}</ul>"
+                  f"<h4>Who hits what</h4>{tg or '<p>Everyone on the boss: no add to assign.</p>'}"
                   + (f"<h4>Talents to change</h4><ul>{bd}</ul>" if bd else  # "not a sim": the legend, once
-                     "<h4>Talents to change <span class='rl-ok'>&#10003; nobody, from the log</span></h4>")
+                     ("<h4>Talents to change <span class='rl-ok'>&#10003; nobody, from the log</span></h4>"
+                      if not sh.get("unread") else
+                      f"<h4>Talents to change <span class='rl-unread'>? {len(sh['unread'])} "
+                      f"player{'s' if len(sh['unread']) > 1 else ''} not read: {e(', '.join(sh['unread']))}</span></h4>"))
                   + lust_block(sh, difficulty) + "</article>")
     allbtn = (copy_button("\n\n".join(text(sh, difficulty) for sh in everything), "Copy every boss for Discord")
               if everything else "")
@@ -407,8 +424,8 @@ def page_body(difficulty: str) -> str:
               + f", for the {len(state['players']) - len(bench)} players of your raid.</p>") if n else ""
     if answer:  # the answer is the page's lead; what the page does goes
         head = head.replace(lead, answer)
-    words = ("<p class='rl-words'>Padding talents: the build for an add (more targets); boss talents: the build for "
-             "single target; both the top players' builds, not a sim. The MRT note is the text the Method Raid Tools "
+    words = ("<p class='rl-words'>Pad build: the talents for an add (more targets); boss build: for single target; "
+             "both the top players' builds, not a sim. The MRT note is the text the Method Raid Tools "
              "addon shows in game.</p>"
              ) if everything else ""
     return (head + roster + f"<h2>Boss by boss</h2><div class='rl-all'>{allbtn}</div>{miss}{words}<div class='rl-grid'>{cards}</div>"
