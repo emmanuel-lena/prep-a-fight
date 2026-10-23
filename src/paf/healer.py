@@ -1020,18 +1020,25 @@ def _shown(name: str) -> str:
 KEPT = "\x00kept"  # a key of `named` no button has: (KEPT, hit) -> (the button the lead keeps, its share)
 
 
-def _not_kept(hit: float, hs: float, named: dict | None, c: Cooldown | None = None) -> str:
-    """"not kept for the X hit: N% in its window", with the lead's button when N reaches the quarter bar, and the
-    kills still going (round 102: a late hit's share without its count)."""
-    kept = (named or {}).get((KEPT, hit))
+def _line_where(at, hit: float) -> str:
+    """A window line's chip head: its time and its offset from the hit, as every chip (heal confirm round 12:
+    "about 0:37 · in the window of the 0:35 hit: 20%"); a spread of times keeps its range and the window."""
+    if isinstance(at, str) and re.fullmatch(r"\d+:\d\d", at):
+        return at + _offset(float(_secs(at)), _mmss(hit))
+    if not isinstance(at, str):
+        return _mmss(at) + _offset(at, _mmss(hit))
+    return f"about {at} &middot; in the window of the {_mmss(hit)} hit"
+
+
+def _not_kept(hit: float, hs: float, named: dict | None, c: Cooldown | None = None, t: float | None = None) -> str:
+    """A press in a hit's window kept for none: its offset, its window share, "not kept" (heal confirm round 12:
+    "not kept for the 0:35 hit: 25% in its window, under Revival / Restoral's 38%", a sentence in a chip); the
+    kept button is the table row's. The kills still going said (round 102)."""
     from paf.defensives import is_defensive
 
-    why = (", a personal defensive, no raid answer" if c is not None and is_defensive(c.spell_id, c.name)  # round
-           else f", under {e(kept[0])}'s {_pct(kept[1])}"  # 104; the kept button whatever the
-           if kept and (c is None or kept[0] != _shown(c.name)) else "")  # window share (round 105: Yu'lon "16% in
-    # its window" read as the reason, its time shared by 30%)
-    return (f" &middot; not kept for the {_mmss(hit)} hit: {_pct(hs)} in its window"
-            f"{_reach_note(c, hit) if c is not None else ''}{why}")
+    where = _offset(t, _mmss(hit)) if t is not None else f" &middot; in the window of the {_mmss(hit)} hit"
+    why = " &middot; personal, not kept" if c is not None and is_defensive(c.spell_id, c.name) else " &middot; not kept"
+    return f"{where} &middot; {_pct(hs)}{_reach_note(c, hit) if c is not None else ''}{why}"
 
 
 def _untied_at(c: Cooldown, t: float, n: str, tied: str, named: dict | None) -> str:
@@ -1041,7 +1048,7 @@ def _untied_at(c: Cooldown, t: float, n: str, tied: str, named: dict | None) -> 
         return ""
     hit = _secs(n.partition(" ")[0])
     hs = hit_share(c, t, hit)
-    return "" if hs is None else _not_kept(hit, hs, named, c)
+    return "" if hs is None else _not_kept(hit, hs, named, c, t)
 
 
 def _window_said(c: Cooldown, t: float, n: str, tied: str, named: dict | None, sp: float) -> bool:
@@ -1239,11 +1246,11 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
             return ""                                  # "or 0:37 for 25%" in the 0:35 hit, no clause)
         hit = _secs(h.partition(" ")[0])
         hs = hit_share(c, a, hit)
-        return "" if hs is None else _not_kept(hit, hs, named, c)
+        return "" if hs is None else _not_kept(hit, hs, named, c, at(a))
     # a tied habit keeps its moment's share; its hit's window count follows, as a named one's (round 64: "or 0:23
     # for 36%" beside a main "0:04 · 31%" mixed a window share with a moment's)
-    def back(a: float) -> str:  # tagged as the main time is (Evangelism's 1:42 habit, round 29)
-        return f" &middot; back from cooldown{' for about half' if a in c.back_half else ''}{_lead_back(c, a)}"
+    def back(a: float) -> str:  # tagged as the main time is (Evangelism's 1:42 habit, round 29); its window's
+        return f"{_lead_back(c, a)} &middot; back from cooldown{' for about half' if a in c.back_half else ''}"  # share first
     def at(a: float) -> float:  # an "or" time named for a hit's window: shown at the window's own time
         hit = (named or {}).get((c.name, a))
         inside = _counted(c, a, hit) if hit is not None and hit_share(c, a, hit) is not None else []
@@ -1272,7 +1279,7 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
                else " &middot; some")  # one form, as a main chip ("or 2:02 · 30%"; heal round 12: three forms)
         if w.startswith(" &middot; in its window:"):  # tied: the window's share is the chip's
             own, w = " &middot;" + w[len(" &middot; in its window:"):], ""
-        elif u or w or "in the window of" in bk:  # a window's share said: the only one (heal round 12: "or 2:10 for
+        elif u or w or _lead_back(c, a):  # a window's share said: the only one (heal round 12: "or 2:10 for
             own = ""                            # 32% · in the window of the 2:10 hit: 25%")
         return f"{_chip(at(a), n)}{own}{bk}{w}{u}"
     return ", or " + ", ".join(one(a, sp, n) for a, sp, n in near)
@@ -1568,8 +1575,7 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
         # (none when a window chip follows: heal round 12, Spirit Link Totem's 2:13 under "no shared time"),
         # a named line may follow (round 91; heal round 10: "timing varies: no shared moment" three times a sheet)
         + _pull_chip(c)
-        + "".join(f"<span class='chip'>about {v[1] if isinstance(v[1], str) else _mmss(v[1])} &middot; in the "
-                  f"window of the {_mmss(k[1][1])} hit: {_pct(v[0])}{v[2]}"
+        + "".join(f"<span class='chip'>{_line_where(v[1], k[1][1])} &middot; {_pct(v[0])}{v[2]}"
                   f"{' &middot; ' + v[3] if len(v) > 3 and v[3] and not (c.every and v[3] == 'on cooldown') else ''}</span>"  # a chip of its own, led by its time
                   # (round 91: plain text after a chip read as that chip's continuation)
                   for k, v in (named or {}).items()

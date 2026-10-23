@@ -604,7 +604,8 @@ def test_an_untied_time_in_a_hit_window_says_it_is_not_kept():
     # Mistweaver Monk, Nek'zali (round 90): Invoke Yu'lon "or 0:32 for 30%" in the 0:35 hit's window, no reason
     c = healer.Cooldown("Invoke Yu'lon", 1, 1.0, 2.0, [5.0], [""], alt=[32.0], alt_support=[0.3], alt_of=[5.0],
                         alt_near=["0:35 Soulcoil Rite"], presses=[[32.0]] * 16 + [[5.0]] * 84, n_all=100)
-    assert "or 0:32 &middot; not kept for the 0:35 hit: 16% in its window" in healer.cooldowns_html([c], set())
+    out = healer.cooldowns_html([c], set())
+    assert "or 0:32 &middot; 3 s before the 0:35 hit &middot; 16% &middot; not kept" in out
 
 
 def test_a_held_habit_of_a_button_on_cooldown_says_it_is_not_kept():
@@ -612,7 +613,8 @@ def test_a_held_habit_of_a_button_on_cooldown_says_it_is_not_kept():
     c = healer.Cooldown("Celestial Conduit", 1, 1.0, 3.0, [5.0], [""], alt=[37.0], alt_support=[0.25],
                         alt_of=[5.0], alt_near=["0:35 Soulcoil Rite"], every=97.0,
                         presses=[[37.0]] * 25 + [[5.0]] * 75, n_all=100)
-    assert "or 0:37 &middot; not kept for the 0:35 hit: 25% in its window" in healer.cooldowns_html([c], set())
+    out = healer.cooldowns_html([c], set())
+    assert "or 0:37 &middot; 2 s after the 0:35 hit starts &middot; 25% &middot; not kept" in out
 
 
 def test_a_first_press_at_the_pull_says_so_on_hover():
@@ -656,11 +658,8 @@ def test_more_counts_a_press_named_in_a_hit_window():
 def test_a_quarter_not_kept_names_the_button_kept():
     # Mistweaver Monk, Nek'zali (round 95): Conduit "not kept for the 0:35 hit: 25%" beside the note's quarter bar
     named = {(healer.KEPT, 35.0): ("Revival / Restoral", 0.38)}
-    assert (healer._not_kept(35.0, 0.25, named)
-            == " &middot; not kept for the 0:35 hit: 25% in its window, under Revival / Restoral's 38%"
-            "")
-    assert healer._not_kept(35.0, 0.16, named) == (" &middot; not kept for the 0:35 hit: 16% in its window, under "
-                                                   "Revival / Restoral's 38%")  # round 105
+    assert healer._not_kept(35.0, 0.25, named, t=37.0) == (" &middot; 2 s after the 0:35 hit starts &middot; 25% "
+                                                          "&middot; not kept")  # the kept button: the table's row
 
 
 def test_a_late_time_share_says_the_kills_still_going():
@@ -791,7 +790,7 @@ def test_a_press_in_a_hit_window_shows_one_share():
     c = healer.Cooldown("Divine Protection", 1, 0.73, 1.0, [256.0], ["4:15 Hit"], support=[0.19], n_all=100,
                         presses=[[256.0]] * 20 + [[100.0]] * 53)
     out = healer.cooldowns_html([c], set())
-    assert "4:16 &middot; not kept for the 4:15 hit: 20% in its window" in out and "19%" not in out
+    assert "4:16 &middot; 1 s after the 4:15 hit starts &middot; 20% &middot; not kept" in out and "19%" not in out
 
 
 def test_a_chip_named_for_a_hit_window_shows_the_windows_share_only():
@@ -817,7 +816,7 @@ def test_a_main_time_with_its_reason_then_its_or():
                         alt_support=[0.17], alt_of=[257.0], n_all=100,
                         presses=[[257.0]] * 22 + [[229.0]] * 17 + [[100.0]] * 51)
     out = healer.cooldowns_html([c], set())
-    assert "4:17 &middot; not kept for the 4:15 hit: 22% in its window, or 3:49 &middot; 17%" in out
+    assert "4:17 &middot; 2 s after the 4:15 hit starts &middot; 22% &middot; not kept, or 3:49 &middot; 17%" in out
 
 
 def test_trinkets_and_split_talents_show_their_icons():
