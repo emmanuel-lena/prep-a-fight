@@ -757,7 +757,7 @@ def test_one_none_kept_reason_on_several_rows_is_said_once():
     # them in it)" on two rows under a lead saying none is kept
     found = [healer.Moment(t, 1000.0, 5.0, "Crush") for t in (60.0, 120.0, 175.0)]
     why = " (no long defensive of theirs pressed by a tenth of them in it)"
-    late = why[:-1] + "; 89 kills going)"  # Holy Paladin, Vashnik (heal round 11): the count kept it apart
+    late = why[:-1] + " (89 kills going))"  # Holy Paladin, Vashnik (heal rounds 11, 13): the count kept it apart
     out = healer.hits_table(found, found, [], {"1:00": why, "2:00": late, "2:55": " (12% press Shield Wall)"},
                             None, {}, "")
     assert out.count("pressed by a tenth") == 1 and "None kept: no long defensive of theirs" in out

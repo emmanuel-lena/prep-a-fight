@@ -964,6 +964,7 @@ def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list
     # its kills-going count left out: nobody pressed, so it says nothing (heal round 11: "; 89 kills going" kept
     # the 3:35 row apart from the 2:10's)
     def bare_of(v: str) -> str:
+        v = re.sub(r" \(\d+ kills going\)\)$", ")", v)  # as _reach_note writes it, inside the reason's bracket
         return re.sub(r"; \d+ kills going\)$", ")", v) if re.fullmatch(r" \(no [^()]*\)", v) else v
     common = Counter(bare_of(v) for k, v in bare.items() if k not in said).most_common(1)
     same = common[0][0] if common and common[0][1] >= 2 and re.fullmatch(r" \(no [^()]*\)", common[0][0]) else None
