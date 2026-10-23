@@ -369,7 +369,7 @@ def test_no_job_kept_by_the_top_players_is_the_answer():
     sh = SimpleNamespace(spec="Restoration Shaman", jobs=["nothing stands out against the other healers"])
     lead = healer.jobs_lead([hp, sh], "Restoration Shaman")
     assert lead.startswith("<p class='lead'>No healer spec has a job of its own here that the top players keep.</p>")
-    assert ("<td><b>Holy Paladin</b></td><td>heals the tanks more</td><td><b>9%</b> vs 7% <small>(548 kills)"
+    assert ("Holy Paladin</b></td><td>heals the tanks more</td><td><b>9%</b> vs 7% <small>(548 kills)"
             "</small></td><td><b>8%</b> vs 8%</td>") in lead  # a table: every healer, then the top players
     hp.tank = 0.08  # the table's own number beside the means (round 78)
     assert "(548 kills; the table&#x27;s median Holy Paladin: 8%)</small>" in healer.jobs_lead([hp, sh],
@@ -516,7 +516,7 @@ def test_a_two_step_button_says_its_release_and_what_it_stores():
     tl.players = [{"casts": {1: [100.0, 200.0], 2: [216.0]}, "duration": 270.0}] * 4
     healer.two_step(tl, [c], [m])
     assert c.release_gap == 16.0 and c.unreleased == 0.5
-    assert "Dream Breath (in 100% of the stores, twice in 75%)" in out
+    assert "<span class='chip'>Dream Breath &middot; 100% &middot; twice 75%</span>" in out
 
 
 def test_two_groups_of_presses_in_a_window_are_said_apart():

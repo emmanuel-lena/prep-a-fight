@@ -311,7 +311,7 @@ def render(p: TankPrep) -> str:
         trinkets_html,
     )
 
-    mit = "".join(f"<li><b>{e(n)}</b><small>up {u:.0%} of the kill for the top tanks</small></li>"
+    mit = "".join(f"<li><b>{e(n)}</b><b class='upn'>{u:.0%}</b><small>uptime</small></li>"
                   for n, u in p.mitigation)
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]
     others = [c for c in p.cooldowns if c not in defs]
@@ -481,7 +481,7 @@ def render_sheet(p: TankPrep) -> str:
             got = getattr(p, "name_icons", {}).get(n, "")
             return img(got, "small", "ics") if got else ""
         return "".join(f"<li><b>{ic(n)}{e(n)}</b><span class='upbar' aria-hidden='true'><span style='width:"
-                       f"{u * 100:.0f}%'></span></span><small>up {u:.0%} of the kill for the top tanks</small></li>"
+                       f"{u * 100:.0f}%'></span></span><b class='upn'>{u:.0%}</b><small>uptime</small></li>"
                        for n, u in p.mitigation) + "".join(
             f"<li><b>{ic(n)}{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top players"
             + (f" &middot; on cooldown, about every {ev:.0f} s" if ev else "") + "</small>"

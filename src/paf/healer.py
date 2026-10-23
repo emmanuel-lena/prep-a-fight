@@ -150,6 +150,23 @@ def _ic(c: Cooldown | None) -> str:
     return img(c.icon, "small", "ics", "") if c is not None and c.icon else ""
 
 
+def _spec_ic(spec: str) -> str:
+    """A spec's class icon before its name in the tables (heal round 10: bare spec names, the cheapest visual)."""
+    from paf import icons
+
+    cls = icons.class_key(spec)
+    return icons.img(icons.CLASS_ICON.format(cls=cls), "small", "ics", "") if cls else ""
+
+
+def _comp_label(c) -> str:
+    """A composition's specs, each with its icon ("2 Holy Priests + Restoration Shaman")."""
+    n = Counter(getattr(c, "specs", ()) or ())
+    if not n:
+        return e(c.label)
+    return " + ".join(f"<span class='nw'>{_spec_ic(s)}{e(f'{k} {s}s' if k > 1 else s)}</span>"
+                      for s, k in sorted(n.items(), key=lambda x: (-x[1], x[0])))
+
+
 # how to read the cards, one term a line (the owner: less text; every rule kept, said once)
 HOW_TO_READ = (
     "<dl class='legend'><dt>N%</dt><dd>of the top players read; &ldquo;(N kills going)&rdquo;: of the kills still "
@@ -1453,9 +1470,8 @@ def _unnest(text: str) -> str:
 def _src_chip(x: str) -> str:
     """A source as a chip: what, then its kill count; the qualifiers on hover (they add, never answer)."""
     what, _, rest = x.partition(": ")
-    m = re.search(r"[\d,]+(?: top)? kills", rest)
-    shown = rest if len(rest) <= 90 else m.group(0) if m else rest  # short: whole (149 top kills from 100: why)
-    more = f" title='{e(rest)}'" if m and rest.strip() != shown else ""
+    shown = rest.partition(" (")[0]  # one form on every sheet: its count, the bracket on hover (heal round 10: a
+    more = f" title='{e(rest)}'" if shown != rest else ""  # 90-character cut read one chip two ways)
     return f"<span class='src'{more}><b>{e(what[:1].upper() + what[1:])}</b> {e(shown)}</span>"
 
 
@@ -1817,9 +1833,9 @@ def _released(c: Cooldown) -> str:
            # chip says its stores' share never released
            f"<small class='alt'>released{gap} at varying times{never}</small>")  # as chips, as the store's (r. 83)
     if c.stored:
-        out += (f"<small class='alt'>what they store (the first {STORED} spells cast after storing): " + ", ".join(
-            f"{e(nm)} (in {_pct(sh)} of the stores" + (f", twice in {_pct(tw)}" if tw >= 0.1 else "") + ")"
-            for nm, sh, tw in c.stored) + "</small>")
+        out += (f"<span class='subrow'><small class='alt'>stored (first {STORED} casts):</small>" + "".join(
+            f"<span class='chip'>{e(nm)} &middot; {_pct(sh)}" + (f" &middot; twice {_pct(tw)}" if tw >= 0.1 else "")
+            + "</span>" for nm, sh, tw in c.stored) + "</span>")  # chips, as the releases (heal round 10: prose)
     return out
 
 
@@ -2217,7 +2233,7 @@ def roles_table(roles: list, mine: str = "") -> str:
             + ("<th>Buffs given a kill</th>" if buffs else "")
             + "<th>Players</th>")
     rows = "".join(
-        f"<tr class='{'mine' if r.spec == mine else ''}'><td>{e(r.spec)}{' <small>(you)</small>' if r.spec == mine else ''}"
+        f"<tr class='{'mine' if r.spec == mine else ''}'><td>{_spec_ic(r.spec)}{e(r.spec)}{' <small>(you)</small>' if r.spec == mine else ''}"
         f"{' <small>few players</small>' if r.players < 100 else ''}"
         f"</td><td class='n'>{_pct(r.healing)}</td><td class='n'>{_pct(r.tank)}</td><td class='n'>{_pct(r.spike)}</td>"
         f"<td class='n'>{_pct(r.overheal)}</td><td class='n'>{r.dispels:.1f}</td>"
@@ -2389,10 +2405,10 @@ def jobs_lead(roles: list, mine: str = "") -> str:
                          r"; among the top players ranked by their healing [^:]*: the median top .*? ([\d.]+%?), the "
                          r"other specs' ([\d.]+%?)", j)
             if not m:  # an unknown form: the sentence as it is
-                rows += f"<tr><td><b>{e(sp)}</b></td><td colspan='3'>{e(j)}</td></tr>"
+                rows += f"<tr><td><b>{_spec_ic(sp)}{e(sp)}</b></td><td colspan='3'>{e(j)}</td></tr>"
                 continue
             what, a_, b_, n, ta, tb = m.groups()
-            rows += (f"<tr><td><b>{e(sp)}</b></td><td>{e(what)} more</td><td><b>{a_}</b> vs {b_} <small>({n} kills"
+            rows += (f"<tr><td><b>{_spec_ic(sp)}{e(sp)}</b></td><td>{e(what)} more</td><td><b>{a_}</b> vs {b_} <small>({n} kills"
                      f"{e(table(sp, j)).replace(' (the table', '; the table').rstrip(')')})</small></td>"
                      f"<td><b>{ta}</b> vs {tb}</td><td class='no'>&#10007; not kept</td></tr>")
         return ("<p class='lead'>No healer spec has a job of its own here that the top players keep.</p>"
@@ -2469,7 +2485,7 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
                                  and not few_without else "") + "</td>" if deaths else ""))
         if few and not deaths:
             cells = "<td class='n' colspan='2'><small>too few kills</small></td>"
-        rows += (f"<tr class='{'mine ' if p.spec == mine else ''}{'few' if few else ''}'><td>{e(p.spec)}</td>"
+        rows += (f"<tr class='{'mine ' if p.spec == mine else ''}{'few' if few else ''}'><td>{_spec_ic(p.spec)}{e(p.spec)}</td>"
                  f"<td class='n'>{_pct(p.share)} <small>({p.kills} kill{'s' if p.kills != 1 else ''}"
                  f"{', a wide reading' if FEW_KILLS <= p.kills < WIDE_KILLS else ''})</small></td>"
                  f"{cells}</tr>")
@@ -2494,7 +2510,7 @@ def comps_table(comps: list, n_kills: int) -> str:
     deaths = any(c.deaths is not None for c in comps)
     comps = [c for c in comps if c.kills >= FEW_KILLS]  # the same cut as every other table
     rows = "".join(
-        f"<tr><td>{e(c.label)}</td><td class='n'>{_pct(c.share)} <small>({c.kills} kills)</small></td><td class='n'>{_mmss(c.duration)}</td>"
+        f"<tr><td>{_comp_label(c)}</td><td class='n'>{_pct(c.share)} <small>({c.kills} kills)</small></td><td class='n'>{_mmss(c.duration)}</td>"
         + (f"<td class='n'>{'' if c.deaths is None else f'{c.deaths:.1f}' if c.kills >= FEW_KILLS else '<small>too few kills</small>'}</td>"
            if deaths else "") + "</tr>"
         for c in comps)
@@ -2878,12 +2894,12 @@ def render_sheet(h: HealerPrep) -> str:
                   f"{h.own_kills - h.own_timed} more, read for their healers only)"
                   if h.own_timed and h.own_kills > h.own_timed else ""))
               if h.own_kills else "",
-              f"the table, jobs and the other healers: {h.role_kills:,} kills of this boss, every spec's"
+              f"the table, jobs and the other healers: {h.role_kills:,} kills · every spec"
               + (" (the other healers' presses: those whose stage starts are read)" if getattr(h, "staged", False)
                  else "") if h.role_kills
               else "",
               f"the raid's damage: {h.raid_kills} kills" if h.raid_kills else "",
-              "each job: the kills holding the spec and another healer, its own count said",
+              "each job: count per row",
               f"dispel timings: {h.dispel_kills} kills" if getattr(h, "dispel_kills", 0) else ""]
     deeper_first.append("<p class='sources'><span class='src-lab'>Read on</span>"  # one chip a source (the owner:
                         + "".join(_src_chip(x) for x in counts if x) + "</p>")  # less text)
