@@ -345,8 +345,7 @@ def _cmp_table(rows: list[dict]) -> str:
         return ""
     lab = rows[0].get("pulls") or ["", ""]  # which pulls: "Pull 27 (2:38)", so an expert can check them
     # the comparison's own pulls: its best and worst without a death (paf.pulldiff), not the night's best pull
-    return ("<p class='lr-cmp-cap'>Two pulls without a death, side by side:</p>"
-            "<table class='lr-cmp fit'><thead><tr><th></th>"
+    return ("<table class='lr-cmp fit'><thead><tr><th>No-death pulls</th>"
             f"<th>Better{' <small>' + e(lab[0]) + '</small>' if lab[0] else ''}</th>"
             f"<th>Weaker{' <small>' + e(lab[1]) + '</small>' if lab[1] else ''}</th><th>Gap</th></tr>"
             "</thead><tbody>"

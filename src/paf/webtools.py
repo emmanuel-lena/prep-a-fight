@@ -295,10 +295,8 @@ by step.</p>
 </div><div>
 {account if account else "<h2>Warcraft Logs</h2><div class='set-wcl'>"}\
 {'<h3 class="key-h">Your own API key</h3>' if account else ''}
-<p class="small measure">{current} To use another one (a new
-client, or a regenerated secret): create or open it on <a href="https://www.warcraftlogs.com/api/clients"
-target="_blank" rel="noopener">warcraftlogs.com/api/clients</a>, then paste both values.
-It is tested before it replaces the old one.</p>
+<p class="small measure">{current} <a href="https://www.warcraftlogs.com/api/clients"
+target="_blank" rel="noopener">Use another key &#8599;</a></p>
 <form method="post" action="/credentials" class="row"><input type="hidden" name="back" value="settings">
 <label class="key-l">Client ID<input name="id" class="key-in" required></label>
 <label class="key-l">Client Secret<input name="secret" class="key-in" type="password" required

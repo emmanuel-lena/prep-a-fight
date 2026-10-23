@@ -442,3 +442,4 @@ table.mx a.mx.nosim.old{border:1px dashed var(--warn)} /* no sim first, its age'
 .rl-boss li.rl-b .rl-side{justify-self:start} /* a pill its own width, never a stretched empty field */
 .rl-side.boss::before{content:"\25CF\00a0";font-size:9px;vertical-align:1px} .rl-side.pad::before{content:"\2234\00a0"} /* one target / many */
 .rl-boss ul+h4,.rl-boss .rl-tg+h4{margin-top:20px}
+.rl-chips button[title]:hover::after{content:attr(title);margin-left:6px;font-size:11px;font-weight:600;color:var(--muted)} /* bench, said where you point */

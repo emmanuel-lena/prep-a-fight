@@ -1,6 +1,8 @@
 from paf.bossguide import abilities_html, bullets, summary_html
 from paf.mechanics import Section
 
+NOW_DEADLY = 'as in Stage One, now</span> <span class="pill warn">deadly</span>'  # the pill, as every ability
+
 
 def sec(id_, title, kind, text="", flags=(), spell=0, children=()):
     s = Section(id_, title, kind, spell, list(flags), text, 0, id_, -1)
@@ -50,7 +52,7 @@ def test_a_stage_names_what_it_repeats():
     second = a[a.index("Stage Two"):]
     assert "Also, as in Stage One: Soulcoil Well, Soulcoil Rite, Uncoiled Rage." in second
     assert "A well of necrotic energy." not in second and "She calls the cultists." in second
-    assert "A corpse lingers." not in second and "as in Stage One, now deadly" in second  # only the new tag
+    assert "A corpse lingers." not in second and NOW_DEADLY in second  # only the new tag
 
 
 def test_another_roles_abilities_are_named_not_told():
@@ -81,7 +83,7 @@ def test_a_unit_told_before_shows_only_what_changes():
     a = abilities_html([one, two])
     inter = a[a.index("Intermission"):]
     assert "As in Stage One; what changes:" in inter and "Ancient spirits" not in inter
-    assert "as in Stage One, now deadly" in inter and "A corpse lingers." not in inter
+    assert NOW_DEADLY in inter and "A corpse lingers." not in inter
     assert "Also, as in Stage One: Corpse Blight." in inter
 
 

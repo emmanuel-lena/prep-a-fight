@@ -1182,8 +1182,6 @@ def raid_board(encs, class_name: str, spec: str) -> str:
                   f"<div class='rb-pop' role='group' aria-label='{e(x.name)}'><b class='rb-title'>{e(x.name)}</b>"
                   f"<div class='rb-ds'>{states}</div></div></div>")
     return (f"<h2 class='h-mine'>Your raid, boss by boss</h2>"
-            f"<p class='rb-legend'>{e(DIFF_LABELS.get(settings.get('difficulty'), ''))} this week; click a boss for "
-            "its sheets and preps.</p>"
             f"<div class='rb-row'>{items}</div>{QUEUE_JS}{RB_JS}")  # the queue strip: in the hero, this week
 
 
@@ -1376,9 +1374,7 @@ the raid log link (step 3) or leave it empty first.</span></div>
 </form></div>
 {(f"<aside class='boss-guide'>{guide}</aside>") if guide else ""}</div>{journal}
 {_story_css()}{STORY_JS}
-<h2>What you know that the logs cannot</h2>
-<p class="adv-lede">Two plain-text notes the next prep of this boss reads: your own fight plan, and what you know about the
-boss itself. Both are optional; the prep works from the logs without them.</p>
+<h2>What you know that the logs cannot <span class="pill">optional</span></h2>
 <section class="adv"><h3>Your fight plan: your own movements, Bloodlust, Power Infusion</h3>
 {plan_block(enc, difficulty)}</section>
 <section class="adv"><h3>What you know about this boss: damage amps, targets to ignore</h3>

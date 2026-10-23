@@ -292,8 +292,10 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
                 pic = icons.img(ctx["icons"].get(s.title, ""), "small")
                 rows.append(f'<div class="ab" style="margin-left:{min(depth, 1) * 14}px"><div>{pic}<b>{e(s.title)}</b>'
                             f' <span class="muted small">as in {e(was[0])}'
-                            + (f", now {e(' and '.join(x.lower() for x in new))}" if new else ", changed")
-                            + "</span></div></div>")
+                            + (", now</span> " + " ".join(  # the pills every other ability gets (app round 11)
+                                f'<span class="pill {"warn" if x in ("deadly", "interrupt") else ""}">{e(x)}</span>'
+                                for x in new) if new else ", changed</span>")
+                            + "</div></div>")
             elif s.kind == "ability":
                 rows.append(_ability(s, depth, ctx))
             elif s.kind == "creature":  # a unit told before: its name, then only what changed under it
