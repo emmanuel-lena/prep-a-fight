@@ -33,3 +33,12 @@ def test_settings_page_changes_the_warcraft_logs_key(tmp_path, monkeypatch):
     page = webtools.settings_page()
     assert "9a1b2c3d…" in page and "long-client-id" not in page
     assert 'action="/credentials"' in page and 'name="back" value="settings"' in page
+
+
+def test_the_quota_bar_reads_thousands(monkeypatch):
+    # app round 15: "31 / 3,600 points" drew a full warm bar (31 / 3)
+    from paf import webtools
+
+    monkeypatch.setattr("paf.wcl.quota_line", lambda: "31 / 3,600 points used this hour (reset in 12 min)")
+    out = webtools.quota_html()
+    assert "width:1%" in out and " hi" not in out

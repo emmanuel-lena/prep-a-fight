@@ -35,8 +35,9 @@ def parse_time(s: str) -> float:
 
 
 def mmss(t: float) -> str:
-    """0:52.7 -> "0:53": rounded once, so 59.6 s is "1:00", never "0:60" (one form for every page: app round 11)."""
-    s = int(round(t))
+    """0:52.7 -> "0:52": whole seconds cut, as the MRT notes' timers and the fight tab write them (one form for every
+    page and sheet: app round 11, DPS round 14)."""
+    s = int(max(0.0, t))
     return f"{s // 60}:{s % 60:02d}"
 
 

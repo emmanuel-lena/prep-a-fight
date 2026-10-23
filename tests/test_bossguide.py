@@ -126,4 +126,4 @@ def test_journal_times_round_as_the_page_header():
     # app round 14: "Restless Amani around 0:52" under a header and plan box saying 0:53 (52.7 s)
     from paf import bossguide
 
-    assert bossguide._when([52.7, 167.0]) == "0:53, 2:47"
+    assert bossguide._when([52.7, 167.0]) == "0:52, 2:47"  # the fight tab's and the MRT notes' form

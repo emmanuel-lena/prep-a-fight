@@ -239,8 +239,9 @@ def quota_html() -> str:
         from paf.wcl import quota_line
 
         line = quota_line()
-        m = re.match(r"(\d+) / (\d+)", line)
-        return (meter(int(m[1]) / max(1, int(m[2]))) if m else "") + e(line)  # a bar beside the numbers
+        m = re.match(r"([\d,]+) / ([\d,]+)", line)  # thousands written "3,600" (app round 15: the bar read 31/3)
+        n = [int(x.replace(",", "")) for x in m.groups()] if m else []
+        return (meter(n[0] / max(1, n[1])) if n else "") + e(line)  # a bar beside the numbers
     except Exception as ex:  # noqa: BLE001 - shown as is
         return f"<span class='neg'>{e(str(ex)[:160])}</span>"
 
