@@ -15,7 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from paf.corpus.analyze import kills_filter
-from paf.wcl import WCLClient, WCLError
+from paf.wcl import WCLClient, WCLDown, WCLError
 
 # versioned table of the raid-wide haste buffs (the names depend on the log's language: ids first)
 LUST_IDS = {2825: "Bloodlust", 32182: "Heroism", 80353: "Time Warp", 264667: "Primal Rage", 272678: "Primal Rage",
@@ -90,6 +90,9 @@ def fetch_lust(client: WCLClient, con: sqlite3.Connection, encounter_id: int, di
                 events += list(client.events(rep, fid, block["nextPageTimestamp"], fr["endTime"], data_type="Buffs",
                                              hostility="Friendlies", filter_expression=expr, cache=False))
         except (WCLError, KeyError, TypeError, IndexError, OSError) as e:
+            if isinstance(e, WCLDown):  # one line, not one a kill (issue #36)
+                log(f"  lust stopped: {str(e)[:100]}; the rest is read on a later prep")
+                break
             log(f"  lust skipped: {str(e)[:100]}")
             continue
         con.execute("INSERT OR REPLACE INTO raid_lust VALUES(?,?,?)",

@@ -36,6 +36,15 @@ class WCLError(RuntimeError):
     pass
 
 
+class WCLDown(WCLError):
+    """Warcraft Logs failed every retry several queries in a row: the next ones fail at once for a while, rather than
+    each waiting out its retries (issue #36: a 503 outage cost 30 s a kill, 55 min for one step)."""
+
+
+DOWN_AFTER = 2  # queries in a row that failed every retry on a server error: Warcraft Logs is down
+DOWN_FOR = 300.0  # seconds the next queries fail at once, before one tries again
+
+
 def _urllib_transport(url: str, body: bytes, headers: dict[str, str]) -> tuple[int, bytes]:
     req = urllib.request.Request(url, data=body, headers={"User-Agent": USER_AGENT, **headers})
     try:
@@ -164,6 +173,9 @@ class WCLClient:
         self._token: str | None = None
         self._token_expires = 0.0
         self._reset_at: float | None = None  # when the hourly quota resets, as last read (rate_limit)
+        self._fails = 0  # queries in a row that failed every retry on a server error
+        self._down_until = 0.0  # until then Warcraft Logs is taken as down (WCLDown)
+        self.clock: Callable[[], float] = time.time
 
     # --- auth ---------------------------------------------------------------------------------
 
@@ -234,6 +246,9 @@ class WCLClient:
 
     def _ask(self, query: str, variables: dict[str, Any], cache_file: Path | None) -> dict[str, Any]:
 
+        if self.clock() < self._down_until:
+            mins = max(1, round((self._down_until - self.clock()) / 60))
+            raise WCLDown(f"WCL API unavailable: down, tried again in {mins} min")
         body = json.dumps({"query": query, "variables": variables}).encode()
         delay = 2.0
         quota_waits = 0
@@ -271,6 +286,9 @@ class WCLClient:
                 continue
             if status == 429 or status >= 500:
                 if attempt == self.max_retries:
+                    self._fails += 1
+                    if self._fails >= DOWN_AFTER:
+                        self._down_until, self._fails = self.clock() + DOWN_FOR, 0
                     raise WCLError(f"WCL API unavailable: HTTP {status}")
                 self.sleep(delay)
                 delay *= 2
@@ -278,6 +296,7 @@ class WCLClient:
             break
         if status != 200:
             raise WCLError(f"WCL API error: HTTP {status}: {raw[:300]!r}")
+        self._fails = 0
 
         payload = json.loads(raw)
         if payload.get("errors"):

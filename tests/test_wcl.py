@@ -178,3 +178,30 @@ def test_an_estimate_knows_the_quota_is_used_up_without_waiting(tmp_path, monkey
     assert left == 0.0 and 19 <= reset <= 20  # used up now, back in the 20 minutes the prep read
     monkeypatch.setattr(wcl, "QUOTA_FRESH", 120.0)  # recent: refused once, said by the shared read (issue #30)
     assert wcl.quota_left(page)[0] == 0.0 and wcl.fresh_quota()["spent"] == 3600
+
+
+def test_an_outage_fails_fast_after_two_queries(tmp_path):
+    # issue #36: a 503 outage waited out 4 retries on every kill (30 s each, 55 min for the lust step)
+    from paf.wcl import WCLClient, WCLDown, WCLError
+
+    calls, now = [], [1000.0]
+
+    def transport(url, body, headers):
+        if "oauth" in url:
+            return 200, b'{"access_token": "t", "expires_in": 3600}'
+        calls.append(url)
+        return 503, b"down"
+
+    c = WCLClient("id", "secret", cache_dir=tmp_path, transport=transport, max_retries=2, sleep=lambda s: None)
+    c.clock = lambda: now[0]
+    for _ in range(2):
+        with pytest.raises(WCLError):
+            c.query("{ a }", {})
+    n = len(calls)
+    with pytest.raises(WCLDown):
+        c.query("{ a }", {})
+    assert len(calls) == n  # no request while down
+    now[0] += 301
+    with pytest.raises(WCLError):
+        c.query("{ a }", {})
+    assert len(calls) > n  # tried again after the pause
