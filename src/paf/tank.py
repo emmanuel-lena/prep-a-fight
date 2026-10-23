@@ -27,7 +27,7 @@ from paf.healer import (
     RELATIVE,
     SPIKE,
     SPIKE_GAP,
-    STAGED,
+    STAGE_TERM,
     STEP,
     UNSIMMED,
     Cooldown,
@@ -659,7 +659,7 @@ def render_sheet(p: TankPrep) -> str:
         f"{'' if p.moments else '<li>No big moment: steady damage.</li>'}</ul></div>",
         f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
         f"{nouned(cooldowns_html(defs, answered, named, moved_t)) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
-        + (TANK_HOW_TO_READ.replace("</dl>", f"<dt>Stage time</dt><dd>{STAGED.rstrip('; ')}.</dd></dl>")
+        + (TANK_HOW_TO_READ.replace("</dl>", f"<dt>Stage time</dt><dd>{STAGE_TERM}</dd></dl>")
            if getattr(p, "staged", False) else TANK_HOW_TO_READ)
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
            f"</p>" if p.rare else ""),
@@ -681,7 +681,7 @@ def render_sheet(p: TankPrep) -> str:
     change = [build_lead(p.builds, p.spec, p.split_players or p.kills, p.split, p.split_wide),
               talents_html(p.builds, p.split_players or p.kills, f"{p.spec}s", p.hero),
               split_html(p.split, p.split_players, p.spec, p.split_wide) if p.split else "",
-              f"<h2>Trinkets the top {e(p.spec)}s play</h2><ul class='hl2'>"
+              f"<h2>Trinkets the top {e(p.spec)}s play</h2><ul class='hl2 bars'>"
               f"{trinkets_html(p.trinkets) or '<li>No gear yet.</li>'}</ul>",
               ]  # the lead says no sim weighs them
     top_share = max((s_ for _n, s_ in p.hitters), default=1.0) or 1.0

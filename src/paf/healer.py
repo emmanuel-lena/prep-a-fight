@@ -162,6 +162,11 @@ HOW_TO_READ = (
     "counted for it (&#10226;&nbsp;about half: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
     "time some top players press it instead.</dd></dl>")
 
+# stage time, as a legend term: every rule of STAGED, in fewer words
+STAGE_TERM = ("after a dashed line: each kill's damage and presses counted from that stage's start, placed at its "
+              "median start; a stage's seconds past the next one's start are left out of the times, still counted "
+              "in who presses a button.")
+
 LEAD_HITS = 4  # the big moments the lead says at most: Nek'zali's two rites and Stage Two's two waves
 # the stage clock said, on a boss with stages (paf.stagetime, round 100)
 STAGED = ("in stage time: each kill's damage and presses after a stage starts are counted from that stage's start, "
@@ -2450,9 +2455,9 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
     return ((f"<p>With or without any {e(what.lower())} spec here, kill time and deaths stay within the noise.</p>"
              if not marked else "")
             + f"<table class='hcomp'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"
-            "<dl class='legend'><dt>Marked</dt><dd>a gap with and without the spec beyond three standard errors "
-            "(clear with every number tested at once): a reading of these kills, not a reason to bring it.</dd>"
-            "<dt>Deaths</dt><dd>per 20 players (heroic raids are 10 to 30), a mean over the kills whose deaths are "
+            "<dl class='legend'>" + ("<dt>Marked</dt><dd>a gap with and without the spec beyond three standard "
+            "errors (clear with every number tested at once): a reading of these kills, not a reason to bring it."
+            "</dd>" if marked else "") + "<dt>Deaths</dt><dd>per 20 players (heroic raids are 10 to 30), a mean over the kills whose deaths are "
             f"read.</dd><dt>A wide reading</dt><dd>{FEW_KILLS} to {WIDE_KILLS - 1} kills: never marked.</dd>"
             f"<dt>Too few kills</dt><dd>under {FEW_KILLS}: no number.</dd></dl>")  # every term (round 86; less text)
 
@@ -2752,8 +2757,6 @@ def render_sheet(h: HealerPrep) -> str:
                                  for c in rare) + " on this boss.</p>")
     # the rule, once, under the long cooldowns and their "fewer than half" line (Zephyr's read as part of it)
     # one definition a line, the term first (round 76: 120 words in one paragraph read as no reference)
-    fight.append(legend_for(HOW_TO_READ.replace("</dl>", f"<dt>Stage time</dt><dd>{STAGED.rstrip('; ')}.</dd></dl>")
-                            if getattr(h, "staged", False) else HOW_TO_READ, "".join(fight)))  # its used terms only
     exts = [c for c in heals if _external(c.spell_id) == "protective"]
 
     def fewer(cs: list) -> str:
@@ -2798,7 +2801,7 @@ def render_sheet(h: HealerPrep) -> str:
     if h.split:
         change.append(split_html(h.split, h.split_players, h.spec, h.split_wide))
     trk = trinkets_html(h.trinkets) or "<li>No gear yet.</li>"
-    change.append(f"<h2>Trinkets the top {e(h.spec)}s play</h2><ul class='hl2'>{trk}</ul>"
+    change.append(f"<h2>Trinkets the top {e(h.spec)}s play</h2><ul class='hl2 bars'>{trk}</ul>"
                   f"<p class='small muted'>"
                   f"To weigh a talent or an item for your character, use <a href=\"{QE_LIVE}\" target=\"_blank\" "
                   f"rel=\"noopener\">QE Live</a>.</p>")
@@ -2899,6 +2902,9 @@ def render_sheet(h: HealerPrep) -> str:
     byline = (f"{e(h.character or h.spec)} &middot; {e(h.spec)} &middot; from {h.kills} top kills (median "
               f"{_mmss(h.duration)})"  # the healers' other samples are said on Dig deeper, where they are used
               + " &middot; no healing sim")
+    # the legend under every card it explains, its used terms only (a review: mid-page, it split the cards)
+    fight.append(legend_for(HOW_TO_READ.replace("</dl>", f"<dt>Stage time</dt><dd>{STAGE_TERM}</dd></dl>")
+                            if getattr(h, "staged", False) else HOW_TO_READ, "".join(fight)))
     return sheet_page(h.boss, h.difficulty, byline, h.class_name,
                       {"fight": fight, "change": change, "boss": boss, "deeper": deeper}, theme.style("healer"),
                       UNSIMMED)
