@@ -333,6 +333,8 @@ def _why(d, name: str, t: float, presses: list[float]) -> str:
         if there is not None and here < 0.25:
             when = "wait until" if there[1] > t else "press it earlier, at"  # a deviation said as one (a review:
             why += f"; {there[0]:.0%} of the top players {when} {_mmss(there[1])}"  # "press it at 1:37" on a 2:03 row)
+        elif there is not None and there[0] >= here + 0.15:  # most press it a little apart: said, as Dig deeper's
+            why += f"; {there[0]:.0%} of the top players press it at about {_mmss(there[1])}"  # warning (DPS c. 11)
         elif here >= 0.5:
             why += f"; {here:.0%} of the top players press it then"  # a share, not the rule's backing (DPS c. 8)
     return why.lstrip(";, ")  # a later press with no rule said: its top players' part alone
