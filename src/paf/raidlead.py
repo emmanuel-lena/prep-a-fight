@@ -505,7 +505,8 @@ def lust_block(sh: dict, difficulty: str) -> str:
            "Checked by default: the top raids' most used spot, since lust timing is a raid-wide call and one spec's "
            "gain is only a hint. Your pick goes into your preps here and into the Discord text.")
     rest = 1 - sum(x.share for x in spots)
-    notes = [f"{rest:.0%} of the top raids lust elsewhere, each spot under 5%."] if rest >= 0.03 else []
+    notes = ([f"{rest:.0%} of the top raids lust elsewhere, each spot under 5%."] if rest >= 0.03 else
+             [f"The other {rest:.0%}: elsewhere."] if rest >= 0.005 else [])  # the shares add to 100% (a review: 98%)
     notes.append(f"Simmed on the newest {e(spec)} prep here{f' ({_mmss(kill)} kill)' if kill else ''}, with "
                  f"Bloodlust at each spot against the spot it played (baseline). Other specs may gain differently."
                  if gains else "Prepare this boss to see what each spot gives.")

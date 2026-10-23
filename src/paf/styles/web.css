@@ -432,3 +432,10 @@ table.mx a.mx.old,.mx-legend .pill.old{border:1px solid var(--warn)} .mx-legend 
 table.mx .mx-boss{background:#15121c}
 table.mx a.mx.nosim.old{border:1px dashed var(--warn)} /* no sim first, its age's amber kept */
 .rl-other{font:600 12.5px var(--font-body);padding:1px 9px;border-radius:6px;border:1px solid var(--warn);color:var(--fg)}
+/* raid lead: every talent line's chips start on one vertical line */
+.rl-boss li.rl-b{display:grid;grid-template-columns:20px minmax(90px,max-content) 150px 170px 1fr;align-items:center;gap:4px 8px}
+.rl-boss li.rl-b small{white-space:nowrap} .rl-other,.rl-side{white-space:nowrap}
+.rl-boss li.rl-b{grid-template-columns:20px 120px 150px 170px 1fr}
+.rb-boss.grey .rb-face{filter:grayscale(1) opacity(.65)} /* not prepared: grey, still recognisable */
+.rl-lusts{max-width:560px}
+.rl-boss li.rl-b{grid-template-columns:20px 120px 150px 1fr} .rl-boss li.rl-b .rl-ts{grid-column:2/-1} /* the chips on their own line, all from one x */

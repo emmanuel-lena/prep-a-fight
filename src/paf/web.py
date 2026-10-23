@@ -1221,7 +1221,7 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
         last, said = lastraid.card(slug), lastraid.headline(slug)
         if said and "data-reading" not in last:  # read: one line beside the prep, the details on Reclear
             last = (f"<section class='lr lr-row'><h2>Your last raid</h2><p class='lr-line'>{e(said)} "
-                    "<a href='/reclear'>Your pulls, read &rarr;</a></p></section>")
+                    "<a href='/reclear'>Reclear &rarr;</a></p></section>")
         else:
             last = last + lastraid.CARD_JS if last else ""
     except Exception:  # noqa: BLE001 - the home always shows
