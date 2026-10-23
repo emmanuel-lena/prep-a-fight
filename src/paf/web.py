@@ -544,14 +544,10 @@ def boss_cards(items: list[dict], order: tuple[str, ...] = (), spec: bool = True
 
 
 def short_ago(mtime: float, now: float | None = None) -> str:
-    """A sheet's age in a few characters, for a table cell ("24 min", "3 h", "20 Oct")."""
-    s = max(0.0, (now or time.time()) - mtime)
-    if s < 120:  # as ago() (the board): one sheet, one age
-        return "now"
-    if s < 3600:
-        return f"{int(s // 60)} min ago"  # an age, not a duration (a review: "12 min" read as how long)
-    if s < 86400:
-        return f"{int(s // 3600)} h ago"
+    """A sheet's day in a few characters, for a table cell ("today", "20 Oct")."""
+    lt, today = time.localtime(mtime), time.localtime(now or time.time())  # one form a cell: a day (app
+    if (lt.tm_year, lt.tm_yday) == (today.tm_year, today.tm_yday):  # confirm round 10: "now", "13 min ago"
+        return "today"  # and "10 Oct" in one row); the hour is on hover
     lt = time.localtime(mtime)
     return f"{lt.tm_mday} {time.strftime('%b', lt)}"  # "9 Oct", no leading zero
 

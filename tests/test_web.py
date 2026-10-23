@@ -298,7 +298,7 @@ def test_simple_home_once_set_up(tmp_path, monkeypatch):
     (rep / "prep-the-altar-heroic-elemental-shaman.html").write_text("<title>The Altar prep</title>")
     page = web.home().decode()
     assert "Prepare a boss</h1>" in page and 'class="go-boss"' in page and 'name="difficulty" value="mythic"' in page
-    assert "<h2>Your sheets</h2>" in page and "The Altar" in page and ">now</a>" in page  # one table, its age
+    assert "<h2>Your sheets</h2>" in page and "The Altar" in page and ">today</a>" in page  # one table, its age
     assert "Change your character" not in page  # the character, the raid and the key live in Characters and Settings
     assert "%" not in page.split("<h2>Your sheets</h2>", 1)[1].split("</table>", 1)[0]  # no numbers in the cells
 
@@ -352,3 +352,12 @@ def test_a_single_target_boss_offers_no_add_padding(monkeypatch):
     assert web.fight_has_no_adds(enc, 4, "heroic", "Elemental")
     monkeypatch.setattr(Fight, "load", classmethod(lambda cls, p: SimpleNamespace(add_waves=[object()])))
     assert not web.fight_has_no_adds(enc, 4, "heroic", "Elemental")
+
+
+def test_a_sheet_cell_says_its_day():
+    # app confirm round 10: "now", "13 min ago" and "10 Oct" in one row
+    import time as _t
+
+    now = _t.mktime((2026, 10, 23, 15, 0, 0, 0, 0, -1))
+    assert web.short_ago(now - 600, now) == "today"
+    assert web.short_ago(now - 2 * 86400, now) == "21 Oct"
