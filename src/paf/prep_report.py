@@ -621,7 +621,8 @@ def suggestions(d: PrepData) -> list[Suggestion]:
                 others += "; vs the plan the sheet plays: " + ", ".join(rel)
         if others:
             lines.append(f"<span class='muted small'>Also: {e(others)}.</span>")
-        if any("Switch to the talents" in x.title for x in out) and p.gain > 2 * p.error:  # beside a talent gain
+        if (any("Switch to the talents" in x.title for x in out) and p.gain > 2 * p.error  # beside a talent gain,
+                and p.objective in ("boss", "total")):  # in the same kind of damage (not a burst plan's)
             lines.append("<span class='pill'>&ne; adds to the talents' gain: simmed apart</span>")  # (DPS confirm 3)
         if d.mrt.get(p.objective):
             lines.append(copy_button(d.mrt[p.objective], "Copy the MRT note")
