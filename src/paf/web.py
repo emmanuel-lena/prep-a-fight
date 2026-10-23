@@ -1004,8 +1004,9 @@ def queue_strip(difficulty: str) -> str:
                 if q.get("paused") == "character" else
                 "<small>Stopped: prepare again to go on, the bosses already prepared stay.</small>")
     return (f"<div class='rq' id='raidq'><div class='rq-txt'><span class='rq-head'>Prepare the whole raid in one "
-            f"go</span><span class='rq-now'>Every boss in turn, in the background.</span>"
-            f"{note}</div><a class='btn ghost' href='/raid/prepare?difficulty={e(difficulty)}'>Prepare the whole raid</a>"
+            f"go</span>"
+            f"{note}</div><a class='btn ghost' href='/raid/prepare?difficulty={e(difficulty)}' "
+            "title='Every boss in turn, in the background'>Prepare the whole raid</a>"
             "</div>")
 
 
@@ -1311,9 +1312,18 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
         sp = (settings.get("spec") or "").lower()
         mine = "healer" if sp in HEALER_SPECS else "tank" if sp in TANK_SPECS else "damage"
         guide = f"<h2>The boss in 60 seconds</h2>{bossguide.summary_html(sections, mine)}"
+        timings = {m.name: list(m.times) for m in (mechs or []) if getattr(m, "times", None)}  # what the lede
+        try:  # promises (app round 12: no ability showed a time): the mechanics' and the adds' of the template
+            from paf.corpus.template import template_path
+            from paf.fight import Fight
+
+            for w in Fight.load(template_path(enc.name, difficulty)).add_waves:
+                timings.setdefault(w.name, []).append(w.time)
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
         journal = (f"<section class='boss-journal'><h2>Every ability, from the Encounter Journal</h2><p class='adv-lede'>Timings "
                    f"and how many players are hit come from the ranked kills.</p><div class='stages'>"
-                   f"{bossguide.abilities_html(sections, mechanics=mechs, icon_map=gicons, role=mine, difficulty=difficulty)}"
+                   f"{bossguide.abilities_html(sections, timings=timings, mechanics=mechs, icon_map=gicons, role=mine, difficulty=difficulty)}"
                    "</div></section>")
     try:  # where the data will come from, and how long: from what will really happen (paf.estimate)
         from paf import estimate
@@ -1592,7 +1602,7 @@ def plan_block(enc, difficulty: str) -> str:
     else:
         return ('<p class="muted small">Available after the first prep: your own movements (a soak at 2:45, a '
                 "dodge...), Bloodlust and Power Infusion timings, on top of the rebuilt fight.</p>")
-    return f"""<p class="small muted">Every sim of the prep runs on this fight; the mechanics you tick above are added as
+    return f"""<p class="small muted">Every sim of the prep runs on this fight; the mechanics you tick in step 2 are added as
 <code>assign</code> lines.</p>
 <form method="post" action="/plan"><input type="hidden" name="boss" value="{enc.id}">
 <input type="hidden" name="difficulty" value="{e(difficulty)}"><textarea name="plan" aria-label="Fight plan lines">{e(text)}</textarea>

@@ -134,7 +134,7 @@ def notes_template(fight: Fight) -> str:
                      f"amp, uncomment and set the real value:")
         lines.append(f"# amp {base} {vs[0].multiplier:g}")
     if lines[-1] == "# Detected in the logs:":  # said, not an empty list
-        lines.append("#   nothing: no boss-type unit and no damage window on this fight.")
+        lines.append("#   nothing to correct: no second boss and no damage window on this fight.")
     return "\n".join(lines) + "\n"
 
 

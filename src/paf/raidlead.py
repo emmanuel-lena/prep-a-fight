@@ -455,7 +455,6 @@ def page_body(difficulty: str) -> str:
             f"<a href='/raid/prepare?difficulty={e(difficulty)}'>Prepare the whole raid</a> first.</p>" if missing else "")
     n = len(everything)
     answer = (f"<p class='lead'>{n} {'boss' if n == 1 else 'bosses'} to copy for Discord"
-              + (f", {len(missing)} with no top kills read yet" if missing else "")  # not the home's "prepared"
               + f", for the {len(state['players']) - len(bench)} players of your raid.</p>") if n else ""
     if answer:  # the answer is the page's lead; what the page does goes
         head = head.replace(lead, answer)

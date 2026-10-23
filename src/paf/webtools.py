@@ -127,11 +127,11 @@ def new_reports(since: float) -> list[str]:
 # `paf config` (paf.settings); a key missing here goes to the folded group.
 SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
     ("Your raid", False, [
-        ("difficulty", "Difficulty", "The difficulty a new prep starts on."),
+        ("difficulty", "Difficulty", ""),
         ("guild", "Guild", "Its latest public log: who plays what in your raid (pad the adds or not), and your "
                            "last pull against the top players'."),
         ("guild_server", "Guild's server", "As the game writes it (Kazzak, Twisting Nether)."),
-        ("guild_region", "Guild's region", "Where your guild's logs are read from."),
+        ("guild_region", "Guild's region", ""),
     ]),
     ("The app", False, [
         ("refresh_after_reset", "Prepare again after the weekly reset",
@@ -145,7 +145,7 @@ SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
         ("corpus_points", "Quota for background reading",
          "Warcraft Logs points per hour (of 3600) the reading in the background may use; a prep you wait for "
          "uses the whole quota."),
-        ("region", "Rankings from one region only", "All regions unless you pick one."),
+        ("region", "Rankings from one region only", ""),
         ("cache_max_mb", "Disk cache cap (MB)", "Sim results and Warcraft Logs answers; the oldest go first."),
     ]),
 ]
@@ -311,8 +311,8 @@ stays where it is">Get nightly</button></form></div></td></tr>
 <tr><td>{OK_DOT}prep-a-fight</td><td class="small"><div class="val"><span>version {e(__version__)}</span>
 <form method="post" action="/update/check"><button class="btn ghost">Check for updates</button></form></div></td></tr>
 <tr><td>{ok_wcl}Warcraft Logs</td><td class="small">{quota}</td></tr>
-<tr><td>Caches (sims, logs)</td><td class="small">{cache_meter}{size(cache_root()) / 1e6:,.0f} MB
-(cap {settings.get('cache_max_mb')} MB)</td></tr>
+<tr><td>Caches (sims, logs)</td><td class="small">{cache_meter}{size(cache_root()) / 1e9:.1f} /
+{float(settings.get('cache_max_mb') or 0) / 1000:.1f} GB</td></tr>
 <tr><td>Data folder</td><td class="small">{path_html(str(data_dir()))}</td></tr></table></div>
 <p class="muted small">Every tool the prep runs also has <a href="/tools">its own page</a>.</p>
 </div></div>
