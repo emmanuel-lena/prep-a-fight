@@ -190,33 +190,45 @@ def _rel(a: float, b: float) -> float:
 
 def highlights(a: Side, b: Side, boss: str) -> list[tuple[str, str]]:
     """What B did better (or worse) than A, biggest first: (kind, sentence) with kind good / bad."""
-    out: list[tuple[float, str, str]] = []
+    return [(k, s) for k, s, _r in highlights_full(a, b, boss)]
+
+
+def highlights_full(a: Side, b: Side, boss: str) -> list[tuple[str, str, tuple[str, str, str]]]:
+    """The highlights with their row for a table: (kind, sentence, (what, value in B, value in A))."""
+    out: list[tuple[float, str, str, tuple[str, str, str]]] = []
     t = min(a.duration, b.duration)
     if a.pull.health and b.pull.health:  # the boss's health is known (the boss is prepared)
         la, lb = a.pull.left_at(t), b.pull.left_at(t)
         out.append((abs(la - lb) * 4, "good" if lb < la else "bad",
-                    f"At {int(t // 60)}:{int(t % 60):02d}, the boss had {lb:.0%} left in B against {la:.0%} in A."))
+                    f"At {int(t // 60)}:{int(t % 60):02d}, the boss had {lb:.0%} left in B against {la:.0%} in A.",
+                    (f"Boss health left at {int(t // 60)}:{int(t % 60):02d}", f"{lb:.0%}", f"{la:.0%}")))
     da, db = sum(len(v) for v in a.deaths.values()), sum(len(v) for v in b.deaths.values())
     if da != db:
-        out.append((abs(da - db) / 10, "good" if db < da else "bad", f"Deaths before the wipe: {db} in B, {da} in A."))
+        out.append((abs(da - db) / 10, "good" if db < da else "bad", f"Deaths before the wipe: {db} in B, {da} in A.",
+                    ("Deaths before the wipe", str(db), str(da))))
     for target in sorted(set(a.shares) | set(b.shares), key=lambda x: -(a.shares.get(x, 0) + b.shares.get(x, 0))):
         sa, sb = a.shares.get(target, 0.0), b.shares.get(target, 0.0)
         if abs(sb - sa) >= 0.03:
             good = (sb > sa) == (target in (b.pull.bosses or {boss}))
             out.append((abs(sb - sa) * 2, "good" if good else "bad",
-                        f"Share of the raid's damage on {target}: {sb:.0%} in B, {sa:.0%} in A."))
+                        f"Share of the raid's damage on {target}: {sb:.0%} in B, {sa:.0%} in A.",
+                        (f"Raid damage on {target}", f"{sb:.0%}", f"{sa:.0%}")))
     pa, pb = a.player, b.player
     if pa and pb:
         if abs(_rel(pa.boss_dps, pb.boss_dps)) >= MOVED:
             out.append((abs(_rel(pa.boss_dps, pb.boss_dps)) * 3, "good" if pb.boss_dps > pa.boss_dps else "bad",
-                        f"{pb.name}: {pb.boss_dps / 1000:,.0f}k on the boss in B, {pa.boss_dps / 1000:,.0f}k in A."))
+                        f"{pb.name}: {pb.boss_dps / 1000:,.0f}k on the boss in B, {pa.boss_dps / 1000:,.0f}k in A.",
+                        (f"{pb.name}: damage on the boss", f"{pb.boss_dps / 1000:,.0f}k",
+                         f"{pa.boss_dps / 1000:,.0f}k")))
         if pa.active is not None and pb.active is not None and abs(pb.active - pa.active) >= 0.03:
             out.append((abs(pb.active - pa.active) * 3, "good" if pb.active > pa.active else "bad",
-                        f"{pb.name}: active {pb.active:.0%} of the pull in B, {pa.active:.0%} in A."))
+                        f"{pb.name}: active {pb.active:.0%} of the pull in B, {pa.active:.0%} in A.",
+                        (f"{pb.name}: active", f"{pb.active:.0%}", f"{pa.active:.0%}")))
         if len(pa.deaths) != len(pb.deaths):
             out.append((0.3, "good" if len(pb.deaths) < len(pa.deaths) else "bad",
-                        f"{pb.name}: died {len(pb.deaths)} time(s) in B, {len(pa.deaths)} in A."))
-    return [(k, s) for _, k, s in sorted(out, key=lambda x: -x[0])]
+                        f"{pb.name}: died {len(pb.deaths)} time(s) in B, {len(pa.deaths)} in A.",
+                        (f"{pb.name}: deaths", str(len(pb.deaths)), str(len(pa.deaths)))))
+    return [(k, s, r) for _, k, s, r in sorted(out, key=lambda x: -x[0])]
 
 
 def ability_rows(a: Player, b: Player, limit: int = 8) -> list[dict]:
@@ -248,7 +260,7 @@ def to_dict(boss: str, a: Side, b: Side) -> dict:
              for k, s in (("a", a), ("b", b))}
     out = {"boss": boss, "a": {"label": a.label, "fight": a.fight, "duration": a.duration},
            "b": {"label": b.label, "fight": b.fight, "duration": b.duration}, "curves": curve,
-           "highlights": [{"kind": k, "text": t} for k, t in highlights(a, b, boss)],
+           "highlights": [{"kind": k, "text": t, "row": list(r)} for k, t, r in highlights_full(a, b, boss)],
            "deaths": {"a": a.deaths, "b": b.deaths, "bare_a": a.bare, "bare_b": b.bare}}
     if a.player and b.player:
         pa, pb = a.player, b.player

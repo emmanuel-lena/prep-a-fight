@@ -268,7 +268,9 @@ def sentences(b: dict, player: str) -> list[str]:
                        + (f"; padding talents: {', '.join(me['pad_talents'])}" if me.get("pad_talents") else "") + ".")
     d = _result(b["jobs"].get("diff"))
     if d:  # B is the better pull of the two (paf.pulldiff.player_pair, default_pair)
-        out += [_ab(h["text"], player) for h in d.get("highlights", [])]
+        out += [({"cmp": [_you(h["row"][0], player), *h["row"][1:]], "kind": h.get("kind", ""),
+                  "text": _ab(h["text"], player)} if h.get("row") else _ab(h["text"], player))
+                for h in d.get("highlights", [])]  # a row of the pulls' table (the owner: less text)
     return out
 
 
@@ -279,6 +281,20 @@ def _ab(text: str, player: str = "") -> str:
     if player and text.lower().startswith(player.lower() + ":"):
         text = "You:" + text[len(player) + 1:]
     return text
+
+
+def _you(label: str, player: str) -> str:
+    """"Ixuu: damage on the boss" -> "You: damage on the boss"."""
+    return "You:" + label[len(player) + 1:] if player and label.lower().startswith(player.lower() + ":") else label
+
+
+def _cmp_table(rows: list[dict]) -> str:
+    """The best pull against the weaker one, a measure a row, the better value marked (good or bad for you)."""
+    if not rows:
+        return ""
+    return ("<table class='lr-cmp fit'><thead><tr><th></th><th>Best pull</th><th>Weaker pull</th></tr></thead><tbody>"
+            + "".join(f"<tr class='{e(r.get('kind', ''))}'><td>{e(r['cmp'][0])}</td><td><b>{e(r['cmp'][1])}</b></td>"
+                      f"<td>{e(r['cmp'][2])}</td></tr>" for r in rows) + "</tbody></table>")
 
 
 def _key(sentence) -> str:
@@ -364,7 +380,8 @@ def card(slug: str, heading: bool = True) -> str:
         reviewed = f" &middot; reviewed: the kill, {_mmss(rot['duration'])}" if rot and rot.get("duration") else ""
         state_txt = (f"killed in {b['pulls']} {'pull' if b['pulls'] == 1 else 'pulls'}{reviewed}" if b["kill"] else
                      f"not killed: best pull with the boss at {b['best']:.0f}% health, {_pulls(b['pulls'])}")
-        says = [x for x in boss_says if _key(x) not in skip][:3]
+        says = ([x for x in boss_says if _key(x) not in skip and not (isinstance(x, dict) and x.get("cmp"))][:3]
+                + [x for x in boss_says if isinstance(x, dict) and x.get("cmp")][:6])  # a table: more rows fit
         links = "".join(f"<a href='/job/{e(jid)}'>{label}</a>" for kind, label in
                         (("rotation", "Your rotation"), ("wipe", "Why it did not die"), ("diff", "Your best pull vs your worst"))
                         if (jid := b["jobs"].get(kind)) and not _failed(jid))
@@ -373,7 +390,9 @@ def card(slug: str, heading: bool = True) -> str:
         if not says and not cur["finished"]:
             body = "<p class='lr-wait'><span class='pl-spin'></span> Reading&hellip;</p>"
         else:
-            body = ("<ul>" + "".join(_li(s) for s in says) + "</ul>") if says else \
+            rest = [x for x in says if not (isinstance(x, dict) and x.get("cmp"))]
+            body = (("<ul>" + "".join(_li(s) for s in rest) + "</ul>" if rest else "")
+                    + _cmp_table([x for x in says if isinstance(x, dict) and x.get("cmp")])) if says else \
                 "<p class='muted small'>Nothing stands out.</p>"
         card_html = (f"<article class='lr-boss{' kill' if b['kill'] else ''}'><header><b>{e(b['name'])}</b>"
                  f"{diff_pill(b['difficulty'])}<span class='lr-state'>{state_txt}</span></header>"

@@ -392,3 +392,7 @@ table.mx a.mx:hover{border-color:var(--fg)} table.mx a.mx.nosim{border-style:das
 .rl-t.drop{background:color-mix(in srgb,var(--neg) 12%,transparent);color:var(--fg);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--neg) 60%,transparent)}
 .rl-ok{font:600 12px var(--font-body);color:var(--pos);margin-left:8px}
 .rl-n{display:inline-flex;align-items:center;gap:3px;margin:0 6px 0 0} .rl-boss li small .ics{width:14px;height:14px;vertical-align:-2px;margin:0 2px}
+/* Reclear: the best pull against the weaker one, a measure a row */
+table.lr-cmp{margin:6px 0 10px;font-size:14px} table.lr-cmp th{font:600 11px var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:4px 16px 4px 0}
+table.lr-cmp td{padding:5px 16px 5px 0;border-top:1px solid var(--line)} table.lr-cmp td b{font-family:var(--font-data)}
+table.lr-cmp tr.good td b{color:var(--pos)} table.lr-cmp tr.bad td b{color:var(--neg)}

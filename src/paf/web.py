@@ -1018,8 +1018,7 @@ def reclear_page() -> str:
     said = lastraid.headline(slug) if slug else ""
     priced = "lr-pt" in card  # what cost you the most is said once the points are priced (issue #24)
     lead = (e(said) + (" Below, what cost you the most on each boss, against the top players of your spec, and where to "
-                       "look in the log." if priced else " Below, your best pull against your weaker one, and where to "
-                       "look in the log.") if card and said else "Your last raid, read against the top players of your spec: what "
+                       "look in the log." if priced else "") if card and said else "Your last raid, read against the top players of your spec: what "
             "cost you the most, boss by boss, and where to look in the log." if card else "No raid of yours read yet: the app looks for your character's "
             "latest log of the current raid each time it starts.")
     return (f"<div class='rc'><header class='rc-head'><h1>Reclear</h1><p class='lead'>{lead}</p>"

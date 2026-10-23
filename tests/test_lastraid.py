@@ -130,3 +130,17 @@ def test_the_headline_of_a_raid(tmp_path, monkeypatch):
     assert lastraid.headline("ixuu-rogue") == (
         "Sszorak mythic, your best pull got it to 58%; Vashnik the Malignant heroic killed.")
     assert lastraid.headline("nobody") == ""
+
+
+def test_the_pull_comparison_is_a_table(monkeypatch):
+    # the owner (less text): "You: 252k on the boss in your best pull, 209k in your weaker pull." three times over
+    d = {"highlights": [
+        {"kind": "good", "text": "Ixuu: 252k on the boss in B, 209k in A.",
+         "row": ["Ixuu: damage on the boss", "252k", "209k"]},
+        {"kind": "bad", "text": "At 2:38, the boss had 66% left in B against 69% in A.",
+         "row": ["Boss health left at 2:38", "66%", "69%"]}]}
+    monkeypatch.setattr(lastraid, "_result", lambda jid: d if jid == "d" else None)
+    says = lastraid.sentences({"kill": False, "jobs": {"diff": "d"}}, "Ixuu")
+    assert says[0]["cmp"] == ["You: damage on the boss", "252k", "209k"]
+    table = lastraid._cmp_table(says)
+    assert "<tr class='good'><td>You: damage on the boss</td><td><b>252k</b></td><td>209k</td></tr>" in table
