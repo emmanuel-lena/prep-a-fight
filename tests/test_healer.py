@@ -214,10 +214,9 @@ def test_a_press_back_from_cooldown_in_a_hit_is_said_and_drawn_as_none():
     h = healer.HealerPrep("Boss", "heroic", "Restoration Druid", 10, 240.0, [100.0] * 48, found, cds, [], [], [], [])
     sheet = healer.render_sheet(h)
     assert "100% press Tranquility (about 0:42)" in sheet
-    assert ("<span class='none'>None kept</span> (100% press Tranquility in its window, about 2:45, back from "
-            "cooldown)") in sheet  # the 2:40 hit's row
-    assert ("2:45 &middot; 100% &middot; &#10226; &middot; in the window of the 2:40 "
-            "hit") in sheet
+    assert ("<span class='none'>None kept</span> (100% press Tranquility in its window, about 2:45 &middot; "
+            "&#10226;)") in sheet  # the 2:40 hit's row, the legend's glyph as the chips
+    assert "2:45 &middot; 5 s after the 2:40 hit starts &middot; 100% &middot; &#10226;</span>" in sheet
     assert "class='cp off'><title>Tranquility 2:45" in sheet and "class='cp'><title>Tranquility 0:42" in sheet
 
 
@@ -257,7 +256,7 @@ def test_a_ramp_answers_the_hit_after_it(monkeypatch):
     assert "100% press Evangelism (about 0:24, a ramp ahead of it)" in sheet
     assert "pressed again as soon as it is back" not in sheet  # its rhythm line says it (round 30)
     assert "0:24 &middot; 16 s before the 0:40 hit" in sheet
-    assert "1:42 &middot; 100% &middot; &#10226; &middot; ahead of the 2:10 hit" in sheet
+    assert "1:42 &middot; 28 s before the 2:10 hit &middot; 100% &middot; &#10226;</span>" in sheet
 
 
 def test_back_from_cooldown_is_read_per_player():
@@ -535,8 +534,8 @@ def test_a_named_chip_with_one_share_shows_one_time():
     c = healer.Cooldown("Shield Wall", 1, 0.6, 2.0, [179.0], [""], support=[0.15],
                         presses=[[177.0]] * 15 + [[60.0]] * 45, n_all=100)
     out = healer.cooldowns_html([c], set(), {("Shield Wall", 179.0): 175.0})
-    assert ("2:57 &middot; 15% (25% of its users) &middot; in the window of the 2:55 hit"
-            in out and "about" not in out)
+    assert ("2:57 &middot; 2 s after the 2:55 hit starts &middot; 15% (25% of its users)</span>"
+            in out and "about" not in out and "the same" not in out)
 
 
 def test_a_share_under_a_quarter_gives_the_pressers_share():
@@ -720,9 +719,16 @@ def test_the_other_share_counts_players_not_shares():
 
 def test_a_button_pressed_twice_by_some_says_so():
     # Discipline Priest, Nek'zali (round 110): 27 + 20 + 15 + "the other 38%" past the 97% who press it
-    c = healer.Cooldown("Ultimate Penitence", 1, 0.97, 1.0, [76.0], [""], n_all=100,
-                        presses=[[76.0, 230.0]] * 31 + [[76.0]] * 66)
+    c = healer.Cooldown("Ultimate Penitence", 1, 0.97, 1.0, [76.0, 230.0], ["", ""], support=[0.62, 0.31],
+                        n_all=100, presses=[[76.0, 230.0]] * 31 + [[76.0]] * 31 + [[150.0]] * 35)
     assert healer._twice(c) == " (31% press it twice: a player can count in two shares)"
+
+
+def test_twice_is_said_only_when_the_shares_add_past_the_pressers():
+    # Restoration Shaman, Vashnik (heal round 10): Spirit Link Totem 17% at 2:10 + "the other 76%" = its 93%
+    c = healer.Cooldown("Spirit Link Totem", 1, 0.93, 1.0, [130.0], [""], support=[0.17], n_all=100,
+                        presses=[[130.0, 250.0]] * 17 + [[50.0]] * 76)
+    assert healer._twice(c) == ""
 
 
 def test_a_side_line_gives_each_time_its_share():
@@ -744,3 +750,14 @@ def test_hit_dot_has_a_hover():
     svg = healer.curve_svg([100.0] * 300, found, [("Stage Two", 178.0)], "x")
     assert "<title>3:50 &middot; mostly Possession Barrage &middot; 1.41&times; the usual damage &middot; " \
            "Stage Two +0:52</title>" in svg
+
+
+def test_one_none_kept_reason_on_several_rows_is_said_once():
+    # Protection Warrior, Vashnik (heal round 10): "None kept (no long defensive of theirs pressed by a tenth of
+    # them in it)" on two rows under a lead saying none is kept
+    found = [healer.Moment(t, 1000.0, 5.0, "Crush") for t in (60.0, 120.0, 175.0)]
+    why = " (no long defensive of theirs pressed by a tenth of them in it)"
+    out = healer.hits_table(found, found, [], {"1:00": why, "2:00": why, "2:55": " (12% press Shield Wall)"},
+                            None, {}, "")
+    assert out.count("pressed by a tenth") == 1 and "None kept: no long defensive of theirs" in out
+    assert "<span class='none'>None kept</span> (12% press Shield Wall)" in out

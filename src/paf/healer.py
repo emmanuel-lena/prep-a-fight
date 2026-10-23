@@ -942,13 +942,17 @@ def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list
             if x != first:
                 said.setdefault(x, f"<span class='muted'>the other choice of the press on the {first} row</span>")
     lead = {_mmss(m.t) for m in shown}
+    # one reason on several rows: said once under the table (heal round 10: "None kept (no long defensive of theirs
+    # pressed by a tenth of them in it)" twice under a lead saying none is kept)
+    common = Counter(v for k, v in bare.items() if k not in said).most_common(1)
+    same = common[0][0] if common and common[0][1] >= 2 and re.fullmatch(r" \(no [^()]*\)", common[0][0]) else None
     rows = []
     for m in sorted(moments, key=lambda m: m.t):
         k = _mmss(m.t)
         if k in said:
             ans = said[k]
         elif k in bare:
-            ans = f"<span class='none'>None kept</span>{_unnest(bare[k])}"
+            ans = f"<span class='none'>None kept</span>{'' if bare[k] == same else _unnest(bare[k])}"
         else:  # a big moment past the lead's four
             ans = "<span class='muted'>not among the highest, the table reads four</span>" if k not in lead else ""
         tag = _stage_tag(m.t, phases)
@@ -956,9 +960,10 @@ def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list
                     f"<td>{e(m.boss_spell) if m.boss_spell else '<span class=muted>raid damage</span>'}"
                     + "".join(f"<span class='tag'>{x}</span>" for x in (tags or {}).get(k, [])) + "</td>"
                     f"<td class='sz'><span class='track'><span class='bar' style='width:{max(8, round((m.ratio - 1) / max(0.01, top - 1) * 100))}%'></span></span>"
-                    f"<b>{_x(m.ratio)}&times;</b></td><td class='ans'>{ans}</td></tr>")
+                    f"<b>{_x(m.ratio)}&times;</b></td><td class='ans'>{_tidy(ans)}</td></tr>")  # the legend's ⟲, as the chips
     return ("<table class='hits'><thead><tr><th>When</th><th>What hits</th><th>Size &times;</th><th>What the top players press</th></tr></thead><tbody>" + "".join(rows)
-            + f"</tbody></table><p class='small muted hits-rule'>{rule + '. ' if rule else ''}Size: &times; the usual "
+            + f"</tbody></table><p class='small muted hits-rule'>{rule + '. ' if rule else ''}"
+            + (f"None kept: {same.strip()[1:-1]}. " if same else "") + "Size: &times; the usual "
             f"{usual}; bars from 1&times; to the biggest hit.</p>")
 
 
@@ -1062,10 +1067,14 @@ def _times_line(c: Cooldown) -> str:
     return f"pressed by {_pct(c.users)}" + (f"; {times}" if times else ", no shared moment")
 
 
-def _twice(c: Cooldown) -> str:
+def _twice(c: Cooldown, named: dict | None = None) -> str:
     """A button pressed once a kill by most, twice by some: said, or its shares add past who presses it (round 110:
-    Ultimate Penitence 27 + 20 + 15 + "the other 38%" past its 97%, 31% pressing it twice)."""
+    Ultimate Penitence 27 + 20 + 15 + "the other 38%" past its 97%, 31% pressing it twice). Only when they do add
+    past it (heal round 10: Spirit Link Totem 17 + 76 = its 93%, the caveat explained an overlap not there)."""
     if not c.presses or not c.n_all:
+        return ""
+    lines = [v[0] for k, v in (named or {}).items() if k[0] == c.name and isinstance(k[1], tuple)]
+    if sum([*(c.support or []), *(c.alt_support or []), *lines]) + _rest(c, named) <= c.users + 0.005:
         return ""
     two = c.twice if c.twice >= 0 else sum(1 for ts in c.presses if len(ts) >= 2) / c.n_all  # every cast (r. 111)
     return f" ({_pct(two)} press it twice: a player can count in two shares)" if two >= 0.1 else ""
@@ -1463,6 +1472,14 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
     return _tidy(_cooldowns_html(cds, answered, named, moved))
 
 
+def rare_html(cds: list[Cooldown], answered: set | None = None, named: dict | None = None) -> str:
+    """The buttons fewer than half of the top players press: rows like the others, muted, with a "< half" badge
+    (heal round 10: Time Dilation at 50% a row, at 48% a sentence on the next boss's sheet)."""
+    return "".join(r.replace("<li>", "<li class='rare'>", 1).replace("</b>", "<span class='half'>&lt; half</span></b>", 1)
+                   for c in sorted(cds, key=lambda c: -c.users)
+                   for r in [cooldowns_html([c], answered, named)])
+
+
 def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict | None = None,
                     moved: dict | None = None) -> str:
     """The cooldown rows. answered: the (button, time) pairs the lead ties to a hit; a chip says its hit only for
@@ -1480,7 +1497,7 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
                                            + _lead_back(c, t)
                                            if t in c.back and not (c.why or c.every)  # its line says it; its
-                                           and "back from cooldown" not in _split(_named(c, t, named, tie(c, t, n), sp))[1]
+                                           and "back from cooldown" not in _named(c, t, named, tie(c, t, n), sp)
                                            else "")  # window's reading alone, as an "or" time's (round 78)
                                         + _split(_named(c, t, named, tie(c, t, n), sp))[1]  # each time its own
                                         + _or_then_untied(c, t, n, tie(c, t, n), answered, named, moved)
@@ -1488,9 +1505,8 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
                                         for k, (t, n, sp) in enumerate(zip(c.times, c.near,
                                                                            c.support or [0.0] * len(c.times),
                                                                            strict=False)))
-                                or ("<small>no time a quarter of them share</small>"  # a named line may follow
-                                    if any(k[0] == c.name and isinstance(k[1], tuple) for k in (named or {}))
-                                    else "<small>timing varies: no shared moment</small>"))  # (round 91)
+                                or "<span class='vary'>no shared time</span>")  # a badge where the chips go,
+        # a named line may follow (round 91; heal round 10: "timing varies: no shared moment" three times a sheet)
         + _pull_chip(c)
         + "".join(f"<span class='chip'>about {v[1] if isinstance(v[1], str) else _mmss(v[1])} &middot; in the "
                   f"window of the {_mmss(k[1][1])} hit: {_pct(v[0])}{v[2]}"
@@ -1512,7 +1528,7 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
            f"at {_and([_mmss((moved or {}).get((c.name, a), a)) for a in _held(c)])} instead press it again at varying "
            "times</small>" if c.every else
            f"<small class='alt'>{_more(c, named)} more at varying times</small>" if c.times and _more(c, named) else
-           f"<small class='alt'>the other {_pct(_rest(c, named))} at varying times{_twice(c)}</small>"
+           f"<small class='alt'>the other {_pct(_rest(c, named))} at varying times{_twice(c, named)}</small>"
            if (c.times or any(k[0] == c.name and isinstance(k[1], tuple) for k in (named or {})))  # a card with
            and _rest(c, named) >= 0.15  # only a window line too (round 110: Spirit Link Totem's other 76% unsaid)
            else "")
@@ -1550,8 +1566,10 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
         tag = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"
                + (" for about half" if b <= BACK_SHARE[1] else ""))
         if _pct(hs) == _pct(sp):  # one count: said once, at the lead's time, the chip's own (round 78: "2:59 ·
-            return f"{_base(c, hs, hit)}{_pressers(c, sp, t)} &middot; {where} the {_mmss(hit)} hit: the same {_pct(hs)}"  # 15% …
-            # 2:57", two times); under a quarter, of those who press it too (round 84)
+            # 2:57", two times); under a quarter, of those who press it too (round 84); its offset from the hit, as
+            # every other chip (heal round 10: "in the window of the 2:55 moment: the same 15%")
+            return (_offset(_named_at(c, t, named, sp), _mmss(hit)) + _base(c, hs, hit) + _pressers(c, sp, t)
+                    + tag)
         return (f"{_share(sp)}{_still(c, t, sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
                 + (f", about {_about(inside)}" if inside and _about(inside) != _mmss(t) else "") + tag)  # the lead's time (round 67)
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
@@ -1881,14 +1899,18 @@ def _chip(t: float, n: str) -> str:
     """A press's time and the hit it answers, said as before, at or after it ("1:11 · just before the 1:15 hit")."""
     if not n:
         return _mmss(t)
-    hit = n.partition(" ")[0]
+    return _mmss(t) + _offset(t, n.partition(" ")[0])
+
+
+def _offset(t: float, hit: str) -> str:
+    """A press's offset from a hit's start ("3 s before the 1:15 hit"), from the seconds shown, rounded as they are
+    (round 87: "0:40 · 1 s before the 0:40 hit" after the times were rounded and the gap not)."""
     m, _, sec = hit.partition(":")
-    gap = int(round(t)) - (int(m) * 60 + int(sec))  # from the seconds shown, rounded as they are (round 87: "0:40 ·
-    # 1 s before the 0:40 hit" after the times were rounded and the gap not)
-    # said with its offset from the hit's start: "4 s into" its 5 s window, "3 s before", "2 s after" it
-    return _mmss(t) + (" &middot; on the hit" if gap == 0 else  # one form, from its start (a hit
-                       f" &middot; {-gap} s before the {e(hit)} hit" if gap < 0 else  # is a 5 s window: "6 s into"
-                       f" &middot; {gap} s after the {e(hit)} hit starts")  # it read as past it)
+    gap = int(round(t)) - (int(m) * 60 + int(sec))
+    # one form, from its start: "4 s into" its 5 s window read as past it
+    return (" &middot; on the hit" if gap == 0 else
+            f" &middot; {-gap} s before the {e(hit)} hit" if gap < 0 else
+            f" &middot; {gap} s after the {e(hit)} hit starts")
 
 
 SHOWN_TALENTS = 60  # every class and spec difference shown (a hero tree is named, not listed): no "+N more"
@@ -2472,7 +2494,7 @@ def comps_table(comps: list, n_kills: int) -> str:
     deaths = any(c.deaths is not None for c in comps)
     comps = [c for c in comps if c.kills >= FEW_KILLS]  # the same cut as every other table
     rows = "".join(
-        f"<tr><td>{e(c.label)}</td><td class='n'>{c.kills} ({_pct(c.share)})</td><td class='n'>{_mmss(c.duration)}</td>"
+        f"<tr><td>{e(c.label)}</td><td class='n'>{_pct(c.share)} <small>({c.kills} kills)</small></td><td class='n'>{_mmss(c.duration)}</td>"
         + (f"<td class='n'>{'' if c.deaths is None else f'{c.deaths:.1f}' if c.kills >= FEW_KILLS else '<small>too few kills</small>'}</td>"
            if deaths else "") + "</tr>"
         for c in comps)
@@ -2480,8 +2502,7 @@ def comps_table(comps: list, n_kills: int) -> str:
             + ("<th>Deaths per 20 players</th>" if deaths else "") + f"</tr></thead><tbody>{rows}</tbody></table>"
             f"<p class='small muted'>Of {n_kills} top kills read. Exact compositions played at least {FEW_KILLS} times; the "
             f"other {n_kills - sum(c.kills for c in comps)} kills play rarer ones."
-            + (" Deaths, per 20 players (heroic raids are 10 to 30), are a mean over the kills whose deaths were "
-               f"read, shown once {FEW_KILLS} kills of a composition have them." if deaths else
+            + ("" if deaths else  # the deaths read: the legend above says it (heal round 10: said twice)
                f" Deaths: too few of these kills had them read (shown from {FEW_KILLS}).") + "</p>")
 
 
@@ -2658,10 +2679,8 @@ def render_sheet(h: HealerPrep) -> str:
                 return ""
             a, x = max(alts, key=lambda y: y[1])
             other = next((m2 for m2 in shown if m2.t != hit and -ANSWER[0] <= a - m2.t <= ANSWER[1]), None)
-            if other is not None:  # in another hit's window: said so, not by its gap (round 101: Conduit's 3:52, on
-                kept = named.get((KEPT, other.t))  # 3:50), with the button kept there (round 102)
-                return (f"; another {_pct(x)} press it about {_mmss(a)}, in the {_mmss(other.t)} hit's window"
-                        + (f" (not kept for it: {e(kept[0])} is)" if kept and kept[0] != _shown(c.name) else ""))
+            if other is not None:  # in another hit's window: that hit's row and the button's own chip say it (heal
+                return ""  # round 10: Conduit's 3:52 on the 4:15 row, "not kept for it: Revival is", said twice)
             gap = int(abs(_secs(_mmss(hit)) - _secs(_mmss(a))))  # from the hit, as the times shown (round 45)
             out = not (c.ramp or -ANSWER[0] <= a - hit <= ANSWER[1])  # outside its window: no answer, said so (round
             return (f"; another {_pct(x)} press it about {_mmss(a)}, {gap} s {'before' if a < hit else 'after'} the "  # 61)
@@ -2740,6 +2759,11 @@ def render_sheet(h: HealerPrep) -> str:
             moved[(r.name, t)] = at
     svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight, and the top players' healing "
                     "cooldowns", drawn, set(lead_names), answered, moved)
+    rare_kept = [c for c in h.rare if c not in utility]
+    rare = [c for c in rare_kept if c not in items and not is_defensive(c.spell_id, c.name)
+            and _external(c.spell_id) != "protective"]  # the others go to their own section
+    rare_ext = [c for c in rare_kept if c not in items and _external(c.spell_id) == "protective"]
+    rare_def = [c for c in rare_kept if c not in items and c not in rare_ext and is_defensive(c.spell_id, c.name)]
     fight = ([lead] if lead else []) + [
         f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Median raid "
         f"damage per second, {h.raid_kills or 'the top'} kills (up to 40 a spec read: the same hits on every healer "
@@ -2755,47 +2779,24 @@ def render_sheet(h: HealerPrep) -> str:
            "before, matched by timing)") + f".</p><ul class='hl2'>"
         f"{'' if h.moments else '<li>No big moment: steady raid damage.</li>'}</ul></div>",
         f"<h2>Your long cooldowns, where the top {e(h.spec)}s press them</h2><ul class='hl2'>"
-        f"{cooldowns_html(sorted((c for c in heals if _external(c.spell_id) != 'protective'), key=_rank(lead_names)), answered, named, moved) or '<li>Not enough top players in the corpus yet.</li>'}</ul>"]
-    rare_kept = [c for c in h.rare if c not in utility]
-    rare = [c for c in rare_kept if c not in items and not is_defensive(c.spell_id, c.name)
-            and _external(c.spell_id) != "protective"]  # the others go to their own section
-    rare_ext = [c for c in rare_kept if c not in items and _external(c.spell_id) == "protective"]
-    rare_def = [c for c in rare_kept if c not in items and c not in rare_ext and is_defensive(c.spell_id, c.name)]
-    if rare:  # a big cooldown the top players skip is information too (Healing Tide Totem: 3 kills in 100)
-        fight.append(f"<p class='small muted'>Fewer than half of the top {e(h.spec)}s press "
-                     + ", ".join(f"{e(c.name)} ({_times_line(c)})"
-                                 for c in rare) + " on this boss.</p>")
-    # the rule, once, under the long cooldowns and their "fewer than half" line (Zephyr's read as part of it)
-    # one definition a line, the term first (round 76: 120 words in one paragraph read as no reference)
+        f"{cooldowns_html(sorted((c for c in heals if _external(c.spell_id) != 'protective'), key=_rank(lead_names)), answered, named, moved) or '<li>Not enough top players in the corpus yet.</li>'}"
+        f"{rare_html(rare, answered, named)}</ul>"]  # a cooldown the top players skip is information too
     exts = [c for c in heals if _external(c.spell_id) == "protective"]
-
-    def fewer(cs: list) -> str:
-        return (f"<p class='small muted'>Fewer than half of the top {e(h.spec)}s press "
-                + ", ".join(f"{e(c.name)} ({_times_line(c)})"
-                            for c in cs) + ".</p>") if cs else ""
     buffers = [c for c in heals if _external(c.spell_id) == "damage"]  # Power Infusion: a buff on a damage dealer
     buff_note = (f" {_and([e(_shown(c.name)) for c in buffers])}, a buff cast on a damage dealer, is with your long "
                  "cooldowns above." if buffers else "")  # round 34: "fewer than half cast one" read as PI's absence
-    if exts and any(c.times for c in exts):  # cast on another player: their own group, apart from the raid
-        # cooldowns; with no shared moment, the one-line form below (round 98: Time Dilation 50% a card, 48% a line)
+    if exts or rare_ext:  # cast on another player: their own group, apart from the raid cooldowns; one form at
+        # any share (round 98: Time Dilation 50% a card, 48% a line; heal round 10: still two forms)
         fight.append(f"<h2>Your externals{f', where the top {e(h.spec)}s cast them' if any(c.times for c in exts) else ''}"
                      f"</h2><ul class='hl2'>"
-                     f"{cooldowns_html(exts, answered, named)}</ul>{fewer(rare_ext)}"
+                     f"{cooldowns_html(exts, answered, named)}{rare_html(rare_ext, answered, named)}</ul>"
                      + (f"<p class='small muted'>{buff_note.strip()}</p>" if buff_note else ""))
-    elif rare_ext or exts:  # Pain Suppression at 34%: still an external, never filed with the defensives
-        def named_(cs: list, shared: bool) -> str:  # one form for every side line (round 113: "(34%, 3:39)")
-            return ", ".join(f"{e(c.name)} ({_times_line(c).removesuffix(', no shared moment') if shared else _times_line(c)})"
-                             for c in cs)  # its sentence says it already (round 114: said twice)
-        # half or more at no shared moment, then those fewer than half press, each said as such (round 110: Blessing
-        # of Sacrifice 28% listed beside Lay on Hands 66% as if both were staples)
-        parts = ([f"The top {e(h.spec)}s cast these at no shared moment: {named_(exts, True)}"] if exts else []) + (
-            [f"{'fewer' if exts else 'Fewer'} than half of them cast {named_(rare_ext, False)}"] if rare_ext else [])
-        fight.append(f"<h2>Your externals</h2><p class='small muted'>{'; '.join(parts)}.{buff_note}</p>")
     else:  # none, said (round 92: the Shaman's sheet had no line, the Dig deeper table a "–")
         fight.append(f"<h2>Your externals</h2><p class='small muted'>The top {e(h.spec)}s cast no long protective "
                      f"cooldown on another player here.{buff_note}</p>")
     if defs or rare_def:
-        fight.append(f"<h2>Your defensives</h2><ul class='hl2'>{cooldowns_html(defs, answered, named)}</ul>{fewer(rare_def)}")
+        fight.append(f"<h2>Your defensives</h2><ul class='hl2'>{cooldowns_html(defs, answered, named)}"
+                     f"{rare_html(rare_def, answered, named)}</ul>")
     if items:
         fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{cooldowns_html(items, answered)}</ul>")
     potions = h.potions or [c for c in h.cooldowns if _item(c.spell_id) and c not in items]  # as the tank's

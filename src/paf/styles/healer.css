@@ -68,3 +68,8 @@ table.jobs td small{color:var(--muted)}
 table.others td{white-space:normal} table.others td small{white-space:nowrap}
 .nw .ics,.lead .ics{margin-right:4px;vertical-align:-3px}
 .hl2 li:has(> .upbar){display:grid;grid-template-columns:200px 130px auto;align-items:center}
+table.others .under .ics{filter:grayscale(1);opacity:.55} /* a share under the bar: no colour to read as kept */
+.hl2 li.rare{color:var(--muted)} .hl2 li.rare>b{font-weight:500} .hl2 li.rare .ics{filter:grayscale(1);opacity:.6}
+.hl2 .half,.hl2 .vary{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;border:1px dashed var(--line);
+  font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.02em;vertical-align:1px}
+.hl2 .vary{margin-left:0;font-size:12px}

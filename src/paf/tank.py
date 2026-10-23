@@ -444,6 +444,7 @@ def render_sheet(p: TankPrep) -> str:
         journal_lead,
         landed_in,
         presence_table,
+        rare_html,
         split_html,
         talents_html,
         trinkets_html,
@@ -656,18 +657,23 @@ def render_sheet(p: TankPrep) -> str:
     svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight, their defensives and "
                     "the swaps", [*defs, *shorts, *lane], {"Tank swaps", *(n for n, _t in answered)}, answered,
                     moved_t)  # its marks at the lead's times (round 71)
+    # the marks said are the ones drawn (heal round 10: "the table's answers" over a chart of swaps alone)
+    outline = any((c.name, t) not in answered for c in [*defs, *shorts] if c.name in {n for n, _t in answered}
+                  for t in c.times)
+    marks = [*(["the table's answers" + (" (an outline: another press of the same button)" if outline else "")]
+               if answered else []), *(["the swaps"] if lane else [])]
+    marks = f"Marks: {' and '.join(marks)}. " if marks else ""
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + ([table] if table else []) + [
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Median damage per "
         f"second on the ranked tank of each top kill, {p.damage_kills or 'the top'} kills (that tank alone: a swap "
         f"moves it; fewer kills past the median one). "
         + ("After a dashed line, stage time (below). " if getattr(p, "staged", False) else "")
-        + "Marks: the table's answers (an outline: another press of the same button) and the swaps. A dot: one of "
+        + marks + "A dot: one of "
         f"the tanks' three biggest moments, whatever casts it (another as high may be left out).</p><ul class='hl2'>"
         f"{'' if p.moments else '<li>No big moment: steady damage.</li>'}</ul></div>",
         f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
-        f"{nouned(cooldowns_html(defs, answered, named, moved_t)) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
-        + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
-           f"</p>" if p.rare else ""),
+        f"{nouned(cooldowns_html(defs, answered, named, moved_t)) or '<li>No defensive most top tanks share: they spread them.</li>'}"
+        f"{nouned(rare_html(p.rare, answered, named))}</ul>",  # the same rows as the others (heal round 10)
         f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"
         f"{nouned(mit_html(answered)) or '<li>Not measured yet.</li>'}</ul>",
         f"<h2>Tank swaps</h2><p>{swap_said + ' ' if swap_said else ''}{'The swap moments most top raids share' if swap else 'No swap moment most top raids share.'}"
