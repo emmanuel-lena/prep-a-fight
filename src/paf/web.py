@@ -1354,7 +1354,7 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
 """ + f'</div><div class="ob-actions">{nxt}</div></section>')
     est_badge = (f"<p class='est-badge' title='{e(est.lead)}'>&#9201; {e(est.badge)}</p>" if est else "")
     body = f"""<div class="boss-cols"><div class="boss-main"><h1>{e(enc.name)} {diff_pill(difficulty)}</h1>
-<p class="lead">{boss_line(enc, difficulty)}</p>{est_badge}{f'<p class="last-sheet">{last.strip()}</p>' if last.strip() else ""}
+{fight_strip(enc, difficulty) or f'<p class="lead">{boss_line(enc, difficulty)}</p>'}{est_badge}{f'<p class="last-sheet">{last.strip()}</p>' if last.strip() else ""}
 <form method="post" action="/prep" class="ob story" data-boss="{enc.id}-{e(difficulty)}">
 <input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
 <div class="ob-where" aria-hidden="true"><ol class="ob-dots"><li></li><li></li><li></li><li></li></ol><span class="ob-n">Step <b>1</b> of 4</span></div>
@@ -1528,6 +1528,66 @@ def boss_line(enc, difficulty: str) -> str:
         [f"the boss away {', '.join(away[:3])}"] if away else [])
     said = "; ".join(parts) if parts else "one target from the pull to the kill"
     return e(f"In a {mmss(f.duration)} kill: {said}. ")
+
+
+def fight_strip(enc, difficulty: str) -> str:
+    """The rebuilt fight as one strip (fresh app review 5): the adds as bars with their count, the boss away hatched,
+    the moves as ticks, Bloodlust on the axis, a mark a minute. The boss line is its label."""
+    from paf.corpus.template import template_path
+    from paf.fight import Fight
+    from paf.plan import mmss
+
+    try:
+        f = Fight.load(template_path(enc.name, difficulty))
+    except (OSError, ValueError, KeyError, TypeError):
+        return ""
+    if f.duration <= 0:
+        return ""
+    w, x0, x1, axis = 620, 2, 618, 74
+
+    def x(t: float) -> float:
+        return x0 + (x1 - x0) * max(0.0, min(t, f.duration)) / f.duration
+    out = []
+    for m in range(0, int(f.duration) + 1, 60):  # a mark a minute, none too near the kill's length at the end
+        if m and x1 - x(m) < 40:
+            continue
+        out.append(f"<line class='fs-tick' x1='{x(m):.1f}' x2='{x(m):.1f}' y1='{axis}' y2='{axis + 4}'/>"
+                   f"<text class='fs-t' x='{x(m):.1f}' y='{axis + 17}' text-anchor='{'start' if not m else 'middle'}'>"
+                   f"{m // 60}:00</text>")
+    out.append(f"<text class='fs-t end' x='{x1:.1f}' y='{axis + 17}' text-anchor='end'>{mmss(f.duration)}</text>")
+    for v in f.invulnerable:  # the boss away: hatched, its span said
+        out.append(f"<rect class='fs-away' x='{x(v.start):.1f}' y='2' width='{x(v.start + v.duration) - x(v.start):.1f}' "
+                   f"height='{axis - 2}'><title>boss away {mmss(v.start)} to {mmss(v.start + v.duration)}</title></rect>"
+                   f"<text class='fs-l' x='{x(v.start) + 5:.1f}' y='16'>boss away</text>")
+    ends: list[float] = []  # a lane's last end: waves that overlap go one under the other
+    for a in sorted(f.add_waves, key=lambda a: a.time):  # a wave: a bar as long as it lives, its count
+        a0, a1 = x(a.time), x(a.time + a.lifetime)
+        lane = next((i for i, end in enumerate(ends) if end + 30 < a0), None)
+        if lane is None and len(ends) < 2:  # two lanes at most: a third overlap goes where the bars end first
+            ends.append(0.0)
+            lane = len(ends) - 1
+        elif lane is None:
+            lane = min(range(2), key=lambda i: ends[i])
+        ends[lane] = max(ends[lane], a1, a0 + 30)
+        y = 24 + lane * 19
+        out.append(f"<rect class='fs-add' x='{a0:.1f}' y='{y}' width='{max(30.0, a1 - a0):.1f}' height='16' rx='4'>"
+                   f"<title>{e(a.name or 'adds')} at {mmss(a.time)}: {a.count}, ~{a.lifetime:.0f} s</title></rect>"
+                   f"<text class='fs-n' x='{a0 + 5:.1f}' y='{y + 12}'>&#215;{a.count}</text>")
+    for mv in f.movement:  # a move: a tick just over the axis
+        out.append(f"<rect class='fs-move' x='{x(mv.start):.1f}' y='{axis - 7}' "
+                   f"width='{max(2.0, x(mv.start + mv.duration) - x(mv.start)):.1f}' height='6'/>")
+    out.append(f"<line class='fs-axis' x1='{x0}' x2='{x1}' y1='{axis}' y2='{axis}'/>")
+    if f.lust_time is not None:  # on the axis, pointing at its moment
+        lt = f.lust_time if f.lust_time >= 0 else f.duration + f.lust_time
+        out.append(f"<path class='fs-lust' d='M{max(x0, x(lt) - 6):.1f} {axis + 9} l12 0 l-6 -9 z'>"
+                   f"<title>Bloodlust at {mmss(lt)}</title></path>")
+    key = ("<span class='fs-k add'>adds &#215;count</span>"
+           + ("<span class='fs-k away'>boss away</span>" if f.invulnerable else "")
+           + ("<span class='fs-k move'>moves</span>" if f.movement else "")
+           + ("<span class='fs-k lust'>Bloodlust</span>" if f.lust_time is not None else ""))
+    label = html.unescape(boss_line(enc, difficulty)).strip()
+    return (f"<figure class='fstrip'><svg viewBox='0 0 {w} {axis + 22}' role='img' aria-label='{e(label)}'>"
+            f"{''.join(out)}</svg><figcaption>{key}</figcaption></figure>")
 
 
 def _plan_path(enc, difficulty: str) -> Path:

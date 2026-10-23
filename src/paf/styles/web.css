@@ -460,3 +460,13 @@ section.adv textarea{max-width:920px} /* the content column, never to the window
 .rl-t.free{border:1px dashed var(--line);color:var(--muted)} .rl-free{font-size:12.5px;color:var(--muted);margin-left:6px}
 .est-badge{display:inline-block;margin:2px 0 10px;padding:2px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface-2);font:500 13.5px var(--font-body);color:var(--muted)}
 .lr-bar{display:inline-block;width:56px;height:6px;margin-left:8px;border-radius:3px;background:var(--surface-2);vertical-align:middle;overflow:hidden} .lr-bar>span{display:block;height:100%;background:var(--muted)}
+/* the boss page's fight strip (fresh app review 5) */
+.fstrip{margin:6px 0 8px;max-width:620px} .fstrip svg{width:100%;height:auto;display:block}
+.fs-axis,.fs-tick{stroke:var(--line);stroke-width:1} .fs-t{font:500 12px var(--font-data);fill:var(--muted)} .fs-t.end{fill:var(--fg);font-weight:700}
+.fs-away{fill:color-mix(in srgb,var(--muted) 14%,transparent);stroke:var(--line);stroke-dasharray:3 3}
+.fs-l{font:600 12px var(--font-body);fill:var(--muted)} .fs-add{fill:color-mix(in srgb,var(--accent) 55%,transparent)}
+.fs-n{font:700 11.5px var(--font-data);fill:var(--fg)} .fs-move{fill:var(--warn);opacity:.7} .fs-lust{fill:var(--neg)}
+.fstrip figcaption{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:2px}
+.fs-k::before{content:"";display:inline-block;width:12px;height:8px;border-radius:2px;margin-right:5px;vertical-align:0}
+.fs-k.add::before{background:color-mix(in srgb,var(--accent) 55%,transparent)} .fs-k.away::before{border:1px dashed var(--line);background:color-mix(in srgb,var(--muted) 14%,transparent)}
+.fs-k.move::before{background:var(--warn);opacity:.7} .fs-k.lust::before{background:var(--neg);width:8px;clip-path:polygon(0 0,100% 0,50% 100%)}

@@ -361,3 +361,17 @@ def test_a_sheet_cell_says_its_day():
     now = _t.mktime((2026, 10, 23, 15, 0, 0, 0, 0, -1))
     assert web.short_ago(now - 600, now) == "today"
     assert web.short_ago(now - 2 * 86400, now) == "21 Oct"
+
+
+def test_the_boss_page_opens_on_the_fight_strip(monkeypatch, tmp_path):
+    from paf import web
+    from paf.fight import AddWave, Fight, Window
+
+    f = Fight("Nek'zali", 255, add_waves=[AddWave(52, 6, 18, "Restless Amani"), AddWave(167, 14, 18, "Restless Amani")],
+              invulnerable=[Window(101, 59)], lust_time=0.0)
+    monkeypatch.setattr(Fight, "load", classmethod(lambda cls, path: f))
+    enc = type("E", (), {"name": "Nek'zali", "id": 3470})()
+    strip = web.fight_strip(enc, "heroic")
+    assert "&#215;6" in strip and "&#215;14" in strip and "boss away 1:41 to 2:40" in strip
+    assert "Bloodlust at 0:00" in strip and ">4:15<" in strip
+    assert "aria-label='In a 4:15 kill: adds at 0:52, 2:47; the boss away 1:41 to 2:40.'" in strip

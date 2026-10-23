@@ -22,6 +22,8 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 - Talents to take or drop no longer ask you to change a button the sim's rotation never presses (Purge, Tremor
   Totem, Blind, Tranquilizing Shot): they are set apart, in grey, as your choice, on the sheet and on the raid lead
   page.
+- The boss pages open on the fight as one strip: the add waves with their count, the boss away, your moves and
+  Bloodlust, on a timeline of the kill.
 - The boss pages tell the Encounter Journal's words only for the abilities it flags for your role; the others keep
   their name, icon, tags and times, the name a Wowhead link to read them.
 - What a boss drops for you is valued at the item level it can reach: at most 321 on heroic (the Hero track's top),
