@@ -489,3 +489,5 @@ dialog.ss::backdrop{background:var(--bg)}
 .fv .ph-name .rep{font:500 13px var(--font-body);color:var(--muted);margin-left:6px}
 .fv .stl.short .ph-lanes{display:none}
 .fv .keys .src{color:var(--muted)} .fv .stl.short .ph-name h2{font-size:17px}
+/* two cooldowns pressed together on one line: their icons stacked in the icon column */
+.fv .keys li .ics2{display:flex;flex-direction:column;gap:3px}

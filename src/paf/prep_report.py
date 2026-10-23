@@ -228,7 +228,11 @@ def _base(name: str) -> str:
 def cd_name(d: PrepData, key: str) -> str:
     """A cooldown key of the plans as the player knows it (the trinket's name, not 'trinket1')."""
     k = key.replace("use_item:", "")
-    return d.cd_names.get(key) or d.cd_names.get(k) or k.replace("_", " ").title()
+    if d.cd_names.get(key) or d.cd_names.get(k):
+        return d.cd_names.get(key) or d.cd_names.get(k)
+    small = {"of", "the", "and", "a", "an", "in", "on", "to"}  # "Vile Vial of Volatile Venom", not "Of"
+    words = k.replace("_", " ").split()
+    return " ".join(w if i and w in small else w.capitalize() for i, w in enumerate(words))
 
 
 def burst_names(d: PrepData) -> tuple[str, str]:
@@ -278,7 +282,7 @@ def headline(d: PrepData) -> list[str]:
         best = max(d.talents.rows, key=lambda r: r.per_fight.get(fight, (-1e9, None))[0])
         gain = best.per_fight.get(fight, (0.0, None))[0]
         if gain > 2 * d.talents.error:
-            take = ", ".join(best.add[:4]) or "-"
+            take = ", ".join([x for x in best.add if x not in getattr(best, "drop", [])][:4]) or "-"
             out.append(f"Talents: {best.build.label} ({best.build.count} top players) gives {gain:+.1f}% on this "
                        f"fight; it takes {take}.")
         else:
@@ -406,7 +410,7 @@ def simmed_note(d: PrepData) -> str:
 
 def raid_section(r: RaidInfo, gear: bool = True) -> str:
     you = (f"you ({e(r.you[0])}, {r.you[1] / 1000:,.0f}k DPS)" if r.you_found else
-           f"{'an' if r.you[0][:1].lower() in 'aeiou' else 'a'} {e(r.you[0])} at your raid's median DPS ({r.you[1] / 1000:,.0f}k; you are not in that log)")
+           f"{'an' if r.you[0][:1].lower() in 'aeiou' else 'a'} {e(r.you[0])} at your raid's median DPS ({r.you[1] / 1000:,.0f}k; you are not in that log as {e(r.you[0])})")  # another spec of yours may be
     head = (f"<p class='small'>From your raid's log <a href='https://www.warcraftlogs.com/reports/{e(r.report)}' "
             f"target='_blank' rel='noopener'>{e(r.report)}</a> ({e(r.fight)}, {r.players} players), with {you}.</p>")
     if not r.verdicts:
@@ -573,7 +577,7 @@ def suggestions(d: PrepData) -> list[Suggestion]:
             if best.build.code:
                 lines.append(copy_button(best.build.code, "Copy the talent string") +
                              " <span class='muted small'>then in game: Talents, Import loadout. "
-                             "Every build compared in Gear &amp; talents.</span>")
+                             "Every build compared below, in Talents of the top players.</span>")
             out.append(Suggestion(_severity(g), f"Switch to the talents of <b>{e(best.build.label)}</b> "
                                   f"<span class='muted'>(played by {best.build.count} top players)</span>", lines, g,
                                   d.icons.get("__spec__", "")))
@@ -1437,7 +1441,7 @@ the simulated plans above.</p>
 
     # loot
     if d.loot:
-        body = "".join(f"<tr><td>{icons.img(d.icons.get(i, ''), 'small')} {lk(i)}</td><td>{e(s)}</td>"
+        body = "".join(f"<tr><td>{icons.img(d.icons.get(i, ''), 'small')} {lk(i)}</td><td>{e(s.replace('_', ' '))}</td>"
                        f"<td class='n'>{_pct(real) if real is not None else '-'}</td>"
                        f"<td class='n'>{_pct(v)}</td></tr>" for i, s, v, real in d.loot[:12])
         tabs["gear"].append(f"""<h2>What this boss drops, for you</h2><div class="card scroll">

@@ -70,7 +70,8 @@ def _moves(d) -> list[tuple[float, str, str, str]]:
     if d.talents:
         g = best.per_fight.get(d.talents.fights[0], (0.0, None))[0] if best else 0.0
         if best is not None and g > 2 * d.talents.error:
-            add = ", ".join(dict.fromkeys(best.add[:6]))
+            add = ", ".join(dict.fromkeys([x for x in best.add if x not in best.drop][:6]))  # one name both ways
+            # (a rank or another node of it): no change to say (Earthquake "taken" while it stays)
             out.append((g, f"Switch to <b>{e(best.build.label)}</b>, the talents of {best.build.count} top players.",
                         f"It takes {e(add)}." if add else "",
                         copy_button(best.build.code, "Copy the talent string") if best.build.code else ""))

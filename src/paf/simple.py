@@ -100,12 +100,16 @@ def _talent(d, t) -> str:
 
 
 def swaps_html(d, swaps: list) -> str:
-    """Your talent -> the build's talent, one line per point moved."""
+    """The talents to take, then those to drop, each as a strip of icons with their names: the points moved are not
+    pairs (a hero tree changed showed 15 made-up "A -> B" rows; a review)."""
     if not swaps:
         return ""
-    lines = "".join(f"<li class='sw'>{_talent(d, a)}<span class='arr' aria-label='becomes'>&rarr;</span>{_talent(d, b)}</li>"
-                    for a, b in swaps)
-    return f"<li class='sw-list'><ul class='swaps'>{lines}</ul></li>"
+    take = [b for _a, b in swaps if b]
+    drop = [a for a, _b in swaps if a]
+    def strip(word: str, cls: str, ts: list) -> str:
+        return (f"<div class='sw-strip {cls}'><span class='sw-lab'>{word}</span>"
+                + "".join(_talent(d, t) for t in ts) + "</div>") if ts else ""
+    return f"<li class='sw-list'>{strip('+ Take', 'take', take)}{strip('&minus; Drop', 'drop', drop)}</li>"
 
 
 def _hint(d) -> str:

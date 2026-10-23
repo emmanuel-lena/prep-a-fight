@@ -116,3 +116,7 @@ a.tal:hover{background:var(--surface-2)}
 @media (max-width:640px){.simple{font-size:16px}.simple .cards{grid-template-columns:1fr}
   .vt-head,.vt li{grid-template-columns:minmax(0,1fr) 50px minmax(0,1fr);gap:6px}.vt .it{font-size:14px;gap:6px}
   .vt .it img,.vt .it .ic-none{width:24px;height:24px}}
+/* the talents to take, then to drop: two strips of icons with their names (not made-up pairs) */
+.sw-strip{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;margin:4px 0}
+.sw-strip .sw-lab{font:600 12px var(--font-display);letter-spacing:.04em;min-width:58px}
+.sw-strip.take .sw-lab{color:var(--pos)} .sw-strip.drop .sw-lab{color:var(--neg)} .sw-strip.drop .tal{opacity:.8}

@@ -387,7 +387,7 @@ def _row(m: Moment, i: int, gap: float = 0.0) -> str:
 
 
 def job_html(d) -> str:
-    """Your job on this boss, in six lines at most: what kills a raid first, then your cooldowns and when."""
+    """Your job on this boss, a dozen lines at most: what kills a raid first, then your cooldowns and when."""
     from paf.prep_report import rule_phrase
 
     def at(name: str) -> str:  # the waves of that unit, as the fight tab places them
@@ -459,12 +459,25 @@ def job_html(d) -> str:
         if all(t < 5 for t in order[n]) and "potion" not in n.lower():  # a short cooldown: the opener, then rotation
             when += ", then with your rotation"
         why = f": {rule_phrase(d, rules[n])}" if n in rules else ""
-        rows.append((n, f"<b>{e(n)}</b> {e(when)}{e(why)}."))
+        same = next((r for r in rows if isinstance(r[0], list) and r[2] == (when, why)), None)
+        if same is not None:  # pressed together, by the same rule: one line, both icons (Ancestral Call and
+            same[0].append(n)  # Ascendance at 0:51, 2:52: the ninth line cut Ascendance off; a review)
+            continue
+        rows.append(([n], None, (when, why)))
+    rows = [((r[0][0], f"<b>{e(_and_names(r[0]))}</b> {e(r[2][0])}{e(r[2][1])}.", r[0]) if isinstance(r[0], list)
+             else (*r, None)) for r in rows]
     if not rows:
         return ""
-    lis = "".join(f"<li>{_ic(ic if ic == IMMUNE_ICON else _icon(d, ic) if ic else '')}<span>{txt}</span></li>"
-                  for ic, txt in rows[:9])
+    def pics(ic, many) -> str:  # a line's icon, or its cooldowns' side by side
+        if many and len(many) > 1:
+            return "<span class='ics2'>" + "".join(_ic(_icon(d, x)) for x in many) + "</span>"
+        return _ic(ic if ic == IMMUNE_ICON else _icon(d, ic) if ic else "")
+    lis = "".join(f"<li>{pics(ic, many)}<span>{txt}</span></li>" for ic, txt, many in rows[:12])  # every cooldown
     return f"<section class='fbox job'><h2>Your job on this boss</h2><ul class='keys'>{lis}</ul></section>"
+
+
+def _and_names(names: list[str]) -> str:
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
 def _ctx(t: float, its: list[tuple[float, Item]]) -> str:
