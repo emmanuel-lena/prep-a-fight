@@ -2,6 +2,11 @@
 
     python tools/release.py 0.5.4 --message msg.txt --notes "What changed, for the players."
     python tools/release.py 0.5.4 --message msg.txt --notes "..." --dry-run   # the checks only
+    python tools/release.py next --weekly   # the weekly release: CHANGELOG.md's "Unreleased" as its notes
+
+Releases are weekly (Tuesday, .github/workflows/weekly.yml runs the line above), hotfixes only in between. --weekly
+takes the notes from CHANGELOG.md's "Unreleased" section (nothing to release when it is empty), files them under the
+new version, writes the commit message, and closes the issues they name ("(#36)").
 
 Every step stops the release at the first failure, before anything is committed, tagged or pushed when a check fails.
 The working copy is never reset: line-ending noise (CRLF in files written on Windows) is cleaned only when it is the
@@ -11,6 +16,7 @@ only difference left after the commit.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -20,6 +26,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PY = ROOT / ".venv" / ("Scripts" if sys.platform == "win32" else "bin") / "python"
+if not PY.is_file():  # the weekly workflow's runner: its Python, the project installed in it
+    PY = Path(sys.executable)
+CHANGELOG = ROOT / "CHANGELOG.md"
+UNRELEASED = "## Unreleased"
 
 
 class Stop(Exception):
@@ -66,6 +76,31 @@ def bump(version: str) -> None:
     init.write_bytes(code2.encode("utf-8"))
 
 
+def unreleased() -> str:
+    """CHANGELOG.md's "Unreleased" section: the week's notes ("" when there is nothing to release)."""
+    text = CHANGELOG.read_text(encoding="utf-8") if CHANGELOG.is_file() else ""
+    if UNRELEASED not in text:
+        raise Stop(f'no "{UNRELEASED}" section in CHANGELOG.md')
+    body = text.split(UNRELEASED, 1)[1]
+    return body.split("\n## ", 1)[0].strip()
+
+
+def file_notes(version: str, notes: str) -> None:
+    """The notes moved under their version, "Unreleased" left empty for the next week."""
+    text = CHANGELOG.read_text(encoding="utf-8")
+    head, rest = text.split(UNRELEASED, 1)
+    after = rest.split("\n## ", 1)
+    older = ("\n## " + after[1]) if len(after) > 1 else ""
+    day = time.strftime("%Y-%m-%d")
+    CHANGELOG.write_text(f"{head}{UNRELEASED}\n\n## {version} ({day})\n\n{notes}\n{older}", encoding="utf-8")
+
+
+def weekly_message(version: str, notes: str) -> str:
+    fixes = sorted({int(n) for n in re.findall(r"\(#(\d+)\)", notes)})
+    return (f"Release {version}: weekly patch\n\n{notes}\n\n"
+            + "".join(f"Fixes #{n}\n" for n in fixes))
+
+
 def clean_line_endings() -> None:
     """After the commit, files written with CRLF can show as modified. Restore them only when line endings are the
     only difference; anything else is reported and left alone."""
@@ -109,13 +144,31 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("version")
     ap.add_argument("--message", help="file with the commit message (attribution lines included)")
-    ap.add_argument("--notes", required=True, help="release notes for the players")
+    ap.add_argument("--notes", help="release notes for the players")
+    ap.add_argument("--weekly", action="store_true",
+                    help="notes and commit message from CHANGELOG.md's Unreleased section; version may be 'next'")
     ap.add_argument("--dry-run", action="store_true", help="run the checks only")
     ap.add_argument("--resume", action="store_true",
                     help="the commit and tag of this version are pushed but its publication stopped (a build that "
                          "failed for a network error and was run again): wait for the build and publish only")
     a = ap.parse_args()
     try:
+        if a.version == "next":  # the patch after the current version
+            x, y, z = parse(current_version())
+            a.version = f"{x}.{y}.{z + 1}"
+        if a.weekly and not a.resume:
+            a.notes = unreleased()
+            if not a.notes:
+                print("nothing under Unreleased in CHANGELOG.md: no release this week")
+                return 0
+            msg_file = ROOT / ".git" / "WEEKLY_MSG"
+            msg_file.write_text(weekly_message(a.version, a.notes), encoding="utf-8")
+            a.message = str(msg_file)
+        elif a.weekly:
+            a.notes = CHANGELOG.read_text(encoding="utf-8").split(f"## {a.version} (", 1)[1].split("\n", 1)[1]
+            a.notes = a.notes.split("\n## ", 1)[0].strip()
+        if not a.notes:
+            raise Stop("--notes is needed")
         if a.resume:  # nothing is committed, tagged or pushed: the release of this version, already pushed
             if current_version() != a.version:
                 raise Stop(f"the working copy is at {current_version()}, not {a.version}")
@@ -144,6 +197,8 @@ def main() -> int:
             return 0
         # 2. version, commit: the commit must hold everything
         bump(new)
+        if a.weekly:
+            file_notes(new, a.notes)
         run("git", "add", "-A")
         run("git", "commit", "-q", "-F", str(msg))
         in_project = run("git", "show", "HEAD:pyproject.toml", quiet=True).stdout.count(f'version = "{new}"') == 1
@@ -155,6 +210,8 @@ def main() -> int:
         run("git", "tag", f"v{new}")
         run("git", "push", "-q", "origin", "main")
         run("git", "push", "-q", "origin", f"v{new}")
+        if os.environ.get("GITHUB_ACTIONS"):  # a tag pushed by a workflow starts no other one: the build asked for
+            run("gh", "workflow", "run", "release.yml", "--ref", f"v{new}")
         wait_and_publish(f"v{new}", a.notes)
         return 0
     except Stop as ex:

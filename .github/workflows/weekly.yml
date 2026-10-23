@@ -1,0 +1,39 @@
+name: weekly
+# The weekly release, Tuesday 16:00 Paris time (before the NA and EU resets): CHANGELOG.md's "Unreleased" section
+# becomes the patch notes (tools/release.py next --weekly); nothing is released when it is empty. Hotfixes in
+# between: the same command, run by hand.
+on:
+  schedule:
+    - cron: "0 14,15 * * 2"  # 14:00 and 15:00 UTC: one of them is 16:00 in Paris (summer or winter time)
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: write  # starts the installer build (release.yml) for the new tag
+concurrency: weekly
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Paris time
+        id: when
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$(TZ=Europe/Paris date +%H)" = "16" ]; then
+            echo "go=1" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.when.outputs.go
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - if: steps.when.outputs.go
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - if: steps.when.outputs.go
+        run: python -m pip install -e ".[dev]"
+      - if: steps.when.outputs.go
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          python tools/release.py next --weekly
