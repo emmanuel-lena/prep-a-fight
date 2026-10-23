@@ -84,7 +84,13 @@ def _moves(d) -> list[tuple[float, str, str, str]]:
     plan = next((p for p in plans if p.objective == want and p.gain > 2 * p.error), None)
     if plan is None and wanted(d) is None:
         plan = max((p for p in plans if p.gain > 2 * p.error), key=lambda p: p.gain, default=None)
-    if plan is not None:
+    from paf.simple import fallen
+
+    if plan is not None and fallen(plan):  # the fight tab plays the default list (a review: "Play your cooldowns
+        # for total damage +0.6%" beside a plan tagged not played)
+        out.append((0.0, "Play SimC's default priority list: the plan's small gain turns into a loss on a slower "
+                         "kill.", "", ""))
+    elif plan is not None:
         rules = [(cd_name(d, k), rule_phrase(d, r.name)) for k, r in plan.choice.items() if r.name != "default"]
         say = "; ".join(f"{n}: {r}" for n, r in rules) + ("" if getattr(plan, "robust", True) else
                                                           ". Not robust: the gain can vanish on a harder fight.")

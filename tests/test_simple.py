@@ -122,3 +122,7 @@ def test_a_plan_a_slower_kill_turns_into_a_loss_plays_the_default_list():
     played = simple._plan(d)
     assert played.timeline == [(2.0, "Potion")] and not played.choice  # the fight tab: the default list
     assert d.optimized[0].timeline == [(108.0, "Potion")]  # Dig deeper keeps the plan
+    from paf import briefing
+
+    said = [m[1] for m in briefing._moves(d)]
+    assert any("default priority list" in s for s in said) and not any("for boss damage" in s for s in said)

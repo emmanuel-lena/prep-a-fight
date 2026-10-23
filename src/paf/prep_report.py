@@ -487,6 +487,12 @@ def copy_button(text: str, label: str) -> str:
     return f'<button type="button" class="btn ghost copy" data-copy="{e(text)}">{e(label)}</button>'
 
 
+def _fallen(p) -> bool:
+    from paf.simple import fallen
+
+    return fallen(p)
+
+
 def simple_plan(d):
     from paf import simple
 
@@ -640,7 +646,7 @@ def suggestions(d: PrepData) -> list[Suggestion]:
             tag = " <span class='pill'>pick one: see Your raid</span>"
         elif costly(p):
             tag = " <span class='pill'>only if your raid needs it dead fast</span>"
-        played = want is not None and p.objective == want
+        played = want is not None and p.objective == want and not _fallen(p)  # not played: grey, never green
         sev = "info" if costly(p) else "alt" if (want is not None and not played and p.objective in ("boss", "total")) \
             else _severity(p.gain)  # a plan the sheet does not play is an alternative, whatever its size
         from paf.simple import _fallback  # a potion or a racial: the picture the fight tab shows for it
@@ -1390,8 +1396,8 @@ for reference: a build can be worse there and much better on this fight. Each ru
                 checks += "<ul class='small'>" + "".join(f"<li class='warn'>&#9888; {e(re.sub(r'[-+]0[.]0%', 'about 0%', f))}</li>"
                                                          for f in p.flags) + "</ul>"
             blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, 1, err=1e9 if p.objective == "secondary" or _stall(d, p) else 0.0)}
-<span class="small muted">vs the default priority list{'; ' + others if others else ''}</span>{" <span class='pill gold'>the sheet plays this plan</span>" if p.objective == first else ""}</h3>
-{("<p class='small'>Played because " + ("your raid pads the adds" if p.objective == "total" else "your raid stays on the boss" if p.objective == "boss" else "it is your choice") + " (see Your raid and the adds, below)." + (" When the plan presses a burst while the boss is immune, the fight tab moves it onto the adds that spawn then." if d.fight is not None and d.fight.invulnerable else "") + "</p>") if p.objective == first and p.objective in ("boss", "total") else ""}
+<span class="small muted">vs the default priority list{'; ' + others if others else ''}</span>{(" <span class='pill near'>not played: not robust</span>" if _fallen(p) else " <span class='pill gold'>the sheet plays this plan</span>") if p.objective == first else ""}</h3>
+{("<p class='small'>Played because " + ("your raid pads the adds" if p.objective == "total" else "your raid stays on the boss" if p.objective == "boss" else "it is your choice") + " (see Your raid and the adds, below)." + (" When the plan presses a burst while the boss is immune, the fight tab moves it onto the adds that spawn then." if d.fight is not None and d.fight.invulnerable else "") + "</p>") if p.objective == first and p.objective in ("boss", "total") and not _fallen(p) else ""}
 {"<p class='small muted'>Burst damage counts only the damage on " + e(burst_names(d)[1] or "the burst targets") + ": worth it only if your raid needs " + e(burst_names(d)[1] or "them") + " dead fast" + ("." if _stall(d, p) else ", at the cost of the boss and total damage above.") + "</p>" if p.objective == "secondary" else ""}
 {checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases, links=d.links, legend=not blocks)}
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
@@ -1445,7 +1451,8 @@ the simulated plans above.</p>
                 seen_sets.add(k)
                 uniq.append(g)
         for i, (ch, per, w) in enumerate(uniq[:8]):
-            noise = i and top - w <= 2 * d.gear_error and w >= 0  # never "about the best" on a loss
+            noise = (i and top > 2 * d.gear_error and top - w <= 2 * d.gear_error  # never "about the best" on a
+                     and w >= 0)  # loss, nor under a best that is itself "keep yours" (a review: two verdicts)
             items = "".join(f"<div>{lk(c)}</div>" for c in ch.split("; "))
             body += (f"<tr class='{'noise' if noise else ''}'><td class='small gearset'>{items}"
                      + f"</td><td class='n'>{_pct(w, err=d.gear_error)}" + (" <span class='pill near'>&asymp; best</span>" if noise else
@@ -1462,13 +1469,13 @@ the simulated plans above.</p>
 {"<p class='small warn'>&#9888; Every set here loses more than 5%: a sim gone wrong, not a reading. Keep the gear you wear.</p>" if top < -5 else ""}
 <p class="small">Simmed {e(d.gear_plan or 'with the default priority list')}, {e(mine)}.</p>
 <table><tr><th>Swaps vs your equipped gear</th><th>Gain &plusmn;{d.gear_error:.2f}%</th>{head}</tr>{body}</table>
-{"<p class='tiny muted'>&asymp; best: within the error of the best set; &asymp; keep yours: no set beats yours by twice the error.</p>" if "near" in body else ""}</div>""")
+{"<p class='tiny muted'>" + "; ".join(t for k, t in (("&asymp; best<", "&asymp; best: within the error of the best set"), ("keep yours<", "&asymp; keep yours: no set beats yours by twice the error")) if k in body) + ".</p>" if "near" in body else ""}</div>""")
 
     # loot
     if d.loot:
         body = "".join(f"<tr><td>{icons.img(d.icons.get(i, ''), 'small')} {lk(i)}</td><td>{e(s.replace('_', ' '))}</td>"
-                       f"<td class='n'>{_pct(real) if real is not None else '-'}</td>"
-                       f"<td class='n'>{_pct(v)}</td></tr>" for i, s, v, real in d.loot[:12])
+                       f"<td class='n'>{_pct(real, err=d.loot_error) if real is not None else '-'}</td>"
+                       f"<td class='n'>{_pct(v, err=d.loot_error)}</td></tr>" for i, s, v, real in d.loot[:12])
         tabs["gear"].append(f"""<h2>What this boss drops, for you</h2><div class="card scroll">
 {'<p class="notice small">Nothing this boss drops is an upgrade for you at item level ' + str(d.loot_ilvl) + ': every value below is a loss vs what you already have.</p>' if all((real if real is not None else v) <= 0 for _, _, v, real in d.loot) else ''}
 <p class="small muted">"In your best sets": the item inserted in your best Top Gear sets, the rest of your gear

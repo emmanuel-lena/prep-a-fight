@@ -50,6 +50,11 @@ def _ic(d, name: str, size: str = "medium", cls: str = "") -> str:
     return f"<span class='ic-none {cls}' aria-hidden='true'>{e(letter)}</span>"
 
 
+def fallen(p) -> bool:
+    """A plan whose gain a slower kill turns into a loss: the sheet plays the default list instead."""
+    return not getattr(p, "robust", True) and bool(getattr(p, "default_timeline", None))
+
+
 def _plan(d):
     """The cooldown plan of the sheet: the player's (or the raid's) objective, even when it changes nothing (then it
     is the default list's timings); the best one worth it only when nobody made the call."""
@@ -62,7 +67,7 @@ def _plan(d):
     if called is None and (plan is None or plan.gain <= 2 * plan.error):
         better = max((p for p in plans if p.gain > 2 * p.error), key=lambda p: p.gain, default=None)
         plan = better or plan
-    if plan is not None and not getattr(plan, "robust", True) and getattr(plan, "default_timeline", None):
+    if plan is not None and fallen(plan):
         # a gain a slower kill turns into a loss: the fight tab plays the default list (a review: the potion held
         # out of Bloodlust for +0.6%, -0.4% on a 5:16 kill); Dig deeper keeps the plan and its checks
         from dataclasses import replace

@@ -110,3 +110,16 @@ def test_a_long_cooldown_off_the_top_players_moment_is_flagged():
                                   (2, "symbols of death"), (40, "symbols of death"), (70, "symbols of death")])
     assert off_tops(d, p) == ["Shadow Blades: the plan presses it at 1:30, 75% of the top players at about 1:38.",
                               "Shadow Blades: the plan presses it at 3:00, 90% of the top players at about 3:10."]
+
+
+def test_gear_and_loot_inside_the_noise_get_one_verdict_and_no_colour():
+    # Subtlety Rogue, Vashnik (DPS round 10): the best set +0.57% at ±0.29% "≈ keep yours", the sets under it
+    # "≈ best"; a drop at +0.31% green with ±0.20%
+    d = PrepData("Vashnik", "heroic", "Subtlety", "Char", kills=10, duration=240)
+    d.gear = [("trinket: A (334)", {"boss fight": 0.57}, 0.57), ("chest: B (321)", {"boss fight": 0.45}, 0.45)]
+    d.gear_fights, d.gear_error = ["boss fight"], 0.29
+    d.loot, d.loot_error = [("Sanguine Rancor", "trinket", 0.31, -0.15)], 0.20
+    page = render(d)
+    assert page.count("keep yours</span>") == 1 and "&asymp; best</span>" not in page
+    assert "&asymp; best: within" not in page
+    assert '<span class="">+0.31%</span>' in page and '<span class="pos">' not in page.split("What this boss drops")[1]
