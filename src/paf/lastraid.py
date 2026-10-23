@@ -347,9 +347,9 @@ def _cmp_table(rows: list[dict]) -> str:
     if any(r["cmp"][0].startswith("Boss health left") for r in rows):  # the health is a row: the header
         lab = [re.sub(r"^wipe at \d+% after ", "", x) for x in lab]  # keeps the time (app round 16: said twice)
     # the comparison's own pulls: its best and worst without a death (paf.pulldiff), not the night's best pull
-    return ("<table class='lr-cmp fit'><thead><tr><th>No-death pulls</th>"
-            f"<th>Better{' <small>' + e(lab[0]) + '</small>' if lab[0] else ''}</th>"
-            f"<th>Weaker{' <small>' + e(lab[1]) + '</small>' if lab[1] else ''}</th><th>Gap</th></tr>"
+    return ("<table class='lr-cmp fit'><thead><tr><th></th>"
+            f"<th>Better no-death{' <small>' + e(lab[0]) + '</small>' if lab[0] else ''}</th>"  # not the night's
+            f"<th>Weaker no-death{' <small>' + e(lab[1]) + '</small>' if lab[1] else ''}</th><th>Gap</th></tr>"
             "</thead><tbody>"
             + "".join(f"<tr class='{e(r.get('kind', ''))}'><td>{e(r['cmp'][0])}</td><td><b>{e(r['cmp'][1])}</b></td>"
                       f"<td>{e(r['cmp'][2])}</td><td class='gap'>{e(_signed_word(_delta(r['cmp'][1], r['cmp'][2]), r.get('kind')))}"
@@ -444,7 +444,7 @@ def card(slug: str, heading: bool = True) -> str:
         says = ([x for x in boss_says if _key(x) not in skip and not (isinstance(x, dict) and x.get("cmp"))][:3]
                 + [x for x in boss_says if isinstance(x, dict) and x.get("cmp")][:6])  # a table: more rows fit
         links = "".join(f"<a href='/job/{e(jid)}'>{label}</a>" for kind, label in
-                        (("rotation", "Your rotation"), ("wipe", "Why it did not die"), ("diff", "These two pulls, in detail"))
+                        (("rotation", "Your rotation"), ("wipe", "Why it did not die"), ("diff", "These two pulls, side by side"))
                         if (jid := b["jobs"].get(kind)) and not _failed(jid))
         prep = "The prep"
         if not b["kill"] and (_failed(b["jobs"].get("wipe")) or not b["jobs"].get("wipe")):  # needs the boss prepared:
