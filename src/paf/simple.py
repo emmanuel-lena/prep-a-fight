@@ -148,12 +148,14 @@ def change_card(d) -> str:
     from paf.prep_report import best_build, copy_button, linkify
 
     rows = []
+    talents_said = False  # a talent gain above the plan's: said not to add (DPS confirm round 2: two +6.6%)
     best = best_build(d)
     if d.talents and best is not None:
         g = best.per_fight.get(d.talents.fights[0], (0.0, None))[0]
         if g > 2 * d.talents.error:
             spec_ic = icons.img(icons.CLASS_ICON.format(cls=d.class_name.lower()), "medium") if d.class_name else ""
             button = copy_button(best.build.code, "Copy the talents") if best.build.code else ""
+            talents_said = True
             rows.append(f"<li>{spec_ic}<div><b>Change your talents</b><span class='sz {_size(g)}'>"
                         f"{SIZE_WORDS[_size(g)]}, {g:+.1f}%</span></div></li>{swaps_html(d, getattr(best, 'swaps', []))}"
                         f"<li class='sw-copy'>{button}</li>")
@@ -184,8 +186,7 @@ def change_card(d) -> str:
         rows.append(f"<li>{_ic(d, held[0][0])}<div><b>Play your cooldowns this way</b><span class='sz "
                     f"{_size(plan.gain)}'>{SIZE_WORDS[_size(plan.gain)]}, {plan.gain:+.1f}% vs SimC's default list, with your "
                     f"current talents</span><span class='what'>"
-                    f"{e(held[0][0])}{' and more' if len(held) > 1 else ''}: its rules and its MRT note just below; the fight "
-                    f"tab calls them at their times."
+                    + ("Simmed apart from the talents above: the two gains do not add up." if talents_said else "")
                     + ("" if getattr(plan, "robust", True) else " Not robust: the gain can vanish on a harder fight "
                        "(see its checks in Dig deeper).") + "</span></div></li>")
     if getattr(d, "imported", False):  # no bags: the best gear and the loot need the /simc export

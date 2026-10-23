@@ -581,9 +581,7 @@ def suggestions(d: PrepData) -> list[Suggestion]:
 
             lines = []
             if getattr(best, "swaps", None):  # the card above shows them as icons, with its copy button (DPS
-                add = drop = []  # round 11: the same swap three times on one tab)
-                lines.append("<span class='muted small'>The talents to take and drop: in the card above. Every "
-                             "build compared below, in Talents of the top players.</span>")
+                add = drop = []  # round 11: the same swap three times on one tab; no pointer sentence, round 19)
             if add:
                 lines.append("<span class='plus'>+</span> Take " + few(add))
             if drop:

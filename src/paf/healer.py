@@ -2842,8 +2842,10 @@ def render_sheet(h: HealerPrep) -> str:
             at = _named_at(c, t, named, 0.0)
             if (c.name, t) not in moved and _mmss(at) != _mmss(t):
                 moved[(c.name, t)] = at
+    lanes = set(lead_names) | {k[0] for k in named if k[0] != KEPT}  # a button the table names in a hit's window
+    # gets its lane and its outline there (heal confirm round 2: Convoke 60% in the 1:15 window, no mark)
     svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight, and the top players' healing "
-                    "cooldowns", drawn, set(lead_names), answered, moved)
+                    "cooldowns", drawn, lanes, answered, moved)
     rare_kept = [c for c in h.rare if c not in utility]
     rare = [c for c in rare_kept if c not in items and not is_defensive(c.spell_id, c.name)
             and _external(c.spell_id) != "protective"]  # the others go to their own section
@@ -2854,10 +2856,12 @@ def render_sheet(h: HealerPrep) -> str:
         f"damage per second, {h.raid_kills or 'the top'} kills (up to 40 a spec read: the same hits on every healer "
         f"sheet; fewer kills past the median one). "
         + ("After a dashed line, stage time (below). " if getattr(h, "staged", False) else "")
-        + ("Marks: the table's answers" + (" (an outline: another press of the same button)" if any(
-            (c.name, t) not in answered for c in drawn if c.name in lead_names for t in [*c.times, *c.alt])
+        + ("Marks: the table's answers" + (" (an outline: another press, or one in a hit's window that is not "
+                                            "its answer)" if any(
+            (c.name, t) not in answered for c in drawn if c.name in lanes for t in [*c.times, *c.alt])
             else "") + ". " if lead_names
-           else "No cooldown is kept for these hits, so none is drawn. ")
+           else "No cooldown is kept for these hits; an outline: a press in a hit's window, not its answer. "
+           if lanes else "No cooldown is kept for these hits, so none is drawn. ")
         + "A dot: a big hit, "
         + ("named after what deals most of the damage there"
            if h.named_by_damage else "named after the boss cast just before it (&quot;after X&quot;: 8 to 30 s "
