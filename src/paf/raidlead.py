@@ -307,7 +307,7 @@ def _talents_h4(sh: dict, total: int, said: int = -1) -> str:
     read (a review: on a boss with changes, who was not checked vanished)."""
     changing, unread_, other = len(sh["builds"]), sh.get("unread") or [], sh.get("no_split", 0)
     if other >= total:  # no spec has a pad/boss split on this boss: nothing to compare, said as such
-        return "<h4>Talents to change <span class='rl-unread'>no pad/boss build on this boss</span></h4>"
+        return f"<h4>Talents to change <span class='rl-unread'>{NO_BUILD} on this boss</span></h4>"
     ok = total - changing - len(unread_) - other
     parts = [f"<span class='rl-ok'>&#10003; {ok} on their build</span>"] if ok > 0 else []  # always counted
     if other and other != said:  # the roster says the tanks and healers once (fresh app review 4: nine times a page)
@@ -316,6 +316,9 @@ def _talents_h4(sh: dict, total: int, said: int = -1) -> str:
     if unread_:
         parts.append(f"<span class='rl-unread'>{len(unread_)} not read: {e(', '.join(unread_))}</span>")
     return f"<h4>Talents to change {''.join(parts)}</h4>"
+
+
+NO_BUILD = "no pad/boss build"  # one phrase wherever nothing is compared (fresh app review 6)
 
 
 def _strip_cell(x, sh, total: int = 0, difficulty: str = "heroic") -> str:
@@ -327,10 +330,11 @@ def _strip_cell(x, sh, total: int = 0, difficulty: str = "heroic") -> str:
                 "prepare &rarr;</span></a>")
     else:
         adds = sum(len(t["players"]) for t in sh["targets"])
+        n = len(sh["builds"])  # players, not talents (fresh app review 6: "4 talent changes" for 2 players' 6)
+        nobuild = bool(total) and sh.get("no_split", 0) >= total  # nothing compared: said as the card says it
         say = (f"<span class='rl-sv'>{adds} on adds</span>" if adds else "") + (
-            f"<span class='rl-sv'>{len(sh['builds'])} talent changes</span>" if sh["builds"] else "") or (
-            # nothing compared is not "nothing to change": the card says no pad/boss build (fresh app review 5)
-            "<span class='rl-sv none'>no build to compare</span>" if total and sh.get("no_split", 0) >= total else
+            f"<span class='rl-sv'>{n} {'player' if n == 1 else 'players'} to change talents</span>" if n else "") + (
+            f"<span class='rl-sv none'>{NO_BUILD}</span>" if nobuild else "") or (
             "<span class='rl-sv ok'>&#10003; nothing to change</span>")
     img = (f"<img src='/bossimg/{x.id}.png' alt='' loading='eager' onerror=\"this.remove()\">")
     return (f"<a class='rl-sb{' none' if sh is None else ''}' href='#boss-{x.id}'>{img}<b>{e(x.name)}</b>{say}</a>")
@@ -433,7 +437,7 @@ def page_body(difficulty: str) -> str:
     in_raid = [s for n, s, _d in state["players"] if n not in bench]
     said = sum(1 for s in in_raid if not _damage_spec(s))  # no pad/boss build to compare: said here, not per boss
     roster = (f"<section class='rl-roster'><h2>Your roster <small class='muted'>{len(in_raid)} players"
-              + (f" &middot; {said} tanks and healers, no build to compare" if said else "") + "</small></h2>"
+              + (f" &middot; {said} tanks and healers, {NO_BUILD}" if said else "") + "</small></h2>"
               f"<p class='small muted'>From {e(state.get('roster_from', ''))}{when} "
               f"&middot; <a href='https://www.warcraftlogs.com/reports/{e(state['report'])}' target='_blank' rel='noopener'>"
               f"the log &#8599;</a></p><div class='rl-chips'>{chips}</div>"

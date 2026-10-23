@@ -1568,11 +1568,12 @@ def fight_strip(enc, difficulty: str) -> str:
             lane = len(ends) - 1
         elif lane is None:
             lane = min(range(2), key=lambda i: ends[i])
-        ends[lane] = max(ends[lane], a1, a0 + 30)
+        ends[lane] = max(ends[lane], a1 + 28, a0 + 30)  # room for a count written beside its bar
         y = 24 + lane * 19
-        out.append(f"<rect class='fs-add' x='{a0:.1f}' y='{y}' width='{max(30.0, a1 - a0):.1f}' height='16' rx='4'>"
+        inside = a1 - a0 >= 30  # its true length; a short wave's count beside it (fresh app review 6: 5 s drawn 12)
+        out.append(f"<rect class='fs-add' x='{a0:.1f}' y='{y}' width='{max(3.0, a1 - a0):.1f}' height='16' rx='3'>"
                    f"<title>{e(a.name or 'adds')} at {mmss(a.time)}: {a.count}, ~{a.lifetime:.0f} s</title></rect>"
-                   f"<text class='fs-n' x='{a0 + 5:.1f}' y='{y + 12}'>&#215;{a.count}</text>")
+                   f"<text class='fs-n' x='{(a0 + 5) if inside else (a1 + 3):.1f}' y='{y + 12}'>&#215;{a.count}</text>")
     for mv in f.movement:  # a move: a tick just over the axis
         out.append(f"<rect class='fs-move' x='{x(mv.start):.1f}' y='{axis - 7}' "
                    f"width='{max(2.0, x(mv.start + mv.duration) - x(mv.start)):.1f}' height='6'/>")
