@@ -194,7 +194,8 @@ HOW_TO_READ = (
     "under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long.</dd>"
     "<dt>&#10226; back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, not "
     "counted for it (&#10226;&nbsp;about half: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
-    "time some top players press it instead.</dd></dl>")
+    "time some top players press it instead.</dd><dt>not kept</dt><dd>pressed in a hit's window, but the table answers "
+    "that hit with another press.</dd></dl>")
 
 # stage time, as a legend term: every rule of STAGED, in fewer words
 STAGE_TERM = ("after a dashed line: each kill's damage and presses counted from that stage's start, placed at its "
@@ -1024,6 +1025,13 @@ NOT_KEPT = " &middot; not kept"  # a press the table names in a hit's window it 
 # (heal confirm round 13: under a quarter, "0:37 · 2 s after the 0:35 hit starts · 20%" read as kept)
 
 
+def _nk(c: Cooldown | None, named: dict | None) -> str:
+    """"not kept" on a button the table answers a hit with elsewhere only: a button it never names is no answer
+    anywhere, the word adds nothing (heal confirm round 14: every Yu'lon chip "not kept")."""
+    answers = (named or {}).get((KEPT, "answers"))
+    return NOT_KEPT if c is None or answers is None or _shown(c.name) in answers else ""
+
+
 def _line_where(at, hit: float) -> str:
     """A window line's chip head: its time and its offset from the hit, as every chip (heal confirm round 12:
     "about 0:37 · in the window of the 0:35 hit: 20%"); a spread of times keeps its range and the window."""
@@ -1041,7 +1049,8 @@ def _not_kept(hit: float, hs: float, named: dict | None, c: Cooldown | None = No
     from paf.defensives import is_defensive
 
     where = _offset(t, _mmss(hit)) if t is not None else f" &middot; in the window of the {_mmss(hit)} hit"
-    why = " &middot; personal, not kept" if c is not None and is_defensive(c.spell_id, c.name) else " &middot; not kept"
+    why = (" &middot; personal" if c is not None and is_defensive(c.spell_id, c.name)  # says it already
+           else _nk(c, named))
     return f"{where} &middot; {_pct(hs)}{_reach_note(c, hit) if c is not None else ''}{why}"
 
 
@@ -1480,7 +1489,7 @@ def _or_then_untied(c: Cooldown, t: float, n: str, tied: str, answered, named, m
 
 
 LEGEND_USE = {"On cooldown": "on cooldown", "&#10226; back from cooldown": "&#10226;", "&ldquo;or&rdquo;": ", or ",
-              "of its users": "of its users"}
+              "of its users": "of its users", "not kept": "&middot; not kept<"}
 
 
 def legend_for(dl: str, page: str) -> str:
@@ -1579,7 +1588,7 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
         # (none when a window chip follows: heal round 12, Spirit Link Totem's 2:13 under "no shared time"),
         # a named line may follow (round 91; heal round 10: "timing varies: no shared moment" three times a sheet)
         + _pull_chip(c)
-        + "".join(f"<span class='chip'>{_line_where(v[1], k[1][1])} &middot; {_pct(v[0])}{v[2]}{NOT_KEPT}"
+        + "".join(f"<span class='chip'>{_line_where(v[1], k[1][1])} &middot; {_pct(v[0])}{v[2]}{_nk(c, named)}"
                   f"{' &middot; ' + v[3] if len(v) > 3 and v[3] and not (c.every and v[3] == 'on cooldown') else ''}</span>"  # a chip of its own, led by its time
                   # (round 91: plain text after a chip read as that chip's continuation)
                   for k, v in (named or {}).items()
@@ -1638,11 +1647,11 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float, shown_t
         if _pct(hs) == _pct(sp):  # one count: said once, at the lead's time, the chip's own (round 78: "2:59 ·
             # 2:57", two times); under a quarter, of those who press it too (round 84); its offset from the hit, as
             # every other chip (heal round 10: "in the window of the 2:55 moment: the same 15%")
-            return _offset(at, _mmss(hit)) + _base(c, hs, hit) + _pressers(c, sp, t) + (tag or NOT_KEPT)
+            return _offset(at, _mmss(hit)) + _base(c, hs, hit) + _pressers(c, sp, t) + (tag or _nk(c, named))
         if c.ramp and at < hit - ANSWER[0]:  # a ramp ahead of its hit: its offset, as every chip (heal confirm 9)
-            return f"{_offset(at, _mmss(hit))}{_base(c, hs, hit)}" + (tag or NOT_KEPT)  # its window's share, as every
+            return f"{_offset(at, _mmss(hit))}{_base(c, hs, hit)}" + (tag or _nk(c, named))  # its window's share, as every
             # offset chip (heal confirm round 10: "20 s before the 3:35 hit: 38%" beside "21 s before … · 41%")
-        return f"{_share(sp)}{_still(c, t, sp)}{_offset(at, _mmss(hit))}{_base(c, hs, hit)}" + (tag or NOT_KEPT)  # ⟲ says it already
+        return f"{_share(sp)}{_still(c, t, sp)}{_offset(at, _mmss(hit))}{_base(c, hs, hit)}" + (tag or _nk(c, named))  # ⟲ says it already
         # for every window chip, its offset from the time shown (heal confirm round 11)
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
         return _base(c, hs, _secs(n.partition(" ")[0]))
@@ -2519,7 +2528,7 @@ def jobs_lead(roles: list, mine: str = "") -> str:
             what, a_, b_, n, ta, tb = m.groups()
             rows += (f"<tr><td><b>{_spec_ic(sp)}{e(sp)}</b></td><td>{e(what)} more</td><td><b>{a_}</b> vs {b_} <small>({n} kills"
                      f"{e(table(sp, j)).replace(' (the table', '; the table').rstrip(')')})</small></td>"
-                     f"<td><b>{ta}</b> vs {tb}</td><td class='no'>&#10007; not kept</td></tr>")
+                     f"<td><b>{ta}</b> vs {tb}</td><td class='no'>&#10007; not a job</td></tr>")
         return ("<p class='lead'>No healer spec has a job of its own here that the top players keep.</p>"
                 "<table class='jobs fit'><thead><tr><th>Healer</th><th>On average</th><th>Every healer <small>(spec "
                 "vs the others, paired within each kill)</small></th><th>Top players <small>(ranked ones)</small>"
@@ -2920,6 +2929,7 @@ def render_sheet(h: HealerPrep) -> str:
                     lanes_extra.add(_shown(c.name))  # its store's lane too, as the sheets with a kept release
     lanes = set(lead_names) | {k[0] for k in named if k[0] != KEPT} | {c.name for c in drawn if _shown(c.name) in lanes_extra}
     # gets its lane and its outline there (heal confirm round 2: Convoke 60% in the 1:15 window, no mark)
+    named[(KEPT, "answers")] = frozenset(_shown(n) for n in lead_names)  # what "not kept" may be said of
     svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight, and the top players' healing "
                     "cooldowns", drawn, lanes, answered, moved)
     rare_kept = [c for c in h.rare if c not in utility]

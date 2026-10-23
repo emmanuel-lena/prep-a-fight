@@ -189,8 +189,10 @@ def change_card(d) -> str:
         held = [(cd_name(d, k), r.name) for k, r in plan.choice.items() if r.name != "default"]  # the game's name
         rows.append(f"<li>{_ic(d, held[0][0])}<div><b>Play your cooldowns this way</b><span class='sz "
                     f"{_size(plan.gain)}'>{SIZE_WORDS[_size(plan.gain)]}, "
-                    f"{plan.gain:+.{same(talents_said) if talents_said else 1}f}% vs SimC's default list, with your "
-                    f"current talents</span><span class='what'>"
+                    f"{plan.gain:+.{same(talents_said) if talents_said else 1}f}% vs SimC's default list"
+                    + (f" (equal to the talents' within &plusmn;{2 * d.talents.error:.1f}%)" if talents_said
+                       and same(talents_said) == 2 and d.talents else "")  # (DPS confirm round 14)
+                    + ", with your current talents</span><span class='what'>"
                     + ("<span class='pill'>simmed apart from the talents: the gains do not add up</span>"
                        if talents_said else "")  # plain words, the figure said (DPS confirm round 12: "≠ adds to")
                     + ("" if getattr(plan, "robust", True) else " Not robust: the gain can vanish on a harder fight "
