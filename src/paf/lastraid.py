@@ -354,7 +354,8 @@ def _cmp_table(rows: list[dict], report: str = "") -> str:
         t = f" <small>{clock}{e(lab[i])}</small>" if lab[i] else ""
         if report and fights[i]:
             t += (f"<br><a href='https://www.warcraftlogs.com/reports/{e(report)}#fight={fights[i]}' "
-                  f"target='_blank' rel='noopener'>Fight {fights[i]} &#8599;</a>")  # leaves the app: marked
+                  f"target='_blank' rel='noopener' title='fight {fights[i]} in the log (its ids count trash too)'>in the log "
+                  "&#8599;</a>")  # leaves the app: marked; no "fight 14" read as the 14th pull (app confirm round 9)
         return f"<th>{word}{t}</th>"
     # the comparison's own pulls: its best and worst without a death (paf.pulldiff), not the night's best pull
     return ("<table class='lr-cmp fit'><thead><tr><th></th>"
@@ -434,7 +435,7 @@ def card(slug: str, heading: bool = True) -> str:
         return ""
     total = sum(len(_tools(b, cur["report"], cur["player"])) for b in cur["bosses"])
     done = sum(len(b["jobs"]) for b in cur["bosses"])
-    when = datetime.fromtimestamp(cur["date"]).strftime("%A %d %B") if cur.get("date") else ""
+    when = datetime.fromtimestamp(cur["date"]).strftime("%a %d %b") if cur.get("date") else ""  # as the raid lead
     night = f"<a href='/job/{e(cur['night'])}'>the night, pull by pull</a> &middot; " if cur.get("night") else ""
     head = (("<h2>Your last raid</h2>" if heading else "") + f"<p class='lr-sub'>{e(when)} &middot; {_pulls(cur['pulls'])} &middot; {night}"
             f"<a href='{e(URL.format(cur['report']))}' target='_blank' rel='noopener'>the log &#8599;</a></p>")
