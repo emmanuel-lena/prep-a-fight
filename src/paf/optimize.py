@@ -364,7 +364,9 @@ def sanity_flags(plan: Plan, alignment: list, validation: float | None = None) -
                          f"the top players keep it for {tops}")
     validated = validation is not None and abs(validation - 1) <= 0.1
     if plan.gain > LARGE_GAIN and (flags or not validated):
-        why = "fight not validated on the top players (paf validate)" if not validated else "see the other checks"
+        why = ("fight not validated on the top players (paf validate)" if validation is None else  # measured, said
+               f"the sim does {validation:.0%} of the top players' damage on this fight" if not validated else
+               "see the other checks")  # (DPS round 11: "not validated" beside "the sim does 89%")
         flags.insert(0, f"large gain ({plan.gain:+.1f}%): {why}")
     return flags
 
