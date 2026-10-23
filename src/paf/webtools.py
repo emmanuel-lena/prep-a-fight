@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import html
 import os
+import re
 
 from paf import __version__, settings
 from paf.config import data_dir
@@ -221,18 +222,29 @@ def path_html(path: str) -> str:
             f"<span class='p-full'>{e(path)}</span></span>")
 
 
+def meter(share: float) -> str:
+    """A small gauge (the quota spent, the cache filled): warm past three quarters."""
+    x = max(0.0, min(1.0, share))
+    return (f"<span class='meter{' hi' if x >= 0.75 else ''}' aria-hidden='true'><span style='width:{x * 100:.0f}%'>"
+            "</span></span>")
+
+
 def quota_html() -> str:
     """The Warcraft Logs quota line of Settings, or why it cannot be read."""
     try:
         from paf.wcl import quota_line
 
-        return e(quota_line())
+        line = quota_line()
+        m = re.match(r"(\d+) / (\d+)", line)
+        return (meter(int(m[1]) / max(1, int(m[2]))) if m else "") + e(line)  # a bar beside the numbers
     except Exception as ex:  # noqa: BLE001 - shown as is
         return f"<span class='neg'>{e(str(ex)[:160])}</span>"
 
 
 def settings_page(message: str = "") -> str:
     from paf.cache import cache_root, size
+
+    cache_meter = meter(size(cache_root()) / 1e6 / max(1.0, float(settings.get("cache_max_mb") or 1)))
     from paf.simc_install import find_simc
 
     exe = find_simc(None)
@@ -294,7 +306,7 @@ stays where it is">Get nightly</button></form></div></td></tr>
 <tr><td>prep-a-fight</td><td class="small"><div class="val"><span>version {e(__version__)}</span>
 <form method="post" action="/update/check"><button class="btn ghost">Check for updates</button></form></div></td></tr>
 <tr><td>Warcraft Logs</td><td class="small">{quota}</td></tr>
-<tr><td>Caches (sims, logs)</td><td class="small">{size(cache_root()) / 1e6:,.0f} MB
+<tr><td>Caches (sims, logs)</td><td class="small">{cache_meter}{size(cache_root()) / 1e6:,.0f} MB
 (cap {settings.get('cache_max_mb')} MB)</td></tr>
 <tr><td>Data folder</td><td class="small">{path_html(str(data_dir()))}</td></tr></table></div>
 <p class="muted small">Every tool the prep runs also has <a href="/tools">its own page</a>.</p>

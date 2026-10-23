@@ -396,3 +396,6 @@ table.mx a.mx:hover{border-color:var(--fg)} table.mx a.mx.nosim{border-style:das
 table.lr-cmp{margin:6px 0 10px;font-size:14px} table.lr-cmp th{font:600 11px var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:4px 16px 4px 0}
 table.lr-cmp td{padding:5px 16px 5px 0;border-top:1px solid var(--line)} table.lr-cmp td b{font-family:var(--font-data)}
 table.lr-cmp tr.good td b{color:var(--pos)} table.lr-cmp tr.bad td b{color:var(--neg)}
+/* a gauge beside a number (Settings: the quota, the caches) */
+.meter{display:inline-block;width:90px;height:7px;border-radius:4px;background:var(--surface-2);border:1px solid var(--line);vertical-align:middle;margin-right:10px;overflow:hidden}
+.meter>span{display:block;height:100%;background:var(--accent)} .meter.hi>span{background:var(--warn)}

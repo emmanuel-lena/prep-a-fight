@@ -882,8 +882,7 @@ def characters_page() -> str:
         logs = (f'<form method="post" action="/character/autologs" class="cc-logs"><input type="hidden" name="slug" '
                 f'value="{e(c.slug)}"><input type="hidden" name="on" value="{"0" if c.slug in auto else "1"}">'
                 f'<label><input type="checkbox"{" checked" if c.slug in auto else ""} onchange="this.form.submit()"> '
-                f'<span>Check this character&#39;s last raid when the app starts (shown on <a href="/reclear">Reclear'
-                f'</a>)</span>'
+                f'<span>Read its last raid when the app starts (<a href="/reclear">Reclear</a>)</span>'
                 f'</label></form>')
         ic = icons.img(icons.CLASS_ICON.format(cls=c.class_name.lower()), "large", "cc-ic")
         badge = ('<span class="muted small">from a log: no bags</span>' if c.imported else
@@ -909,9 +908,8 @@ def characters_page() -> str:
                   f'</button></div></details></div>{logs}</div>')
     empty = "" if cards else "<p class='muted'>No character yet: add your first one below.</p>"
     cur = next((c for c in characters.all_characters() if c.current), None)
-    lead = (f"You play <b>{e(cur.name)}</b>, {e(cur.spec.title())} {e(cur.class_name.title())}"
-            + (f" ({e(cur.realm)})" if cur.realm else "") + ". Switch in one click; paste a new /simc export after a "
-            "gear change." if cur else "One /simc export per character: switch in one click.")
+    lead = ("One /simc export per character: switch in one click, paste a new one after a gear change."
+            if cur else "One /simc export per character: switch in one click.")  # who you play: its card says it
     have = {c.name.lower() for c in characters.all_characters()}
     from paf import onboarding, wcllogin
 
