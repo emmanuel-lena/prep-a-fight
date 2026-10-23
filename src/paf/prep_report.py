@@ -801,12 +801,11 @@ def defensives_html(d: PrepData) -> str:
         "when you take damage.</p>")
     usage = ", ".join(f"{link(n, f'spell={sid}')} {per:.1f} per kill ({share:.0%} of the kills)"
                       for n, sid, per, share in df.usage[:6])
-    return (f"<h2>Defensives</h2><div class='card'><p class='small'>When the top players of your spec press a "
-            f"defensive on this boss ({df.kills} kills), and the boss ability it answers (cast within about 10 s, or "
-            f"long before for damage that lands later). SimC does not "
-            f"simulate survival: this is advice, not a gain. The fight tab and the notes call the moments where "
-            f"{fightview_support():.0%} or more of the top players press one.</p>{table}"
-            + (f"<p class='small muted'>Used: {usage}.</p>" if usage else "") + "</div>")
+    return (f"<h2>Defensives <span class='pill near'>advice, not simmed</span></h2><div class='card'>{table}"  # the
+            + (f"<p class='small'>Used: {usage}.</p>" if usage else "")  # answer first, how it is read after
+            + f"<p class='small muted'>When the top players of your spec press one ({df.kills} kills) and the boss "
+            "ability it answers (cast within about 10 s, or long before for damage that lands later); the fight tab "
+            f"calls the moments where {fightview_support():.0%} or more of them press one.</p></div>")
 
 
 def nsrt_block(note: str) -> str:
