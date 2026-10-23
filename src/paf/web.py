@@ -590,7 +590,7 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
                    + "".join(f"<td>{cell(sp, n)}</td>" for n in names) + "</tr>" for sp in specs)
     return (f"<h2>Your sheets</h2><div class='mx-wrap'><table class='mx'><thead><tr><th></th>{head}</tr></thead>"
             f"<tbody>{rows}</tbody></table></div><p class='mx-legend'>{diff_pill('normal')} {diff_pill('heroic')} "
-            f"{diff_pill('mythic')} <span class='pill diff mx nosim'>dashed: no sim yet</span></p>")
+            f"{diff_pill('mythic')} <span class='pill diff mx nosim'>no sim yet</span></p>")
 
 
 TABS = (("prep", "Prep sheet"), ("timeline", "Top players' timelines"))

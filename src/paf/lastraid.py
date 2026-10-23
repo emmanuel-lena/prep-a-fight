@@ -329,6 +329,16 @@ def _delta(b: str, a: str) -> str:
     return f"{(x - y) / y:+.0%}" if y else ""
 
 
+def _signed_word(gap: str, kind: str | None) -> str:
+    """A gap that is good while its sign is minus (less boss health left): said in words, never "-3 pts" in the
+    gain colour (DESIGN: a sign always says the same thing)."""
+    if gap.startswith("-") and kind == "good":
+        return gap[1:] + " lower"
+    if gap.startswith("+") and kind == "bad":
+        return gap[1:] + " higher"
+    return gap
+
+
 def _cmp_table(rows: list[dict]) -> str:
     """The best pull against the weaker one, a measure a row, the better value marked (good or bad for you)."""
     if not rows:
@@ -341,7 +351,7 @@ def _cmp_table(rows: list[dict]) -> str:
             f"<th>Weaker{' <small>' + e(lab[1]) + '</small>' if lab[1] else ''}</th><th>Gap</th></tr>"
             "</thead><tbody>"
             + "".join(f"<tr class='{e(r.get('kind', ''))}'><td>{e(r['cmp'][0])}</td><td><b>{e(r['cmp'][1])}</b></td>"
-                      f"<td>{e(r['cmp'][2])}</td><td class='gap'>{e(_delta(r['cmp'][1], r['cmp'][2]))}"
+                      f"<td>{e(r['cmp'][2])}</td><td class='gap'>{e(_signed_word(_delta(r['cmp'][1], r['cmp'][2]), r.get('kind')))}"
                       f"{' &#10007;' if r.get('kind') == 'bad' else ''}</td>"  # a mark where it goes the wrong way only
                       "</tr>" for r in rows) + "</tbody></table>")
 

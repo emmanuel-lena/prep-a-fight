@@ -411,3 +411,7 @@ table.rl-tg{width:100%;margin:4px 0 8px;font-size:14px} table.rl-tg th{font:600 
 table.rl-tg td{padding:6px 10px 6px 0;border-top:1px solid var(--line);vertical-align:top} table.rl-tg td:first-child{width:28%}
 table.rl-tg .rl-best{display:inline-flex;align-items:center;gap:3px;margin-right:8px;white-space:nowrap;font-size:13px;color:var(--muted)}
 .rl-boss li.rl-b{flex-wrap:nowrap;align-items:flex-start} .rl-boss li.rl-b .rl-ts{display:flex;flex-wrap:wrap;gap:4px 6px;flex:1} /* chips wrap in their own column */
+.mx-legend .pill.nosim{border-style:dashed;background:transparent}
+table.rl-tg{table-layout:fixed} table.rl-tg th:nth-child(1),table.rl-tg td:nth-child(1){width:26%} table.rl-tg th:nth-child(2),table.rl-tg td:nth-child(2){width:38%}
+.rl-side.pad{border-color:var(--line);color:var(--fg)} /* neutral: gold is for the one key number (DESIGN) */
+.status .btn{font:600 14px var(--font-body)}

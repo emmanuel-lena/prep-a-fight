@@ -277,6 +277,16 @@ def lust_spot(sh: dict):
         next(iter(sh.get("lust") or []), None)
 
 
+def _unread_h4(names: list[str], total: int) -> str:
+    """Who was read and needs no change, then who was not: "nothing to change" never looks like "not read"."""
+    read = max(0, total - len(names))
+    if not read:  # the whole raid: no talents in the log for this boss
+        return ("<h4>Talents to change <span class='rl-unread'>not read: no talents in the log for this boss"
+                "</span></h4>")
+    return (f"<h4>Talents to change <span class='rl-ok'>&#10003; {read} on their build</span>"
+            f"<span class='rl-unread'>{len(names)} not read: {e(', '.join(names))}</span></h4>")
+
+
 def _ic(spec: str) -> str:
     """A player's class icon from its spec ("Frost DeathKnight" -> the Death Knight's)."""
     from paf import icons
@@ -410,9 +420,7 @@ def page_body(difficulty: str) -> str:
                   f"<h4>Who hits what</h4>{tg or '<p>Everyone on the boss: no add to assign.</p>'}"
                   + (f"<h4>Talents to change</h4><ul>{bd}</ul>" if bd else  # "not a sim": the legend, once
                      ("<h4>Talents to change <span class='rl-ok'>&#10003; nobody, from the log</span></h4>"
-                      if not sh.get("unread") else
-                      f"<h4>Talents to change <span class='rl-unread'>? {len(sh['unread'])} "
-                      f"player{'s' if len(sh['unread']) > 1 else ''} not read: {e(', '.join(sh['unread']))}</span></h4>"))
+                      if not sh.get("unread") else _unread_h4(sh["unread"], len(state["players"]) - len(bench))))
                   + lust_block(sh, difficulty) + "</article>")
     allbtn = (copy_button("\n\n".join(text(sh, difficulty) for sh in everything), "Copy every boss for Discord")
               if everything else "")
