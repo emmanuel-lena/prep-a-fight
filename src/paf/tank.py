@@ -659,8 +659,6 @@ def render_sheet(p: TankPrep) -> str:
         f"{'' if p.moments else '<li>No big moment: steady damage.</li>'}</ul></div>",
         f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
         f"{nouned(cooldowns_html(defs, answered, named, moved_t)) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
-        + (TANK_HOW_TO_READ.replace("</dl>", f"<dt>Stage time</dt><dd>{STAGE_TERM}</dd></dl>")
-           if getattr(p, "staged", False) else TANK_HOW_TO_READ)
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
            f"</p>" if p.rare else ""),
         f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"
@@ -756,6 +754,11 @@ def render_sheet(p: TankPrep) -> str:
         deeper.append("<p class='small muted'>" + ("" if deaths else "The deaths of each composition are not read yet. ")
                       + "A spec's longer kills or extra deaths are a reading, not a verdict: the raids that bring it "
                       "differ in other ways too, and a few kills move a mean of deaths.</p>")
+    from paf.healer import legend_for
+
+    # the legend under every card it explains, its used terms only (as the healers'; a review: mid-page)
+    fight.append(legend_for(TANK_HOW_TO_READ.replace("</dl>", f"<dt>Stage time</dt><dd>{STAGE_TERM}</dd></dl>")
+                            if getattr(p, "staged", False) else TANK_HOW_TO_READ, "".join(fight)))
     byline = (f"{e(p.character or p.spec)} &middot; {e(p.spec)} &middot; from {p.kills} top kills (median "
               f"{_mmss(p.duration)}) &middot; no tank sim")
     return sheet_page(p.boss, p.difficulty, byline, p.class_name,

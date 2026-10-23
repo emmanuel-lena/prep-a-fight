@@ -201,9 +201,16 @@ def unread(state: dict, enc_id: int, diff: int) -> list[str]:
     out = []
     for name, spec, _dps in state.get("players") or []:
         split = (state.get("splits") or {}).get(f"{enc_id}|{diff}|{spec}") or {}
-        if name not in set(state.get("bench") or []) and (not split or not state.get("talents", {}).get(name)):
-            out.append(name)
+        if name not in set(state.get("bench") or []) and split and not state.get("talents", {}).get(name):
+            out.append(name)  # a spec with no pad/boss split (a tank, a healer) has nothing to read: not "unread"
     return out
+
+
+def no_split(state: dict, enc_id: int, diff: int) -> int:
+    """The players whose spec has no pad/boss build on this boss (the tanks and healers): said once, apart."""
+    bench = set(state.get("bench") or [])
+    return sum(1 for name, spec, _d in state.get("players") or [] if name not in bench
+               and not (state.get("splits") or {}).get(f"{enc_id}|{diff}|{spec}"))
 
 
 @by_corpus
@@ -249,6 +256,7 @@ def sheet(state: dict, enc, diff: int) -> dict | None:
                                            "best": [s for s, _d, _n in a.ranking[:3]]} for a in rows],
             "builds": builds(state, enc.id, diff, roles, names),
             "unread": unread(state, enc.id, diff),
+            "no_split": no_split(state, enc.id, diff),
             "enc": enc.id, "diff": diff, "lust": spots, "lust_pick": pick if any(x.label == pick for x in spots) else "",
             "lust_kills": con.execute("SELECT COUNT(*) FROM raid_lust l JOIN fight f USING(report, fight_id) "
                                       "WHERE f.encounter_id=? AND f.difficulty=? AND f.status='done'",
@@ -277,14 +285,18 @@ def lust_spot(sh: dict):
         next(iter(sh.get("lust") or []), None)
 
 
-def _unread_h4(names: list[str], total: int) -> str:
-    """Who was read and needs no change, then who was not: "nothing to change" never looks like "not read"."""
-    read = max(0, total - len(names))
-    if not read:  # the whole raid: no talents in the log for this boss
-        return ("<h4>Talents to change <span class='rl-unread'>not read: no talents in the log for this boss"
-                "</span></h4>")
-    return (f"<h4>Talents to change <span class='rl-ok'>&#10003; {read} on their build</span>"
-            f"<span class='rl-unread'>{len(names)} not read: {e(', '.join(names))}</span></h4>")
+def _talents_h4(sh: dict, total: int) -> str:
+    """The heading with its counts, whatever the list below: on their build, no pad/boss build (tanks, healers), not
+    read (a review: on a boss with changes, who was not checked vanished)."""
+    changing, unread_, other = len(sh["builds"]), sh.get("unread") or [], sh.get("no_split", 0)
+    ok = total - changing - len(unread_) - other
+    parts = ([f"<span class='rl-ok'>&#10003; {ok} on their build</span>"] if ok > 0 and (changing or unread_) else
+             ["<span class='rl-ok'>&#10003; nobody, from the log</span>"] if not changing and not unread_ else [])
+    if other:
+        parts.append(f"<span class='rl-unread'>{other} with no pad/boss build (tanks, healers)</span>")
+    if unread_:
+        parts.append(f"<span class='rl-unread'>{len(unread_)} not read: {e(', '.join(unread_))}</span>")
+    return f"<h4>Talents to change {''.join(parts)}</h4>"
 
 
 def _ic(spec: str) -> str:
@@ -398,12 +410,12 @@ def page_body(difficulty: str) -> str:
         everything.append(sh)
         tg = "".join(  # a row a target: who in your raid, the specs the top raids put on it (the owner: less text;
             # "best specs in the top raids" said once, in the header)
-            f"<tr><td><b>{e(t['name'])}</b></td><td>" + (
+            f"<tr><td><b>{e(t['name'])}</b>"
+            + (" <span class='rl-side'>a second boss</span>" if t["second_boss"] else "") + "</td><td>" + (
                 "everyone" if t["whole_raid"] and not t["players"] else
                 ("".join(f"<span class='rl-n'>{_ic(spec_of.get(n, ''))}{e(n)}</span>" for n in t["players"])
                  if t["players"] else "<span class='muted'>nobody fits</span>"))
-            + "</td><td>" + ("<span class='rl-side'>a second boss</span>" if t["second_boss"] else
-                             " ".join(f"<span class='rl-best'>{_ic(b)}{e(pretty(b))}</span>" for b in t["best"]))
+            + "</td><td>" + " ".join(f"<span class='rl-best'>{_ic(b)}{e(pretty(b))}</span>" for b in t["best"])
             + "</td></tr>" for t in sh["targets"])
         tg = (f"<table class='rl-tg'><thead><tr><th>Target</th><th>Your raid</th><th>Best specs in the top raids</th>"
               f"</tr></thead><tbody>{tg}</tbody></table>") if tg else ""
@@ -418,9 +430,7 @@ def page_body(difficulty: str) -> str:
                   f"{copy_button(text(sh, difficulty), 'Copy for Discord')}"
                   f"{copy_button(text(sh, difficulty, mrt=True), 'Copy MRT note')}</header>"
                   f"<h4>Who hits what</h4>{tg or '<p>Everyone on the boss: no add to assign.</p>'}"
-                  + (f"<h4>Talents to change</h4><ul>{bd}</ul>" if bd else  # "not a sim": the legend, once
-                     ("<h4>Talents to change <span class='rl-ok'>&#10003; nobody, from the log</span></h4>"
-                      if not sh.get("unread") else _unread_h4(sh["unread"], len(state["players"]) - len(bench))))
+                  + _talents_h4(sh, len(state["players"]) - len(bench)) + (f"<ul>{bd}</ul>" if bd else "")
                   + lust_block(sh, difficulty) + "</article>")
     allbtn = (copy_button("\n\n".join(text(sh, difficulty) for sh in everything), "Copy every boss for Discord")
               if everything else "")

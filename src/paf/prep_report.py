@@ -624,7 +624,9 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         goal = {"boss": "if you focus the boss", "total": "if you pad the adds",
                 "secondary": f"to burst {burst_names(d)[1] or 'the secondary targets'}"}.get(p.objective, p.objective)
         tag = ""
-        if want is not None and p.objective == want:
+        if want is not None and p.objective == want and not p.robust and getattr(p, "default_timeline", None):
+            tag = " <span class='pill near'>not played: not robust</span>"  # the fight tab plays the default list
+        elif want is not None and p.objective == want:
             tag = (" <span class='pill gold'>your choice</span>" if d.goal in ("boss", "total")
                    else " <span class='pill gold'>recommended for your raid</span>")
             other = next((o for o in d.optimized if o.objective in ("boss", "total") and o.objective != want
@@ -1326,7 +1328,7 @@ for reference: a build can be worse there and much better on this fight. Each ru
         tabs["cooldowns"].append(f"""<h2>Cooldown plans</h2><div class="card scroll">
 <p class="small">When the top players use their cooldowns: {times}.</p>
 <table><tr><th>Plan</th><th>Total</th><th>Boss</th><th></th></tr>{body}</table>
-<p class="small muted">Statistical error about +/-{pc.error:.2f}%. SimC evaluates these plans; it does not invent new ones.</p>
+<p class="small muted">Statistical error about &plusmn;{pc.error:.2f}%. SimC evaluates these plans; it does not invent new ones.</p>
 </div>""")
 
     # ideal play-by-play per objective
@@ -1457,7 +1459,7 @@ the simulated plans above.</p>
 <p class="small muted">"In your best sets": the item inserted in your best Top Gear sets, the rest of your gear
 rearranged around it (its real value). "Single swap": the classic droptimizer value, on your equipped set.</p>
 <table><tr><th>Item</th><th>Slot</th><th>In your best sets</th><th>Single swap</th></tr>{body}</table>
-<p class="small muted">At item level {d.loot_ilvl}; statistical error about +/-{d.loot_error:.2f}%.</p></div>""")
+<p class="small muted">At item level {d.loot_ilvl}; statistical error about &plusmn;{d.loot_error:.2f}%.</p></div>""")
 
     notes = [re.sub(r"^SimC puts (\d+%) of your damage on the boss vs (\d+%) in the top players' logs, even with more "
                     r"adds:", r"Even with the add waves counted at the minimum, SimC's default priority list puts \1 "

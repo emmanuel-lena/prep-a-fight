@@ -940,7 +940,7 @@ def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list
         said[first] = cell
         for x in dict.fromkeys(ts):
             if x != first:
-                said.setdefault(x, f"<span class='muted'>the same press as at {first}</span>")
+                said.setdefault(x, f"<span class='muted'>the other choice of the press on the {first} row</span>")
     lead = {_mmss(m.t) for m in shown}
     rows = []
     for m in sorted(moments, key=lambda m: m.t):
