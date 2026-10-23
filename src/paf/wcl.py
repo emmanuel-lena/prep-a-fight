@@ -115,7 +115,8 @@ def quota_line(client=None) -> str:
     else:
         rl = (client or WCLClient()).rate_limit()
         spent, limit, reset = rl["pointsSpentThisHour"], rl["limitPerHour"], rl["pointsResetIn"]
-    return f"{float(spent):,.0f} / {float(limit):,.0f} points used this hour (reset in {max(1, round(reset / 60))} min)"  # never "0 min"
+    return (f"{float(spent):,.0f} / {float(limit):,.0f} points used this hour "
+            f"(reset in {max(1, round(reset / 60))} min)")  # never "0 min"
 
 
 def quota_left(client=None) -> tuple[float, float]:

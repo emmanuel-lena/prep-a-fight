@@ -985,7 +985,7 @@ def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list
                     f"<b>{_x(m.ratio)}&times;</b></td><td class='ans'>{_tidy(ans)}</td></tr>")  # the legend's ⟲, as the chips
     return ("<table class='hits'><thead><tr><th>When</th><th>What hits</th><th>Size &times;</th><th>What the top players press</th></tr></thead><tbody>" + "".join(rows)
             + f"</tbody></table><p class='small muted hits-rule'>{rule + '. ' if rule else ''}"
-            + (f"None kept: {same.strip()[1:-1]}. " if same else "") + "Size: &times; the usual "
+            + (f"None kept with no reason beside it: {same.strip()[1:-1]}. " if same else "") + "Size: &times; the usual "
             f"{usual}; bars from 1&times; to the biggest hit.</p>")
 
 
@@ -1049,7 +1049,7 @@ def _also_pressers(c: Cooldown, t: float, named: dict | None, n: str, sp: float)
         end = _secs(n.partition(" ")[0]) + ANSWER[1]  # the window's base: its kills reaching the window's end
         u = _users_at(c, end)  # (round 109: "24% of those who press it" on a chip the window admitted at 25%)
         if hs and u and hs / u < 0.25 - 1e-9 and (ut := _users_at(c, t)):  # a kept time the window's share
-            return f" ({_pct(min(1.0, sp / ut))} of its users share its time)"  # reads under: its own
+            return f" ({_pct(min(1.0, sp / ut))} of its users)"  # one form (heal round 14); reads under: its own
         return _pressers(c, hs, end)  # (round 114: Aura Mastery 4:20 "24%", kept by its time at 28%)
     return ""
 

@@ -760,7 +760,8 @@ def test_one_none_kept_reason_on_several_rows_is_said_once():
     late = why[:-1] + " (89 kills going))"  # Holy Paladin, Vashnik (heal rounds 11, 13): the count kept it apart
     out = healer.hits_table(found, found, [], {"1:00": why, "2:00": late, "2:55": " (12% press Shield Wall)"},
                             None, {}, "")
-    assert out.count("pressed by a tenth") == 1 and "None kept: no long defensive of theirs" in out
+    assert out.count("pressed by a tenth") == 1
+    assert "None kept with no reason beside it: no long defensive of theirs" in out
     assert "<span class='none'>None kept</span> (12% press Shield Wall)" in out
 
 
