@@ -619,8 +619,9 @@ def legend(its: list) -> str:
     """The legend of the bars this fight has, none other."""
     kinds = {x.kind for _t, x in its if x.dur}
     spans = "".join(f"<span><i class='s-{k}'></i>{label}</span>" for k, label in LEGEND_KINDS if k in kinds)
-    grey = "<span>grey row = the tank's, nothing for you</span>" if any(x.kind == "tank" for _t, x in its) else ""
-    return (f"<div class='fv-legend' aria-hidden='true'>{spans}<span>bar length = how long it lasts</span>{grey}</div>")
+    grey = "<span>grey = the tank's</span>" if any(x.kind == "tank" for _t, x in its) else ""
+    # the rows are not spaced to scale: a bar runs down to its end's row, not a length in seconds (a review)
+    return (f"<div class='fv-legend' aria-hidden='true'>{spans}<span>a bar runs until it ends</span>{grey}</div>")
 
 
 def _side(d) -> str:
