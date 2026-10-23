@@ -178,13 +178,18 @@ class GearPool:
             return opts or [eq]
         if fam == "weapon":
             mains = [g for g in [eq.slots[0][1]] + kept if g and not self.off_hand_item(g)]
-            offs = [g for g in [eq.slots[1][1]] + kept if g and self.off_hand_item(g)]
+            eq_oh = eq.slots[1][1]
+            dual = bool(eq_oh and not self.off_hand_item(eq_oh))  # a weapon in the off hand: dual wield (a rogue's
+            offs = [g for g in [eq_oh] + kept if g and (self.off_hand_item(g)  # dagger is no shield: it was dropped,
+                                                       or (dual and not self.two_handed(g)))]  # every set -54%)
             opts = []
             for m in dict.fromkeys(mains):
                 if self.two_handed(m):
                     opts.append(Option(fam, (("main_hand", m), ("off_hand", None))))
                 else:
                     for o in dict.fromkeys(offs) or [None]:
+                        if o is not None and o.key == m.key:  # one item, one hand
+                            continue
                         opts.append(Option(fam, (("main_hand", m), ("off_hand", o))))
             return opts or [eq]
         return [eq] + [Option(fam, ((fam, g),)) for g in kept]

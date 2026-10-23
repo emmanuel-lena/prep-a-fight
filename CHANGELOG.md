@@ -16,3 +16,5 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 - Less to read, more to see: the healer and tank sheets show the big hits as a table with spell icons and size bars,
   shorter cards with one legend, and the other healers' answers as one table; the home page shows every sheet in
   one table (a spec a row, a boss a column).
+- Best gear from your bags no longer drops a dual-wielder's off-hand weapon: a Rogue's sets all simmed one-handed
+  (about -54%). A set list where everything loses more than 5% now says it is a failed sim.

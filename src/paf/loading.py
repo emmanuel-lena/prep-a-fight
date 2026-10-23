@@ -107,8 +107,10 @@ def _boss_name(args: list[str]) -> str:
 
         boss = int(args[1])
         return next((x.name for x in _encounters() if x.id == boss), "the boss")
-    except (ValueError, IndexError):
+    except IndexError:
         return "the boss"
+    except ValueError:  # a prep started by name ("Vashnik the Malignant", the full analysis): its name
+        return args[1] if args[1:] and args[1].strip() else "the boss"
 
 
 def banner(jid: str, job: dict) -> str:

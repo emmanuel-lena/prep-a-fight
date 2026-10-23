@@ -380,7 +380,8 @@ def page_body(difficulty: str) -> str:
                 ("".join(f"<span class='rl-n'>{_ic(spec_of.get(n, ''))}{e(n)}</span>" for n in t["players"])
                  if t["players"] else "<span class='muted'>nobody fits</span>"))
             + (" <span class='rl-side'>a second boss</span>" if t["second_boss"] else
-               " <small>best: " + ", ".join(f"{_ic(b)}{e(pretty(b))}" for b in t["best"]) + "</small>")
+               " <small>top raids: " + ", ".join(f"<span class='rl-best'>{_ic(b)}{e(pretty(b))}</span>"
+                                                 for b in t["best"]) + "</small>")
             + "</li>" for t in sh["targets"])
         bd = "".join(  # one line a player: who, which build, then each talent to take (+) or drop (-)
             f"<li class='rl-b'>{_ic(b['spec'])}<b>{e(b['name'])}</b><small>{e(pretty(b['spec']))}</small>"
@@ -393,7 +394,7 @@ def page_body(difficulty: str) -> str:
                   f"{copy_button(text(sh, difficulty), 'Copy for Discord')}"
                   f"{copy_button(text(sh, difficulty, mrt=True), 'Copy MRT note')}</header>"
                   f"<h4>Who hits what</h4><ul>{tg or '<li>Everyone on the boss: no add to assign.</li>'}</ul>"
-                  + (f"<h4>Talents to change <small>(the top players' builds, not a sim)</small></h4><ul>{bd}</ul>" if bd else
+                  + (f"<h4>Talents to change</h4><ul>{bd}</ul>" if bd else  # "not a sim": the legend, once
                      "<h4>Talents to change <span class='rl-ok'>&#10003; nobody, from the log</span></h4>")
                   + lust_block(sh, difficulty) + "</article>")
     allbtn = (copy_button("\n\n".join(text(sh, difficulty) for sh in everything), "Copy every boss for Discord")
@@ -407,7 +408,8 @@ def page_body(difficulty: str) -> str:
     if answer:  # the answer is the page's lead; what the page does goes
         head = head.replace(lead, answer)
     words = ("<p class='rl-words'>Padding talents: the build for an add (more targets); boss talents: the build for "
-             "single target. The MRT note is the text the Method Raid Tools addon shows in game.</p>"
+             "single target; both the top players' builds, not a sim. The MRT note is the text the Method Raid Tools "
+             "addon shows in game.</p>"
              ) if everything else ""
     return (head + roster + f"<h2>Boss by boss</h2><div class='rl-all'>{allbtn}</div>{miss}{words}<div class='rl-grid'>{cards}</div>"
             f"{_tools()}{COPY_JS}")

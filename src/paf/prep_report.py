@@ -1420,7 +1420,7 @@ the simulated plans above.</p>
         top = d.gear[0][2]
         body = ""
         for i, (ch, per, w) in enumerate(d.gear[:8]):
-            noise = i and top - w <= 2 * d.gear_error
+            noise = i and top - w <= 2 * d.gear_error and w >= 0  # never "about the best" on a loss
             items = "".join(f"<div>{lk(c)}</div>" for c in ch.split("; "))
             body += (f"<tr class='{'noise' if noise else ''}'><td class='small gearset'>{items}"
                      + f"</td><td class='n'>{_pct(w)}" + (" <span class='pill near'>&asymp; best</span>" if noise else "")
@@ -1430,6 +1430,7 @@ the simulated plans above.</p>
         mine = ("on the fight with your assignments and plan: " + "; ".join(d.assigns)) if d.assigns else \
             "on the fight without personal assignments (tick yours in the app to see if they change your gear)"
         tabs["gear"].insert(0, f"""<h2>Best gear from your bags, for this fight</h2><div class="card scroll">
+{"<p class='small warn'>&#9888; Every set here loses more than 5%: a sim gone wrong, not a reading. Keep the gear you wear.</p>" if top < -5 else ""}
 <p class="small">Simmed {e(d.gear_plan or 'with the default priority list')}, {e(mine)}.</p>
 <table><tr><th>Swaps vs your equipped gear</th><th>Gain &plusmn;{d.gear_error:.2f}%</th>{head}</tr>{body}</table>
 {"<p class='tiny muted'>&asymp; best: within the error of the best set.</p>" if "near" in body else ""}</div>""")

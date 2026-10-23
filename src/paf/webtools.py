@@ -135,8 +135,7 @@ SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
     ]),
     ("The app", False, [
         ("refresh_after_reset", "Prepare again after the weekly reset",
-         "After the weekly reset, the app prepares again by itself the bosses you prepared last week with "
-         "\"Prepare the whole raid\"."),
+         "By itself, the bosses of last week's \"Prepare the whole raid\"."),
         ("share_packs", "Share the prep packs you compute",
          "Fight data only, no names: the next player of your spec skips the log download."),
         ("check_updates", "Look for new versions", "Every 10 minutes, on GitHub."),
@@ -222,10 +221,12 @@ def path_html(path: str) -> str:
             f"<span class='p-full'>{e(path)}</span></span>")
 
 
-def meter(share: float) -> str:
-    """A small gauge (the quota spent, the cache filled): warm past three quarters."""
+def meter(share: float, calm: bool = False) -> str:
+    """A small gauge (the quota spent, the cache filled): warm past three quarters, unless calm (the cache prunes
+    itself: full is no alarm)."""
     x = max(0.0, min(1.0, share))
-    return (f"<span class='meter{' hi' if x >= 0.75 else ''}' aria-hidden='true'><span style='width:{x * 100:.0f}%'>"
+    kind = " calm" if calm else " hi" if x >= 0.75 else ""
+    return (f"<span class='meter{kind}' aria-hidden='true'><span style='width:{x * 100:.0f}%'>"
             "</span></span>")
 
 
@@ -244,7 +245,7 @@ def quota_html() -> str:
 def settings_page(message: str = "") -> str:
     from paf.cache import cache_root, size
 
-    cache_meter = meter(size(cache_root()) / 1e6 / max(1.0, float(settings.get("cache_max_mb") or 1)))
+    cache_meter = meter(size(cache_root()) / 1e6 / max(1.0, float(settings.get("cache_max_mb") or 1)), calm=True)
     from paf.simc_install import find_simc
 
     exe = find_simc(None)

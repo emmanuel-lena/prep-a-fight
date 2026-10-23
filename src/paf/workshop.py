@@ -39,7 +39,7 @@ TOOLS: tuple[Tool, ...] = (
          "Every item worth it for you, with its gain in %, best first.", needs_prep=False),
     Tool("bonusroll", "Where to use your bonus rolls", "Which boss is worth your bonus roll.", "inv_misc_coin_17", "gear", "5-10", ("difficulty", "goal"),
          "Every boss of the raid ranked by what a bonus roll brings you, with its best item.", needs_prep=False),
-    Tool("specgear", "Which spec, which gear", "Your best spec here, and the top players' 334 gear on you.", "achievement_bg_topdps", "gear", "1-3", ("boss", "difficulty"),
+    Tool("specgear", "Which spec, which gear", "Your best spec here, and the top players' gear (ilvl 334) on you.", "achievement_bg_topdps", "gear", "1-3", ("boss", "difficulty"),
          "Your character simmed in each spec in the top players' gear, their gap in the logs, your own kills, and one "
          "sentence."),
     Tool("talents", "The top players' talents, on you", "Which top players' build does the most on you.", "inv_misc_book_11", "gear", "3-6", ("boss", "difficulty"),

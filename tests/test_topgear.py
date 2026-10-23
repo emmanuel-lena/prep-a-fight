@@ -108,3 +108,12 @@ def test_select_kept_prunes_and_limits():
     kept = select_kept(p, pass1, {"f": 1.0}, {"armor": 2, "finger": 3}, prune_below=-2.0)
     assert kept.get("head") == [helm]
     assert "finger" not in kept
+
+
+def test_a_dual_wielder_keeps_its_off_hand_weapon():
+    # Subtlety Rogue, Vashnik (2026-10-23): the off-hand dagger is a weapon, not a shield: pass 2 dropped it and every
+    # set simmed one-handed, -54%
+    rogue = EXPORT.replace('shaman="T"\nspec=elemental', 'rogue="T"\nspec=subtlety')
+    p = GearPool(parse_simc_export(rogue), {5001: 13, 5002: 13, 5003: 13, 5004: 13}, SETS)  # every one a 1H weapon
+    opts = p.options_for("weapon", [])
+    assert all(dict(o.slots)["off_hand"] is not None for o in opts)  # the equipped dagger stays in the off hand

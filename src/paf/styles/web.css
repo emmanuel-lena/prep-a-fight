@@ -376,11 +376,11 @@ body.has-side>main .hero-week.lr h2{font-size:30px;line-height:1.15;margin:4px 0
 /* every sheet in one table: a spec a row, a boss a column (the owner: less text) */
 .mx-wrap{overflow-x:auto;max-width:100%}
 table.mx{width:auto;border-collapse:collapse} table.mx th,table.mx td{padding:6px 8px;border-top:1px solid var(--line);text-align:left;vertical-align:middle}
-table.mx thead th{border-top:0;font:600 11px/1.25 var(--font-display);text-transform:none;letter-spacing:0;color:var(--muted);text-align:center;width:84px;vertical-align:bottom}
+table.mx thead th{border-top:0;font:600 11px/1.25 var(--font-display);text-transform:none;letter-spacing:0;color:var(--muted);text-align:center;width:84px;vertical-align:top}
 table.mx thead th span{display:block;max-width:84px;margin:0 auto}
 table.mx .mx-boss{display:block;width:34px;height:34px;border-radius:50%;margin:0 auto 4px;object-fit:cover}
 table.mx tbody th{font:500 14px var(--font-body);text-transform:none;letter-spacing:0;color:var(--fg);white-space:nowrap;padding-right:14px} table.mx tbody th .ics{margin-right:6px;vertical-align:-3px}
-table.mx tr.mine th{font-weight:700} table.mx td{text-align:center}
+table.mx tr.mine th{font-weight:700} table.mx tr.mine td,table.mx tr.mine th{background:var(--accent-soft)} table.mx td{text-align:center}
 table.mx a.mx{display:inline-flex;white-space:nowrap;margin:2px;font:500 11px var(--font-data);text-decoration:none;color:var(--fg)}
 table.mx a.mx:hover{border-color:var(--fg)} table.mx a.mx.nosim{border-style:dashed;opacity:.75}
 /* raid lead: a player's talent changes on one line, + to take, - to drop (the owner: less text) */
@@ -389,13 +389,16 @@ table.mx a.mx:hover{border-color:var(--fg)} table.mx a.mx.nosim{border-style:das
 .rl-side{font:600 11px var(--font-display);letter-spacing:.04em;padding:1px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
 .rl-side.pad{border-color:color-mix(in srgb,var(--warn) 50%,var(--line));color:var(--warn)}
 .rl-t{font-size:13px;padding:1px 8px;border-radius:6px} .rl-t.take{background:color-mix(in srgb,var(--pos) 14%,transparent);color:var(--fg)}
-.rl-t.drop{background:color-mix(in srgb,var(--neg) 12%,transparent);color:var(--fg);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--neg) 60%,transparent)}
+.rl-t.drop{background:color-mix(in srgb,var(--neg) 12%,transparent);color:var(--fg)} /* the sign says it: no strike (read aloud) */
 .rl-ok{font:600 12px var(--font-body);color:var(--pos);margin-left:8px}
 .rl-n{display:inline-flex;align-items:center;gap:3px;margin:0 6px 0 0} .rl-boss li small .ics{width:14px;height:14px;vertical-align:-2px;margin:0 2px}
 /* Reclear: the best pull against the weaker one, a measure a row */
 table.lr-cmp{margin:6px 0 10px;font-size:14px} table.lr-cmp th{font:600 11px var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:4px 16px 4px 0}
-table.lr-cmp td{padding:5px 16px 5px 0;border-top:1px solid var(--line)} table.lr-cmp td b{font-family:var(--font-data)}
-table.lr-cmp tr.good td b{color:var(--pos)} table.lr-cmp tr.bad td b{color:var(--neg)}
+table.lr-cmp td{padding:5px 16px 5px 0;border-top:1px solid var(--line)} table.lr-cmp td:nth-child(n+2){font-family:var(--font-data)}
+table.lr-cmp tr.good td.gap{color:var(--pos)} table.lr-cmp tr.bad td.gap{color:var(--neg)}
 /* a gauge beside a number (Settings: the quota, the caches) */
 .meter{display:inline-block;width:90px;height:7px;border-radius:4px;background:var(--surface-2);border:1px solid var(--line);vertical-align:middle;margin-right:10px;overflow:hidden}
-.meter>span{display:block;height:100%;background:var(--accent)} .meter.hi>span{background:var(--warn)}
+.meter>span{display:block;height:100%;background:var(--accent)} .meter.hi>span{background:var(--warn)} .meter.calm>span{background:var(--muted)}
+
+.mx-legend{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;color:var(--muted);margin:8px 0 0}
+.rl-boss li small .rl-best{white-space:nowrap}
