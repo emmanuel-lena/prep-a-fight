@@ -28,6 +28,7 @@ class Character:
     mtime: float
     current: bool
     realm: str = ""  # "EU/Ysondre", from the export's first line: two characters of one name told apart
+    ilvl: int = 0  # the equipped items' mean item level (the export's "# Name (ilvl)" lines), 0 unknown
 
 
 STALE_DAYS = 7  # an export older than this: its gear and talents may no longer be the character's (issue #32)
@@ -90,8 +91,10 @@ def all_characters() -> list[Character]:
             continue
         first = next((x for x in text.split("\n") if x and x != IMPORTED), "")  # under an imported mark too
         realm = re.search(r"^#[^\n]* - ([A-Z]{2}/[^\n]+?)\s*$", first)
+        levels = [i.ilvl for i in prof.equipped.values() if getattr(i, "ilvl", None)]
         out.append(Character(p.stem, prof.name, prof.class_name, prof.spec, len(prof.candidates),
-                             IMPORTED in text, p.stat().st_mtime, p.stem == now, realm[1] if realm else ""))
+                             IMPORTED in text, p.stat().st_mtime, p.stem == now, realm[1] if realm else "",
+                             round(sum(levels) / len(levels)) if levels else 0))
     return sorted(out, key=lambda c: (not c.current, -c.mtime))
 
 

@@ -901,7 +901,8 @@ def characters_page() -> str:
                 f'<button class="btn ghost">Play this character</button></form>')
         cards += (f'<div class="ccard{" on" if c.current else ""}">{ic}<div class="cc-txt"><b>{e(c.name)}'
                   f'{(" <small class=muted>" + e(c.realm) + "</small>") if c.realm else ""}</b>'
-                  f'<span class="cc-spec">{e(c.spec.title())} {e(c.class_name.title())}</span><span>{badge} '
+                  f'<span class="cc-spec">{e(c.spec.title())} {e(c.class_name.title())}'
+                  f'{f" <span class=cc-ilvl>ilvl {c.ilvl}</span>" if c.ilvl else ""}</span><span>{badge} '
                   f'<span class="muted small">&middot; updated <span>{ago(c.mtime)}</span></span></span>{stale_badge(c, "#simc-box")}</div><div class="cc-act">{play}{refresh}'
                   f'<a class="btn ghost" href="#simc-box" onclick="setTimeout(function(){{document.getElementById(\'simc-box\').focus()}},50)">Paste a new export</a>'
                   f'<details class="rm"><summary class="btn ghost cc-rm">Remove</summary><div class="rm-ask">'

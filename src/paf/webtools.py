@@ -221,6 +221,9 @@ def path_html(path: str) -> str:
             f"<span class='p-full'>{e(path)}</span></span>")
 
 
+OK_DOT = "<span class='ok-dot' aria-hidden='true'>&#10003;</span>"  # a Status row that works
+
+
 def meter(share: float, calm: bool = False) -> str:
     """A small gauge (the quota spent, the cache filled): warm past three quarters, unless calm (the cache prunes
     itself: full is no alarm)."""
@@ -250,8 +253,10 @@ def settings_page(message: str = "") -> str:
 
     exe = find_simc(None)
     simc = path_html(str(exe)) if exe else "<span class='neg'>not installed</span>"
+    ok_simc = OK_DOT if exe else ""  # a check only when it holds
     from paf.wcl import fresh_quota
 
+    ok_wcl = OK_DOT if fresh_quota() else ""  # read recently: the key works
     # a recent read says it at once; else the line comes from /wcl/quota after the page is shown (issue #30)
     quota = quota_html() if fresh_quota() else (
         "<span class='quota-line muted'>reading&hellip;</span><script>fetch('/wcl/quota').then(function(r){"
@@ -300,13 +305,13 @@ autocomplete="off"></label>
 <button class="btn ghost">Save and test</button></form>
 <p class="tiny muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p>{alt}</div>
 <h2>Status</h2><div class="set-status"><table class="status">
-<tr><td>SimulationCraft</td><td class="small"><div class="val">{simc}
+<tr><td>{ok_simc}SimulationCraft</td><td class="small"><div class="val">{simc}
 <form method="post" action="/tool/setup">
 <button class="btn ghost" title="Downloads the latest SimulationCraft nightly into the app; a build of your own
 stays where it is">Get nightly</button></form></div></td></tr>
-<tr><td>prep-a-fight</td><td class="small"><div class="val"><span>version {e(__version__)}</span>
+<tr><td>{OK_DOT}prep-a-fight</td><td class="small"><div class="val"><span>version {e(__version__)}</span>
 <form method="post" action="/update/check"><button class="btn ghost">Check for updates</button></form></div></td></tr>
-<tr><td>Warcraft Logs</td><td class="small">{quota}</td></tr>
+<tr><td>{ok_wcl}Warcraft Logs</td><td class="small">{quota}</td></tr>
 <tr><td>Caches (sims, logs)</td><td class="small">{cache_meter}{size(cache_root()) / 1e6:,.0f} MB
 (cap {settings.get('cache_max_mb')} MB)</td></tr>
 <tr><td>Data folder</td><td class="small">{path_html(str(data_dir()))}</td></tr></table></div>

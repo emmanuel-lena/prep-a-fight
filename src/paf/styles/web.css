@@ -415,3 +415,5 @@ table.rl-tg .rl-best{display:inline-flex;align-items:center;gap:3px;margin-right
 table.rl-tg{table-layout:fixed} table.rl-tg th:nth-child(1),table.rl-tg td:nth-child(1){width:26%} table.rl-tg th:nth-child(2),table.rl-tg td:nth-child(2){width:38%}
 .rl-side.pad{border-color:var(--line);color:var(--fg)} /* neutral: gold is for the one key number (DESIGN) */
 .status .btn{font:600 14px var(--font-body)}
+.cc-ilvl{font:600 12px var(--font-data);color:var(--muted);margin-left:6px;padding:1px 7px;border:1px solid var(--line);border-radius:999px}
+.status .ok-dot{color:var(--pos);font-weight:700;margin-right:8px}
