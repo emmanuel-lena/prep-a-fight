@@ -2837,6 +2837,11 @@ def render_sheet(h: HealerPrep) -> str:
         answered.add((r.name, t))
         if _mmss(at) != _mmss(t):
             moved[(r.name, t)] = at
+    for c in heals:  # a chip shown at its hit window's time: its chart mark there too (heal confirm round:
+        for t in [*c.times, *c.alt]:  # Tranquility "3:36" on the chip, its outline at 3:46)
+            at = _named_at(c, t, named, 0.0)
+            if (c.name, t) not in moved and _mmss(at) != _mmss(t):
+                moved[(c.name, t)] = at
     svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight, and the top players' healing "
                     "cooldowns", drawn, set(lead_names), answered, moved)
     rare_kept = [c for c in h.rare if c not in utility]
