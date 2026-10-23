@@ -1548,8 +1548,11 @@ def cmd_prep(args: argparse.Namespace) -> int:
         best_sets: list[list[str]] = []
         if pool.candidates:
             want = "boss" if args.objective >= 0.5 else "total"
+            from paf.simple import fallen
+
             plan = next((p for p in d.optimized if p.objective == want), None)
-            if plan is not None and any(r.name != "default" for r in plan.choice.values()):
+            if plan is not None and any(r.name != "default" for r in plan.choice.values()) and not fallen(plan):
+                # (a plan the fight tab does not play is no gear's context: DPS confirm round 5)
                 # the best items depend on how cooldowns are played: sim them with the chosen plan
                 from paf.cdplan import dump_apl, parse_apl
                 from paf.optimize import apply_rules

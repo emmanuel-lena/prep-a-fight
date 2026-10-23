@@ -914,8 +914,8 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
         f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(_shown(c.name).split(',')[0][:22])}</text>"
         + "".join(f"<rect x='{float(x((moved or {}).get((c.name, t), t))) - 4:.1f}' y='{H - B + 6 + 18 * i}' "
                   f"width='8' height='13' rx='2' "
-                  f"class='cp{'' if t in tied else ' off'}'><title>{e(c.name)} {c.shown_at.get(t) or _mmss((moved or {}).get((c.name, t), t))}"
-                  f"{'' if t in tied else ' (tied to no hit' + _why_not(c, t, found) + ')'}</title></rect>"
+                  f"class='cp{'' if t in tied else ' off'}'><title>{e(_step_name(c.name))} {c.shown_at.get(t) or _mmss((moved or {}).get((c.name, t), t))}"
+                  f"{'' if t in tied else _mark_reason(c, t, found)}</title></rect>"
                   for t in sorted([*c.times, *c.alt, *[pt for pt in [_pull_t(c)] if pt is not None]])
                   if t <= span  # in time order (round 84), the pull group the card shows too (round 99)
                   for tied in [{a for a in [*c.times, *c.alt] if (c.name, a) in answered} if answered is not None
@@ -1885,6 +1885,18 @@ def _held(c: Cooldown) -> list[float]:
     return [a for a, n in zip(c.alt, c.alt_near or [""] * len(c.alt), strict=False) if n]
 
 
+def _step_name(name: str) -> str:
+    """A two-step button's mark as its lane and cards say it: "Stasis store", not "Stasis (Store)"."""
+    return name.replace(" (Store)", " store").replace(" (Release)", " release")
+
+
+def _mark_reason(c: Cooldown, t: float, found: list | None) -> str:
+    """An outline's hover: why it is no answer; a store whose release answers a hit says that alone (heal confirm
+    round 5: "tied to no hit: its release goes on the 2:10 hit")."""
+    why = _why_not(c, t, found)
+    return f" ({why[2:]})" if why.startswith(": its release goes on") else f" (tied to no hit{why})"
+
+
 def _why_not(c: Cooldown, t: float, found: list | None = None) -> str:
     """An untied mark's reason on hover, as its card gives it (round 75: an outline on a hit's dot read "tied to no
     hit" with no word why); every outline gives one (round 93: four said none). The pull's first press: "at the pull",
@@ -1909,8 +1921,10 @@ def _why_not(c: Cooldown, t: float, found: list | None = None) -> str:
                     + (f"lands before the {_mmss(nx.t)} hit's window" if nx is not None else "lands on no hit"))
     if c.every:  # its card's word first: "on cooldown" (round 94: Avenging Wrath 2:05 read "back from cooldown")
         return ": held past its cooldown" if t in c.alt and t not in c.back else ": on cooldown"
-    if t in c.back:
-        return ": back from cooldown" + (" for about half" if t in c.back_half else "")
+    if t in c.back:  # in a hit's window: the window first, as the table says it (heal confirm round 5)
+        m = hit_near(t)
+        return ((f": in the {_mmss(m.t)} hit's window, back from cooldown: not kept for it" if m is not None else
+                 ": back from cooldown") + (" for about half" if t in c.back_half else ""))
     m = hit_near(t)
     if m is not None:
         return f": in the {_mmss(m.t)} hit's window, not kept for it"
