@@ -1412,7 +1412,10 @@ def legend_for(dl: str, page: str) -> str:
         term = m.group(1)
         need = LEGEND_USE.get(term)
         return m.group(0) if need is None or need in low else ""
-    return re.sub(r"<dt>(.*?)</dt><dd>.*?</dd>", keep, dl)
+    out = re.sub(r"<dt>(.*?)</dt><dd>.*?</dd>", keep, dl)
+    if "ramp" not in low:  # a clause no card uses goes too (a review: the ramp window on a sheet with none)
+        out = out.replace("; a ramp: 8 to 30 s ahead", "")
+    return out
 
 
 def _unnest(text: str) -> str:

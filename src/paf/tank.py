@@ -486,7 +486,7 @@ def render_sheet(p: TankPrep) -> str:
             + (f" &middot; on cooldown, about every {ev:.0f} s" if ev else "") + "</small>"
             + ("<span class='when'>" + "".join(f"<span class='chip'>{_chip(moved_t.get((n, t), t), hit_of(n, t))}"
                                                f"{_share(x := tied.get((n, t), sp) if hit_of(n, t) else sp)}"
-                                               f"{_of_pressers(x, u)}{why(n, t)}</span>"
+                                               f"{_of_pressers(x, u)}{why(n, t) or ('' if hit_of(n, t) else ' &middot; not on a big hit')}</span>"
                                                for t, sp in zip(ts, sps, strict=False)) + "</span>" if ts else "")
             + "</li>" for n, u, k, ts, ev, sps, *_rest in p.short_defs)
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]

@@ -402,8 +402,8 @@ def _goal(objective: str) -> str:
 def simmed_note(d: PrepData) -> str:
     """What the "Simmed" column of the add waves is, in the direction the calibration went."""
     if (d.add_scale or 1) >= 1:
-        return ('"Simmed": the adds of the wave in the sims, at their real number (the logs\' count). SimC still puts '
-                "more of its damage on the boss than the top players do: see the Notes.")
+        return '"Simmed": the adds of the wave in the sims, at their real number (the logs\' count).'  # no claim
+        # on the boss share here: the measured one is in the paragraph below (a review: "more" read against 70% vs 73%)
     return (f'"Simmed": the adds of the wave in the sims, counted at ×{d.add_scale:g} of their real number to bring '
             "the sims' boss share toward the top players' (SimC hits every add in range).")
 
@@ -1203,7 +1203,11 @@ def render(d: PrepData) -> str:
     # the fight
     rows = "".join(f"<tr><td>{_mmss(t)}</td><td>{e('Stage One' if i == 0 and n.lower() == d.boss.lower() else n)}"
                    f"</td></tr>" for i, (n, t) in enumerate(sorted(d.phases, key=lambda p: p[1])))
-    waves = "".join(f"<tr><td>{_mmss(t)}</td><td class='n'>{c or '-'}</td>"
+    scalable = {w.name for w in (d.fight.add_waves if d.fight is not None else []) if w.scalable}
+
+    def simmed(c: int, name: str) -> str:  # the sim's own count: the logs' scaled by add_scale (d.waves: the logs')
+        return str(max(1, round(c * (d.add_scale or 1)))) if c and name in scalable else (str(c) if c else "-")
+    waves = "".join(f"<tr><td>{_mmss(t)}</td><td class='n'>{c or '-'}</td><td class='n'>{simmed(c, names)}</td>"
                     f"<td class='n'>{alive(d.fight, t, life):.0f}s</td><td>{e(names)}</td></tr>" for t, c, life, names in d.waves)
     extra = []
     if d.lust is not None:
@@ -1229,7 +1233,7 @@ def render(d: PrepData) -> str:
                            f"<td class='n'>{f.support:.0%}</td></tr>" for f in d.fight.focus) + "</table></div>")
     adds_block = (f"""<h3 class="small muted" style="margin-top:14px">Add waves (typical timeline across kills)</h3>
 <p class="small muted">{simmed_note(d)}</p>
-<div class="scroll"><table class="fit"><tr><th>Time</th><th class="n">Simmed</th><th class="n">Alive</th><th>Types</th></tr>{waves}</table></div>
+<div class="scroll"><table class="fit"><tr><th>Time</th><th class="n">In the logs</th><th class="n">Simmed</th><th class="n">Alive</th><th>Types</th></tr>{waves}</table></div>
 """ if waves else "")
     tabs["fight"].append(f"""<h2>The fight</h2><div class="card"><p>Typical duration {_mmss(d.duration)}; {"; ".join(extra)}.</p>
 <div class="scroll"><table class="fit">{rows}</table></div>
@@ -1432,7 +1436,14 @@ the simulated plans above.</p>
         head = "".join(f"<th>{e(f)}</th>" for f in d.gear_fights) if many else ""
         top = d.gear[0][2]
         body = ""
-        for i, (ch, per, w) in enumerate(d.gear[:8]):
+        seen_sets: set = set()
+        uniq = []
+        for g in d.gear:  # one row a set of items: two slot orders of the same items are one (a review: twin rows)
+            k = frozenset(x.split(": ", 1)[-1] for part in g[0].split("; ") for x in part.split(" + "))
+            if k not in seen_sets:
+                seen_sets.add(k)
+                uniq.append(g)
+        for i, (ch, per, w) in enumerate(uniq[:8]):
             noise = i and top - w <= 2 * d.gear_error and w >= 0  # never "about the best" on a loss
             items = "".join(f"<div>{lk(c)}</div>" for c in ch.split("; "))
             body += (f"<tr class='{'noise' if noise else ''}'><td class='small gearset'>{items}"
