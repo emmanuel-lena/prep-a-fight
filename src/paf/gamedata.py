@@ -86,6 +86,24 @@ def is_utility(spell_id: int) -> bool:
 
 
 @cache
+def passive_spells() -> frozenset[int]:
+    """The spells the game marks passive (SpellMisc attribute 0x40): a talent that is no button."""
+    return frozenset(int(r["SpellID"]) for r in table_rows("SpellMisc")
+                     if r.get("SpellID", "").isdigit() and r.get("DifficultyID") in (None, "", "0")
+                     and int(r.get("Attributes_0") or 0) & 0x40)
+
+
+def is_throughput(spell_id: int) -> bool:
+    """A spell that deals or heals (directly or over time), or raises damage or haste: Rend, Shiv, Storm Bolt."""
+    # its own effects and the spells it triggers; not the spells of the same name (Purge: an NPC's Purge deals damage)
+    rows = _filtered_rows("SpellEffect", "SpellID", spell_id)
+    rows += [x for r in list(rows) if r.get("Effect") == "64" and int(r.get("EffectTriggerSpell") or 0)
+             for x in _filtered_rows("SpellEffect", "SpellID", int(r["EffectTriggerSpell"]))]
+    return (bool({r.get("Effect") for r in rows} & {"2", "10", "136"})
+            or bool({r.get("EffectAura") for r in rows} & {"3", "8", "79", "138", "193"}))
+
+
+@cache
 def talent_entry_names() -> dict[int, str]:
     """TraitNodeEntry id (what Warcraft Logs reports as talentID) -> talent name."""
     spells = spell_names()

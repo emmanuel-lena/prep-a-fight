@@ -1,4 +1,11 @@
-from paf import raidlead
+import pytest
+
+from paf import raidlead, talents
+
+
+@pytest.fixture(autouse=True)
+def _no_game_data(monkeypatch):  # which talents are buttons the rotation never presses: from simc and the game data
+    monkeypatch.setattr(talents, "utility", lambda names, cls, spec: set())
 
 NAMES = {1: "Malefic Grasp", 2: "Seed of Corruption", 3: "Sow the Seeds", 4: "Haunt"}
 STATE = {
@@ -12,7 +19,17 @@ STATE = {
 def test_a_player_on_the_boss_drops_the_padding_talents():
     out = raidlead.builds(STATE, 7, 4, {}, NAMES)
     assert out == [{"name": "Nolow", "spec": "Affliction Warlock", "side": "boss", "take": ["Malefic Grasp"],
-                    "drop": ["Seed of Corruption", "Sow the Seeds"], "more": 0}]
+                    "drop": ["Seed of Corruption", "Sow the Seeds"], "more": 0, "choice": []}]
+
+
+def test_a_button_the_rotation_never_presses_is_the_players_choice(monkeypatch):
+    monkeypatch.setattr(talents, "utility", lambda names, cls, spec: {"Sow the Seeds"} & set(names))
+    out = raidlead.builds(STATE, 7, 4, {}, NAMES)
+    assert out[0]["drop"] == ["Seed of Corruption"] and out[0]["choice"] == ["Sow the Seeds"]
+    # a player whose only gap is such a button is on their build
+    only = {**STATE, "talents": {"Nolow": [1, 3, 4]}}
+    monkeypatch.setattr(talents, "utility", lambda names, cls, spec: set(names))
+    assert raidlead.builds(only, 7, 4, {}, NAMES) == []
 
 
 def test_a_player_on_an_add_keeps_the_padding_talents():

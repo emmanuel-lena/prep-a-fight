@@ -194,3 +194,34 @@ def encode(spec_id: int, choices: list[Choice], tree_id: int, version: int = 2) 
 def names_of(choices: list[Choice]) -> dict[int, str]:
     names = talent_entry_names()
     return {c.entry_id: names.get(c.entry_id, f"talent {c.entry_id}") for c in choices}
+
+
+def utility(names, class_name: str, spec: str) -> set[str]:
+    """The talents among names that are a button SimC's default rotation never presses and that deals, heals or
+    raises nothing (Purge, Tremor Totem, Blind, Tranquilizing Shot): a player's choice, not a sim's (the owner,
+    2026-10-24). Passive talents are never said so (their effects change other spells: the game data cannot tell
+    a utility one apart). No APL (no simc): none."""
+    from paf import apl
+    from paf.gamedata import is_throughput, passive_spells, talent_entries
+
+    try:
+        cast = apl.spells(apl.default_apl(class_name, spec))
+    except Exception:  # noqa: BLE001 - no APL, no claim
+        return set()
+    if not cast:
+        return set()
+    by_name: dict[str, list[int]] = defaultdict(list)
+    wanted = set(names)
+    for name, sid, *_ in talent_entries().values():
+        if name in wanted and sid:
+            by_name[name].append(sid)
+    passive = passive_spells()
+    out = set()
+    for name in wanted:
+        sids = by_name.get(name)
+        try:  # every talent of that name a button that does nothing a sim counts (two classes can share a name)
+            if sids and apl.norm(name) not in cast and all(s not in passive and not is_throughput(s) for s in sids):
+                out.add(name)
+        except Exception:  # noqa: BLE001 - game data unreachable: not said
+            continue
+    return out

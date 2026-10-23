@@ -174,7 +174,9 @@ def run(log=print) -> int:
 
 def builds(state: dict, enc_id: int, diff: int, roles: dict[str, str], names: dict[int, str]) -> list[dict]:
     """Who should change talents on this boss: a player on an add or a second boss takes the padding side, a player
-    on the boss the boss side. [{name, spec, side, take, drop}]"""
+    on the boss the boss side. [{name, spec, side, take, drop, choice}]"""
+    from paf.talents import utility
+
     out = []
     for name, spec, _dps in state.get("players") or []:
         split = (state.get("splits") or {}).get(f"{enc_id}|{diff}|{spec}") or {}
@@ -190,9 +192,15 @@ def builds(state: dict, enc_id: int, diff: int, roles: dict[str, str], names: di
         both = set(take) & set(drop)
         take = [n for n in dict.fromkeys(take) if n and n not in both]
         drop = [n for n in dict.fromkeys(drop) if n and n not in both]
-        if take or drop:  # the cut said ("+2 more"), never silent (a review: lists that do not balance)
+        # a button the rotation never presses (Purge, Tranquilizing Shot): apart, the player's choice (the owner)
+        sp, _, cls = spec.rpartition(" ")
+        free = utility(take + drop, cls, sp) if take or drop else set()
+        choice = [n for n in take + drop if n in free]
+        take, drop = [n for n in take if n not in free], [n for n in drop if n not in free]
+        if take or drop:  # the cut said ("+2 more"), never silent (a review: lists that do not balance); a player whose
+            # only gaps are buttons of their choice is on their build
             out.append({"name": name, "spec": spec, "side": side, "take": take[:SHOWN], "drop": drop[:SHOWN],
-                        "more": max(0, len(take) - SHOWN) + max(0, len(drop) - SHOWN)})
+                        "more": max(0, len(take) - SHOWN) + max(0, len(drop) - SHOWN), "choice": choice})
     return out
 
 
@@ -466,7 +474,9 @@ def page_body(difficulty: str) -> str:
                 # pill on the row names the build (app round 13: 11 words, six times a page)
                 "".join(f"<span class='rl-t take'>+ {e(t)}</span>" for t in b["take"])
                 + "".join(f"<span class='rl-t drop'>&minus; {e(t)}</span>" for t in b["drop"])
-                + (f"<span class='rl-more'>+{b['more']} more in the build</span>" if b.get("more") else ""))
+                + (f"<span class='rl-more'>+{b['more']} more in the build</span>" if b.get("more") else "")
+                + ("<span class='rl-free' title='buttons the rotation never presses'>your choice:</span>"
+                   + "".join(f"<span class='rl-t free'>{e(t)}</span>" for t in b["choice"]) if b.get("choice") else ""))
             + "</span></li>"
             for b in sh["builds"])
         cards += (f"<article class='rl-boss' id='boss-{x.id}'><header><h3>{e(x.name)}</h3>"

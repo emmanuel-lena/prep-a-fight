@@ -457,3 +457,4 @@ section.adv textarea{max-width:920px} /* the content column, never to the window
 .rl-sh>span{display:block;height:100%;background:var(--muted)} /* the share of the top raids, as a bar */
 .rl-everyone{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);font-size:13px}
 .rl-roster h2 small{font:500 15px var(--font-body);margin-left:6px}
+.rl-t.free{border:1px dashed var(--line);color:var(--muted)} .rl-free{font-size:12.5px;color:var(--muted);margin-left:6px}
