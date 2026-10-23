@@ -120,3 +120,7 @@ a.tal:hover{background:var(--surface-2)}
 .sw-strip{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;margin:4px 0}
 .sw-strip .sw-lab{font:600 12px var(--font-display);letter-spacing:.04em;min-width:58px}
 .sw-strip.take .sw-lab{color:var(--pos)} .sw-strip.drop .sw-lab{color:var(--neg)} .sw-strip.drop .tal{opacity:.8}
+/* take and drop side by side (a review: one 950 px column), each a wrapped grid of talents */
+.simple .cards li.sw-list{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;align-items:start}
+.sw-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:2px 6px}
+.sw-strip .sw-lab{grid-column:1/-1}
