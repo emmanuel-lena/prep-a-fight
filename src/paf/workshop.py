@@ -32,59 +32,45 @@ class Tool:
 GROUPS = (("gear", "Your gear and talents"), ("cds", "Your cooldowns and rotation"), ("raid", "Your raid"), ("boss", "The boss"))
 
 TOOLS: tuple[Tool, ...] = (
-    Tool("topgear", "Best gear from your bags", "Which combination of your items does the most damage on this boss?",
+    Tool("topgear", "Best gear from your bags", "Your bags' best set for this boss.",
          "inv_misc_bag_10", "gear", "5-15", ("boss~", "difficulty", "goal"),
          "Your best sets, each with its gain in % over what you wear.", needs_prep=False),
-    Tool("droptimizer", "What a boss drops for you", "Which items of this boss, or of the whole raid, are real "
-         "upgrades for you?", "inv_misc_coin_02", "gear", "5-10", ("boss?", "difficulty", "goal"),
+    Tool("droptimizer", "What a boss drops for you", "Which drops of this boss, or the raid, upgrade you.", "inv_misc_coin_02", "gear", "5-10", ("boss?", "difficulty", "goal"),
          "Every item worth it for you, with its gain in %, best first.", needs_prep=False),
-    Tool("bonusroll", "Where to use your bonus rolls", "Which boss gives you the most, on average, when you spend "
-         "a bonus roll on it?", "inv_misc_coin_17", "gear", "5-10", ("difficulty", "goal"),
+    Tool("bonusroll", "Where to use your bonus rolls", "Which boss is worth your bonus roll.", "inv_misc_coin_17", "gear", "5-10", ("difficulty", "goal"),
          "Every boss of the raid ranked by what a bonus roll brings you, with its best item.", needs_prep=False),
-    Tool("specgear", "Which spec, which gear", "Which spec of your class does the most on this boss, and what is "
-         "the top players' gear at 334 worth to you?", "achievement_bg_topdps", "gear", "1-3", ("boss", "difficulty"),
+    Tool("specgear", "Which spec, which gear", "Your best spec here, and the top players' 334 gear on you.", "achievement_bg_topdps", "gear", "1-3", ("boss", "difficulty"),
          "Your character simmed in each spec in the top players' gear, their gap in the logs, your own kills, and one "
          "sentence."),
-    Tool("talents", "The top players' talents, on you", "Which talent build of the best players does the most "
-         "damage with your character, on this fight?", "inv_misc_book_11", "gear", "3-6", ("boss", "difficulty"),
+    Tool("talents", "The top players' talents, on you", "Which top players' build does the most on you.", "inv_misc_book_11", "gear", "3-6", ("boss", "difficulty"),
          "The builds compared on your character, with their gain and the talents to change."),
-    Tool("optimize", "When to press your cooldowns", "Hold a cooldown for a moment of the fight or press it on "
-         "cooldown: what does the most damage on this fight?", "spell_holy_borrowedtime", "cds", "20-40",
+    Tool("optimize", "When to press your cooldowns", "Hold each cooldown for a moment, or press it on cooldown.", "spell_holy_borrowedtime", "cds", "20-40",
          ("boss", "difficulty", "goal3"), "The best cooldown plan for each goal you pick, and the pull played with it."),
-    Tool("timeline", "The top players' cooldowns, minute by minute", "When do the best players of your spec press "
-         "each cooldown on this boss?", "inv_misc_pocketwatch_01", "cds", "1", ("boss", "difficulty"),
+    Tool("timeline", "The top players' cooldowns, minute by minute", "When the best players of your spec press each cooldown.", "inv_misc_pocketwatch_01", "cds", "1", ("boss", "difficulty"),
          "A page with the cooldown timeline of each top player, side by side."),
-    Tool("raid", "Pad the adds or stay on the boss?", "From your raid's composition and DPS: do the others already "
-         "cover the adds?", "inv_misc_groupneedmore", "raid", "1-3", ("boss", "difficulty", "raid"),
+    Tool("raid", "Pad the adds or stay on the boss?", "Do the others already cover the adds?", "inv_misc_groupneedmore", "raid", "1-3", ("boss", "difficulty", "raid"),
          "The verdict for each add type, and why."),
-    Tool("review", "Your raid's pull, player by player", "Who stays on the boss, who pads, who should go on a secondary "
-         "target? Your raid's pull next to the top raids.", "inv_misc_spyglass_03", "raid", "1",
+    Tool("review", "Your raid's pull, player by player", "Who stays on the boss, who pads, next to the top raids.", "inv_misc_spyglass_03", "raid", "1",
          ("boss", "difficulty", "raid"), "Each player's damage on the boss and on each target, next to the top "
          "players of their spec, and what to change for more boss damage."),
-    Tool("comp", "Who hits what in your raid", "The adds you cannot skip: does the whole raid hit them, or a few "
-         "players? Who, in your raid?", "achievement_guildperk_everybodysfriend", "raid", "1",
+    Tool("comp", "Who hits what in your raid", "Who hits the adds you cannot skip, in your raid.", "achievement_guildperk_everybodysfriend", "raid", "1",
          ("boss", "difficulty", "raid"), "Each add with who takes it in the top raids and in your pull, and who "
          "should, in their own spec."),
-    Tool("wipe", "Your best pull, in detail", "What did the deaths and the damage off the boss cost, and when would "
-         "the boss have died without them?", "spell_shadow_soulleech_3", "raid", "1", ("boss", "difficulty", "raid"),
+    Tool("wipe", "Your best pull, in detail", "What the deaths cost, and when the boss would have died.", "spell_shadow_soulleech_3", "raid", "1", ("boss", "difficulty", "raid"),
          "The boss's health over your best pull, as played and without the deaths, and what each death cost."),
-    Tool("night", "Your raid night, pull by pull", "Who died, who used a healthstone or a health potion, who pressed "
-         "a damage potion? Tonight's log, live too.", "inv_stone_04", "raid", "1", ("raid",),
+    Tool("night", "Your raid night, pull by pull", "Deaths, healthstones and potions, pull by pull; live too.", "inv_stone_04", "raid", "1", ("raid",),
          "Each player over the night, then each pull: deaths, healthstones, potions.", needs_prep=False),
-    Tool("diff", "Two pulls side by side", "What went better in one pull than in another, for the raid and for "
-         "you?", "inv_misc_spyglass_02", "raid", "1-2", ("boss", "difficulty", "raid"),
+    Tool("diff", "Two pulls side by side", "What went better in one pull than another, raid and you.", "inv_misc_spyglass_02", "raid", "1-2", ("boss", "difficulty", "raid"),
          "From the log you give: its worst and best pulls without a death (else its best wipe and the kill), with "
          "both pulls' boss health, deaths, damage per target, and your damage, casts and buffs in each.",
          needs_prep=False),
-    Tool("rotation", "Your rotation, spell by spell", "In single target, cleave and AoE: do you cast what the best "
-         "rotation casts, with your gear and talents?", "ability_rogue_rollthebones", "cds", "1-2",
+    Tool("rotation", "Your rotation, spell by spell", "Single target, cleave, AoE: your casts against the best rotation.", "ability_rogue_rollthebones", "cds", "1-2",
          ("boss", "difficulty", "raid"), "The points to work on, your share of each spell next to the rotation's, "
          "your DoTs and your cooldowns.", needs_prep=False),
-    Tool("mechanics", "The boss's mechanics", "Every ability from the Encounter Journal, by role: what concerns you?",
+    Tool("mechanics", "The boss's mechanics", "Every ability from the Encounter Journal, by role.",
          "inv_misc_book_09", "boss", "1", ("boss", "difficulty"),
          "The boss's abilities by role, and who handles what in the top kills.", needs_prep=False),
-    Tool("assigns", "Assignments you can take", "Which mechanics can a player be assigned to, when do they come, and "
-         "what do they cost?", "ability_warrior_rallyingcry", "boss", "1", ("boss", "difficulty"),
+    Tool("assigns", "Assignments you can take", "Which mechanics a player can take, when, at what cost.", "ability_warrior_rallyingcry", "boss", "1", ("boss", "difficulty"),
          "Each assignable mechanic with its timings and the damage it costs.", needs_prep=False),  # reads the kills
 )
 BY_CMD = {t.cmd: t for t in TOOLS}
@@ -113,8 +99,8 @@ def index() -> str:
     for gid, title in GROUPS:
         groups += f"<h2>{e(title)}</h2>{cards([t.cmd for t in TOOLS if t.group == gid])}"
 
-    return (f"<div class='ws'><header class='ws-head'><div><h1>Tools</h1><p class='lead'>Each tool answers one "
-            f"question. The prep of a boss already runs them all: here, run one again to dig further.</p></div>"
+    return (f"<div class='ws'><header class='ws-head'><div><h1>Tools</h1><p class='lead'>A boss's prep runs them "
+            f"all; run one again to dig further.</p></div>"
             f"</header>{groups}</div>{CSS}")
 
 
