@@ -636,17 +636,20 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         stall = _stall(d, p)
         if stall:
             lines.append(f"<div class='why'>&#9888; {e(stall)}</div>")
-        if p.flags:  # shown, not folded; a sign under the shown precision says nothing
+        fell = want is not None and p.objective == want and _fallen(p)
+        flags = [f for f in p.flags if not (fell and f.startswith("not robust"))]  # its pill says it (confirm 9)
+        if flags:  # shown, not folded; a sign under the shown precision says nothing
             lines.append("<div class='why'>&#9888; " + "; ".join(
                 e(re.sub(r"[-+]0\.0%", "about 0%", f)[:1].upper() + re.sub(r"[-+]0\.0%", "about 0%", f)[1:])
-                for f in p.flags) + "</div>")
+                for f in flags) + "</div>")
         first = next((k for k, r in p.choice.items() if r.name != "default"), next(iter(p.choice), ""))  # what it changes
         goal = {"boss": "if you focus the boss", "total": "if you pad the adds",
                 "secondary": f"to burst {burst_names(d)[1] or 'the secondary targets'}"}.get(p.objective, p.objective)
         tag = ""
         if want is not None and p.objective == want and not p.robust and getattr(p, "default_timeline", None):
-            tag = " <span class='pill near'>not played</span>"  # the fight tab plays the default list; its "not
-            # robust" line below says why, with its numbers (DPS round 15: said twice)
+            worst = min(p.sensitivity.items(), key=lambda x: x[1], default=None)  # the fight tab plays the default
+            tag = (" <span class='pill near'>not played: not robust"  # list; why, in the pill, with its number
+                   + (f", {worst[1]:+.1f}% if {e(worst[0])}" if worst else "") + "</span>")  # (DPS rounds 15, 9)
         elif want is not None and p.objective == want:
             tag = (" <span class='pill gold'>your choice</span>" if d.goal in ("boss", "total")
                    else " <span class='pill gold'>recommended for your raid</span>")
@@ -1131,6 +1134,8 @@ def render(d: PrepData) -> str:
             lines = in_time_order("\n".join([x for x in v.splitlines() if " Defensive: " not in x] + defs)).splitlines()
             return "\n".join(dict.fromkeys(lines[:1] + fightview.prepull(lines[1:])))  # once each, however often run
         d.mrt = {k: tidy(v) for k, v in d.mrt.items()}
+    if "secondary" in d.mrt:  # a burst plan's card gives its gain on another base: the note's title gives none
+        d.mrt["secondary"] = re.sub(r" \([+-]?\d+\.\d%\)", "", d.mrt["secondary"], count=1)  # (DPS confirm 9)
     if d.nsrt and d.defensives and d.defensives.moments:  # NSRT reminds the same defensives as the fight tab
         from paf.defensives import Defensives, nsrt_lines
 
