@@ -319,6 +319,12 @@ def kills_sentence(r: Result) -> str:
     return s + "."
 
 
+def measured(boss_dps, dps, boss: bool) -> float:
+    """The number the comparison ranks on: boss damage (when the sim has adds) for a boss role, total damage for
+    padding."""
+    return (boss_dps if boss and boss_dps else dps).mean
+
+
 def compare(profile: str, client, enc, difficulty: int, diff_name: str, cls: str, mine: str, fight_lines: list[str],
             run_dir: Path, *, character: tuple[str, str, str] = ("", "", ""), target_error: float = 0.2,
             metric: str = "bossdps", log=print) -> Result:
@@ -374,9 +380,11 @@ def compare(profile: str, client, enc, difficulty: int, diff_name: str, cls: str
             res.notes.append(f"{spec_label(spec)}: the top players' {', '.join(dropped)} is unknown to this SimC "
                              "build; simmed with that slot empty (a little under its real worth).")
         err = 100 * sim.baseline["dps"].error / sim.baseline["dps"].mean
-        got = {first: (sim.baseline.get("prioritydps") or sim.baseline["dps"]).mean}
+        boss = metric != "dps"  # padding: total damage, as the heading says (DPS confirm round: the tiles read
+        # the boss's gap under "for padding the adds": Enhancement -12% for +4%)
+        got = {first: measured(sim.baseline.get("prioritydps"), sim.baseline["dps"], boss)}
         for ps in sim.profilesets:
-            got[ps.name] = (ps.metrics.get("prioritydps") or ps.dps).mean
+            got[ps.name] = measured(ps.metrics.get("prioritydps"), ps.dps, boss)
         best = max(got, key=got.get)
         row.sim, row.error, row.talents = got[best], err, best
         row.builds = got
@@ -389,8 +397,8 @@ def compare(profile: str, client, enc, difficulty: int, diff_name: str, cls: str
                              f"with it): {other} is the one simmed.")
     log("  your character as you are...")
     sim = simc.run(simc.build_input(profile, fight_lines), run_dir / "now", target_error=target_error)
-    m = sim.baseline.get("prioritydps") or sim.baseline["dps"]
-    res.now, res.now_error = m.mean, 100 * sim.baseline["dps"].error / sim.baseline["dps"].mean
+    res.now = measured(sim.baseline.get("prioritydps"), sim.baseline["dps"], metric != "dps")
+    res.now_error = 100 * sim.baseline["dps"].error / sim.baseline["dps"].mean
     name, server, region = character
     try:
         res.kills = my_kills(client, name, server, region, enc.id, difficulty, mine, metric)

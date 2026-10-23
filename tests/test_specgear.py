@@ -121,3 +121,14 @@ def test_the_build_is_the_one_most_top_players_play():
     rows = [{"talents": b}, {"talents": list(reversed(a))}, {"talents": a}, {"talents": []}]
     assert specgear.common_build(rows) == ((1, 1), (2, 2))
     assert specgear.common_build([{"talents": []}]) == ()
+
+
+def test_padding_compares_total_damage():
+    # DPS confirm round: "for padding the adds" over tiles of the boss's gap (Enhancement -12% for +4% total)
+    from types import SimpleNamespace as N
+
+    from paf.specgear import measured
+
+    boss, total = N(mean=160013.0), N(mean=265675.0)
+    assert measured(boss, total, boss=False) == 265675.0 and measured(boss, total, boss=True) == 160013.0
+    assert measured(None, total, boss=True) == 265675.0  # no adds: no boss-only number

@@ -26,3 +26,11 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
   plays SimC's default list (Dig deeper still shows the plan and its checks).
 - With your raid: when your character is in the raid's log as another spec (your alt), it is swapped for the one
   you prepare, never counted twice.
+- Your class's other specs, when you pad the adds: the tiles compare total damage, as their heading says (they
+  showed the boss-damage gap: Enhancement -12% for +4% in total).
+- When your raid's log has you on another spec or another character, the sheet says so with a badge, reads you with
+  the spec you prepare, and stands in for you at your raid's median damage dealer (not its fourth best).
+- A defensive is never moved later than the top players press it (a Feint ran out before the hit it was for).
+- A cooldown plan not robust enough to be played keeps its own MRT note and NSRT times on its card; gear and drops
+  inside the sims' noise are no longer coloured as gains.
+- Times read the same everywhere (cut to the second, as the MRT timers), and durations match the times shown.
