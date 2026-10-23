@@ -1026,11 +1026,12 @@ def _untied_at(c: Cooldown, t: float, n: str, tied: str, named: dict | None) -> 
     return "" if hs is None else _not_kept(hit, hs, named, c)
 
 
-def _window_said(c: Cooldown, t: float, n: str, tied: str, named: dict | None) -> bool:
+def _window_said(c: Cooldown, t: float, n: str, tied: str, named: dict | None, sp: float) -> bool:
     """A chip whose hit-window share follows: its own timed share left out, one number for one press (heal round
     11: "4:16 · 19% (26% of its users) · not kept for the 4:15 hit: 20% in its window")."""
-    if _untied_at(c, t, n, tied, named):
-        return True
+    if _untied_at(c, t, n, tied, named) or _split(_named(c, t, named, tied, sp))[1]:
+        return True  # a window clause on the chip: its share is the one (heal round 12: "3:49 · 30% · in the
+        # window of the 3:50 hit: 22%")
     return t in c.back and not (c.why or c.every) and bool(_lead_back(c, t))
 
 
@@ -1245,7 +1246,8 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
     def one(a: float, sp: float, n: str) -> str:  # one share a press: its window's when one is said (heal round 11:
         w, u = window(a, n), untied(a, n)          # "for 29% · in its window: 26%", "for 27% · ⟲, … window: 23%")
         bk = "" if w and "back from cooldown" in w else back(a) if a in c.back and not c.why else ""
-        own = f" for {_pct(sp)}{_still(c, a, sp)}{_pressers(c, sp, a)}" if sp else " for some"
+        own = (f"{' &middot;' if n else ' for'} {_pct(sp)}{_still(c, a, sp)}{_pressers(c, sp, a)}" if sp
+               else " for some")  # after an offset, as a main chip ("· 26%"), never "for 28%" beside it
         if w.startswith(" &middot; in its window:"):  # tied: the window's share is the chip's
             own, w = " &middot;" + w[len(" &middot; in its window:"):], ""
         elif u or "hit's window:" in bk:
@@ -1525,7 +1527,7 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
         + (f", {_pct(c.on_others)} of the presses on another player" if 0 <= c.on_others < 0.95 else
            ", all on another player" if c.on_others >= 0.95 else "") + "</small>"
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip((moved or {}).get((c.name, t), _named_at(c, t, named, sp)), tie(c, t, n))}"
-                                        + ("" if _window_said(c, t, n, tie(c, t, n), named) else
+                                        + ("" if _window_said(c, t, n, tie(c, t, n), named, sp) else
                                            _split(_named(c, t, named, tie(c, t, n), sp))[0]
                                            + _also_pressers(c, t, named, tie(c, t, n), sp))
 

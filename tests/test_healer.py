@@ -791,3 +791,11 @@ def test_a_press_in_a_hit_window_shows_one_share():
                         presses=[[256.0]] * 20 + [[100.0]] * 53)
     out = healer.cooldowns_html([c], set())
     assert "4:16 &middot; not kept for the 4:15 hit: 20% in its window" in out and "19%" not in out
+
+
+def test_a_chip_named_for_a_hit_window_shows_the_windows_share_only():
+    # Holy Paladin, Nek'zali (heal round 12): "3:49 · 30% · in the window of the 3:50 hit: 22%"
+    c = healer.Cooldown("Avenging Wrath", 1, 1.0, 3.0, [229.0], [""], support=[0.30], n_all=100,
+                        presses=[[229.0]] * 22 + [[222.0]] * 8 + [[100.0]] * 70)
+    out = healer.cooldowns_html([c], set(), {("Avenging Wrath", 229.0): 230.0})
+    assert "in the window of the 3:50 hit: 22%" in out and "30%" not in out
