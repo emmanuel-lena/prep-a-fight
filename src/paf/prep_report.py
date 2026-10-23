@@ -840,6 +840,14 @@ def defensives_html(d: PrepData) -> str:
                "") + "</div>")  # no table: no columns told, the source in the chips' label (DPS confirm round 15)
 
 
+def _track_top(d) -> str:
+    """", the top of the Hero track" when the loot is valued at its difficulty's cap, not at your gear's level."""
+    from paf.droptimizer import LOOT_CAP
+
+    track = {"heroic": "Hero", "mythic": "Myth"}.get((d.difficulty or "").lower())
+    return f", the top of the {track} track" if track and d.loot_ilvl == LOOT_CAP.get(d.difficulty.lower()) else ""
+
+
 def nsrt_block(note: str) -> str:
     if not note:
         return ""
@@ -1530,7 +1538,7 @@ than the coverage means they hold the cooldown.{burst_note}</p>
 <p class="small muted">"In your best sets": the item inserted in your best Top Gear sets, the rest of your gear
 rearranged around it (its real value). "Single swap": the classic droptimizer value, on your equipped set.</p>
 <table><tr><th>Item</th><th>Slot</th><th>In your best sets</th><th>Single swap</th></tr>{body}</table>
-<p class="small muted">At item level {d.loot_ilvl}; statistical error about &plusmn;{d.loot_error:.2f}%.</p></div>""")
+<p class="small muted">At item level {d.loot_ilvl}{_track_top(d)}; statistical error about &plusmn;{d.loot_error:.2f}%.</p></div>""")
 
     notes = [re.sub(r"^SimC puts (\d+%) of your damage on the boss vs (\d+%) in the top players' logs, even with more "
                     r"adds:", r"Even with the add waves counted at the minimum, SimC's default priority list puts \1 "

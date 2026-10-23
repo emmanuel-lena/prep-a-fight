@@ -46,3 +46,12 @@ def test_an_item_of_another_specs_main_stat_is_left_out():
     got = usable_loot([9], "Shaman", loot, classes, names, "Elemental", primary)
     assert [i.name for i in got] == ["Mace"]
     assert len(usable_loot([9], "Shaman", loot, classes, names, "Enhancement", primary)) == 1  # the claw
+
+
+def test_the_loot_is_valued_at_most_at_its_tracks_top():
+    from paf.droptimizer import loot_ilvl
+
+    assert loot_ilvl([326, 326, 327], "heroic") == 321  # a heroic drop upgrades to Hero 6/6 at most
+    assert loot_ilvl([326, 326, 327], "Mythic") == 326  # under the Myth track's top: your own level
+    assert loot_ilvl([310, 312, 314], "heroic") == 312
+    assert loot_ilvl([], "heroic") == 0

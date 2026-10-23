@@ -660,11 +660,10 @@ def cmd_plan(args: argparse.Namespace) -> int:
 
 
 def cmd_droptimizer(args: argparse.Namespace) -> int:
-    import statistics as st
 
     from paf import simc
     from paf.corpus.template import template_path
-    from paf.droptimizer import boss_ev, run_droptimizer, usable_loot
+    from paf.droptimizer import boss_ev, loot_ilvl, run_droptimizer, usable_loot
     from paf.encounters import find_encounter, raid_encounters
     from paf.fight import PRESETS
     from paf.gamedata import encounter_loot, item_classes, item_names
@@ -682,7 +681,9 @@ def cmd_droptimizer(args: argparse.Namespace) -> int:
         zone = max(e.zone_id for e in encs)
         encs = [e for e in encs if e.zone_id == zone]
     levels = [i.ilvl for i in profile.equipped.values() if i.ilvl]
-    ilvl = args.ilvl or (round(st.median(levels)) if levels else 0)
+    from paf import settings
+
+    ilvl = args.ilvl or loot_ilvl(levels, getattr(args, "difficulty", None) or settings.get("difficulty"))
     if not ilvl:
         print("Your profile has no item levels: give one with --ilvl, or load your /simc export.")
         return 1
@@ -1110,7 +1111,6 @@ def calibration_note(got: float, target: float, scale: float = 0.1) -> str:
 
 
 def cmd_prep(args: argparse.Namespace) -> int:
-    import statistics as st
     import webbrowser
 
     from paf import settings, simc
@@ -1121,7 +1121,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
     from paf.corpus.analyze import analyze
     from paf.corpus.template import _slug, build_template, report_key, template_path
     from paf.corpus.timeline import build_timeline, render_html
-    from paf.droptimizer import run_droptimizer, usable_loot
+    from paf.droptimizer import loot_ilvl, run_droptimizer, usable_loot
     from paf.gamedata import encounter_loot, item_classes, item_inventory_types, item_names, item_sets
     from paf.prep_report import PrepData, render, sheet_pickle
     from paf.profile import parse_simc_export
@@ -1577,7 +1577,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
         items = usable_loot([enc.id], profile.class_name, encounter_loot(), item_classes(), item_names(),
                             profile.spec, _primary())
         levels = [i.ilvl for i in profile.equipped.values() if i.ilvl]
-        ilvl = args.ilvl or (round(st.median(levels)) if levels else 0)
+        ilvl = args.ilvl or loot_ilvl(levels, diff_name)
         if not ilvl:  # a profile without item levels (an old import): the loot cannot be valued
             print("  skipped: your profile has no item levels (paste your /simc export to see what this boss drops)")
             d.notes.append("What this boss drops was skipped: your character's profile has no item levels. Paste "

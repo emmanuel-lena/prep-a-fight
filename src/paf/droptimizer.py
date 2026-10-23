@@ -102,6 +102,20 @@ def usable_loot(encounters: list[int], class_name: str, loot: dict[int, tuple[st
     return out
 
 
+LOOT_CAP = {"heroic": 321, "mythic": 334}  # the top of the track a difficulty's drops upgrade to (Hero, Myth; S2)
+
+
+def loot_ilvl(levels: list[int], difficulty: str = "") -> int:
+    """The item level the loot is valued at: your gear's median, at most what this difficulty's drops upgrade to (a
+    heroic drop never reaches your 326; the owner, 2026-10-24). 0: no item levels."""
+    import statistics as st
+
+    if not levels:
+        return 0
+    mid = round(st.median(levels))
+    return min(mid, LOOT_CAP.get((difficulty or "").lower(), mid))
+
+
 def item_options(item: LootItem, profile: Profile, ilvl: int) -> list[list[str]]:
     """simc lines for each way of equipping the item (both ring/trinket slots)."""
     def value(slot: str) -> str:
