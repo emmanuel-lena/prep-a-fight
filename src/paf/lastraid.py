@@ -290,7 +290,7 @@ def _you(label: str, player: str) -> str:
     return "You:" + label[len(player) + 1:] if player and label.lower().startswith(player.lower() + ":") else label
 
 
-ROWS = ((r"^(.+): (\S+) on the boss in B, (\S+) in A\.$", "{0}: damage on the boss"),
+ROWS = ((r"^(.+): (\S+) on the boss in B, (\S+) in A\.$", "{0}: boss DPS"),
         (r"^(.+): active (\S+) of the pull in B, (\S+) in A\.$", "{0}: time casting"),
         (r"^At (\d+:\d\d), the boss had (\S+) left in B against (\S+) in A\.$", "Boss health left at {0}"),
         (r"^Deaths before the wipe: (\S+) in B, (\S+) in A\.$", "Deaths before the wipe"),
@@ -302,8 +302,8 @@ def _pull_label(side: dict | None) -> str:
     """"pull 27, 2:38": a compared pull, as the log names it, with its length."""
     if not side:
         return ""
-    dur = side.get("duration")
-    return f"{side.get('label') or ''}" + (f", {_mmss(dur)}" if dur else "")
+    label, dur = side.get("label") or "", side.get("duration")  # the label names its length already
+    return label if label or not dur else _mmss(dur)
 
 
 def _row_of(text: str) -> list[str] | None:
@@ -334,9 +334,11 @@ def _cmp_table(rows: list[dict]) -> str:
     if not rows:
         return ""
     lab = rows[0].get("pulls") or ["", ""]  # which pulls: "Pull 27 (2:38)", so an expert can check them
-    return ("<table class='lr-cmp fit'><thead><tr><th></th>"
-            f"<th>Best pull{' <small>' + e(lab[0]) + '</small>' if lab[0] else ''}</th>"
-            f"<th>Weaker pull{' <small>' + e(lab[1]) + '</small>' if lab[1] else ''}</th><th>Gap</th></tr>"
+    # the comparison's own pulls: its best and worst without a death (paf.pulldiff), not the night's best pull
+    return ("<p class='lr-cmp-cap'>Two pulls without a death, side by side:</p>"
+            "<table class='lr-cmp fit'><thead><tr><th></th>"
+            f"<th>Better{' <small>' + e(lab[0]) + '</small>' if lab[0] else ''}</th>"
+            f"<th>Weaker{' <small>' + e(lab[1]) + '</small>' if lab[1] else ''}</th><th>Gap</th></tr>"
             "</thead><tbody>"
             + "".join(f"<tr class='{e(r.get('kind', ''))}'><td>{e(r['cmp'][0])}</td><td><b>{e(r['cmp'][1])}</b></td>"
                       f"<td>{e(r['cmp'][2])}</td><td class='gap'>{e(_delta(r['cmp'][1], r['cmp'][2]))}"

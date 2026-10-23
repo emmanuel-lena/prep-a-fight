@@ -128,19 +128,19 @@ def new_reports(since: float) -> list[str]:
 SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
     ("Your raid", False, [
         ("difficulty", "Difficulty", "The difficulty a new prep starts on."),
-        ("guild", "Guild", "Its latest public log tells the prep who plays what in your raid: whether the others cover "
-                           "the adds or you should pad them, and how your last pull compares with the top players'."),
+        ("guild", "Guild", "Its latest public log: who plays what in your raid (pad the adds or not), and your "
+                           "last pull against the top players'."),
         ("guild_server", "Guild's server", "As the game writes it (Kazzak, Twisting Nether)."),
         ("guild_region", "Guild's region", "Where your guild's logs are read from."),
     ]),
     ("The app", False, [
         ("refresh_after_reset", "Prepare again after the weekly reset",
-         "By itself, the bosses of last week's \"Prepare the whole raid\"."),
+         "Re-runs last week's \"Prepare the whole raid\" bosses after the reset."),
         ("share_packs", "Share the prep packs you compute",
          "Fight data only, no names: the next player of your spec skips the log download."),
         ("check_updates", "Look for new versions", "Every 10 minutes, on GitHub."),
     ]),
-    ("Advanced: the logs read, the quota, the caches", True, [
+    ("Advanced", True, [
         ("corpus_size", "Kills read per boss", "The top kills a prep reads, then keeps reading in the background."),
         ("corpus_points", "Quota for background reading",
          "Warcraft Logs points per hour (of 3600) the reading in the background may use; a prep you wait for "

@@ -1158,7 +1158,8 @@ def raid_board(encs, class_name: str, spec: str) -> str:
             else:
                 href, state, word = f"/boss?boss={x.id}&amp;difficulty={diff}", "no", "prepare"
             if diff == settings.get("difficulty"):  # said under the portrait, without pointing at it
-                said = {"no": "not prepared", "ok": f"ready {word}", "old": "redo"}.get(state, word)
+                said = {"no": "no sim yet" if item else "not prepared", "ok": f"ready {word}",
+                        "old": "to redo"}.get(state, word)  # a sheet without a sim (timelines) is no "not prepared"
                 here = f"<small class='rb-st {state}'>{said}</small>"
             states += (f"<a class='rb-d {state}' href='{href}'><span class='rb-frame {shape}'><span class='rb-in'>"
                        f"{portrait(x)}</span></span><b>{e(DIFF_LABELS.get(diff, diff))}</b><small>{word}</small></a>")

@@ -156,8 +156,7 @@ HOW_TO_READ = (
     "going then; &ldquo;of its users&rdquo;: of the top players who press the button.</dd><dt>Tied to a hit</dt>"
     "<dd>pressed in the hit's window (5 s before to 8 s after; a ramp: 8 to 30 s ahead) by a quarter of its users; "
     "its share is the window's. One button a hit (a second within the noise), else the most pressed, &ldquo;only "
-    "N%&rdquo; under a quarter.</dd><dt>A time</dt><dd>shared by a quarter of those who press the button (at the pull: a fifth of the "
-    "top players); its share: the top players pressing within 8 s of it (&ldquo;of its users&rdquo; too, "
+    "N%&rdquo; under a quarter.</dd><dt>A time</dt><dd>shared by a quarter of those who press the button; its share: the top players pressing within 8 s of it (&ldquo;of its users&rdquo; too, "
     "under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long.</dd>"
     "<dt>Back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, not "
     "counted for it (&ldquo;for about half&rdquo;: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
@@ -944,7 +943,7 @@ def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list
         if k in said:
             ans = said[k]
         elif k in bare:
-            ans = f"<span class='none'>None kept</span>{bare[k]}"
+            ans = f"<span class='none'>None kept</span>{_unnest(bare[k])}"
         else:  # a big moment past the lead's four
             ans = "<span class='muted'>not among the highest, the table reads four</span>" if k not in lead else ""
         tag = _stage_tag(m.t, phases)

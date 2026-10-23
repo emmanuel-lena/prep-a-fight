@@ -218,7 +218,7 @@ def highlights_full(a: Side, b: Side, boss: str) -> list[tuple[str, str, tuple[s
         if abs(_rel(pa.boss_dps, pb.boss_dps)) >= MOVED:
             out.append((abs(_rel(pa.boss_dps, pb.boss_dps)) * 3, "good" if pb.boss_dps > pa.boss_dps else "bad",
                         f"{pb.name}: {pb.boss_dps / 1000:,.0f}k on the boss in B, {pa.boss_dps / 1000:,.0f}k in A.",
-                        (f"{pb.name}: damage on the boss", f"{pb.boss_dps / 1000:,.0f}k",
+                        (f"{pb.name}: boss DPS", f"{pb.boss_dps / 1000:,.0f}k",
                          f"{pa.boss_dps / 1000:,.0f}k")))
         if pa.active is not None and pb.active is not None and abs(pb.active - pa.active) >= 0.03:
             out.append((abs(pb.active - pa.active) * 3, "good" if pb.active > pa.active else "bad",

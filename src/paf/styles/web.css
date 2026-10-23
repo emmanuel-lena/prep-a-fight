@@ -403,3 +403,5 @@ table.lr-cmp tr.good td.gap{color:var(--pos)} table.lr-cmp tr.bad td.gap{color:v
 
 .mx-legend{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;color:var(--muted);margin:8px 0 0}
 .rl-boss li small .rl-best{white-space:nowrap}
+table.lr-cmp td.gap{white-space:nowrap} table.lr-cmp td:first-child{min-width:220px} .lr-cmp-cap{font-size:13px;color:var(--muted);margin:8px 0 0}
+.meter{min-width:90px} td:has(>.meter){white-space:nowrap}
