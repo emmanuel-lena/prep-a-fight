@@ -2355,6 +2355,7 @@ def _raid_verdict(client, con, enc, diff: int, url: str, profile, spec: str, fil
         logged, label = me[1], f"{spec} {me[1].rpartition(' ')[2]}"
         rc.players = [(n, label if (n, s) == me[:2] else s, dps) for n, s, dps in rc.players]
         me = (me[0], label, me[2])
+    in_log = len(rc.players)  # the log's players, your alt in it too: as the night table counts them (review 36)
     other = next((p for p in rc.players if me is None and profile.name and p[0].lower() == profile.name.lower()), None)
     if other is not None:  # your character of another class in that log: swapped out of every list, said (DPS
         logged = other[1]  # round 13: Ixuu (Subtlety Rogue) still listed on the Elemental sheet)
@@ -2388,7 +2389,7 @@ def _raid_verdict(client, con, enc, diff: int, url: str, profile, spec: str, fil
     profiles = raidneed.spec_profiles(client, enc.id, diff, [s for _, s, _ in rc.players] + [you[0]])
     types = [raidneed.with_profiles(t, profiles) for t in types]
     vs = raidneed.verdicts(types, others, you)
-    return RaidInfo(rc.report, rc.fight, len(rc.players), you, found, vs, raidneed.overall(vs),
+    return RaidInfo(rc.report, rc.fight, in_log, you, found, vs, raidneed.overall(vs),
                     raidneed.best_cleavers(types, rc.players), raidneed.archetypes(types, rc.players),
                     raidneed.archetype(types[0], you[0]) if types else "", profiles.get(you[0]),
                     sorted(types[0].estimated) if types else [], logged)

@@ -356,7 +356,7 @@ def review_card(d) -> str:
         says.append(f"You move more than them {span}, top players {p.tops_moving:.0%}): "
                     f"outside the strategy's moments, stand still.")
     elif r.tops_moving is not None:
-        says.append("You do not move more than the top players.")
+        says.append("You move about as much as the top players.")  # within MOVE_GAP: 46% vs 44% (review 36)
     gaps = "".join(f"<time>{_mmss(a)} &middot; {b:.0f} s</time>" for a, b in r.gaps)
     longest = "Your longest pause" if len(r.gaps) == 1 else "Your longest pauses"
     pauses = (f"<p class='what pauses'>{longest} without casting:</p><div class='times'>{gaps}</div>"
