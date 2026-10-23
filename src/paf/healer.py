@@ -2454,8 +2454,10 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
     head = (f"<th>{what}</th><th>Top kills with one</th><th>Per kill</th><th>Median kill</th>"
             + ("<th>Deaths per 20 players</th>" if deaths else ""))
     marked = "beyond the noise" in rows
-    return ((f"<p>With or without any {e(what.lower())} spec here, kill time and deaths stay within the noise.</p>"
-             if not marked else "")
+    wide = any(FEW_KILLS <= p.kills < WIDE_KILLS for p in pres)  # never tested: not said within the noise
+    noise = (f"<p>With or without any {e(what.lower())} spec{f' in {WIDE_KILLS} kills or more' if wide else ''} "
+             "here, kill time and deaths stay within the noise.</p>")
+    return ((noise if not marked else "")
             + f"<table class='hcomp'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"
             "<dl class='legend'>" + ("<dt>Marked</dt><dd>a gap with and without the spec beyond three standard "
             "errors (clear with every number tested at once): a reading of these kills, not a reason to bring it."
@@ -2674,7 +2676,7 @@ def render_sheet(h: HealerPrep) -> str:
         ramps = {n: [p for _k, p in kps] for n, kps in ramps.items()}
         # a two-step button's release in a hit no cooldown is kept for: its heal lands there (Stasis, 48% released
         # in Vashnik's 3:35 window; the owner, round 79)
-        released, rel_marks = [], []
+        released, rel_marks, rel_named = [], [], []
         for b in list(bare):
             m = next(x for x in shown if _mmss(x.t) == b)
             for c in h.cooldowns:
@@ -2684,6 +2686,8 @@ def render_sheet(h: HealerPrep) -> str:
                     t_rel = min(c.release.times, key=lambda t: abs(t - m.t), default=None)  # its chart mark, tied
                     if t_rel is not None and abs(t_rel - m.t) <= ANSWER[1] + SLACK:  # as the lead says (the chart
                         rel_marks.append((c.release, t_rel, _center(inside)))  # follows the lead)
+                    rel_named.append(c)  # named in the lead with the other answers (a review: "answer them with Rewind"
+                    # while two of three rows were Stasis releases)
                     released.append((m.t, f"for the {b} hit, {_pct(hs)} release a {e(_shown(c.name))}, whichever "
                                           "store it was"
                                           f"{_reach_note(c.release, m.t)} (about {_about(inside)}"
@@ -2720,7 +2724,9 @@ def render_sheet(h: HealerPrep) -> str:
         lead = (f"<p class='lead'>{len(shown)} big raid {'hit' if len(shown) == 1 else 'hits'}"
                 + (f": the top {e(h.spec)}s answer {them} with "
                    + _and([f"<span class='nw'>{_ic(by_icon.get(_shown(n)))}<b>{e(_shown(n))}</b></span>"
-                           for n in lead_names]) if lead_names
+                           for n in lead_names]
+                          + [f"<span class='nw'>{_ic(c)}<b>a {e(_shown(c.name))} release</b></span>"
+                             for c in dict.fromkeys(rel_named)]) if lead_names or rel_named
                    else f"; the top {e(h.spec)}s keep no cooldown for {'it' if len(shown) == 1 else 'them'}")
                 + f".{long}{from_dispel}</p>"
                 + hits_table(h.moments, shown, pairs, {b: landed(b) for b in bare}, h.phases, by_icon,
@@ -2739,7 +2745,9 @@ def render_sheet(h: HealerPrep) -> str:
         f"damage per second, {h.raid_kills or 'the top'} kills (up to 40 a spec read: the same hits on every healer "
         f"sheet; fewer kills past the median one). "
         + ("After a dashed line, stage time (below). " if getattr(h, "staged", False) else "")
-        + ("Marks: the table's answers (an outline: another press of the same button). " if lead_names
+        + ("Marks: the table's answers" + (" (an outline: another press of the same button)" if any(
+            (c.name, t) not in answered for c in drawn if c.name in lead_names for t in [*c.times, *c.alt])
+            else "") + ". " if lead_names
            else "No cooldown is kept for these hits, so none is drawn. ")
         + "A dot: a big hit, "
         + ("named after what deals most of the damage there"

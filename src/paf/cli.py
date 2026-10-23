@@ -2340,7 +2340,9 @@ def _raid_verdict(client, con, enc, diff: int, url: str, profile, spec: str, fil
     cls = (profile.class_name or "").replace("_", "").lower()
     me = next((p for p in rc.players if profile.name and p[0].lower() == profile.name.lower()
                and (not cls or p[1].rpartition(" ")[2].lower() == cls)), None)  # a namesake of another class is not you
-    others = [(s, dps) for n, s, dps in rc.players if me is None or n != me[0]]
+    # you play one character in the raid: a namesake of another class is your other character, swapped out for
+    # this one, never counted beside it (a review: the Subtlety Ixuu kept, an Elemental added: 15 players for 14)
+    others = [(s, dps) for n, s, dps in rc.players if not (profile.name and n.lower() == profile.name.lower())]
     if me is not None:
         you, found = (me[1], me[2]), True
     else:  # not in that log: a damage dealer of your spec at the raid's median DPS among damage dealers

@@ -24,3 +24,5 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
   Elemental Shaman's sheet, at -17%).
 - A cooldown plan whose small gain turns into a loss on a slower kill is no longer what the fight tab plays: it
   plays SimC's default list (Dig deeper still shows the plan and its checks).
+- With your raid: when your character is in the raid's log as another spec (your alt), it is swapped for the one
+  you prepare, never counted twice.

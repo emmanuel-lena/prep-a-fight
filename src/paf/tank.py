@@ -574,15 +574,22 @@ def render_sheet(p: TankPrep) -> str:
             got[2].lead_back[got[3]] = x.t  # its chip says the same window count (round 114: 23% vs "3:27 for 27%")
             return f"; {e(got[0])} {got[1]:.0%} in its window, back from cooldown"
 
+        from paf.healer import _reach_note
+
+        def reach_of(a: tuple, x: Moment) -> str:  # "(99 kills going)" when a kill ended before, as the healers'
+            return _reach_note(pressed[a[0]], x.t) if a[0] in pressed else ""
+
         big = answer(m)  # the biggest moment and its answer first, then the other hits in time order
         cells = {}  # each moment's answer, on its row of the hits table (the owner: less text)
         if big:
-            cells[m.t] = f"{big[2]:.0%} press {e(big[0])} (about {when(big, m)}){long_too(big, m)}"
+            cells[m.t] = (f"{big[2]:.0%} press {e(big[0])}{reach_of(big, m)} (about {when(big, m)})"
+                          f"{long_too(big, m)}")
         # the other dots in time order: their most shared press, or why none is kept
         pairs = [(x, answer(x)) for x in sorted(p.moments, key=lambda x: x.t) if x is not m]
         for x, a in pairs:
             if a:
-                cells[x.t] = f"{a[2]:.0%} press {e(a[0])} (about {when(a, x)}{more_back(a, x)}){long_too(a, x)}"
+                cells[x.t] = (f"{a[2]:.0%} press {e(a[0])}{reach_of(a, x)} (about {when(a, x)}{more_back(a, x)})"
+                              f"{long_too(a, x)}")
         answered = {(a[0], a[1]) for a in [big, *(a for _x, a in pairs), *extra] if a}  # the chart draws these full
         tied.update({(a[0], a[1]): a[2] for a in [big, *(a for _x, a in pairs), *extra] if a})
         from paf.healer import _counted

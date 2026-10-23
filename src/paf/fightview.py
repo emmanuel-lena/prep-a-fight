@@ -313,6 +313,11 @@ def _why(d, name: str, t: float, presses: list[float]) -> str:
     ts, n = d.tops_casts.get(_key(name)), d.tops_players
     if ts and n:
         here, there = tops_moment(ts, n, t)
+        prev = [x for x in presses if x < t - 1]
+        gaps = [b - a for a, b in zip(presses, presses[1:], strict=False)]
+        if there is not None and there[1] < t and prev and gaps and there[1] < prev[-1] + min(gaps) - 3:
+            there = None  # an earlier moment the cooldown cannot reach after the previous press: it is that
+            # press's (a review: "earlier, at 1:37" on a 2:03 row whose previous press is 1:33)
         if there is not None and here < 0.25:
             when = "wait until" if there[1] > t else "press it earlier, at"  # a deviation said as one (a review:
             why += f"; {there[0]:.0%} of the top players {when} {_mmss(there[1])}"  # "press it at 1:37" on a 2:03 row)
