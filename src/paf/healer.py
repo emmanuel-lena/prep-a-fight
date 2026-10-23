@@ -2033,8 +2033,10 @@ def talents_html(builds: list, players: int, who: str, hero: list | None = None)
     """The hero tree the top players pick (the first choice), then their builds played by enough of them."""
     line = ""
     if hero:
-        line = ("<p><b>Hero tree:</b> " + (f"{e(hero[0][0])} (all {players} players read)" if len(hero) == 1 else
-                " &middot; ".join(f"{e(t)} {s:.0%}" for t, s in hero) + f" of the {players} players read") + ".</p>")
+        line = (f"<p><b>Hero tree:</b> {e(hero[0][0])} (all {players} players read).</p>" if len(hero) == 1 else
+                "<ul class='hl2 split'>" + _pair(" / ".join(f"{t} {round(sh * 100)}%" for t, sh in hero[:2]))  # the
+                .replace("<li class='pair'><span>", "<li class='pair'><span><small>Hero tree</small> ", 1)  # choice
+                + "</ul>")  # rows' stacked bar (heal round 16: plain text)
     if builds and builds[0][0] < BUILD_SHARE * players:  # 3 of 100 is no build to show, empty row and all
         return f"<h2>Talents the top {e(who)} play</h2>{line}" if line else ""  # the lead said there is no build
     return (f"<h2>Talents the top {e(who)} play</h2>{line}<ul class='hl2'>"
