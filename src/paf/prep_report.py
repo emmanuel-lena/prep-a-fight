@@ -843,8 +843,8 @@ def defensives_html(d: PrepData) -> str:
 def nsrt_block(note: str) -> str:
     if not note:
         return ""
-    return (f'<div class="nb"><h4>Northern Sky Raid Tools reminders {copy_button(note, "Copy for NSRT")}</h4><p '
-            f'class="tiny muted">Personal reminders, times from each phase.</p><pre class="small note-pre">{e(note)}</pre></div>')
+    # the button alone: the raw reminders are for the addon, not to read (the owner, 2026-10-24)
+    return f'<div class="nb"><h4>Northern Sky Raid Tools reminders {copy_button(note, "Copy for NSRT")}</h4></div>'
 
 
 def suggestions_html(d: PrepData) -> str:
@@ -1339,6 +1339,7 @@ and the gear for that.</p></div>""")
 
     # talents
     if d.talents:
+        from paf.raidlead import OTHER_BUILD
         tc = d.talents
         adds = any(c for _t, c, _l, _n in d.waves)  # with adds the metric matters; without, it is boss damage
         names = {"boss fight": "This fight (total damage)" if adds else "This fight (boss damage)",
@@ -1355,7 +1356,10 @@ and the gear for that.</p></div>""")
             add = [t for t in dict.fromkeys(r.add) if t not in both]
             drop = [t for t in dict.fromkeys(r.drop) if t not in both]
             diff = "<span class='muted'>only ranks or a choice node differ from yours</span>"
-            if add or drop:
+            if len(add) + len(drop) > OTHER_BUILD:  # another build altogether: one badge, not 40 names (the owner,
+                # 2026-10-24; as on the raid lead page)
+                diff = f"<span class='other-build'>other build &middot; {len(add) + len(drop)} talents apart</span>"
+            elif add or drop:
                 diff = (f"<span class='plus'>+</span> {e(', '.join(add) or '-')}<br>"
                         f"<span class='minus'>&minus;</span> <span class='muted'>{e(', '.join(drop) or '-')}</span>")
             body += (f"<tr><td>{e(r.build.label)}<br><span class='small muted'>{r.build.count} players, median rank "
@@ -1391,7 +1395,7 @@ its target_error): a gap under that is noise. A build can lose on the dummy and 
         note = re.sub(r"cooldowns for .*\(\+?-?0\.0%\)", "cooldowns: SimC's default priority list",
                       d.mrt.get(p.objective, ""), count=1)
         tabs["cooldowns"].append(
-            "<h2>Ideal cooldown play-by-play</h2><div class='card'><p><b>The default priority list is already right "
+            "<h2>Cooldown plan</h2><div class='card'><p><b>The default priority list is already right "
             "on this fight:</b> play it as it is. No other plan beats it for boss, total "
             "or burst damage (every gap within the sims' noise)."
             + (f" The sims leave out {e(', '.join(unsimmed_amps(d)))}: see the fight tab." if unsimmed_amps(d) else "")
@@ -1414,13 +1418,6 @@ its target_error): a gap under that is noise. A build can lose on the dummy and 
                             f"<td>{e(rule_phrase(d, r.name))}</td></tr>"
                             for k, r in changed.items()) or "<tr><td>Every cooldown</td><td>as SimC's default priority list casts it</td></tr>"
             others = ", ".join(f"{_goal(o)} {_pct(v, 1)}" for o, v in p.totals.items() if o != p.objective)
-            steps = ""
-            if p.timeline and d.fight is not None:
-                from paf.optimize import fight_context
-
-                steps = "".join(f"<tr><td>{_mmss(t)}</td><td>{e(cd_name(d, label.lower().replace(' ', '_')))}</td>"
-                                f"<td class='small muted'>{e(fight_context(d.fight, t).replace('lust', 'Bloodlust') or ('the end of the fight: used before it ends' if t > d.fight.duration - 25 else ''))}"
-                                "</td></tr>" for t, label in p.timeline)
             note = d.mrt.get(p.objective, "")
             checks = ""
             if p.sensitivity:
@@ -1445,14 +1442,12 @@ its target_error): a gap under that is noise. A build can lose on the dummy and 
 {checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases, links=d.links, legend=not blocks)}
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
 {"<p class='small muted'>The cooldowns not listed follow SimC's default priority list: their times can move with the ones the plan holds.</p>" if changed else ""}
-<div class="pp-grid"><div><h4>Play-by-play of one simulated pull</h4><div class="scroll pp"><table>
-<tr><th>Time</th><th>Cooldown</th><th>Context</th></tr>{steps}</table></div></div>
-{(f'<div><div class="nb"><h4>MRT note {copy_button(note, "Copy the MRT note")}</h4><pre class="small note-pre">{e(note)}</pre></div>'
+<div class="pp-grid">{(f'<div><div class="nb"><h4>MRT note {copy_button(note, "Copy the MRT note")}</h4><pre class="small note-pre">{e(note)}</pre></div>'
   + nsrt_block(d.nsrt.get(p.objective, "")) + "</div>") if (changed or p.objective == first) and note else
  "<div><p class='small muted'>The default priority list as it is: no note to paste. The fight tab's note has its "
  "presses and your defensives.</p></div>"}</div>
 </div>""")
-        tabs["cooldowns"].append("<h2>Ideal cooldown play-by-play, per objective</h2>" + "".join(blocks))
+        tabs["cooldowns"].append("<h2>Cooldown plans, per objective</h2>" + "".join(blocks))
 
     if d.alignment and (d.alignment[0].adds_cover or d.alignment[0].units_cover):  # no adds: nothing to hold for
         a0 = d.alignment[0]

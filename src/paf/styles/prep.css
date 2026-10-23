@@ -107,3 +107,4 @@ th.n{text-align:right}
 .sugg .gain.muted{color:var(--muted)} /* a plan not played: its gain is no call to take it */
 div.chips{display:grid;grid-template-columns:auto 1fr;gap:6px;align-items:start;margin:8px 0} div.chips .chip.rare{opacity:.6}
 div.chips .chip{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;margin:2px 4px 2px 0;border:1px solid var(--line);border-radius:999px} /* the defensives used, one chip each */
+.other-build{font:600 12.5px var(--font-body);padding:1px 9px;border-radius:6px;border:1px solid var(--warn);white-space:nowrap}

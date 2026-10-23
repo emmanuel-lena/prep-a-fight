@@ -88,3 +88,6 @@ def test_the_strip_says_what_each_boss_asks():
     assert "href='#boss-7'" in cell and "2 on adds" in cell and "3 talent changes" in cell
     assert "nothing to change" in raidlead._strip_cell(x, {"targets": [], "builds": []})
     assert "no kills read" in raidlead._strip_cell(x, None)
+    # no spec with a pad/boss build on this boss (Coiled Altar): nothing compared, never "nothing to change"
+    none = raidlead._strip_cell(x, {"targets": [], "builds": [], "no_split": 18}, 18)
+    assert "no build to compare" in none and "nothing to change" not in none

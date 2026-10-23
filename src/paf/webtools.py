@@ -151,6 +151,10 @@ SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
 ]
 
 
+SHOWN_HELP = {"share_packs": "Fight data only, no names."}  # what leaves the computer: always in sight
+PLACEHOLDER = {"guild_server": "as the game writes it: Kazzak, Twisting Nether"}
+
+
 def _setting_control(key: str) -> str:
     s, cur = settings.SETTINGS[key], settings.get(key)
     if key == "region":  # a dropdown, as the guild's region above it
@@ -174,7 +178,8 @@ def _setting_control(key: str) -> str:
             for c in s.choices  # no LFR to pick, as on every other page
             if not (key == "difficulty" and c == "lfr" and cur != "lfr")) + "</select>"
     kind = " inputmode='numeric'" if s.kind is int else ""
-    return f"<input name='{e(key)}' id='s-{e(key)}' value='{e(str(cur))}'{kind}>"
+    ph = f" placeholder='{e(PLACEHOLDER[key])}'" if key in PLACEHOLDER else ""
+    return f"<input name='{e(key)}' id='s-{e(key)}' value='{e(str(cur))}'{kind}{ph}>"
 
 
 def settings_form() -> str:
@@ -190,9 +195,11 @@ def settings_form() -> str:
     for group, _folded, rows in groups:
         def row(k: str, label: str, help_: str) -> str:
             check = settings.SETTINGS[k].choices == ("on", "off")  # a checkbox goes before its label
-            lab, ctl = f"<label for='s-{e(k)}'>{e(label)}</label>", _setting_control(k)
+            # the help on hover, not a line under each row (the owner, 2026-10-24); what is shared stays said
+            title = f" title='{e(help_)}'" if help_ else ""
+            lab, ctl = f"<label for='s-{e(k)}'{title}>{e(label)}</label>", _setting_control(k)
             return (f"<div class='set-row{' set-check' if check else ''}'>" + (ctl + lab if check else lab + ctl)
-                    + (f"<p class='set-help'>{e(help_)}</p>" if help_ else "") + "</div>")
+                    + (f"<p class='set-help'>{e(SHOWN_HELP[k])}</p>" if k in SHOWN_HELP else "") + "</div>")
         fields = "".join(row(k, label, help_) for k, label, help_ in rows)
         out += f"<fieldset class='set-group'><legend>{e(group)}</legend>{fields}</fieldset>"  # nothing folded
     return out

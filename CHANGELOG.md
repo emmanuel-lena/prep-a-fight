@@ -16,7 +16,9 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 - Less to read, more to see: the healer and tank sheets show the big hits as a table with spell icons and size bars,
   shorter cards with one legend, and the other healers' answers as one table; the home page shows every sheet in
   one table (a spec a row, a boss a column); the goal choices carry an icon, and the raid lead page says the
-  tanks and healers once, beside the roster.
+  tanks and healers once, beside the roster. The DPS sheet's other talent builds of the top players say "other
+  build · N talents apart" instead of listing 40 talents; its plans keep the MRT note and the NSRT copy button
+  without the play-by-play table; the settings' help lines show on hover.
 - Best gear from your bags no longer drops a dual-wielder's off-hand weapon: a Rogue's sets all simmed one-handed
   (about -54%). A set list where everything loses more than 5% now says it is a failed sim.
 - The fight tab says how many adds come as the logs count them (Nek'zali's 6, then 14 Restless Amani), not the

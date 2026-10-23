@@ -455,5 +455,5 @@ section.adv textarea{max-width:920px} /* the content column, never to the window
 .rl-sb b{font-weight:600;line-height:1.2} .rl-sv{color:var(--muted)} .rl-sv.ok{color:var(--pos)} .rl-sb.none{opacity:.6}
 .rl-sh{display:inline-block;width:60px;height:6px;margin-right:6px;border-radius:3px;background:var(--surface-2);border:1px solid var(--line);vertical-align:1px;overflow:hidden}
 .rl-sh>span{display:block;height:100%;background:var(--muted)} /* the share of the top raids, as a bar */
-.rl-all{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);font-size:13px}
+.rl-everyone{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);font-size:13px}
 .rl-roster h2 small{font:500 15px var(--font-body);margin-left:6px}

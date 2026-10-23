@@ -310,15 +310,17 @@ def _talents_h4(sh: dict, total: int, said: int = -1) -> str:
     return f"<h4>Talents to change {''.join(parts)}</h4>"
 
 
-def _strip_cell(x, sh) -> str:
+def _strip_cell(x, sh, total: int = 0) -> str:
     """A boss of the strip: its portrait, then what its card asks: players on adds, talent changes, or no kills."""
     if sh is None:
         say = "<span class='rl-sv none'>no kills read</span>"
     else:
         adds = sum(len(t["players"]) for t in sh["targets"])
         say = (f"<span class='rl-sv'>{adds} on adds</span>" if adds else "") + (
-            f"<span class='rl-sv'>{len(sh['builds'])} talent changes</span>" if sh["builds"] else "") or \
-            "<span class='rl-sv ok'>&#10003; nothing to change</span>"
+            f"<span class='rl-sv'>{len(sh['builds'])} talent changes</span>" if sh["builds"] else "") or (
+            # nothing compared is not "nothing to change": the card says no pad/boss build (fresh app review 5)
+            "<span class='rl-sv none'>no build to compare</span>" if total and sh.get("no_split", 0) >= total else
+            "<span class='rl-sv ok'>&#10003; nothing to change</span>")
     img = (f"<img src='/bossimg/{x.id}.png' alt='' loading='eager' onerror=\"this.remove()\">")
     return (f"<a class='rl-sb{' none' if sh is None else ''}' href='#boss-{x.id}'>{img}<b>{e(x.name)}</b>{say}</a>")
 
@@ -441,12 +443,12 @@ def page_body(difficulty: str) -> str:
             strip.append(_strip_cell(x, None))
             continue
         everything.append(sh)
-        strip.append(_strip_cell(x, sh))
+        strip.append(_strip_cell(x, sh, len(in_raid)))
         tg = "".join(  # a row a target: who in your raid, the specs the top raids put on it (the owner: less text;
             # "best specs in the top raids" said once, in the header)
             f"<tr><td><b>{e(t['name'])}</b>"
             + (" <span class='rl-side'>a second boss</span>" if t["second_boss"] else "") + "</td><td>" + (
-                f"<span class='rl-all' title='the whole raid'>&#128101; all {len(in_raid)}</span>"
+                f"<span class='rl-everyone' title='the whole raid'>&#128101; all {len(in_raid)}</span>"
                 if t["whole_raid"] and not t["players"] else
                 ("".join(f"<span class='rl-n'>{_ic(spec_of.get(n, ''))}{e(n)}</span>" for n in t["players"])
                  if t["players"] else "<span class='muted'>nobody fits</span>"))

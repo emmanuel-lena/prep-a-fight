@@ -1033,8 +1033,7 @@ def reclear_page() -> str:
             "cost you the most, boss by boss, and where to look in the log." if card else "No raid of yours read yet: the app looks for your character's "
             "latest log of the current raid each time it starts.")
     return (f"<div class='rc'><header class='rc-head'><h1>Reclear</h1><p class='lead'>{lead}</p>"
-            f"</header>{last}<h2>Dig deeper into your play</h2><p class='muted'>Each one starts from your raid's latest "
-            f"log; paste another link to read that one instead.</p>"
+            f"</header>{last}<h2>Dig deeper into your play</h2>"  # no help line (the owner, 2026-10-24)
             f"{workshop.cards(('rotation', 'diff', 'wipe'))}<p class='muted'>The raid's pulls, player by player, and "
             f"your raid night are on <a href='/raidlead'>Raid lead</a>.</p></div>{workshop.CSS}")
 
@@ -1196,9 +1195,8 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
                       for x in encs)
     where = e(DIFF_LABELS.get(diff, diff))
     if nxt is not None:  # the next boss to prepare: no list to scroll, the board below picks another one
-        pick = (f'<input type="hidden" name="boss" value="{nxt.id}"><p class="start-next">'
-                + (f'{len(ready)} of {len(encs)} bosses ready this week. ' if ready else '')
-                + f'Next to prepare: <b>{e(nxt.name)}</b>.</p>')  # another: the board below (its portraits are links)
+        pick = (f'<input type="hidden" name="boss" value="{nxt.id}">'  # the button names it (the owner, 2026-10-24)
+                + (f'<p class="start-next">{len(ready)} of {len(encs)} bosses ready this week.</p>' if ready else ''))
     else:
         pick = ((f'<p class="start-say">Every boss is ready this week in {where}: pick one to prepare again.</p>'
                  if encs else "") + f'<select name="boss" aria-label="Boss" class="big">{options}</select>')
