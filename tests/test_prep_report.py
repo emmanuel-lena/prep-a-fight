@@ -123,3 +123,17 @@ def test_gear_and_loot_inside_the_noise_get_one_verdict_and_no_colour():
     assert page.count("keep yours</span>") == 1 and "&asymp; best</span>" not in page
     assert "&asymp; best: within" not in page
     assert '<span class="">+0.31%</span>' in page and '<span class="pos">' not in page.split("What this boss drops")[1]
+
+
+def test_a_plan_not_played_keeps_its_own_notes_on_its_card():
+    # Subtlety Rogue, Vashnik (DPS round 11): the pad card's MRT note was the default list's (potion 0:02) beside
+    # the plan's NSRT times (potion 1:48)
+    from paf.optimize import Plan, Rule
+
+    d = PrepData("Vashnik", "heroic", "Subtlety", "Char", kills=10, duration=240)
+    d.goal = "total"
+    d.optimized = [Plan("total", {"potion": Rule("hold_adds_60", "", None)}, 0.6, 0.1, sensitivity={"slower": -0.4},
+                        timeline=[(108.0, "potion")], default_timeline=[(2.0, "potion")])]
+    d.mrt = {"total": "prep-a-fight: Vashnik, cooldowns for total damage (pad) (+0.6%)\n{time:1:48} Potion"}
+    page = render(d)
+    assert "{time:1:48} Potion" in page and "{time:0:02} Potion" not in page.split("not played")[1]

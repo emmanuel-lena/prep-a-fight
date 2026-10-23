@@ -1045,6 +1045,9 @@ def onto_adds(d: PrepData) -> None:
             d.nsrt[p.objective] = nsrt_note(int(enc[1]), p, d.fight, getattr(d, "game_phases", None) or d.phases, tag[1], spell_ids, d.cd_names)
 
 
+PLAYED = "played"  # the notes key of the default list the fight tab plays instead of a plan not robust enough
+
+
 def sheet_pickle(d) -> bytes:
     """The sheet's data as a pickle: database rows become dicts, functions made on the fly (the plans' rules, the
     compared plans) are dropped; nothing on the sheet reads them."""
@@ -1090,6 +1093,20 @@ def render(d: PrepData) -> str:
     d.mrt = {k: before_pull(in_time_order(v)) for k, v in d.mrt.items()}
     d.nsrt = {k: in_time_order(v) for k, v in d.nsrt.items()}
     from paf import fightview, simple
+
+    played = simple._plan(d)
+    if played is not None and simple.plays_default(d) and d.fight is not None:  # the fight tab plays the default
+        # list: its NSRT reminders too; the plan's card keeps its own notes (DPS round 11: a default-list MRT note
+        # beside the plan's NSRT times under the pad plan)
+        from paf.optimize import nsrt_note
+
+        old = d.nsrt.get(played.objective, "")
+        enc, tag = re.match(r"EncounterID:(\d+)", old), re.search(r";tag:([^;]+);", old)
+        if enc and tag:
+            ids = {n.lower(): int(r.split("=", 1)[1]) for n, r in d.links.items()
+                   if r.startswith("spell=") and r.split("=", 1)[1].isdigit()}
+            d.nsrt[PLAYED] = in_time_order(nsrt_note(int(enc[1]), played, d.fight, getattr(d, "game_phases", None)
+                                                     or d.phases, tag[1], ids, d.cd_names))
 
     if d.talents and d.talents.rows and d.talents.fights:  # builds lettered in the order the sheet lists them: best first
         f0 = d.talents.fights[0]
@@ -1139,9 +1156,9 @@ def render(d: PrepData) -> str:
                            "see the MRT note): " + ", ".join(dropped))
             return out
         d.nsrt = {k: renote(v) for k, v in d.nsrt.items()}
-    played = simple._plan(d)
     if played is not None and d.mrt.get(played.objective):  # the plan you play: one note, the fight tab's, everywhere
-        d.mrt[played.objective] = fightview.mrt(d)
+        d.mrt[PLAYED if simple.plays_default(d) else played.objective] = fightview.mrt(d)  # a plan not played keeps
+        # its own on its card
     from dataclasses import replace as _replace
 
     d.actions = [_replace(a, text=re.sub(r"(take it in (\d+)% of the kills): expect it\.",

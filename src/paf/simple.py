@@ -55,7 +55,13 @@ def fallen(p) -> bool:
     return not getattr(p, "robust", True) and bool(getattr(p, "default_timeline", None))
 
 
-def _plan(d):
+def plays_default(d) -> bool:
+    """The sheet's plan is not robust: the fight tab plays the default list instead (its own notes)."""
+    p = _plan(d, raw=True)
+    return p is not None and fallen(p)
+
+
+def _plan(d, raw: bool = False):
     """The cooldown plan of the sheet: the player's (or the raid's) objective, even when it changes nothing (then it
     is the default list's timings); the best one worth it only when nobody made the call."""
     from paf.prep_report import wanted
@@ -67,7 +73,7 @@ def _plan(d):
     if called is None and (plan is None or plan.gain <= 2 * plan.error):
         better = max((p for p in plans if p.gain > 2 * p.error), key=lambda p: p.gain, default=None)
         plan = better or plan
-    if plan is not None and fallen(plan):
+    if plan is not None and fallen(plan) and not raw:
         # a gain a slower kill turns into a loss: the fight tab plays the default list (a review: the potion held
         # out of Bloodlust for +0.6%, -0.4% on a 5:16 kill); Dig deeper keeps the plan and its checks
         from dataclasses import replace
@@ -229,6 +235,7 @@ def copy_menu(d) -> str:
     """One button that asks which note to copy: the MRT note or the NSRT reminders of the sheet's plan."""
     plan = _plan(d)
     want = plan.objective if plan is not None else "boss"
+    want = "played" if "played" in d.mrt else want  # the default list played instead of a plan (prep_report.PLAYED)
     notes = [(d.mrt.get(want) or next(iter(d.mrt.values()), ""), "MRT note", "Method Raid Tools: paste it in your note"),
              (d.nsrt.get(want) or next(iter(d.nsrt.values()), ""), "NSRT reminders",
               "Northern Sky Raid Tools: your personal reminders")]
