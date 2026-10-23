@@ -507,7 +507,8 @@ def lust_block(sh: dict, difficulty: str) -> str:
         where = f" · in {e(x.phase)}" if x.phase and x.kind in ("time", "last_minute") else ""
         rows += (f"<label class='rl-lust'><input type='radio' name='spot' value='{e(x.label)}'"
                  f"{' checked' if x is current else ''} onchange='this.form.submit()'>"
-                 f"<span class='rl-what'><b>{e(x.label)}{when}</b><small>{x.share:.0%} of the top raids{where}</small>"
+                 f"<span class='rl-what'><b>{e(x.label)}{when}</b><small><span class='rl-sh' aria-hidden='true'>"
+                 f"<span style='width:{round(100 * x.share)}%'></span></span>{x.share:.0%} of the top raids{where}</small>"
                  f"</span>{gain}</label>")
     best = max(((x, gains[x.label][0]) for x in spots if x.t is not None and gains.get(x.label)
                 and gains[x.label][0] is not None), key=lambda xg: xg[1], default=None)
