@@ -292,7 +292,7 @@ def _you(label: str, player: str) -> str:
 
 
 ROWS = ((r"^(.+): (\S+) on the boss in B, (\S+) in A\.$", "{0}: boss DPS"),
-        (r"^(.+): active (\S+) of the pull in B, (\S+) in A\.$", "{0}: time casting"),
+        (r"^(.+): active (\S+) of the pull in B, (\S+) in A\.$", "{0}: active time"),
         (r"^At (\d+:\d\d), the boss had (\S+) left in B against (\S+) in A\.$", "Boss health left at {0}"),
         (r"^Deaths before the wipe: (\S+) in B, (\S+) in A\.$", "Deaths before the wipe"),
         (r"^Share of the raid's damage on (.+): (\S+) in B, (\S+) in A\.$", "Raid damage on {0}"),

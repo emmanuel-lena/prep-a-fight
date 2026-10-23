@@ -157,7 +157,7 @@ def change_card(d) -> str:
             button = copy_button(best.build.code, "Copy the talents") if best.build.code else ""
             talents_said = True
             rows.append(f"<li>{spec_ic}<div><b>Change your talents</b><span class='sz {_size(g)}'>"
-                        f"{SIZE_WORDS[_size(g)]}, {g:+.1f}%</span></div></li>{swaps_html(d, getattr(best, 'swaps', []))}"
+                        f"{SIZE_WORDS[_size(g)]}, {g:+.1f}% vs your talents</span></div></li>{swaps_html(d, getattr(best, 'swaps', []))}"
                         f"<li class='sw-copy'>{button}</li>")
     if d.gear and d.gear[0][2] > 2 * d.gear_error:
         changes, _, w = d.gear[0]

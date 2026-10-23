@@ -145,7 +145,7 @@ def test_the_pull_comparison_is_a_table(monkeypatch):
     table = lastraid._cmp_table(says)
     assert ("<tr class='good'><td>You: damage on the boss</td><td><b>252k</b></td><td>209k</td>"
             "<td class='gap'>+21%</td></tr>") in table
-    assert lastraid._row_of("Ixuu: active 99% of the pull in B, 89% in A.") == ["Ixuu: time casting", "99%", "89%"]
+    assert lastraid._row_of("Ixuu: active 99% of the pull in B, 89% in A.") == ["Ixuu: active time", "99%", "89%"]
 
 
 def test_the_comparison_headers_keep_the_time_when_the_health_is_a_row():

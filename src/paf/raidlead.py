@@ -27,7 +27,7 @@ from paf.config import data_dir
 from paf.corpus.memo import by_corpus
 
 TALENT_GAP = 0.15  # as paf.wipe: a talent taken this much more on one side is a side's talent
-SHOWN = 3
+SHOWN = 12  # every talent of a few swaps shown (fresh app review: "+2 more" hid them); past 12, the badge
 
 
 def _path() -> Path:
@@ -303,7 +303,8 @@ def _talents_h4(sh: dict, total: int) -> str:
     ok = total - changing - len(unread_) - other
     parts = [f"<span class='rl-ok'>&#10003; {ok} on their build</span>"] if ok > 0 else []  # always counted
     if other:
-        parts.append(f"<span class='rl-unread'>{other} with no pad/boss build (tanks, healers)</span>")
+        parts.append(f"<span class='rl-unread' title='no pad or boss build for these roles'>{other} tanks and "
+                     "healers</span>")  # short, nine times a page (fresh app review: the page grew)
     if unread_:
         parts.append(f"<span class='rl-unread'>{len(unread_)} not read: {e(', '.join(unread_))}</span>")
     return f"<h4>Talents to change {''.join(parts)}</h4>"
