@@ -41,7 +41,7 @@ def test_tank_busters_hitters_and_swaps():
     assert "What hits you, and when" in page and "Crush" in page and "Tank swaps" in page
     assert "Shield Wall" in page and "Shield Block" in page and "Taunt at 3 stacks." in page
     sheet = tank.render_sheet(p)  # the four-tab sheet the app shows: its lead names the tanks' own danger
-    assert "What hits the top tanks the most: Melee" in sheet and "The top tanks' biggest moment: 0:30, Crush" in sheet
+    assert "What hits the top tanks the most: Melee" in sheet and "<b>0:30</b></td><td>Crush</td>" in sheet
     import re
     assert not re.search(r"round \d+", re.sub(r"<[^>]+>", " ", sheet))  # no review note in the page's text
 
@@ -95,4 +95,4 @@ def test_a_long_defensive_is_said_beside_a_short_one():
                       [("Shield Block", 0.6)], [], [], [],
                       short_defs=[("Spell Reflection", 0.9, 1.0, [28.0], [], [0.38], sr, [60.0] * 100)])
     sheet = tank.render_sheet(p)
-    assert "press Spell Reflection for it (about 0:28); 23% press Shield Wall, a long defensive (about 0:29)" in sheet
+    assert "press Spell Reflection (about 0:28); 23% press Shield Wall, a long defensive (about 0:29)" in sheet

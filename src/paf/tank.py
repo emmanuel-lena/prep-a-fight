@@ -413,6 +413,18 @@ def _none_for(note: str) -> str:
     return f"; no defensive of theirs is kept for it{note}."
 
 
+# how to read the defensive cards, one term a line (the owner: less text; every rule kept, said once)
+TANK_HOW_TO_READ = (
+    "<dl class='legend'><dt>Tied to a hit</dt><dd>a quarter of those who press the button press it in the hit's window "
+    "(5 s before to 8 s after it starts); its share is then the window's. A card on cooldown, a potion, a trinket or "
+    "a magic-only defensive in a physical hit says why it is not tied.</dd><dt>A time</dt><dd>shared by a quarter of "
+    "those who press the button; its share: the top players pressing within 8 s of it (&ldquo;of those who press "
+    "it&rdquo; too, under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long."
+    "</dd><dt>Back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, "
+    "not counted for it (&ldquo;for about half&rdquo;: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
+    "time some top players press the same press at instead.</dd></dl>")
+
+
 def render_sheet(p: TankPrep) -> str:
     """The tank's sheet in the four sections of every role's sheet (issue #27): The fight (what hits you and when,
     your defensives where the top tanks press them, the swaps), What to change (mitigation, talents, trinkets), The
@@ -422,7 +434,6 @@ def render_sheet(p: TankPrep) -> str:
         SWAP_LANE,
         _chip,
         _share,
-        _x,
         build_lead,
         comps_table,
         cooldowns_html,
@@ -430,7 +441,6 @@ def render_sheet(p: TankPrep) -> str:
         curve_svg,
         journal_lead,
         landed_in,
-        moments_html,
         presence_table,
         split_html,
         talents_html,
@@ -493,6 +503,7 @@ def render_sheet(p: TankPrep) -> str:
     lead, answered = [], set()
     named: dict = {}  # the press the lead names for each hit kept for none: its chip counts that window too
     tied: dict[tuple[str, float], float] = {}  # a tied press's share in its hit's window: the lead's, on its chip
+    table = ""  # the hits table, when there are big moments
     moved_t: dict[tuple[str, float], float] = {}  # ... and its counted presses' time, when it reads differently
     if p.moments:
         m = max(p.moments, key=lambda x: x.ratio)
@@ -556,20 +567,14 @@ def render_sheet(p: TankPrep) -> str:
             return f"; {e(got[0])} {got[1]:.0%} in its window, back from cooldown"
 
         big = answer(m)  # the biggest moment and its answer first, then the other hits in time order
-        lead.append(f"The top tanks' biggest moment: {_mmss(m.t)}, {e(m.boss_spell or 'tank damage')} ({_x(m.ratio)}&times; the "
-                    f"usual damage" + ("" if own else ", raid damage the tanks take too") + ")"
-                    + (f"; {big[2]:.0%} of the top {e(p.spec)}s press {e(big[0])} for it (about {when(big, m)})"
-                       f"{long_too(big, m)}." if big else _none_for(landed_in(m, defs, named, 'long defensive'))))
-        # the other dots in time order: their most shared press, or one clause for those with none
+        cells = {}  # each moment's answer, on its row of the hits table (the owner: less text)
+        if big:
+            cells[m.t] = f"{big[2]:.0%} press {e(big[0])} (about {when(big, m)}){long_too(big, m)}"
+        # the other dots in time order: their most shared press, or why none is kept
         pairs = [(x, answer(x)) for x in sorted(p.moments, key=lambda x: x.t) if x is not m]
-        def noun(x: Moment) -> str:  # under 1.5x a moment, not a hit (round 99: "hits" then "not set hits")
-            return "hit" if x.ratio >= 1.5 else "moment"
-
-        def at(x: Moment) -> str:  # each hit with its size, as the biggest moment (round 76: "the 1:35 hit" never
-            return f"{_mmss(x.t)} ({_x(x.ratio)}&times;)"  # sized, 1.46x, out of time order after the biggest)
-        said = [f"for the {at(x)} {noun(x)}, {a[2]:.0%} press {e(a[0])} (about {when(a, x)}{more_back(a, x)})"
-                f"{long_too(a, x)}"
-                for x, a in pairs if a]
+        for x, a in pairs:
+            if a:
+                cells[x.t] = f"{a[2]:.0%} press {e(a[0])} (about {when(a, x)}{more_back(a, x)}){long_too(a, x)}"
         answered = {(a[0], a[1]) for a in [big, *(a for _x, a in pairs), *extra] if a}  # the chart draws these full
         tied.update({(a[0], a[1]): a[2] for a in [big, *(a for _x, a in pairs), *extra] if a})
         from paf.healer import _counted
@@ -579,30 +584,26 @@ def render_sheet(p: TankPrep) -> str:
             inside = _counted(pressed[a[0]], a[1], x.t) if a and a[0] in pressed else []
             if inside and _mmss(st.median(inside)) != _mmss(a[1]):
                 moved_t[(a[0], a[1])] = st.median(inside)
-        notes = [(x, landed_in(x, defs, named, 'long defensive')) for x, a in pairs if not a]
-        none = " (no long defensive of theirs pressed by a tenth of them in it)"
-        quiet = [x for x, n in notes if n == none]  # the same aside once, for every such hit (round 62)
-        bare = [f"the {at(x)} {noun(x)}{n}" for x, n in notes if n != none]
-        if said:
-            lead.append("F" + "; ".join(said)[1:] + ".")  # "For the 0:35 hit, 41% press Spell Reflection"
-        first_none = not big and "no long defensive" in lead[0]
-        hits = (f"the {_and([at(x) for x in quiet])} {noun(quiet[0]) if quiet else 'hit'}"
-                f"{'s' if len(quiet) > 1 else ''}")
-        if quiet and first_none:  # "nor": the biggest moment said the same, in one sentence (round 65)
-            lead[0] = lead[0].rstrip(".") + f", nor in {hits}."  # (rounds 91, 96: "it" read across the clause)
-        elif quiet:  # the pattern of every other hit, in one sentence with them (round 68)
-            bare = [f"the {at(x)} {noun(x)}{none}" for x in quiet] + bare
+        bare = {_mmss(x.t): landed_in(x, defs, named, 'long defensive') for x in p.moments if x.t not in cells}
+        names = list(dict.fromkeys(n for n, _t in answered))
+        by_icon = {c.name: c for c in defs}
+        from paf.healer import _and as and_
+        from paf.healer import _ic, hits_table
+
+        lead.append(f"{len(p.moments)} big moments for the tanks"
+                    + (f": the top {e(p.spec)}s answer them with "
+                       + and_([f"{_ic(by_icon.get(n))}<b>{e(n)}</b>" for n in names]) + "." if names
+                       else f"; the top {e(p.spec)}s keep no long defensive for them."))
+        if not own:  # the biggest is the raid's damage, not a tank buster (said, as the lead did)
+            lead.append(f"The biggest, at {_mmss(m.t)}, is raid damage the tanks take too.")
         up = [(n, u) for n, u in p.mitigation if u >= 0.5][:2]  # what they do have, measured: their active
-        if first_none and up:  # mitigation's uptime (round 86: the biggest hit's answer was a negative alone)
-            lead[0] = lead[0].rstrip(".") + ("; instead, their active mitigation is up most of the kill: "
-                                             + _and([f"{e(n)} {u:.0%}" for n, u in up]) + ".")
-        if bare:
-            lead.append(f"No defensive is kept for {', nor '.join(bare)}.")  # each hit its own aside (round 42)
-        low = [x for x in sorted(p.moments, key=lambda x: x.t) if x.ratio < 1.5]  # the healers' rule said (round 98:
-        if low:                                                                  # 1.45x "hits" with no word)
-            lead.append(f"The {_and([_mmss(x.t) for x in low])} {'moments stay' if len(low) > 1 else 'moment stays'} "
-                        f"under 1.5&times; the usual damage: {'they are' if len(low) > 1 else 'it is'} among the "
-                        "tanks' three highest.")
+        if not names and up:  # mitigation's uptime (round 86: the biggest hit's answer was a negative alone)
+            lead.append("Instead, their active mitigation is up most of the kill: "
+                        + and_([f"{e(n)} {u:.0%}" for n, u in up]) + ".")
+        tags: dict[str, list[str]] = {}
+        for x in p.moments:
+            if x.ratio < 1.5:  # the healers' rule said (round 98: 1.45x "hits" with no word)
+                tags.setdefault(_mmss(x.t), []).append("under 1.5&times;: among the tanks' three highest")
         # a hit that comes with a swap (Vashnik's 1:35 and 2:55, after Dripping Fangs): the time is the link
         with_swap = [(x, w) for x in p.moments for w in p.swaps if abs(w - x.t) <= ANSWER[0]]
         # said only when swaps are rare enough for it to mean something: one every 28 s (Vashnik) lands within 5 s
@@ -610,21 +611,19 @@ def render_sheet(p: TankPrep) -> str:
         n_swaps = max(len(p.swaps), 2 * round(p.taunts_per_kill or 0))  # every swap of a kill, not only those
         chance = n_swaps * 2 * ANSWER[0] / max(p.duration, 1)  # shared: each tank taunts, two taunts a swap pair
         if with_swap and chance < 1 / 3:
-            lead.append(f"The {_and([_mmss(x.t) for x, _w in with_swap])} hit{'s' if len(with_swap) > 1 else ''} "
-                        f"{'come' if len(with_swap) > 1 else 'comes'} with a tank swap (at "
-                        f"{_and([_mmss(w) for _x, w in with_swap])}).")
+            for x, w in with_swap:
+                tags.setdefault(_mmss(x.t), []).append(f"tank swap at {_mmss(w)}")
+        table = hits_table(p.moments, p.moments, [(t, f"for the {_mmss(t)} hit, {c}") for t, c in cells.items()],
+                           bare, p.phases, by_icon, "", tags)
+    swap_said = ""
     if p.swaps:
         # a tank's share of the kill's swaps, at least half the shared moments (round 43: "about 4" beside 9 swaps)
         taunts = f"{max(p.taunts_per_kill, len(p.swaps) / 2):.1f}".removesuffix(".0")
         swaps = f"{2 * max(p.taunts_per_kill, len(p.swaps) / 2):.0f}"  # both tanks' taunts: the swaps listed below
-        lead.append(f"The tanks swap about {swaps} times a kill after the pull, each top tank taunting about {taunts} "
-                    "times (swaps on adds count)"
-                    + ((f", most often at about {p.stacks[common][0]} stacks of {e(common)}." if common in p.stacks
-                        and p.stacks[common][0] >= 2 else f", swapping after each {e(common)} (the debuff lasts "
-                        f"about {p.stacks[common][1]:.0f} s; they never take a second stack)." if common in p.stacks
-                        else f", most often right after {e(common)} (a timing, not a measured cause).")
-                       if one else
-                       f", the first time at {_mmss(p.swaps[0])}" + (f" after {e(causes[0])}." if causes[0] else ".")))
+        swap_said = (f"The tanks swap about {swaps} times a kill after the pull, each top tank taunting about {taunts} "
+                     "times (swaps on adds count)"  # the stacks: said by the swap moments' line below
+                     + ("." if one else f", the first time at {_mmss(p.swaps[0])}"
+                        + (f" after {e(causes[0])}." if causes[0] else ".")))
     # the chart's lanes: the defensives and short ones, the lead's answer first (Spell Reflection had none)
     shorts = [Cooldown(n, 0, u, k, ts, ["" for _ in ts], support=sps) for n, u, k, ts, _ev, sps, *_r in p.short_defs if ts]
     lane = [Cooldown("Tank swaps", SWAP_LANE, 1.0, len(p.swaps), p.swaps, [""] * len(p.swaps))] if p.swaps else []
@@ -633,33 +632,22 @@ def render_sheet(p: TankPrep) -> str:
     svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight, their defensives and "
                     "the swaps", [*defs, *shorts, *lane], {"Tank swaps", *(n for n, _t in answered)}, answered,
                     moved_t)  # its marks at the lead's times (round 71)
-    fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + [
-        f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Damage the ranked tank "
-        f"of each top kill takes per second, median of {p.damage_kills or 'the'} kills (read on up to 40 of the top kills; "
-        f"that tank alone, so a swap moves it up or down; past the median kill, fewer kills are still going); "
-        + (STAGED if getattr(p, "staged", False) else "")
-        + "under it, the defensives the lead ties to a hit (an "
-        f"outline: another press of the same button) and the swaps. A dot is one of the tanks' three biggest "
-        f"moments of damage, whatever casts it: only the three highest are dotted, another as high may be left out.</p><ul class='hl2'>"
-        f"{moments_html(p.moments, 'tank damage', p.phases) or '<li>No big moment: steady damage.</li>'}</ul></div>",
+    fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + ([table] if table else []) + [
+        f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Median damage per "
+        f"second on the ranked tank of each top kill, {p.damage_kills or 'the top'} kills (that tank alone: a swap "
+        f"moves it; fewer kills past the median one). "
+        + (STAGED[:1].upper() + STAGED[1:].rstrip("; ") + ". " if getattr(p, "staged", False) else "")
+        + "Marks: the table's answers (an outline: another press of the same button) and the swaps. A dot: one of "
+        f"the tanks' three biggest moments, whatever casts it (another as high may be left out).</p><ul class='hl2'>"
+        f"{'' if p.moments else '<li>No big moment: steady damage.</li>'}</ul></div>",
         f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
         f"{nouned(cooldowns_html(defs, answered, named, moved_t)) or '<li>No defensive most top tanks share: they spread them.</li>'}</ul>"
-        "<p class='small muted'><b>Tied to a hit:</b> only the lead ties a press to a hit; a button on cooldown, a "
-        "potion, a trinket or a magic-only defensive in a physical hit says why it is not; a time with no hit named "
-        "lands on none, or the lead keeps another button for it (a press is kept for a hit when one of its times, "
-        "shared by a quarter of those who press it, sits in the hit's window; its share is then the window's)."
-        "<br><b>On cooldown:</b> pressed every time it comes back, all kill long.<br><b>A time shown:</b> a quarter of those who press the button share it.<br><b>A time's share:</b> "
-        "the top players pressing within 8 s of it (under a quarter of them, also of those who press the button)."
-        "<br><b>A hit's share:</b> for a press the lead names for a hit, the top players pressing in that hit's "
-        "window, 5 s before to 8 s after it starts.<br><b>\"or\":</b> the time other top players press "
-        "the same press instead.<br><b>\"Back from cooldown\":</b> most of its players press it as soon as it came "
-        "back from their last use, so it was not saved for what it lands on (\"for about half\": 40 to 60% of them); "
-        "either keeps it from counting for the hit.</p>"
+        + TANK_HOW_TO_READ
         + (f"<p class='small muted'>Fewer of them press: {', '.join(f'{e(c.name)} ({c.users:.0%})' for c in p.rare)}."
            f"</p>" if p.rare else ""),
         f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"
         f"{nouned(mit_html(answered)) or '<li>Not measured yet.</li>'}</ul>",
-        f"<h2>Tank swaps</h2><p>{'The swap moments most top raids share' if swap else 'No swap moment most top raids share.'}"
+        f"<h2>Tank swaps</h2><p>{swap_said + ' ' if swap_said else ''}{'The swap moments most top raids share' if swap else 'No swap moment most top raids share.'}"
         f"{_cause(common, p.stacks) if swap and one else ''}"
         f"{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
                                                           f"</li></ul>" if swap else "")

@@ -151,7 +151,7 @@ def test_one_press_for_either_hit_is_said_once():
     h = healer.HealerPrep("Boss", "heroic", "Holy Paladin", 9, 240.0, [100.0] * 48, found, cds, [], [], [], [])
     sheet = healer.render_sheet(h)
     # the most shared hit first
-    assert "their Aura Mastery goes on the 1:15 hit (56%, about 1:19) or the 0:35 hit (44%, about 0:36)" in sheet
+    assert "Their Aura Mastery goes on the 1:15 hit (56%, about 1:19) or the 0:35 hit (44%, about 0:36)" in sheet
     assert "for the 1:15 hit, 56% press" not in sheet
 
 
@@ -165,7 +165,7 @@ def test_two_cooldowns_as_common_for_a_hit_are_both_named():
     cds = healer.cooldowns(tl, found, {1: (120.0, 1), 2: (180.0, 1)})
     h = healer.HealerPrep("Boss", "heroic", "Holy Paladin", 100, 240.0, [100.0] * 48, found, cds, [], [], [], [])
     sheet = healer.render_sheet(h)
-    assert "for the 0:40 hit, 36% press Avenging Wrath (about 0:42) and 35% press Aura Mastery (about 0:44)" in sheet
+    assert "36% press Avenging Wrath (about 0:42) and 35% press Aura Mastery (about 0:44)" in sheet
 
 
 def test_the_most_played_build_says_its_side_of_each_split():
@@ -213,9 +213,9 @@ def test_a_press_back_from_cooldown_in_a_hit_is_said_and_drawn_as_none():
     assert cds[0].rhythm and cds[0].near[1] == ""
     h = healer.HealerPrep("Boss", "heroic", "Restoration Druid", 10, 240.0, [100.0] * 48, found, cds, [], [], [], [])
     sheet = healer.render_sheet(h)
-    assert "for the 0:40 hit, 100% press Tranquility (about 0:42)" in sheet
-    assert ("No cooldown is kept for the 2:40 hit (100% press Tranquility in its window, about 2:45, back from "
-            "cooldown)") in sheet
+    assert "100% press Tranquility (about 0:42)" in sheet
+    assert ("<span class='none'>None kept</span> (100% press Tranquility in its window, about 2:45, back from "
+            "cooldown)") in sheet  # the 2:40 hit's row
     assert ("2:45 &middot; 100% of the top players &middot; back from cooldown &middot; in the window of the 2:40 "
             "hit") in sheet
     assert "class='cp off'><title>Tranquility 2:45" in sheet and "class='cp'><title>Tranquility 0:42" in sheet
@@ -254,7 +254,7 @@ def test_a_ramp_answers_the_hit_after_it(monkeypatch):
     h = healer.HealerPrep("Boss", "heroic", "Discipline Priest", 10, 270.0, [100.0] * 54, found, [cd], [], [], [],
                           [])
     sheet = healer.render_sheet(h)
-    assert "for the 0:40 hit, 100% press Evangelism (about 0:24, a ramp ahead of it)" in sheet
+    assert "100% press Evangelism (about 0:24, a ramp ahead of it)" in sheet
     assert "pressed again as soon as it is back" not in sheet  # its rhythm line says it (round 30)
     assert "0:24 &middot; 16 s before the 0:40 hit" in sheet
     assert "1:42 &middot; 100% of the top players &middot; back from cooldown &middot; ahead of the 2:10 hit" in sheet

@@ -869,6 +869,7 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     p.abilities = _role_journal(enc.id, diff_name, "tank", tl, also)
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
+    healer.add_icons(p)
     out.write_text(tank.render_sheet(p), encoding="utf-8")
     for m in found:
         print(f"  tank buster at {healer._mmss(m.t)} ({m.ratio:.1f}x): {m.boss_spell}")
@@ -1048,6 +1049,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         print(f"  {r.spec} ({r.players} healers): {'; '.join(r.jobs)}")
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
+    healer.add_icons(h)
     out.write_text(healer.render_sheet(h), encoding="utf-8")
     for m in found:
         print(f"  big raid damage at {healer._mmss(m.t)} ({m.ratio:.1f}x): {m.boss_spell}")

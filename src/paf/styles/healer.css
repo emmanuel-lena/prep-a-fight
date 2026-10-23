@@ -31,3 +31,18 @@
 .rd .cl{fill:var(--muted);font-size:11px} .rd .cp{fill:var(--fg);opacity:.7}
 .rd .gd{stroke:var(--warn);stroke-dasharray:2 3;opacity:.45}
 .rd .sw{stroke:var(--muted);stroke-width:2} .rd .cp.off{fill:none;stroke:var(--fg);stroke-width:1.2;opacity:.6}
+/* the big hits, one row each: when, what, how hard (a bar), the top players' answer (the owner: less text) */
+table.hits{max-width:1000px;margin:6px 0 4px}
+table.hits th{font:600 12px/1.4 var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 10px 6px 0}
+table.hits th small{text-transform:none;letter-spacing:0;font-weight:400}
+table.hits td{padding:10px 10px 10px 0;border-top:1px solid var(--line);vertical-align:top}
+table.hits td.t{white-space:nowrap;font-family:var(--font-data)} table.hits td.t b{font-size:16px}
+table.hits td.t small{display:block;color:var(--muted);font:400 12px var(--font-body)}
+table.hits td.sz{width:150px;white-space:nowrap} table.hits td.sz .track{display:inline-block;width:80px;height:8px;border-radius:4px;background:color-mix(in srgb,var(--warn) 14%,transparent);vertical-align:middle;margin-right:8px} table.hits td.sz .bar{display:block;height:100%;border-radius:4px;background:var(--warn)}
+table.hits td.sz b{font-family:var(--font-data)}
+table.hits td.ans .ics{margin-right:6px;vertical-align:-3px}
+table.hits td.ans .none{font-weight:600;margin-right:4px}
+/* how to read the cards: the term, then its rule, one a line */
+dl.legend{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;max-width:1000px;margin:14px 0;font-size:13px;color:var(--muted)}
+dl.legend dt{font-weight:600;color:var(--fg)} dl.legend dd{margin:0}
+table.hits td .tag{display:inline-block;margin:4px 6px 0 0;padding:1px 8px;border-radius:999px;font-size:12px;color:var(--muted);border:1px solid var(--line)}

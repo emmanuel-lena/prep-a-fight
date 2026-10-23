@@ -104,9 +104,44 @@ class Cooldown:
     unreleased: float = 0.0  # the share of stores with no release before the next store
     fates: list = field(default_factory=list)  # (each store, its release or None)
     hits: list = field(default_factory=list)  # the big hits' times, for a release chip's window
+    icon: str = ""  # its game icon's file name (paf.icons), "" offline
     shown_at: dict = field(default_factory=dict)  # a mark's time as its card says it ("1:50 to 2:04"), for its hover
     lead_back: dict = field(default_factory=dict)  # a time back from cooldown the lead says in a hit's window: its hit
 
+
+def add_icons(prep) -> None:
+    """Every cooldown of a sheet (HealerPrep, TankPrep) gets its spell's icon: read once from Wowhead, then cached;
+    none offline (the names stay)."""
+    cds = [c for v in vars(prep).values() if isinstance(v, list) for c in v if isinstance(c, Cooldown)]
+    cds += [c.release for c in cds if c.release is not None]
+    try:
+        from paf.icons import icons_for
+
+        found = icons_for({str(c.spell_id): f"spell={c.spell_id}" for c in cds if c.spell_id > 0})
+    except Exception:  # noqa: BLE001 - offline: no icons
+        return
+    for c in cds:
+        c.icon = found.get(str(c.spell_id), "")
+
+
+def _ic(c: Cooldown | None) -> str:
+    from paf.icons import img
+
+    return img(c.icon, "small", "ics", "") if c is not None and c.icon else ""
+
+
+# how to read the cards, one term a line (the owner: less text; every rule kept, said once)
+HOW_TO_READ = (
+    "<dl class='legend'><dt>Tied to a hit</dt><dd>a quarter of those who press the button press it in the hit's window "
+    "(5 s before to 8 s after it starts; a ramp: 8 to 30 s ahead); its share is then the window's. The table keeps "
+    "one button a hit (a second within the noise), else names the most pressed, &ldquo;only N%&rdquo; under a "
+    "quarter. A card on cooldown, on another player, used moving, a trinket or a personal defensive says why it is "
+    "not tied.</dd><dt>A time</dt><dd>shared by a quarter of those who press the button (at the pull: a fifth of the "
+    "top players); its share: the top players pressing within 8 s of it (&ldquo;of those who press it&rdquo; too, "
+    "under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long.</dd>"
+    "<dt>Back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, not "
+    "counted for it (&ldquo;for about half&rdquo;: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
+    "time some top players press the same press at instead.</dd></dl>")
 
 LEAD_HITS = 4  # the big moments the lead says at most: Nek'zali's two rites and Stage Two's two waves
 # the stage clock said, on a boss with stages (paf.stagetime, round 100)
@@ -849,6 +884,47 @@ def moments_html(found: list[Moment], what: str, phases: list | None = None) -> 
                    for m in found)
 
 
+def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list | None, by_icon: dict,
+               rule: str, tags: dict | None = None) -> str:
+    """The big hits as a table: when, what hits, how hard (a bar), and what the top players press for it, with its
+    icon; the lead's clauses each on their hit's row (a press said for two hits: on the first, the second points to
+    it), a hit kept for none with why. Replaces the lead's long sentence and the list under the chart (the owner:
+    less text)."""
+    if not moments:
+        return ""
+    top = max(m.ratio for m in moments) or 1
+    said: dict[str, str] = {}  # hit time -> its answer cell
+    for _t, text in pairs:
+        ts = re.findall(r"the (\d+:\d\d) hits?", text) + re.findall(r"(\d+:\d\d)(?:,| and) ", text.split("hits:")[0]
+                                                                           if "hits:" in text else "")
+        first = next((x for x in ts), None) or _mmss(_t)
+        cell = re.sub(r"^for the \d+:\d\d hit, ", "", text)
+        icons = "".join(_ic(c) for n, c in by_icon.items() if f"{e(n)}" in cell and c is not None)
+        said[first] = f"{icons}{cell[:1].upper() + cell[1:]}"
+        for x in dict.fromkeys(ts):
+            if x != first:
+                said.setdefault(x, f"<span class='muted'>the same press as at {first}</span>")
+    lead = {_mmss(m.t) for m in shown}
+    rows = []
+    for m in sorted(moments, key=lambda m: m.t):
+        k = _mmss(m.t)
+        if k in said:
+            ans = said[k]
+        elif k in bare:
+            ans = f"<span class='none'>None kept</span>{bare[k]}"
+        else:  # a big moment past the lead's four
+            ans = "<span class='muted'>not among the highest the lead reads</span>" if k not in lead else ""
+        tag = _stage_tag(m.t, phases)
+        rows.append(f"<tr><td class='t'><b>{k}</b>" + (f"<small>{e(tag)}</small>" if tag else "") + "</td>"
+                    f"<td>{e(m.boss_spell) if m.boss_spell else '<span class=muted>raid damage</span>'}"
+                    + "".join(f"<span class='tag'>{x}</span>" for x in (tags or {}).get(k, [])) + "</td>"
+                    f"<td class='sz'><span class='track'><span class='bar' style='width:{max(8, round((m.ratio - 1) / max(0.01, top - 1) * 100))}%'></span></span>"
+                    f"<b>{_x(m.ratio)}&times;</b></td><td class='ans'>{ans}</td></tr>")
+    return ("<table class='hits'><thead><tr><th>When</th><th>What hits</th><th>Size <small>(&times; the usual raid "
+            "damage)</small></th><th>What the top players press</th></tr></thead><tbody>" + "".join(rows)
+            + f"</tbody></table><p class='small muted hits-rule'>{rule}</p>")
+
+
 def _stage_tag(t: float, phases: list | None) -> str:
     """"Stage Two +0:52": a time's place in the stage it falls in, after the first one (stage time)."""
     cur = max(((n, s) for n, s, *_r in phases or [] if 0 < s <= t), key=lambda x: x[1], default=None)
@@ -1295,7 +1371,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
     def tie(c: Cooldown, t: float, n: str) -> str:
         return n if answered is None or (c.name, t) in answered else ""
     return "".join(
-        f"<li><b>{e(_shown(c.name))}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill"
+        f"<li><b>{_ic(c)}{e(_shown(c.name))}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill"
         + (f", {_pct(c.on_others)} of the presses on another player" if 0 <= c.on_others < 0.95 else
            ", all on another player" if c.on_others >= 0.95 else "") + "</small>"
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip((moved or {}).get((c.name, t), _named_at(c, t, named, sp)), tie(c, t, n))}"
@@ -2326,8 +2402,9 @@ def render_sheet(h: HealerPrep) -> str:
         hits = (sep.join if sep else _and)([f"{_and([_mmss(m.t) for m in ms])}"
                      + (f" ({'each time ' if len(ms) > 1 else ''}{e(name)})" if name else "") for name, ms in groups.items()])
         hits += f": {ratios} the usual damage"
+        rule = ""
         if any(m.ratio < SPIKE for m in shown):  # said, not left to a reader of the 1.5x rule (round 29)
-            hits += (" (no hit reaches 1.5&times; here: these are the highest waves)"  # the rule moments() applied,
+            rule = (" (no hit reaches 1.5&times; here: these are the highest waves)"  # the rule moments() applied,
                      if max(m.ratio for m in h.moments) < SPIKE else  # not the rounded figures (1.45 shows 1.5)
                      f" (a hit at {_x(max(SPIKE * 0.9, RELATIVE * max(m.ratio for m in h.moments)))}&times; or more"
                      " counts too, 0.85 of the highest)")  # the bar applied (round 101: 1.35x said, 1.42x applied)
@@ -2503,11 +2580,11 @@ def render_sheet(h: HealerPrep) -> str:
                                           + ")"))
                     bare.remove(b)
                     break
-        answers = [x for _t, x in sorted(
+        pairs = sorted(
             released + [clause(k, ps) for k, ps in by_press.items() if k not in merged]
             + [(ps[0][0], f"{e(_shown(n))} is their ramp ahead of the {_and([_mmss(p[0]) for p in ps])} hits: "
                           + ", ".join(f"{_pct(sp)} about {_tw(c_, t, hit)}" for hit, t, sp, c_ in ps) + _other(ps))
-               for n, ps in ramps.items()])]
+               for n, ps in ramps.items()])
         # a ramp's later presses made as soon as it is back: said by its rhythm line and the bare hits' landed_in
         end = len(h.curve) * STEP
         long = "".join(f" {'From ' + _mmss(a) + ' to the end' if b >= end - STEP else _mmss(a) + ' to ' + _mmss(b)}, "
@@ -2524,11 +2601,15 @@ def render_sheet(h: HealerPrep) -> str:
             return landed_in(m, h.cooldowns, named)
         # each hit with its own bracket: "the 2:10 hit, nor the 3:40 hit (35% have...)", never one bracket read
         # as covering both
-        said_each = [f"the {b} hit{landed(b)}" for b in bare]
-        bare_said = said_each[0] + "".join(f", nor {x}" for x in said_each[1:]) if said_each else ""
-        lead = (f"<p class='lead'>Big raid damage at {hits}.{long}{from_dispel}"
-                + (f" Among the top {e(h.spec)}s, {'; '.join(answers)}." if answers else "")
-                + (f" No cooldown is kept for {bare_said}." if bare else "") + "</p>")
+        by_icon = {_shown(c.name): c for c in [*h.cooldowns, *h.rare] + [c.release for c in h.cooldowns
+                                                                         if c.release is not None]}
+        lead = (f"<p class='lead'>{len(shown)} big raid {'hit' if len(shown) == 1 else 'hits'}"
+                + (f": the top {e(h.spec)}s answer {'it' if len(shown) == 1 else 'them'} with "
+                   + _and([f"{_ic(by_icon.get(_shown(n)))}<b>{e(_shown(n))}</b>" for n in lead_names]) if lead_names
+                   else f"; the top {e(h.spec)}s keep no cooldown for {'it' if len(shown) == 1 else 'them'}")
+                + f".{long}{from_dispel}</p>"
+                + hits_table(h.moments, shown, pairs, {b: landed(b) for b in bare}, h.phases, by_icon,
+                             rule.strip(" ()")[:1].upper() + rule.strip(" ()")[1:]))
     drawn = list(heals)  # the chart's lanes: the cards' cooldowns, and a two-step button's release the lead ties
     for r, t, at in rel_marks:  # (its own lane, a full mark; on the store's card, not a card of its own)
         drawn = [*drawn, r] if r not in drawn else drawn
@@ -2539,18 +2620,17 @@ def render_sheet(h: HealerPrep) -> str:
     svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight, and the top players' healing "
                     "cooldowns", drawn, set(lead_names), answered, moved)
     fight = ([lead] if lead else []) + [
-        f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Raid "
-        f"damage taken per second, median of the {h.raid_kills or 'top'} kills of this boss whose raid damage is recorded "
-        f"(up to 40 for each spec read: every healer sheet shows the same hits; past the median kill, fewer kills are "
-        f"still going); "
-        + (STAGED if getattr(h, "staged", False) else "")
-        + ("under it, the cooldowns the lead ties to a hit (an outline: another press of the same button). " if lead_names
-           else "no cooldown is kept for these hits, so none is drawn. ")
-        + "A dot is a big moment, "
-        + ("named after what does most of the raid's damage there"
+        f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Median raid "
+        f"damage per second, {h.raid_kills or 'the top'} kills (up to 40 a spec read: the same hits on every healer "
+        f"sheet; fewer kills past the median one). "
+        + (STAGED[:1].upper() + STAGED[1:].rstrip("; ") + ". " if getattr(h, "staged", False) else "")
+        + ("Marks: the table's answers (an outline: another press of the same button). " if lead_names
+           else "No cooldown is kept for these hits, so none is drawn. ")
+        + "A dot: a big hit, "
+        + ("named after what deals most of the damage there"
            if h.named_by_damage else "named after the boss cast just before it (&quot;after X&quot;: 8 to 30 s "
            "before, matched by timing)") + f".</p><ul class='hl2'>"
-        f"{moments_html(h.moments, 'raid damage', h.phases) or '<li>No big moment: steady raid damage.</li>'}</ul></div>",
+        f"{'' if h.moments else '<li>No big moment: steady raid damage.</li>'}</ul></div>",
         f"<h2>Your long cooldowns, where the top {e(h.spec)}s press them</h2><ul class='hl2'>"
         f"{cooldowns_html(sorted((c for c in heals if _external(c.spell_id) != 'protective'), key=_rank(lead_names)), answered, named, moved) or '<li>Not enough top players in the corpus yet.</li>'}</ul>"]
     rare_kept = [c for c in h.rare if c not in utility]
@@ -2564,21 +2644,7 @@ def render_sheet(h: HealerPrep) -> str:
                                  for c in rare) + " on this boss.</p>")
     # the rule, once, under the long cooldowns and their "fewer than half" line (Zephyr's read as part of it)
     # one definition a line, the term first (round 76: 120 words in one paragraph read as no reference)
-    fight.append("<p class='small muted'><b>Tied to a hit:</b> only the lead ties a press to a hit; a button on "
-                 "cooldown, cast on another player, used while moving, a trinket or a personal defensive says why it is not; a time with no "
-                 "hit named lands on none, or says it is not kept for the hit in whose window it sits (a press is kept for a hit when "
-                 "one of its times, shared by a quarter of those who press the button, sits in the hit's window: its "
-                 "share is then the window's, whatever it is; else the lead names the most pressed in the window, "
-                 "\"only N%\" under a quarter, with why it is not kept; a second button only when its share is within "
-                 "the noise of the first's).<br><b>On cooldown:</b> pressed every time it comes back, all kill long."
-                 "<br><b>A time shown:</b> a quarter of those who press the button share "
-                 "it (a first press at the pull: a fifth of the top players).<br><b>A time's share:</b> the top players pressing within 8 s of it (under a quarter of them, also "
-                 "of those who press the button).<br><b>A hit's share:</b> for a press the lead names for a hit (a chip "
-                 "tied to a hit gives it, not its time's), the top players pressing in that hit's window, 5 s before to 8 s after it starts (a ramp: 8 to 30 s "
-                 "ahead).<br><b>\"or\":</b> the time other "
-                 "top players press the same press instead.<br><b>\"Back from cooldown\":</b> most of its players "
-                 "press it as soon as it came back from their last use, so it was not saved for what it lands on "
-                 "(\"for about half\": 40 to 60% of them); either keeps it from counting for the hit.</p>")
+    fight.append(HOW_TO_READ)
     exts = [c for c in heals if _external(c.spell_id) == "protective"]
 
     def fewer(cs: list) -> str:
