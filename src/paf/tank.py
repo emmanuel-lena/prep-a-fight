@@ -628,8 +628,8 @@ def render_sheet(p: TankPrep) -> str:
             lead.append(f"The biggest, at {_mmss(m.t)}, is raid damage the tanks take too.")
         up = [(n, u) for n, u in p.mitigation if u >= 0.5][:2]  # what they do have, measured: their active
         if not names and up:  # mitigation's uptime (round 86: the biggest hit's answer was a negative alone)
-            lead.append("Instead, their active mitigation is up most of the kill: "
-                        + and_([f"{e(n)} {u:.0%}" for n, u in up]) + ".")
+            lead.append("Instead, their active mitigation is up most of the kill: "  # the bars below give the
+                        + and_([f"<span class='nw'>{_ic(by_icon.get(n))}{e(n)}</span>" for n, _u in up]) + ".")  # %
         tags: dict[str, list[str]] = {}
         for x in p.moments:
             if x.ratio < 1.5:  # the healers' rule said (round 98: 1.45x "hits" with no word)
