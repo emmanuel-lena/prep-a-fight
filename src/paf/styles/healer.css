@@ -46,3 +46,13 @@ table.hits td.ans .none{font-weight:600;margin-right:4px}
 dl.legend{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;max-width:1000px;margin:14px 0;font-size:13px;color:var(--muted)}
 dl.legend dt{font-weight:600;color:var(--fg)} dl.legend dd{margin:0}
 table.hits td .tag{display:inline-block;margin:4px 6px 0 0;padding:1px 8px;border-radius:999px;font-size:12px;color:var(--muted);border:1px solid var(--line)}
+/* the other healers' answers: a spec a row, a hit a column (the owner: less text) */
+table.others{max-width:1100px;margin:6px 0} table.others th{font:600 12px/1.4 var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 10px 6px 0}
+table.others td{padding:9px 10px 9px 0;border-top:1px solid var(--line);vertical-align:top;font-size:14px}
+table.others td.who b{display:block} table.others td.who small,table.others td small{color:var(--muted);font-size:12px}
+table.others .ics{margin-right:5px;vertical-align:-3px} table.others .under{opacity:.6} table.others .held{font-weight:600;color:var(--muted)}
+/* where the numbers come from: a chip a source */
+p.sources{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:baseline;max-width:1000px;font-size:13px;color:var(--muted)}
+p.sources .src-lab{font:600 12px var(--font-display);letter-spacing:.06em;text-transform:uppercase;margin-right:4px}
+p.sources .src{padding:2px 10px;border:1px solid var(--line);border-radius:999px} p.sources .src b{color:var(--fg);font-weight:600}
+table.jobs td small{color:var(--muted)}

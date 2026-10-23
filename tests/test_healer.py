@@ -199,8 +199,8 @@ def test_the_other_healers_cooldowns_on_the_hits_keep_a_button_pressed_on_cooldo
         ("Tranquility", 2.0, [(43.0, 0.42, False), (225.0, 0.24, True)], 0.9)])
     hits = [healer.Moment(40.0, 1000.0, 5.0, "Caustic Surge"), healer.Moment(220.0, 1000.0, 5.0, "Toxic Vapor")]
     more = healer.roles_more([druid], "Holy Priest", hits)
-    assert "the 0:40 hit: Tranquility 0:43 &middot; 42%</span>" in more
-    assert "the 3:40 hit: none shared</span>" in more  # back from cooldown: no answer, as on the fight tab
+    assert "<b>Tranquility</b> 0:43 &middot; 42%</td>" in more  # the 0:40 hit
+    assert "none shared</span></td></tr>" in more  # the 3:40 hit: back from cooldown, no answer
 
 
 def test_a_press_back_from_cooldown_in_a_hit_is_said_and_drawn_as_none():
@@ -362,14 +362,19 @@ def test_the_other_healers_are_read_over_the_hits_window():
 
 def test_no_job_kept_by_the_top_players_is_the_answer():
     # Nek'zali (round 41): every job found is taken back on the ranked players
-    hp = SimpleNamespace(spec="Holy Paladin", jobs=["heals the tanks more, but only on average: 9% against 7%"])
+    hp = SimpleNamespace(spec="Holy Paladin", jobs=[
+        "heals the tanks more, but only on average: 9% of its healing goes on them, against 7% for the other healers "
+        "of the same kills (548 kills); among the top players ranked by their healing there is no gap: the median "
+        "top Holy Paladin 8%, the other specs' 8% (40 and 300 ranked players, one in each top kill of each healer "
+        "spec's sheet)"])
     sh = SimpleNamespace(spec="Restoration Shaman", jobs=["nothing stands out against the other healers"])
     lead = healer.jobs_lead([hp, sh], "Restoration Shaman")
     assert lead.startswith("<p class='lead'>No healer spec has a job of its own here that the top players keep.</p>")
-    assert "On average across every healer (means paired within each kill" in lead
-    assert "the Holy Paladin heals the tanks more: 9%" in lead
+    assert ("<td><b>Holy Paladin</b></td><td>heals the tanks more</td><td><b>9%</b> vs 7% <small>(548 kills)"
+            "</small></td><td><b>8%</b> vs 8%</td>") in lead  # a table: every healer, then the top players
     hp.tank = 0.08  # the table's own number beside the means (round 78)
-    assert "against 7% (the table&#x27;s median Holy Paladin: 8%)" in healer.jobs_lead([hp, sh], "Restoration Shaman")
+    assert "(548 kills; the table&#x27;s median Holy Paladin: 8%)</small>" in healer.jobs_lead([hp, sh],
+                                                                                              "Restoration Shaman")
 
 
 def test_a_press_is_said_at_its_most_shared_time():
@@ -440,7 +445,7 @@ def test_the_other_healers_chip_gives_the_share_the_bar_reads():
     rd = SimpleNamespace(spec="Restoration Druid", raid_cds=1, own_players=150,
                          cd_names=[("Tranquility", 1, [], 0.8, ([[74.0]] * 24 + [[200.0]] * 56, 100, 180.0))])
     out = healer.roles_more([rd], found=[healer.Moment(75.0, 1000.0, 1.6, "Soulcoil Rite")])
-    assert "Tranquility 1:14 &middot; 24% <small>(30% of its users)</small>" in out
+    assert "<b>Tranquility</b> 1:14 &middot; 24% <small>(30% of its users)</small>" in out
 
 
 def test_a_button_on_cooldowns_far_habit_is_dropped():
@@ -562,7 +567,7 @@ def test_a_ramp_played_back_from_cooldown_stays_a_ramp(monkeypatch):
     di = SimpleNamespace(spec="Discipline Priest", raid_cds=1, own_players=100,
                          cd_names=[("Evangelism", 1, [], 1.0, (ps, 100, 90.0, 472433))])
     found = [healer.Moment(t, 1000.0, 1.4, "Caustic Surge") for t in (40.0, 130.0, 215.0)]
-    assert "the 2:10 hit: Evangelism 1:49 (a ramp)" in healer.roles_more([di], found=found)
+    assert "<b>Evangelism</b> 1:49 <small>(a ramp)</small>" in healer.roles_more([di], found=found)
 
 
 def test_a_chip_offset_is_the_shown_times_difference():
