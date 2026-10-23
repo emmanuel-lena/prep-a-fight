@@ -488,7 +488,7 @@ def render_sheet(p: TankPrep) -> str:
             + (f" &middot; on cooldown, about every {ev:.0f} s" if ev else "") + "</small>"
             + ("<span class='when'>" + "".join(f"<span class='chip'>{_chip(moved_t.get((n, t), t), hit_of(n, t))}"
                                                f"{_share(x := tied.get((n, t), sp) if hit_of(n, t) else sp)}"
-                                               f"{_of_pressers(x, u)}{why(n, t) or ('' if hit_of(n, t) else ' &middot; not on a big hit')}</span>"
+                                               f"{_of_pressers(x, u)}{why(n, t)}</span>"  # no hit named: none (heal round 17: "not on a big hit" twice)
                                                for t, sp in zip(ts, sps, strict=False))
                + (f"<small class='alt'>+{round(k) - len(ts)} more at varying times</small>"  # every press counted, as
                   if not ev and round(k) > len(ts) else "")  # the cards (heal round 16: "3 a kill", two chips)

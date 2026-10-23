@@ -77,3 +77,4 @@ table.others .under .ics{filter:grayscale(1);opacity:.55} /* a share under the b
 .sbar.pair{display:inline-flex;overflow:hidden} .sbar.pair>span{border-radius:0} .sbar.pair>.p1{background:color-mix(in srgb,var(--muted) 45%,var(--surface-2))}
 .hl2.split li.pair{display:grid;grid-template-columns:minmax(200px,280px) 130px auto;align-items:center} /* the other rows' columns */
 .dispels{display:flex;flex-wrap:wrap;gap:6px} .dispels .chip{padding:3px 9px;border-radius:999px;border:1px solid var(--line);font-size:13px}
+.hl2.split li.pair.hero .sbar::after{display:none} /* two trees, no half to read */
