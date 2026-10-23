@@ -2857,18 +2857,19 @@ def render_sheet(h: HealerPrep) -> str:
                           windowed=[*c.windowed, t_line])
                      if c.name == n else c for c in drawn]
     for txt in bare_said.values():  # "press X in its window …, about 4:18": that mark's hover gives the row's reason
-        for n, at in re.findall(r"press (.+?) in its window[^()]*?about (\d+:\d\d)", re.sub(r"<[^>]+>", "", txt)):
+        for n, at in re.findall(r"press ([A-Z][^()]{2,40}?) in its window.*?about (\d+:\d\d)", re.sub(r"<[^>]+>", "", txt)):
             t_row = float(_secs(at))
             drawn = [_rep(c, windowed=[*c.windowed, *(t for t in [*c.times, *c.alt] if abs(t - t_row) <= 10)])
                      if _shown(c.name) == html.unescape(n) else c for c in drawn]
             lanes_extra.add(html.unescape(n))
-        for _n, at in re.findall(r"release a (.+?), whichever store it was,[^()]*?about (\d+:\d\d)",
+        for _n, at in re.findall(r"release a ([A-Z][^()]{2,40}?), whichever store it was,.*?about (\d+:\d\d)",
                                   re.sub(r"<[^>]+>", "", txt)):  # a release in the window: its lane and outline
             t_row = float(_secs(at))  # (heal confirm round 4: Nek'zali's Evoker 3:53, no mark)
             for c in heals:
                 r = c.release
-                if r is not None and r not in drawn and any(abs(t - t_row) <= 10 for t in [*r.times, *r.alt]):
-                    drawn = [*drawn, _rep(r, windowed=[t for t in [*r.times, *r.alt] if abs(t - t_row) <= 10])]
+                if r is not None and all(x.name != r.name for x in drawn):
+                    drawn = [*drawn, _rep(r, alt=[*r.alt, t_row], alt_near=[*(r.alt_near or [""] * len(r.alt)), ""],
+                                          windowed=[t_row])]
                     lanes_extra.add(_shown(r.name))
     lanes = set(lead_names) | {k[0] for k in named if k[0] != KEPT} | {c.name for c in drawn if _shown(c.name) in lanes_extra}
     # gets its lane and its outline there (heal confirm round 2: Convoke 60% in the 1:15 window, no mark)

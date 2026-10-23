@@ -668,7 +668,7 @@ def render_sheet(p: TankPrep) -> str:
 
     from paf.healer import _secs
     for v in (bare.values() if p.moments else []):
-        for n, at in _re.findall(r"press (.+?) in its window[^()]*?about (\d+:\d\d)", _re.sub(r"<[^>]+>", "", v)):
+        for n, at in _re.findall(r"press ([A-Z][^()]{2,40}?) in its window.*?about (\d+:\d\d)", _re.sub(r"<[^>]+>", "", v)):
             for c in defs:
                 if e(c.name) == n:
                     for t in [*c.times, *c.alt]:
