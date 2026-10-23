@@ -310,6 +310,19 @@ def _talents_h4(sh: dict, total: int) -> str:
     return f"<h4>Talents to change {''.join(parts)}</h4>"
 
 
+def _strip_cell(x, sh) -> str:
+    """A boss of the strip: its portrait, then what its card asks: players on adds, talent changes, or no kills."""
+    if sh is None:
+        say = "<span class='rl-sv none'>no kills read</span>"
+    else:
+        adds = sum(len(t["players"]) for t in sh["targets"])
+        say = (f"<span class='rl-sv'>{adds} on adds</span>" if adds else "") + (
+            f"<span class='rl-sv'>{len(sh['builds'])} talent changes</span>" if sh["builds"] else "") or \
+            "<span class='rl-sv ok'>&#10003; nothing to change</span>"
+    img = (f"<img src='/bossimg/{x.id}.png' alt='' loading='eager' onerror=\"this.remove()\">")
+    return (f"<a class='rl-sb{' none' if sh is None else ''}' href='#boss-{x.id}'>{img}<b>{e(x.name)}</b>{say}</a>")
+
+
 def _ic(spec: str) -> str:
     """A player's class icon from its spec ("Frost DeathKnight" -> the Death Knight's)."""
     from paf import icons
@@ -410,6 +423,7 @@ def page_body(difficulty: str) -> str:
     spec_of = {n: sp for n, sp, _d in state["players"]}  # a player's class icon beside its name
     cards, missing = "", []
     everything = []
+    strip: list[str] = []  # the night at a glance: a boss a cell, what it asks (fresh app reviews 1-3)
     for x in journal_order(_encounters()):
         try:
             sh = sheet(state, x, diff)
@@ -418,8 +432,10 @@ def page_body(difficulty: str) -> str:
             continue
         if sh is None:
             missing.append(x.name)
+            strip.append(_strip_cell(x, None))
             continue
         everything.append(sh)
+        strip.append(_strip_cell(x, sh))
         tg = "".join(  # a row a target: who in your raid, the specs the top raids put on it (the owner: less text;
             # "best specs in the top raids" said once, in the header)
             f"<tr><td><b>{e(t['name'])}</b>"
@@ -463,7 +479,8 @@ def page_body(difficulty: str) -> str:
              "both the top players' builds, not a sim. The MRT note is the text the Method Raid Tools "
              "addon shows in game.</p>"
              ) if everything else ""
-    return (head + roster + f"<h2>Boss by boss</h2><div class='rl-all'>{allbtn}</div>{miss}{words}<div class='rl-grid'>{cards}</div>"
+    return (head + roster + f"<h2>Boss by boss</h2><nav class='rl-strip' aria-label='Every boss'>{''.join(strip)}</nav>"
+            f"<div class='rl-all'>{allbtn}</div>{miss}{words}<div class='rl-grid'>{cards}</div>"
             f"{_tools()}{COPY_JS}")
 
 

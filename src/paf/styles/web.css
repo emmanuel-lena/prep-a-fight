@@ -449,3 +449,7 @@ table.lr-cmp th small{text-transform:none;letter-spacing:0;font:500 12px var(--f
 .mx-legend .pill.nosim{border:1px dashed var(--muted)} /* the cells' own dashed outline (fresh app review) */
 .mx-legend .pill{text-transform:none;letter-spacing:0} /* the cells' own case (fresh app review 2) */
 section.adv textarea{max-width:920px} /* the content column, never to the window's edge */
+.rl-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:6px;margin:8px 0 16px} /* the ten bosses on one row */
+.rl-sb{display:grid;justify-items:center;gap:3px;padding:8px 6px;border:1px solid var(--line);border-radius:var(--radius);text-decoration:none;color:var(--fg);text-align:center;font-size:12px}
+.rl-sb:hover{border-color:var(--fg)} .rl-sb,.rl-sb *{text-decoration:none} .rl-sb img{width:44px;height:44px;border-radius:50%;object-fit:cover}
+.rl-sb b{font-weight:600;line-height:1.2} .rl-sv{color:var(--muted)} .rl-sv.ok{color:var(--pos)} .rl-sb.none{opacity:.6}

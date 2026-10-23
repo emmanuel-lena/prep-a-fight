@@ -76,3 +76,15 @@ def test_a_few_swaps_stay_chips_another_build_is_one_badge():
     sh = {"boss": "Nek'zali", "targets": [], "builds": [few, many]}
     lines = raidlead.text(sh, "heroic").splitlines()
     assert lines[1].startswith("Ssamii (padding talents): take T0") and "another build (38 talents apart)" in lines[2]
+
+
+def test_the_strip_says_what_each_boss_asks():
+    # fresh app reviews 1-3: nine boss cards of the same weight, no overview at the top
+    from types import SimpleNamespace
+
+    x = SimpleNamespace(id=7, name="Vashnik")
+    sh = {"targets": [{"players": ["A", "B"]}, {"players": []}], "builds": [{}, {}, {}]}
+    cell = raidlead._strip_cell(x, sh)
+    assert "href='#boss-7'" in cell and "2 on adds" in cell and "3 talent changes" in cell
+    assert "nothing to change" in raidlead._strip_cell(x, {"targets": [], "builds": []})
+    assert "no kills read" in raidlead._strip_cell(x, None)
