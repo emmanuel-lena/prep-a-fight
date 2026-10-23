@@ -60,3 +60,15 @@ def test_your_character_in_each_spec_shows_as_tiles_for_your_role():
     assert "<div class='spt go'><span class='spt-n'>Outlaw</span><span class='spt-v'>+6%</span>" in html
     assert "<div class='spt same'><span class='spt-n'>Assassination</span><span class='spt-v'>same</span>" in html
     assert briefing.spec_html(SimpleNamespace(specs=None)) == ""
+
+
+def test_a_spec_simmed_one_item_short_is_marked_and_said_once():
+    # DPS confirm round 6: "simmed without Band of the Swarmcaller (too new for SimC)" on two tiles
+    s = {"mine": "Subtlety", "verdict": "stay", "notes": [
+        "Subtlety: the top players' finger2 is unknown to this SimC build; simmed with that slot empty.",
+        "Assassination: the top players' finger2 is unknown to this SimC build; simmed with that slot empty."],
+         "rows": [{"spec": s_, "label": s_, "sim": v, "error": 0.2,
+                   "items": [{"slot": "finger2", "name": "Band of the Swarmcaller"}]}
+                  for s_, v in (("Subtlety", 100.0), ("Assassination", 79.0), ("Outlaw", 94.0))]}
+    out = briefing.spec_html(SimpleNamespace(specs=s))
+    assert out.count("&dagger;") == 3 and out.count("Band of the Swarmcaller") == 1

@@ -371,7 +371,9 @@ def spec_html(d) -> str:
         row = next((r for r in s.get("rows") or [] if r.get("label") == name), {})
         item = next((i.get("name") for i in row.get("items") or [] if i.get("slot") == m[1]), "")
         what = item or re.sub(r"\d$", "", m[1]).replace("_", " ")
-        return f" <small>simmed without {e(what)} (too new for SimC)</small>"
+        missing.add(what)
+        return "<small> &dagger;</small>"  # the item said once, under the tiles (DPS confirm round 6)
+    missing: set[str] = set()
     tiles = "".join(
         f"<div class='spt {kind}'><span class='spt-n'>{e(name)}</span><span class='spt-v'>"
         f"{'your spec' if gap is None else 'same' if kind == 'same' else f'{gap:+.0f}%'}{short(name)}</span></div>"
@@ -385,7 +387,9 @@ def spec_html(d) -> str:
                      for r in s.get("rows") or [] if not r.get("sim"))
     return (f"<div class='specs rv'><p class='specs-head'><b>We simmed your character in each damage spec of your class"
             f"</b> <span class='muted'>for {e(spec_role(s))}, on this fight</span></p>"
-            f"<div class='spt-row'>{tiles}</div></div>")
+            f"<div class='spt-row'>{tiles}</div>"
+            + (f"<p class='small muted'>&dagger; simmed one item short: {e(', '.join(sorted(missing)))} (too new for "
+               "SimC), so that tile's gap is only roughly right.</p>" if missing else "") + "</div>")
 
 
 def confidence_pill(d) -> str:

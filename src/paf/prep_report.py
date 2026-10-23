@@ -617,8 +617,8 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         if played_p is not None and played_p is not p and played_p.gain > 2 * played_p.error:  # the real cost
             rel = [f"{_goal(o)} damage {100 * ((1 + p.totals[o] / 100) / (1 + played_p.totals[o] / 100) - 1):+.1f}%"
                    for o in ("boss", "total") if o in p.totals and o in played_p.totals]
-            if rel:
-                others += "; vs the plan the sheet plays: " + ", ".join(rel)
+            if rel:  # the trade a player makes: against the plan played, the default list's numbers in Dig deeper
+                others = "vs the plan the sheet plays: " + ", ".join(rel)  # (DPS confirm round 6: four numbers)
         if others:
             lines.append(f"<span class='muted small'>Also: {e(others)}.</span>")
         if d.mrt.get(p.objective):
