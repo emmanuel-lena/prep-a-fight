@@ -579,11 +579,15 @@ def suggestions(d: PrepData) -> list[Suggestion]:
                 return e(", ".join(names[:6]) + (f" and {len(names) - 6} more" if len(names) > 6 else ""))
 
             lines = []
+            if getattr(best, "swaps", None):  # the card above shows them as icons, with its copy button (DPS
+                add = drop = []  # round 11: the same swap three times on one tab)
+                lines.append("<span class='muted small'>The talents to take and drop: in the card above. Every "
+                             "build compared below, in Talents of the top players.</span>")
             if add:
                 lines.append("<span class='plus'>+</span> Take " + few(add))
             if drop:
                 lines.append("<span class='minus'>&minus;</span> <span class='muted'>Drop " + few(drop) + "</span>")
-            if best.build.code:
+            if best.build.code and not getattr(best, "swaps", None):
                 lines.append(copy_button(best.build.code, "Copy the talent string") +
                              " <span class='muted small'>then in game: Talents, Import loadout. "
                              "Every build compared below, in Talents of the top players.</span>")
@@ -1343,9 +1347,8 @@ and the gear for that.</p></div>""")
                    if best_g[0] <= 2 * tc.error else
                    f"<p><b>{e(best_g[1])} beats yours by {best_g[0]:+.1f}%</b> on this fight.</p>")
         tabs["gear"].append(f"""<h2>Talents of the top players, on your character</h2><div class="card scroll">
-{verdict}<p class="small muted">Each build of the top players simmed on your character. "Single target" is a plain dummy fight,
-for reference: a build can be worse there and much better on this fight. Each run's statistical error is about
-&plusmn;{tc.error:.2f}%: a gap under {2 * tc.error:.1f}% between two builds is noise.</p>
+{verdict}<p class="small muted">Each top build simmed on your character, &plusmn;{tc.error:.2f}% error: a gap under
+{2 * tc.error:.1f}% is noise. A build can lose on the dummy and win on this fight.</p>
 <table><tr><th>Build</th>{head}<th>Changes vs your talents</th></tr>{body}</table></div>""")
 
     # cooldown plans
