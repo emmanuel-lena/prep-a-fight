@@ -30,6 +30,17 @@ class Character:
     realm: str = ""  # "EU/Ysondre", from the export's first line: two characters of one name told apart
 
 
+STALE_DAYS = 7  # an export older than this: its gear and talents may no longer be the character's (issue #32)
+
+
+def stale_days(c: Character, now: float | None = None) -> int:
+    """How many days old its export is, when older than STALE_DAYS; else 0."""
+    import time
+
+    days = int(((now or time.time()) - c.mtime) // 86400)
+    return days if days >= STALE_DAYS else 0
+
+
 def _dir() -> Path:
     return data_dir() / "profiles" / "chars"
 

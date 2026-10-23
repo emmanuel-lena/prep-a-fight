@@ -79,3 +79,21 @@ def test_an_imported_character_can_be_refreshed_from_its_log(tmp_path, monkeypat
     assert c.imported and c.realm == "EU/archimonde"
     page = web.characters_page()
     assert "Refresh from Warcraft Logs" in page and "value='archimonde'" in page and "value='eu'" in page
+
+
+def test_an_export_a_week_old_is_flagged(tmp_path, monkeypatch):
+    # issue #32: an alert when the character's export is more than a week old
+    import os
+    import time
+
+    from paf import web
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    c = characters.save(SHAMAN)
+    assert characters.stale_days(c) == 0 and web.stale_badge(c) == ""
+    old = time.time() - 9 * 86400
+    os.utime(tmp_path / "profiles" / "chars" / "zapper-shaman.simc", (old, old))
+    c = characters.all_characters()[0]
+    assert characters.stale_days(c) == 9
+    assert "Export 9 days old" in web.stale_badge(c) and "stale-dot" in web.character_menu()
+    assert "Export 9 days old" in web.characters_page()

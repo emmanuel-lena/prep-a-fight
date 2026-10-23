@@ -760,6 +760,18 @@ def _class_style() -> str:
     return theme.class_accent(cur.class_name) if cur else ""
 
 
+def stale_badge(c, where: str = "/characters") -> str:
+    """An export a week old or more: its age as a badge that leads to updating it (issue #32)."""
+    from paf.characters import stale_days
+
+    d = stale_days(c)
+    if not d:
+        return ""
+    how = "refresh it" if c.imported else "paste a new /simc"
+    return (f'<a class="stale" href="{where}" title="Gear and talents read {d} days ago: {how}">'
+            f'<span class="stale-dot" aria-hidden="true"></span>Export {d} days old &middot; update</a>')
+
+
 def character_menu() -> str:
     """The active character next to the brand, on every page: the whole app is about it. Its menu switches to another
     character (staying on the page) or adds one."""
@@ -781,7 +793,12 @@ def character_menu() -> str:
         f'<input type="hidden" name="back" value="/"><button onclick="{back}">{ic(c)}<span><b>{e(c.name)}</b>'
         f'<small>{e(c.spec.title())} {e(c.class_name.title())}</small></span></button></form>'
         for c in chars if not c.current)
-    return (f'<details class="who"><summary>{ic(cur)}<span><b>{e(cur.name)}</b><small>{e(cur.spec.title())} '
+    from paf.characters import stale_days
+
+    old = stale_days(cur)
+    dot = (f'<span class="stale-dot who-dot" title="Export {old} days old: update it on Characters"></span>'
+           if old else "")
+    return (f'<details class="who"><summary>{ic(cur)}{dot}<span><b>{e(cur.name)}</b><small>{e(cur.spec.title())} '
             f'{e(cur.class_name.title())}</small></span><span class="who-caret">&#9662;</span></summary>'
             f'<div class="who-menu">{others}<a href="/characters#add">+ Add a character</a>'
             f'<a href="/characters">Manage your characters</a></div></details>')
@@ -835,7 +852,7 @@ def characters_page() -> str:
         cards += (f'<div class="ccard{" on" if c.current else ""}">{ic}<div class="cc-txt"><b>{e(c.name)}'
                   f'{(" <small class=muted>" + e(c.realm) + "</small>") if c.realm else ""}</b>'
                   f'<span class="cc-spec">{e(c.spec.title())} {e(c.class_name.title())}</span><span>{badge} '
-                  f'<span class="muted small">&middot; updated <span>{ago(c.mtime)}</span></span></span></div><div class="cc-act">{play}{refresh}'
+                  f'<span class="muted small">&middot; updated <span>{ago(c.mtime)}</span></span></span>{stale_badge(c, "#simc-box")}</div><div class="cc-act">{play}{refresh}'
                   f'<a class="btn ghost" href="#simc-box" onclick="setTimeout(function(){{document.getElementById(\'simc-box\').focus()}},50)">Paste a new export</a>'
                   f'<details class="rm"><summary class="btn ghost cc-rm">Remove</summary><div class="rm-ask">'
                   f'<span>Remove this character? Its /simc export is deleted.</span>'
@@ -1154,9 +1171,16 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
              f'<div class="sheets">{boss_cards(own, order, spec=False)}</div>' if own else "")
             + (f'<h2>Your other specs&#39; sheets</h2><div class="sheets">{boss_cards(rest, order)}</div>' if rest else ""))
     g = settings.get("guild")
+    try:
+        from paf import characters as chars_
+
+        cur = next((c for c in chars_.all_characters() if c.current), None)
+        stale = stale_badge(cur) if cur else ""
+    except Exception:  # noqa: BLE001 - the home always shows
+        stale = ""
     return f"""<section class="home-hero"><div><form method="get" action="/boss" class="start"><h1>Prepare a boss</h1>
 <p class="me">{ic}<span>for <b>{e(loaded.name)}</b>, {e(loaded.spec.title())} {e(loaded.class_name.title())}\
-{(" &middot; " + e(g)) if g else ""}</span></p>{pick}
+{(" &middot; " + e(g)) if g else ""}</span>{stale}</p>{pick}
 <div class="segs" role="radiogroup" aria-label="Difficulty">{diffs}</div>
 <button class="btn go">Prepare <span class="go-boss">{e(nxt.name if nxt else (encs[0].name if encs else "this boss"))}</span>
 &rarr;</button></form>{queue_strip(diff) if encs else ""}</div>{last_side}</section>
