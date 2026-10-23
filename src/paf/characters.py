@@ -50,9 +50,10 @@ def _read(p: Path):
 
 
 def _migrate() -> None:
-    """A profile loaded before the characters existed becomes the first character."""
+    """A profile loaded before the characters existed becomes the first character: once, before the characters'
+    folder exists (an empty one is the last character removed, not to bring back: issue #37)."""
     cur = _current()
-    if cur.is_file() and not (_dir().is_dir() and any(_dir().glob("*.simc"))):
+    if cur.is_file() and not _dir().is_dir():
         prof = _read(cur)
         if prof.class_name:
             _dir().mkdir(parents=True, exist_ok=True)
@@ -76,7 +77,8 @@ def all_characters() -> list[Character]:
         prof = _read(p)
         if not prof.class_name:
             continue
-        realm = re.search(r"^#[^\n]* - ([A-Z]{2}/[^\n]+?)\s*$", text.split("\n", 1)[0])
+        first = next((x for x in text.split("\n") if x and x != IMPORTED), "")  # under an imported mark too
+        realm = re.search(r"^#[^\n]* - ([A-Z]{2}/[^\n]+?)\s*$", first)
         out.append(Character(p.stem, prof.name, prof.class_name, prof.spec, len(prof.candidates),
                              IMPORTED in text, p.stat().st_mtime, p.stem == now, realm[1] if realm else ""))
     return sorted(out, key=lambda c: (not c.current, -c.mtime))

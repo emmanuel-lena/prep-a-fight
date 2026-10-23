@@ -60,3 +60,22 @@ def test_the_active_character_in_the_top_bar(tmp_path, monkeypatch):
     assert "Manage your characters" in page
 
     assert "--class:#" in page  # the app takes the active character's class color
+
+
+def test_the_last_character_removed_stays_removed(tmp_path, monkeypatch):
+    # issue #37: removing the only character brought it back at once (the old profile's migration)
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    characters.save(SHAMAN)
+    assert characters.remove("zapper-shaman")
+    assert characters.all_characters() == [] and not (tmp_path / "profiles" / "current.simc").exists()
+
+
+def test_an_imported_character_can_be_refreshed_from_its_log(tmp_path, monkeypatch):
+    # issue #37: a character added from Warcraft Logs had no way to be updated but a /simc paste
+    from paf import web
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    c = characters.save("# Zapper - Elemental - EU/archimonde\n" + SHAMAN, imported=True)
+    assert c.imported and c.realm == "EU/archimonde"
+    page = web.characters_page()
+    assert "Refresh from Warcraft Logs" in page and "value='archimonde'" in page and "value='eu'" in page

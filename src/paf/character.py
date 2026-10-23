@@ -67,6 +67,9 @@ def import_character(client, name: str, server: str, region: str) -> tuple[str, 
             if not cls or not spec or not talents:
                 continue
             profile = profile_from_log(ch.get("name") or name, cls, spec, race, talents, info["gear"])
+            # the export's first line, so the character can be refreshed from its log later (issue #37)
+            realm = server_slug(server).replace("-", " ").title()
+            profile = f"# {ch.get('name') or name} - {spec} - {region}/{realm}\n" + profile
             # the log does not carry the stats of crafted items: the real secondary ratings instead
             stats = info.get("stats") or {}
             profile += "".join(f"{opt}={int(stats[k]['max'])}\n" for k, opt in STAT_OPTIONS.items()

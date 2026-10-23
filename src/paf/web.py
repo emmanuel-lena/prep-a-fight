@@ -805,7 +805,7 @@ def characters_strip() -> str:
 ADD_FORM = ('<form method="post" action="/profile" class="add-form"><p class="add-help">In game, on that character: '
             'type <code>/simc</code>, then Ctrl+A, Ctrl+C, and paste here. Paste it again after a gear change to '
             'update it.</p><textarea name="simc" id="simc-box" required placeholder="Paste the /simc export here"></textarea>'
-            '<p><button class="btn go">Add this character</button></p></form>')
+            '<p><button class="btn go">Add or update this character</button></p></form>')
 
 
 def characters_page() -> str:
@@ -824,13 +824,18 @@ def characters_page() -> str:
         ic = icons.img(icons.CLASS_ICON.format(cls=c.class_name.lower()), "large", "cc-ic")
         badge = ('<span class="muted small">from a log: no bags</span>' if c.imported else
                  f'<span class="muted small">{c.bags} items in bags</span>')
+        rg, _, sv = c.realm.partition("/")
+        refresh = (f"<form method='post' action='/character/import'><input type='hidden' name='name' value='{e(c.name)}'>"
+                   f"<input type='hidden' name='server' value='{e(sv)}'><input type='hidden' name='region' "
+                   f"value='{e(rg.lower())}'><button class='btn ghost'>Refresh from Warcraft Logs</button></form>"
+                   if c.imported and sv else "")  # its latest logged fight again (issue #37: no way to update it)
         play = ('<span class="cc-on">Playing now</span>' if c.current else
                 f'<form method="post" action="/character/select"><input type="hidden" name="slug" value="{e(c.slug)}">'
                 f'<button class="btn ghost">Play this character</button></form>')
         cards += (f'<div class="ccard{" on" if c.current else ""}">{ic}<div class="cc-txt"><b>{e(c.name)}'
                   f'{(" <small class=muted>" + e(c.realm) + "</small>") if c.realm else ""}</b>'
                   f'<span class="cc-spec">{e(c.spec.title())} {e(c.class_name.title())}</span><span>{badge} '
-                  f'<span class="muted small">&middot; updated <span>{ago(c.mtime)}</span></span></span></div><div class="cc-act">{play}'
+                  f'<span class="muted small">&middot; updated <span>{ago(c.mtime)}</span></span></span></div><div class="cc-act">{play}{refresh}'
                   f'<a class="btn ghost" href="#simc-box" onclick="setTimeout(function(){{document.getElementById(\'simc-box\').focus()}},50)">Paste a new export</a>'
                   f'<details class="rm"><summary class="btn ghost cc-rm">Remove</summary><div class="rm-ask">'
                   f'<span>Remove this character? Its /simc export is deleted.</span>'
