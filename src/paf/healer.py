@@ -1072,7 +1072,7 @@ def _kept_by_time(c: Cooldown, t: float, hit: float, sp: float) -> str:
     if t not in c.times or not sp or not u or sp / u >= 0.25 - 1e-9 or len(c.support) != len(c.times):
         return ""
     ut = _users_at(c, t)
-    return f", shared by {_pct(min(1.0, c.support[c.times.index(t)] / ut))} of its users" if ut else ""
+    return f" ({_pct(min(1.0, c.support[c.times.index(t)] / ut))} of its users)" if ut else ""  # one form
 
 
 def _pressers(c: Cooldown, sp: float, t: float | None = None) -> str:
@@ -2380,7 +2380,10 @@ def roles_more(roles: list, mine: str = "", found: list | None = None, staged: b
             if back:
                 u = back[0]
                 return (f"<span class='held'>&#10226; none held</span> <small>{e(_shown(u[1]))} {_mmss(u[2])} &middot; "
-                        f"{_pct(u[3])}{' (a ramp)' if len(u) > 5 and u[5] else ''}</small>")
+                        f"{_pct(u[3])}"
+                        + (f" ({int(u[4] * 100)}% of its users)" if len(u) > 5 and f"{int(u[4] * 100)}%" != _pct(u[3])
+                           else "")  # as every cell (heal round 13)
+                        + f"{' (a ramp)' if len(u) > 5 and u[5] else ''}</small>")
             return "<span class='muted'>&mdash; none shared</span>"
         n = getattr(r, "own_players", 0)  # under 100: a few players' habit, said (Disc: 43; round 46)
         out += (f"<tr><td class='who'><b>{_spec_ic(r.spec)}{e(r.spec)}</b>"

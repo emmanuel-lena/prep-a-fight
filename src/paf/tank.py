@@ -573,7 +573,8 @@ def render_sheet(p: TankPrep) -> str:
             if not got or got[1] <= a[2]:
                 return ""
             got[2].lead_back[got[3]] = x.t  # its chip says the same window count (round 114: 23% vs "3:27 for 27%")
-            return f"; {e(got[0])} {got[1]:.0%} in its window, back from cooldown"
+            return f" &middot; {e(got[0])} {got[1]:.0%} in its window, back from cooldown"  # after the answer's
+            # bracket (heal round 13: "(about 3:28; Shield Wall 23% … ⟲; 99 kills going)" read as Shield Wall's 99)
 
         from paf.healer import _reach_note
 
@@ -589,7 +590,7 @@ def render_sheet(p: TankPrep) -> str:
         pairs = [(x, answer(x)) for x in sorted(p.moments, key=lambda x: x.t) if x is not m]
         for x, a in pairs:
             if a:
-                cells[x.t] = (f"{a[2]:.0%} press {e(a[0])}{reach_of(a, x)} (about {when(a, x)}{more_back(a, x)})"
+                cells[x.t] = (f"{a[2]:.0%} press {e(a[0])}{reach_of(a, x)} (about {when(a, x)}){more_back(a, x)}"
                               f"{long_too(a, x)}")
         answered = {(a[0], a[1]) for a in [big, *(a for _x, a in pairs), *extra] if a}  # the chart draws these full
         tied.update({(a[0], a[1]): a[2] for a in [big, *(a for _x, a in pairs), *extra] if a})
