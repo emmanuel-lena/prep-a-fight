@@ -827,10 +827,11 @@ def defensives_html(d: PrepData) -> str:
              f"ability it answers</th></tr>{rows}</table></div>") if df.moments else (
         "<p class='small'>The top players do not press their defensives at one shared moment on this boss: use them "
         "when you take damage.</p>")
-    usage = ", ".join(f"{link(n, f'spell={sid}')} {per:.1f} per kill ({share:.0%} of the kills)"
-                      for n, sid, per, share in df.usage[:6])
+    usage = "".join(f"<span class='chip'>{icons.img(d.icons.get(n, ''), 'small')}{link(n, f'spell={sid}')} "
+                    f"<b>{per:.1f}</b>/kill &middot; {share:.0%} of the kills</span>"
+                    for n, sid, per, share in df.usage[:6] if per >= 0.2)  # chips, the rare ones left out (DPS c. 13)
     return (f"<h2>Defensives <span class='pill near'>advice, not simmed</span></h2><div class='card'>{table}"  # the
-            + (f"<p class='small'>Used: {usage}.</p>" if usage else "")  # answer first, how it is read after
+            + (f"<p class='small chips'><span class='muted'>Used:</span> {usage}</p>" if usage else "")  # answer first
             + f"<p class='small muted'>When the top players of your spec press one ({df.kills} kills) and the boss "
             "ability it answers (cast within about 10 s, or long before for damage that lands later); the fight tab "
             f"calls the moments where {fightview_support():.0%} or more of them press one.</p></div>")

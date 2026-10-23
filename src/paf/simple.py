@@ -149,6 +149,10 @@ def change_card(d) -> str:
 
     rows = []
     talents_said = 0.0  # a talent gain above the plan's: said not to add (DPS confirm round 2: two +6.6%)
+    p0 = _plan(d)
+
+    def same(g: float) -> int:  # two gains that round alike: two decimals, never one figure copied (DPS c. 13)
+        return 2 if p0 is not None and f"{g:.1f}" == f"{p0.gain:.1f}" and abs(g - p0.gain) >= 0.005 else 1
     best = best_build(d)
     if d.talents and best is not None:
         g = best.per_fight.get(d.talents.fights[0], (0.0, None))[0]
@@ -157,7 +161,7 @@ def change_card(d) -> str:
             button = copy_button(best.build.code, "Copy the talents") if best.build.code else ""
             talents_said = g
             rows.append(f"<li>{spec_ic}<div><b>Change your talents</b><span class='sz {_size(g)}'>"
-                        f"{SIZE_WORDS[_size(g)]}, {g:+.1f}% vs your talents</span></div></li>{swaps_html(d, getattr(best, 'swaps', []))}"
+                        f"{SIZE_WORDS[_size(g)]}, {g:+.{same(g)}f}% vs your talents</span></div></li>{swaps_html(d, getattr(best, 'swaps', []))}"
                         f"<li class='sw-copy'>{button}</li>")
     if d.gear and d.gear[0][2] > 2 * d.gear_error:
         changes, _, w = d.gear[0]
@@ -184,9 +188,10 @@ def change_card(d) -> str:
 
         held = [(cd_name(d, k), r.name) for k, r in plan.choice.items() if r.name != "default"]  # the game's name
         rows.append(f"<li>{_ic(d, held[0][0])}<div><b>Play your cooldowns this way</b><span class='sz "
-                    f"{_size(plan.gain)}'>{SIZE_WORDS[_size(plan.gain)]}, {plan.gain:+.1f}% vs SimC's default list, with your "
+                    f"{_size(plan.gain)}'>{SIZE_WORDS[_size(plan.gain)]}, "
+                    f"{plan.gain:+.{same(talents_said) if talents_said else 1}f}% vs SimC's default list, with your "
                     f"current talents</span><span class='what'>"
-                    + (f"<span class='pill'>not stacked with the talents' {talents_said:+.1f}%: simmed apart</span>"
+                    + ("<span class='pill'>simmed apart from the talents: the gains do not add up</span>"
                        if talents_said else "")  # plain words, the figure said (DPS confirm round 12: "≠ adds to")
                     + ("" if getattr(plan, "robust", True) else " Not robust: the gain can vanish on a harder fight "
                        "(see its checks in Dig deeper).") + "</span></div></li>"

@@ -1020,6 +1020,10 @@ def _shown(name: str) -> str:
 KEPT = "\x00kept"  # a key of `named` no button has: (KEPT, hit) -> (the button the lead keeps, its share)
 
 
+NOT_KEPT = " &middot; not kept"  # a press the table names in a hit's window it does not keep, whatever its share
+# (heal confirm round 13: under a quarter, "0:37 · 2 s after the 0:35 hit starts · 20%" read as kept)
+
+
 def _line_where(at, hit: float) -> str:
     """A window line's chip head: its time and its offset from the hit, as every chip (heal confirm round 12:
     "about 0:37 · in the window of the 0:35 hit: 20%"); a spread of times keeps its range and the window."""
@@ -1575,7 +1579,7 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
         # (none when a window chip follows: heal round 12, Spirit Link Totem's 2:13 under "no shared time"),
         # a named line may follow (round 91; heal round 10: "timing varies: no shared moment" three times a sheet)
         + _pull_chip(c)
-        + "".join(f"<span class='chip'>{_line_where(v[1], k[1][1])} &middot; {_pct(v[0])}{v[2]}"
+        + "".join(f"<span class='chip'>{_line_where(v[1], k[1][1])} &middot; {_pct(v[0])}{v[2]}{NOT_KEPT}"
                   f"{' &middot; ' + v[3] if len(v) > 3 and v[3] and not (c.every and v[3] == 'on cooldown') else ''}</span>"  # a chip of its own, led by its time
                   # (round 91: plain text after a chip read as that chip's continuation)
                   for k, v in (named or {}).items()
@@ -1634,11 +1638,11 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float, shown_t
         if _pct(hs) == _pct(sp):  # one count: said once, at the lead's time, the chip's own (round 78: "2:59 ·
             # 2:57", two times); under a quarter, of those who press it too (round 84); its offset from the hit, as
             # every other chip (heal round 10: "in the window of the 2:55 moment: the same 15%")
-            return _offset(at, _mmss(hit)) + _base(c, hs, hit) + _pressers(c, sp, t) + tag
+            return _offset(at, _mmss(hit)) + _base(c, hs, hit) + _pressers(c, sp, t) + (tag or NOT_KEPT)
         if c.ramp and at < hit - ANSWER[0]:  # a ramp ahead of its hit: its offset, as every chip (heal confirm 9)
-            return f"{_offset(at, _mmss(hit))}{_base(c, hs, hit)}" + tag  # its window's share, " · N%" as every
+            return f"{_offset(at, _mmss(hit))}{_base(c, hs, hit)}" + (tag or NOT_KEPT)  # its window's share, as every
             # offset chip (heal confirm round 10: "20 s before the 3:35 hit: 38%" beside "21 s before … · 41%")
-        return f"{_share(sp)}{_still(c, t, sp)}{_offset(at, _mmss(hit))}{_base(c, hs, hit)}" + tag  # one form
+        return f"{_share(sp)}{_still(c, t, sp)}{_offset(at, _mmss(hit))}{_base(c, hs, hit)}" + (tag or NOT_KEPT)  # ⟲ says it already
         # for every window chip, its offset from the time shown (heal confirm round 11)
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
         return _base(c, hs, _secs(n.partition(" ")[0]))

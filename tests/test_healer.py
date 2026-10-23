@@ -534,7 +534,7 @@ def test_a_named_chip_with_one_share_shows_one_time():
     c = healer.Cooldown("Shield Wall", 1, 0.6, 2.0, [179.0], [""], support=[0.15],
                         presses=[[177.0]] * 15 + [[60.0]] * 45, n_all=100)
     out = healer.cooldowns_html([c], set(), {("Shield Wall", 179.0): 175.0})
-    assert ("2:57 &middot; 2 s after the 2:55 hit starts &middot; 15% (25% of its users)</span>"
+    assert ("2:57 &middot; 2 s after the 2:55 hit starts &middot; 15% (25% of its users) &middot; not kept</span>"
             in out and "about" not in out and "the same" not in out)
 
 

@@ -683,9 +683,9 @@ def render_sheet(p: TankPrep) -> str:
     # the marks said are the ones drawn (heal round 10: "the table's answers" over a chart of swaps alone)
     outline = any((c.name, t) not in answered for c in [*defs, *shorts]
                   if c.name in {n for n, _t in answered} | window_named for t in c.times)
-    marks = [*(["the table's answers" + (" (an outline: another press, or one in a hit's window that is not its "
+    marks = [*(["the table's answers" + (" (an outline: another press, or one in a moment's window that is not its "
                                           "answer)" if outline else "")]
-               if answered else ["an outline: a press in a hit's window, not its answer"] if window_named else []),
+               if answered else ["an outline: a press in a moment's window, not its answer"] if window_named else []),
              *(["a tick: a tank swap" if window_named and not answered else "the swaps"] if lane else [])]
     marks = f"Marks: {('; ' if window_named and not answered else ' and ').join(marks)}. " if marks else ""
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + ([table] if table else []) + [
