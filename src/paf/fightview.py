@@ -410,7 +410,7 @@ def job_html(d) -> str:
     def at(name: str) -> str:  # the waves of that unit, as the fight tab places them
         ts = [t for t, c, _l, n in d.waves if c and _clean(n) == name]
         return f" at {', '.join(_mmss(t) for t in ts)}" if ts else ""
-    rows = [(a.name, f"<b>{e(a.text.split(':')[0].split(' (')[0])}</b>{at(a.name)}") for a in d.actions
+    rows = [(a.name, f"<b>{e(a.text.split(':')[0].split(' (')[0])}</b>{at(a.name)}.") for a in d.actions
             if a.kind in ("kill", "contact") or (a.kind == "interrupt" and a.text.startswith("Interrupt"))][:2]
     kills = [a for a in d.actions if a.kind == "kill"][:2]
     if len(kills) == 2 and at(kills[0].name) and at(kills[0].name) == at(kills[1].name):  # one wave, two units:
@@ -418,7 +418,7 @@ def job_html(d) -> str:
         kills.sort(key=lambda a: next((i for i, w in enumerate(d.waves) if _clean(w[3]) == a.name), 99))
         both = "Kill " + " and ".join(e(a.name) for a in kills)  # the timeline's words and order (DPS round 12)
         rows = [r for r in rows if r[0] not in {a.name for a in kills}]
-        rows.insert(0, (kills[0].name, f"<b>{both}</b>{at(kills[0].name)}"))
+        rows.insert(0, (kills[0].name, f"<b>{both}</b>{at(kills[0].name)}."))  # every line ends alike
     hints = {it.name: it.hint for _t, it in items(d) if it.hint}
     said = {_clean(a.name) for a in d.actions}
     skip = {a.name for a in d.actions if a.kind == "ignore"}
@@ -476,7 +476,10 @@ def job_html(d) -> str:
     for n in sorted((n for n in names if n in order), key=lambda n: min(order[n])):  # in the order you first press them
         pre = [t for t in order[n] if t < 0.5 and (n in d.precast or "potion" in n.lower())]
         rest = [_mmss(t) for t in order[n] if t not in pre]
-        when = ", ".join(rest[:5]) + ("…" if len(rest) > 5 else "")
+        secs = [t for t in order[n] if t not in pre]
+        gaps = sorted(b - a for a, b in zip(secs, secs[1:], strict=False))
+        when = (", ".join(rest) if len(rest) <= 5 else  # a long list: its cadence, never cut with "…" (DPS round 16)
+                f"{rest[0]}, then about every {gaps[len(gaps) // 2]:.0f} s ({len(rest)} times)")
         if pre:
             when = "before the pull" + (f", then {when}" if rest else "")
         elif rest:
