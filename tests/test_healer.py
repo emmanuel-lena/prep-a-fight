@@ -799,7 +799,7 @@ def test_a_chip_named_for_a_hit_window_shows_the_windows_share_only():
     c = healer.Cooldown("Avenging Wrath", 1, 1.0, 3.0, [229.0], [""], support=[0.30], n_all=100,
                         presses=[[229.0]] * 22 + [[222.0]] * 8 + [[100.0]] * 70)
     out = healer.cooldowns_html([c], set(), {("Avenging Wrath", 229.0): 230.0})
-    assert "in the window of the 3:50 hit: 22%" in out and "30%" not in out
+    assert "3:49 &middot; 1 s before the 3:50 hit &middot; 22%" in out and "30%" not in out
 
 
 def test_an_or_time_named_for_a_hit_shows_one_time_and_one_share():
@@ -808,7 +808,7 @@ def test_an_or_time_named_for_a_hit_shows_one_time_and_one_share():
                         alt_support=[0.32], alt_of=[111.0], n_all=100,
                         presses=[[111.0]] * 40 + [[131.0]] * 25 + [[124.0]] * 7 + [[60.0]] * 28)
     out = healer.cooldowns_html([c], set(), {("Celestial Conduit", 130.0): 130.0})
-    assert "or 2:11 &middot; in the window of the 2:10 hit: 25%</span>" in out and "32%" not in out
+    assert "or 2:11 &middot; 1 s after the 2:10 hit starts &middot; 25%</span>" in out and "32%" not in out
 
 
 def test_a_main_time_with_its_reason_then_its_or():
