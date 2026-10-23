@@ -23,8 +23,8 @@ def test_summary_and_abilities():
         sec(6, "Malice", "ability", "A bolt.", ["interruptible", "deadly"], 1290779)])
     s = summary_html([over, stage], "damage")
     assert "She splashes venom." in s and "<li>Burst the Heart.</li>" in s
-    # another role: the abilities its summary names, not its words (the owner's decision 1)
-    assert "<b>Tank:</b> Malice</p>" in s and "Taunt on" not in s
+    # another role: not here; the ability list names theirs from the journal's flags (round 37: two lists)
+    assert "Tank:" not in s and "Taunt on" not in s
 
     class Mech:
         name, kind, players_per_kill, cost = "Malice", "interrupt", 0, 1.0
@@ -140,11 +140,13 @@ def test_what_hits_you_too_stays_told_in_every_stage():
     assert "For the tanks" not in a and "Echoes burst too." in a
 
 
-def test_a_healers_dispels_and_what_their_summary_names_are_told():
+def test_a_healers_dispels_are_told_what_their_summary_names_tagged():
     over = sec(1, "Overview", "overview", children=[sec(2, "Healers", "role", "- Imbibe inflicts heavy damage.")])
     stage = sec(4, "Stage One", "stage", children=[
         sec(5, "Essence Rend", "ability", "A magic curse on a player.", ["magic"]),
         sec(6, "Imbibe", "ability", "The boss drinks."),
         sec(7, "Plague Froth", "ability", "Froth.")])
     a = abilities_html([over, stage], role="healer")
-    assert "A magic curse on a player." in a and "The boss drinks." in a and "Froth." not in a and ">magic<" in a
+    # the dispel told; what the healers' summary names: their tag, its words being the summary's (round 37)
+    assert "A magic curse on a player." in a and ">magic<" in a and "Froth." not in a
+    assert "The boss drinks." not in a and "<b>Imbibe</b> <span class=\"pill\">healer</span>" in a

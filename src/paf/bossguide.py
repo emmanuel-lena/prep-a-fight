@@ -195,12 +195,9 @@ def summary_html(sections: list[Section], role: str = "damage", full_link: str =
                    + "".join(f"<li>{e(readable(b))}</li>" for b in bullets(mine.text)) + "</ul>")
     if sentences:
         out.append("<h3>The fight</h3><div class='over'>" + "".join(f"<p>{e(x)}</p>" for x in sentences) + "</div>")
-    for c in others:  # the other roles: what their summary names, not its words (the owner's decision 1; review 36)
-        said = " ".join(bullets(c.text)).lower()
-        names = list(dict.fromkeys(s.title for _, s in walk(sections) if s.kind == "ability" and s.title
-                                   and s.title.lower() in said))
-        if names:
-            out.append(f"<p class='others'><b>{e(c.title)}:</b> {e(', '.join(names))}</p>")
+    # the other roles: none here; the ability list names theirs from the journal's flags, one source (round 37: two
+    # healer lists that disagreed)
+    del others
     if full_link:
         out.append(f'<p class="small"><a href="{e(full_link)}">Every ability, phase by phase &rarr;</a></p>')
     return f'<div class="guide">{"".join(out)}</div>'
@@ -239,9 +236,13 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
         facts.append(f"<b>burst window: the boss takes x{ctx['burst'][s.title.lower()]:g} damage</b>")
     # the journal's words only on what the journal flags for your role (or hits you too); the rest: its name, icon,
     # tags and times, the name a Wowhead link to read it (the owner, 2026-10-24: less prose)
-    told = (not ctx["role"] or ctx["role"] in s.flags or s.title in ctx["also"] or s.title in ctx["named"]
-            or (ctx["role"] == "healer" and bool(DISPEL & set(s.flags))))  # what the role's own summary names, and
-    # a healer's dispels (review 36: Essence Rend, the boss tab's headline, a bare name)
+    told = (not ctx["role"] or ctx["role"] in s.flags or s.title in ctx["also"]
+            or (ctx["role"] == "healer" and bool(DISPEL & set(s.flags))))  # a healer's dispels (review 36: Essence
+    # Rend, the boss tab's headline, a bare name); what the role's summary names: a tag, its words being the
+    # summary's (round 37: the same sentences in both columns)
+    if s.title in ctx["named"] and not told:
+        tags += f'<span class="pill">{SHOWN_FLAGS.get(ctx["role"], ctx["role"])}</span>'  # the role's own tag
+
     text = readable(s.text, ctx["difficulty"]).strip() if s.text and told else ""
     if not text and told:  # no journal text, or only another difficulty's sentence: the spell's own description
         text = readable(ctx["describe"](s.spell_id), ctx["difficulty"])
@@ -331,7 +332,7 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
                 # the adds had no time, then the intermission's repeat gave the Stage One spawns)
                 rows.append(f'<div class="unit" style="margin-left:{min(depth, 1) * 14}px">{e(s.title)}{at}</div>'
                             + (f"<p class='small muted unit-d' style='margin-left:{min(depth, 1) * 14}px'>"
-                               + (f"As in {e(seen[key(s)])}; what changes:" if told
+                               + (f"As in {e(_short(seen[key(s)]))}; what changes:" if told
                                   else e(readable(s.text, difficulty)))
                                + "</p>" if s.text and (told or not role) else ""))  # a unit's story: not told
                 # on a role's page (the owner, 2026-10-24); its abilities below say what it does
