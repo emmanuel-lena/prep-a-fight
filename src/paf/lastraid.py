@@ -317,11 +317,23 @@ def _row_of(text: str) -> list[str] | None:
     return None
 
 
+def _num(x: str) -> float | None:
+    m = re.fullmatch(r"([\d.,]+)(k|%)?", x)
+    return float(m[1].replace(",", "")) if m else None
+
+
+def _bar(v: str, pair: tuple[str, str]) -> str:
+    """A value with a short bar beside it, as long as its share of the larger of the two (a % of 100)."""
+    x, top = _num(v), (100.0 if v.endswith("%") else max((_num(p) or 0.0) for p in pair))
+    if x is None or not top:
+        return e(v)
+    return (f"{e(v)}<span class='lr-bar' aria-hidden='true'><span style='width:{min(1.0, x / top) * 100:.0f}%'>"
+            "</span></span>")
+
+
 def _delta(b: str, a: str) -> str:
     """The best pull against the weaker one, in % when both are numbers ("252k", "209k" -> "+21%")."""
-    def num(x: str) -> float | None:
-        m = re.fullmatch(r"([\d.,]+)(k|%)?", x)
-        return float(m[1].replace(",", "")) if m else None
+    num = _num
     x, y = num(b), num(a)
     if x is None or y is None:
         return ""
@@ -361,8 +373,8 @@ def _cmp_table(rows: list[dict], report: str = "") -> str:
     return ("<table class='lr-cmp fit'><thead><tr><th></th>"
             + head("Best clean pull", 0) + head("Weakest clean pull", 1) + "<th>Gap</th></tr>"  # not the night's best
             "</thead><tbody>"
-            + "".join(f"<tr class='{e(r.get('kind', ''))}'><td>{e(r['cmp'][0])}</td><td><b>{e(r['cmp'][1])}</b></td>"
-                      f"<td>{e(r['cmp'][2])}</td><td class='gap'>{e(_signed_word(_delta(r['cmp'][1], r['cmp'][2]), r.get('kind')))}"
+            + "".join(f"<tr class='{e(r.get('kind', ''))}'><td>{e(r['cmp'][0])}</td>"  # bars: fresh app review 5
+                      f"<td><b>{_bar(r['cmp'][1], r['cmp'][1:3])}</b></td><td>{_bar(r['cmp'][2], r['cmp'][1:3])}</td><td class='gap'>{e(_signed_word(_delta(r['cmp'][1], r['cmp'][2]), r.get('kind')))}"
                       f"{' &#10007;' if r.get('kind') == 'bad' else ''}</td>"  # a mark where it goes the wrong way only
                       "</tr>" for r in rows) + "</tbody></table>")
 

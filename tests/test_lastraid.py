@@ -143,8 +143,9 @@ def test_the_pull_comparison_is_a_table(monkeypatch):
     says = lastraid.sentences({"kill": False, "jobs": {"diff": "d"}}, "Ixuu")
     assert says[0]["cmp"] == ["You: damage on the boss", "252k", "209k"]
     table = lastraid._cmp_table(says)
-    assert ("<tr class='good'><td>You: damage on the boss</td><td><b>252k</b></td><td>209k</td>"
-            "<td class='gap'>+21%</td></tr>") in table
+    assert ("<tr class='good'><td>You: damage on the boss</td><td><b>252k<span class='lr-bar' aria-hidden='true'>"
+            "<span style='width:100%'></span></span></b></td><td>209k<span class='lr-bar' aria-hidden='true'>"
+            "<span style='width:83%'></span></span></td><td class='gap'>+21%</td></tr>") in table
     assert lastraid._row_of("Ixuu: active 99% of the pull in B, 89% in A.") == ["Ixuu: active time", "99%", "89%"]
 
 
