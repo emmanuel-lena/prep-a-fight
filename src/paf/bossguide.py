@@ -13,7 +13,9 @@ from paf.wowhead import link, spell_ref
 e = html.escape
 ROLE_TITLES = {"damage": "Damage Dealers", "healer": "Healers", "tank": "Tank"}
 SHOWN_FLAGS = {"tank": "tank", "healer": "healer", "damage": "dps", "interruptible": "interrupt", "deadly": "deadly",
-               "mythic": "mythic", "important": "important"}
+               "mythic": "mythic", "important": "important", "magic": "magic", "curse": "curse", "poison": "poison",
+               "disease": "disease"}
+DISPEL = {"magic", "curse", "poison", "disease"}  # a healer's to dispel: told on a healer's page (review 36)
 
 
 def bullets(text: str) -> list[str]:
@@ -124,6 +126,12 @@ def modernize(html: str, difficulty: str = "heroic") -> str:
     return readable(h, difficulty)
 
 
+def _named_in_summary(sections: list[Section], role: str) -> set[str]:
+    """The abilities the journal's summary for this role names ("Imbibe inflicts heavy damage…" for the healers)."""
+    said = " ".join(role_bullets(sections, role)).lower()
+    return {s.title for _, s in walk(sections) if s.kind == "ability" and s.title and s.title.lower() in said}
+
+
 def _short(stage: str) -> str:
     """"Stage One: Soulcoiler Initiation" -> "Stage One": its name once in its heading (fresh app review 6)."""
     return stage.split(":", 1)[0].strip() or stage
@@ -187,9 +195,12 @@ def summary_html(sections: list[Section], role: str = "damage", full_link: str =
                    + "".join(f"<li>{e(readable(b))}</li>" for b in bullets(mine.text)) + "</ul>")
     if sentences:
         out.append("<h3>The fight</h3><div class='over'>" + "".join(f"<p>{e(x)}</p>" for x in sentences) + "</div>")
-    for c in others:  # the other roles: one short paragraph each (what the raid around you does)
-        out.append(f"<p class='others'><b>{e(c.title)}:</b> "
-                   + " ".join(e(readable(b)) for b in bullets(c.text)) + "</p>")
+    for c in others:  # the other roles: what their summary names, not its words (the owner's decision 1; review 36)
+        said = " ".join(bullets(c.text)).lower()
+        names = list(dict.fromkeys(s.title for _, s in walk(sections) if s.kind == "ability" and s.title
+                                   and s.title.lower() in said))
+        if names:
+            out.append(f"<p class='others'><b>{e(c.title)}:</b> {e(', '.join(names))}</p>")
     if full_link:
         out.append(f'<p class="small"><a href="{e(full_link)}">Every ability, phase by phase &rarr;</a></p>')
     return f'<div class="guide">{"".join(out)}</div>'
@@ -228,7 +239,9 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
         facts.append(f"<b>burst window: the boss takes x{ctx['burst'][s.title.lower()]:g} damage</b>")
     # the journal's words only on what the journal flags for your role (or hits you too); the rest: its name, icon,
     # tags and times, the name a Wowhead link to read it (the owner, 2026-10-24: less prose)
-    told = not ctx["role"] or ctx["role"] in s.flags or s.title in ctx["also"]
+    told = (not ctx["role"] or ctx["role"] in s.flags or s.title in ctx["also"] or s.title in ctx["named"]
+            or (ctx["role"] == "healer" and bool(DISPEL & set(s.flags))))  # what the role's own summary names, and
+    # a healer's dispels (review 36: Essence Rend, the boss tab's headline, a bare name)
     text = readable(s.text, ctx["difficulty"]).strip() if s.text and told else ""
     if not text and told:  # no journal text, or only another difficulty's sentence: the spell's own description
         text = readable(ctx["describe"](s.spell_id), ctx["difficulty"])
@@ -258,7 +271,8 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
     ctx = {"timings": {k.lower(): v for k, v in (timings or {}).items()},
            "mechanics": {m.name.lower(): m for m in (mechanics or [])},
            "burst": {k.lower(): v for k, v in (burst or {}).items()}, "icons": icon_map or {},
-           "describe": describe, "difficulty": difficulty, "also": also or {}, "role": role}
+           "describe": describe, "difficulty": difficulty, "also": also or {}, "role": role,
+           "named": _named_in_summary(sections, role) if role else set()}
     def key(s: Section) -> tuple:
         return s.kind, s.title, readable(s.text), tuple(s.flags)
 
@@ -330,14 +344,14 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
         if top.kind == "ability":
             rows.insert(0, _ability(top, 0, ctx))
         title = "" if top.kind == "ability" else f"<h3>{head}</h3>"  # an ability's card: its row names it
-        also = "".join("<p class='small muted also'>" + (
+        notes = "".join("<p class='small muted also'>" + (  # not `also`: the parameter (review 36: lost from stage 2)
             f"Also, as in {e(_short(where))}: {e(', '.join(dict.fromkeys(names)))}." if len(set(names)) <= 4 else
             f"{len(set(names))} abilities {'you deal with ' if role else ''}from {e(_short(where))} stay as they were.")
             + "</p>"  # the role's own count, the others' named below (round 79: 7 on a healer sheet, 9 on a tank's)
             for where, names in repeated.items())
-        also += "".join(f"<p class='small muted also'>For {ROLE_OTHERS[r]}: {e(', '.join(dict.fromkeys(names)))}.</p>"
+        notes += "".join(f"<p class='small muted also'>For {ROLE_OTHERS[r]}: {e(', '.join(dict.fromkeys(names)))}.</p>"
                         for r, names in others.items())
-        cards.append(f'<section class="stage">{title}{intro}{grouped("".join(rows))}{also}</section>')
+        cards.append(f'<section class="stage">{title}{intro}{grouped("".join(rows))}{notes}</section>')
     return "".join(cards)
 
 

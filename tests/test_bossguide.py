@@ -17,13 +17,14 @@ def test_bullets():
 def test_summary_and_abilities():
     over = sec(1, "Overview", "overview", "She splashes venom.", children=[
         sec(2, "Damage Dealers", "overview", "- Kill the Clutch. - Burst the Heart.", ["damage"]),
-        sec(3, "Tank", "overview", "- Taunt on Mother's Wrath.", ["tank"])])
+        sec(3, "Tank", "overview", "- Taunt on Malice.", ["tank"])])
     stage = sec(4, "Stage One", "stage", children=[
         sec(5, "Venomous Heart", "ability", "The heart is exposed.", ["damage"], 1299526),
         sec(6, "Malice", "ability", "A bolt.", ["interruptible", "deadly"], 1290779)])
     s = summary_html([over, stage], "damage")
     assert "She splashes venom." in s and "<li>Burst the Heart.</li>" in s
-    assert "<b>Tank:</b> Taunt on Mother&#x27;s Wrath." in s
+    # another role: the abilities its summary names, not its words (the owner's decision 1)
+    assert "<b>Tank:</b> Malice</p>" in s and "Taunt on" not in s
 
     class Mech:
         name, kind, players_per_kill, cost = "Malice", "interrupt", 0, 1.0
@@ -128,3 +129,22 @@ def test_journal_times_round_as_the_page_header():
     from paf import bossguide
 
     assert bossguide._when([52.7, 167.0]) == "0:52, 2:47"  # the fight tab's and the MRT notes' form
+
+
+def test_what_hits_you_too_stays_told_in_every_stage():
+    """Review 36: the stage notes reused the name of `also`, so from Stage Two Possession Barrage (the tank's, a big
+    raid hit too) was named 'For the tanks' on a healer's sheet."""
+    s1 = sec(4, "Stage One", "stage", children=[sec(5, "Possession Barrage", "ability", "Echoes burst.", ["tank"])])
+    s2 = sec(6, "Stage Two", "stage", children=[sec(7, "Possession Barrage", "ability", "Echoes burst too.", ["tank"])])
+    a = abilities_html([s1, s2], role="healer", also={"Possession Barrage": "big raid damage at 3:50"})
+    assert "For the tanks" not in a and "Echoes burst too." in a
+
+
+def test_a_healers_dispels_and_what_their_summary_names_are_told():
+    over = sec(1, "Overview", "overview", children=[sec(2, "Healers", "role", "- Imbibe inflicts heavy damage.")])
+    stage = sec(4, "Stage One", "stage", children=[
+        sec(5, "Essence Rend", "ability", "A magic curse on a player.", ["magic"]),
+        sec(6, "Imbibe", "ability", "The boss drinks."),
+        sec(7, "Plague Froth", "ability", "Froth.")])
+    a = abilities_html([over, stage], role="healer")
+    assert "A magic curse on a player." in a and "The boss drinks." in a and "Froth." not in a and ">magic<" in a
