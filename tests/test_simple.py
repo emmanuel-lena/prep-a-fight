@@ -126,3 +126,17 @@ def test_a_plan_a_slower_kill_turns_into_a_loss_plays_the_default_list():
 
     said = [m[1] for m in briefing._moves(d)]
     assert any("default priority list" in s for s in said) and not any("for boss damage" in s for s in said)
+
+
+def test_the_talent_card_sets_the_players_choice_apart(monkeypatch):
+    """The owner's decision 8 on the What to change card (review 36: Purge and Tremor Totem listed as the sim's)."""
+    from types import SimpleNamespace
+
+    from paf import simple, talents
+
+    monkeypatch.setattr(talents, "utility", lambda names, cls, spec: {"Purge", "Tremor Totem"} & set(names))
+    d = SimpleNamespace(icons={}, class_name="Shaman", spec="Elemental")
+    out = simple.swaps_html(d, [(None, ("Preeminence", 0)), (None, ("Tremor Totem", 0)), (("Purge", 0), None)])
+    take, choice = out.split("sw-strip take")[1].split("sw-strip free")
+    assert "Preeminence" in take and "Tremor Totem" not in take and "Drop" not in out
+    assert "Your choice" in choice and "+</span><span class='tal'>" in choice and "&minus;</span>" in choice

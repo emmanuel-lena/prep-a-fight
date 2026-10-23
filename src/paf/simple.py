@@ -121,12 +121,23 @@ def swaps_html(d, swaps: list) -> str:
     pairs (a hero tree changed showed 15 made-up "A -> B" rows; a review)."""
     if not swaps:
         return ""
+    from paf.talents import utility
+
     take = [b for _a, b in swaps if b]
     drop = [a for a, _b in swaps if a]
+    # a button the rotation never presses (Purge, Tremor Totem): apart, grey, its sign kept (the owner's decision 8;
+    # review 36: the card listed them as the sim's)
+    free = utility([t[0] for t in take + drop], getattr(d, "class_name", ""), d.spec)
+    mine = [("+", t) for t in take if t[0] in free] + [("&minus;", t) for t in drop if t[0] in free]
+    take, drop = [t for t in take if t[0] not in free], [t for t in drop if t[0] not in free]
+
     def strip(word: str, cls: str, ts: list) -> str:
         return (f"<div class='sw-strip {cls}'><span class='sw-lab'>{word}</span>"
                 + "".join(_talent(d, t) for t in ts) + "</div>") if ts else ""
-    return f"<li class='sw-list'>{strip('+ Take', 'take', take)}{strip('&minus; Drop', 'drop', drop)}</li>"
+    choice = ("<div class='sw-strip free'><span class='sw-lab'>Your choice</span>"
+              + "".join(f"<span class='sw-sign'>{sign}</span>{_talent(d, t)}" for sign, t in mine) + "</div>"
+              if mine else "")
+    return f"<li class='sw-list'>{strip('+ Take', 'take', take)}{strip('&minus; Drop', 'drop', drop)}{choice}</li>"
 
 
 def _hint(d) -> str:

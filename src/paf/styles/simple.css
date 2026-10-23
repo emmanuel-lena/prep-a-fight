@@ -124,3 +124,4 @@ a.tal:hover{background:var(--surface-2)}
 .simple .cards li.sw-list{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;align-items:start}
 .sw-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:2px 6px}
 .sw-strip .sw-lab{grid-column:1/-1}
+.sw-strip.free .sw-lab{color:var(--muted)} .sw-strip.free .tal{opacity:.65} .sw-strip.free .sw-sign{color:var(--muted);font-weight:700;margin-left:4px}

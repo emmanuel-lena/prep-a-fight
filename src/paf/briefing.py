@@ -71,8 +71,12 @@ def _moves(d) -> list[tuple[float, str, str, str]]:
     if d.talents:
         g = best.per_fight.get(d.talents.fights[0], (0.0, None))[0] if best else 0.0
         if best is not None and g > 2 * d.talents.error:
+            from paf.talents import utility
+
             takes = list(dict.fromkeys(x for x in best.add if x not in best.drop))  # one name both ways (a rank
             drops = list(dict.fromkeys(x for x in best.drop if x not in best.add))  # or another node): no change
+            free = utility(takes + drops, getattr(d, "class_name", ""), d.spec)  # the player's choice: not counted
+            takes, drops = [x for x in takes if x not in free], [x for x in drops if x not in free]
             add = ", ".join(takes)
             say = (f"It takes {e(add)}." if takes and len(takes) + len(drops) <= 6 else  # a few: named; more: counted,
                    f"+{len(takes)} / &minus;{len(drops)} talents: see What to change." if takes or drops else "")
