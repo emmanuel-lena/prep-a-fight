@@ -1141,7 +1141,7 @@ def raid_board(encs, class_name: str, spec: str) -> str:
                 f"else{{this.dataset.r=1;this.src+='?r=1'}}\">")  # one retry, then the initial
     items = ""
     for i, x in enumerate(encs, 1):
-        states, ready, here = "", False, ""
+        states, ready, here, ring = "", False, "", ""
         for diff, shape in DIFF_SHAPES:
             key = f"{_slug(x.name)}-{diff}-{mine}"
             item = done.get(key)
@@ -1162,9 +1162,10 @@ def raid_board(encs, class_name: str, spec: str) -> str:
                 said = {"no": "no sim yet" if item else "not prepared", "ok": f"ready {word}",
                         "old": "to redo"}.get(state, word)  # a sheet without a sim (timelines) is no "not prepared"
                 here = f"<small class='rb-st {state}'>{said}</small>"
+                ring = f" st-{state}" + (" st-nosim" if state == "no" and item else "")  # the face's ring says it
             states += (f"<a class='rb-d {state}' href='{href}'><span class='rb-frame {shape}'><span class='rb-in'>"
                        f"{portrait(x)}</span></span><b>{e(DIFF_LABELS.get(diff, diff))}</b><small>{word}</small></a>")
-        items += (f"<div class='rb-boss{'' if ready else ' grey'}' tabindex='0'><span class='rb-face'>{portrait(x)}"
+        items += (f"<div class='rb-boss{'' if ready else ' grey'}{ring}' tabindex='0'><span class='rb-face'>{portrait(x)}"
                   f"<span class='rb-n'>{i}</span></span><span class='rb-name'>{e(x.name)}</span>{here}"
                   f"<div class='rb-pop' role='group' aria-label='{e(x.name)}'><b class='rb-title'>{e(x.name)}</b>"
                   f"<div class='rb-ds'>{states}</div></div></div>")

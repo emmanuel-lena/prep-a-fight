@@ -417,3 +417,9 @@ table.rl-tg{table-layout:fixed} table.rl-tg th:nth-child(1),table.rl-tg td:nth-c
 .status .btn{font:600 14px var(--font-body)}
 .cc-ilvl{font:600 12px var(--font-data);color:var(--muted);margin-left:6px;padding:1px 7px;border:1px solid var(--line);border-radius:999px}
 .status .ok-dot{color:var(--pos);font-weight:700;margin-right:8px}
+/* the board: a boss's state at the chosen difficulty on its face's ring (green ready, amber to redo, dashed no sim) */
+.rb-boss.st-ok .rb-face{box-shadow:0 0 0 3px var(--pos);border-radius:50%}
+.rb-boss.st-old .rb-face{box-shadow:0 0 0 3px var(--warn);border-radius:50%}
+.rb-boss.st-nosim .rb-face{outline:2px dashed var(--muted);outline-offset:2px;border-radius:50%}
+.rb-boss.grey.st-old .rb-face{filter:brightness(.8)} /* a sheet to redo: in colour, darker, its amber ring seen */
+.mx-legend .pill.nosim::before{display:none}
