@@ -548,9 +548,9 @@ def short_ago(mtime: float, now: float | None = None) -> str:
     if s < 300:
         return "now"
     if s < 3600:
-        return f"{int(s // 60)}m ago"  # an age, not a duration (a review: "12 min" read as how long)
+        return f"{int(s // 60)} min ago"  # an age, not a duration (a review: "12 min" read as how long)
     if s < 86400:
-        return f"{int(s // 3600)}h ago"
+        return f"{int(s // 3600)} h ago"
     return time.strftime("%d %b", time.localtime(mtime))
 
 

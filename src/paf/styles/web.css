@@ -381,7 +381,7 @@ table.mx thead th span{display:block;max-width:84px;margin:0 auto}
 table.mx .mx-boss{display:block;width:34px;height:34px;border-radius:50%;margin:0 auto 4px;object-fit:cover}
 table.mx tbody th{font:500 14px var(--font-body);text-transform:none;letter-spacing:0;color:var(--fg);white-space:nowrap;padding-right:14px} table.mx tbody th .ics{margin-right:6px;vertical-align:-3px}
 table.mx tr.mine th{font-weight:700} table.mx tr.mine td,table.mx tr.mine th{background:var(--accent-soft)} table.mx td{text-align:center}
-table.mx a.mx{display:inline-flex;white-space:nowrap;margin:2px;font:500 11px var(--font-data);text-decoration:none;color:var(--fg)}
+table.mx a.mx{display:inline-flex;white-space:nowrap;text-transform:none;letter-spacing:0;margin:2px;font:500 11px var(--font-data);text-decoration:none;color:var(--fg)}
 table.mx a.mx:hover{border-color:var(--fg)} table.mx a.mx.nosim{border-style:dashed;opacity:.75}
 /* raid lead: a player's talent changes on one line, + to take, - to drop (the owner: less text) */
 .rl-boss li.rl-b{list-style:none;margin-left:-18px;display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}
@@ -396,6 +396,7 @@ table.mx a.mx:hover{border-color:var(--fg)} table.mx a.mx.nosim{border-style:das
 table.lr-cmp{margin:6px 0 10px;font-size:14px} table.lr-cmp th{font:600 11px var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:4px 16px 4px 0}
 table.lr-cmp td{padding:5px 16px 5px 0;border-top:1px solid var(--line)} table.lr-cmp td:nth-child(n+2){font-family:var(--font-data)}
 table.lr-cmp tr.good td.gap{color:var(--pos)} table.lr-cmp tr.bad td.gap{color:var(--neg)}
+.home-hero .me{flex-wrap:nowrap} .home-hero .me>span{white-space:nowrap} .meter+*{white-space:nowrap}
 /* a gauge beside a number (Settings: the quota, the caches) */
 .meter{display:inline-block;width:90px;height:7px;border-radius:4px;background:var(--surface-2);border:1px solid var(--line);vertical-align:middle;margin-right:10px;overflow:hidden}
 .meter>span{display:block;height:100%;background:var(--accent)} .meter.hi>span{background:var(--warn)} .meter.calm>span{background:var(--muted)}

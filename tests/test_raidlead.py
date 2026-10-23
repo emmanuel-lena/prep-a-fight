@@ -64,5 +64,5 @@ def test_the_page_opens_on_the_answer(tmp_path, monkeypatch):
     monkeypatch.setattr(raidlead, "sheet", lambda state, x, diff: sh)
     monkeypatch.setattr(raidlead, "lust_block", lambda sh, difficulty: "")
     page = raidlead.page_body("heroic")
-    assert "1 boss ready to copy for Discord, for the 4 players of your raid.</p>" in page
+    assert "1 boss to copy for Discord, for the 4 players of your raid.</p>" in page
     assert "everyone stays on the boss" not in page and "Frosty, Ssamii, Tristy" in page

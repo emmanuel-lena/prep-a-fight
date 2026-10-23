@@ -130,7 +130,7 @@ SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
         ("difficulty", "Difficulty", "The difficulty a new prep starts on."),
         ("guild", "Guild", "Its latest public log tells the prep who plays what in your raid: whether the others cover "
                            "the adds or you should pad them, and how your last pull compares with the top players'."),
-        ("guild_server", "Guild's server", "For example Kazzak."),
+        ("guild_server", "Guild's server", "As the game writes it (Kazzak, Twisting Nether)."),
         ("guild_region", "Guild's region", "Where your guild's logs are read from."),
     ]),
     ("The app", False, [

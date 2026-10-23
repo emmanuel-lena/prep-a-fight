@@ -223,7 +223,7 @@ def highlights_full(a: Side, b: Side, boss: str) -> list[tuple[str, str, tuple[s
         if pa.active is not None and pb.active is not None and abs(pb.active - pa.active) >= 0.03:
             out.append((abs(pb.active - pa.active) * 3, "good" if pb.active > pa.active else "bad",
                         f"{pb.name}: active {pb.active:.0%} of the pull in B, {pa.active:.0%} in A.",
-                        (f"{pb.name}: active", f"{pb.active:.0%}", f"{pa.active:.0%}")))
+                        (f"{pb.name}: time casting", f"{pb.active:.0%}", f"{pa.active:.0%}")))
         if len(pa.deaths) != len(pb.deaths):
             out.append((0.3, "good" if len(pb.deaths) < len(pa.deaths) else "bad",
                         f"{pb.name}: died {len(pb.deaths)} time(s) in B, {len(pa.deaths)} in A.",

@@ -380,7 +380,7 @@ def page_body(difficulty: str) -> str:
                 ("".join(f"<span class='rl-n'>{_ic(spec_of.get(n, ''))}{e(n)}</span>" for n in t["players"])
                  if t["players"] else "<span class='muted'>nobody fits</span>"))
             + (" <span class='rl-side'>a second boss</span>" if t["second_boss"] else
-               " <small>top raids: " + ", ".join(f"<span class='rl-best'>{_ic(b)}{e(pretty(b))}</span>"
+               " <small>best specs in the top raids: " + ", ".join(f"<span class='rl-best'>{_ic(b)}{e(pretty(b))}</span>"
                                                  for b in t["best"]) + "</small>")
             + "</li>" for t in sh["targets"])
         bd = "".join(  # one line a player: who, which build, then each talent to take (+) or drop (-)
@@ -402,7 +402,7 @@ def page_body(difficulty: str) -> str:
     miss = (f"<p class='small muted'>Not prepared yet, so no sheet: {e(', '.join(missing))}. "
             f"<a href='/raid/prepare?difficulty={e(difficulty)}'>Prepare the whole raid</a> first.</p>" if missing else "")
     n = len(everything)
-    answer = (f"<p class='lead'>{n} {'boss' if n == 1 else 'bosses'} ready to copy for Discord"
+    answer = (f"<p class='lead'>{n} {'boss' if n == 1 else 'bosses'} to copy for Discord"
               + (f", {len(missing)} still to prepare" if missing else "")
               + f", for the {len(state['players']) - len(bench)} players of your raid.</p>") if n else ""
     if answer:  # the answer is the page's lead; what the page does goes

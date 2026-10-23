@@ -271,6 +271,7 @@ def sentences(b: dict, player: str) -> list[str]:
         for h in d.get("highlights", []):  # a row of the pulls' table (the owner: less text)
             row = h.get("row") or _row_of(h["text"])  # a result read before the rows: from its sentence
             out.append({"cmp": [_you(row[0], player), *row[1:]], "kind": h.get("kind", ""),
+                        "pulls": [_pull_label(d.get("b")), _pull_label(d.get("a"))],
                         "text": _ab(h["text"], player)} if row else _ab(h["text"], player))
     return out
 
@@ -290,11 +291,19 @@ def _you(label: str, player: str) -> str:
 
 
 ROWS = ((r"^(.+): (\S+) on the boss in B, (\S+) in A\.$", "{0}: damage on the boss"),
-        (r"^(.+): active (\S+) of the pull in B, (\S+) in A\.$", "{0}: active"),
+        (r"^(.+): active (\S+) of the pull in B, (\S+) in A\.$", "{0}: time casting"),
         (r"^At (\d+:\d\d), the boss had (\S+) left in B against (\S+) in A\.$", "Boss health left at {0}"),
         (r"^Deaths before the wipe: (\S+) in B, (\S+) in A\.$", "Deaths before the wipe"),
         (r"^Share of the raid's damage on (.+): (\S+) in B, (\S+) in A\.$", "Raid damage on {0}"),
         (r"^(.+): died (\d+) time\(s\) in B, (\d+) in A\.$", "{0}: deaths"))
+
+
+def _pull_label(side: dict | None) -> str:
+    """"pull 27, 2:38": a compared pull, as the log names it, with its length."""
+    if not side:
+        return ""
+    dur = side.get("duration")
+    return f"{side.get('label') or ''}" + (f", {_mmss(dur)}" if dur else "")
 
 
 def _row_of(text: str) -> list[str] | None:
@@ -324,11 +333,14 @@ def _cmp_table(rows: list[dict]) -> str:
     """The best pull against the weaker one, a measure a row, the better value marked (good or bad for you)."""
     if not rows:
         return ""
-    return ("<table class='lr-cmp fit'><thead><tr><th></th><th>Best pull</th><th>Weaker pull</th><th>Gap</th></tr>"
+    lab = rows[0].get("pulls") or ["", ""]  # which pulls: "Pull 27 (2:38)", so an expert can check them
+    return ("<table class='lr-cmp fit'><thead><tr><th></th>"
+            f"<th>Best pull{' <small>' + e(lab[0]) + '</small>' if lab[0] else ''}</th>"
+            f"<th>Weaker pull{' <small>' + e(lab[1]) + '</small>' if lab[1] else ''}</th><th>Gap</th></tr>"
             "</thead><tbody>"
             + "".join(f"<tr class='{e(r.get('kind', ''))}'><td>{e(r['cmp'][0])}</td><td><b>{e(r['cmp'][1])}</b></td>"
                       f"<td>{e(r['cmp'][2])}</td><td class='gap'>{e(_delta(r['cmp'][1], r['cmp'][2]))}"
-                      f"{' &#9650;' if r.get('kind') == 'good' else ' &#9660;' if r.get('kind') == 'bad' else ''}</td>"
+                      f"{' &#10003;' if r.get('kind') == 'good' else ' &#10007;' if r.get('kind') == 'bad' else ''}</td>"
                       "</tr>" for r in rows) + "</tbody></table>")
 
 
