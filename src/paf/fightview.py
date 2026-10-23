@@ -150,8 +150,9 @@ def _defensives(d) -> list[tuple[float, str, str]]:
             continue
         t = m.time
         hits = [c for c in casts.get(m.boss_ability, []) if t - 3 <= c <= t + DEF_SNAP] if m.boss_ability else []
-        if hits:
-            t = max(0.0, min(hits, key=lambda c: abs(c - t)) - 1)
+        if hits:  # never later than the top players press it: a cast time can be its channel's end (DPS round 10:
+            # Feint at 3:05, 6 s long, moved to 3:11 for Imbibe "cast" at 3:12, when its venoms spawn)
+            t = max(0.0, min(t, min(hits, key=lambda c: abs(c - t)) - 1))
         # the logs tie it to that ability; with no cast of it close by, it is a hit that lands long after its cast
         # no cast of it around the press (8 s before to 12 s after, as the defensives table reads it): a late hit
         late = m.boss_ability in casts and not [c for c in casts[m.boss_ability] if t - 8 <= c <= t + 12]

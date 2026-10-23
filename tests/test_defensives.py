@@ -38,3 +38,16 @@ def test_defensives_travel_in_the_pack(tmp_path, monkeypatch):
     assert q.defensives.usage[0] == ("Feint", 1966, 2.5, 0.74) and q.defensives.kills == 199
     p.defensives = None  # packs made before defensives
     assert pack.from_json(pack.to_json(p)).defensives is None
+
+
+def test_a_defensive_is_never_moved_after_the_top_players_press():
+    # Subtlety Rogue, Vashnik (DPS round 10): Feint at 3:05 (6 s) moved to 3:11 for Imbibe "cast" at 3:12, the end
+    # of its channel: past the buff
+    from paf import fightview
+
+    p = PrepData(boss="Vashnik", difficulty="heroic", spec="Subtlety", character="X")
+    p.defensives = Defensives([DefensiveMoment(185.0, 0.41, [("Feint", 1966, 0.81)], "Imbibe", 1)], [], 100)
+    p.boss_casts = [("Imbibe", [24.0, 108.0, 192.0])]
+    assert [round(t) for t, _s, _w in fightview._defensives(p)] == [185]
+    p.boss_casts = [("Imbibe", [24.0, 108.0, 184.0])]  # a cast just before: the press goes just before it
+    assert [round(t) for t, _s, _w in fightview._defensives(p)] == [183]
