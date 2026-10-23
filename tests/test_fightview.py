@@ -52,7 +52,7 @@ def test_the_page_carries_its_data_and_one_script(monkeypatch):
     blades = [a for a in data["acts"] if a["n"] == "Shadow Blades"]
     assert blades[0]["t"] == 52 and blades[0]["c"] == "on the 4 × Amani"  # called at its own time, not the row's
     assert [a["k"] for a in data["anchors"]] == ["pull", "cast", "adds", "phase", "cast"]  # what a press can confirm
-    assert "<dialog class='ss' id='ss'" in page and "Dig deeper" in page
+    assert "<dialog class='ss' id='ss'" in page and "For those who dig" not in page  # the tab is there
     assert fightview.JS.strip().startswith("/*") and "</script" not in fightview.JS
 
 

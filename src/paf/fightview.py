@@ -682,8 +682,7 @@ def _side(d) -> str:
             "<div class='meter'><i id='c-meter'></i></div></div>"
             f"{_btn('c-sync', '', 'Control+Shift+Space', hidden=True)}"
             f"<div class='foot'>{_btn('ss-open', 'Second screen', cls='btn ghost')}{copy}</div></section>"
-            f"{job_html(d)}<p class='deep'>For those who dig: the cooldown plan, when the top players press each "
-            "cooldown and every number are in <a href='#deeper'>Dig deeper</a>.</p></aside>")
+            f"{job_html(d)}</aside>")  # no pointer to the Dig deeper tab: it is right there (review 36)
 
 
 def _second_screen(d) -> str:

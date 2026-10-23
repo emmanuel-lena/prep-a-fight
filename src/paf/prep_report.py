@@ -454,14 +454,14 @@ def raid_section(r: RaidInfo, gear: bool = True) -> str:
 <th class="n">Top raids' weakest quarter</th><th>Verdict</th></tr>{rows}</table></div>
 <p class="small muted">Damage your raid puts on these adds, as a share of the top raids' (their median = 100%).</p>
 <p class="small">Your raid on this boss, by what each spec does with the adds:</p><ul class="small">{groups}</ul>{est}{build}
-<details open><summary class="small">How it is computed</summary><p class="small muted">Measured: on this boss, each spec puts
+<h4 class="small">How it is computed</h4><p class="small muted">Measured: on this boss, each spec puts
 a share of its damage on these adds while they are up (from the ranked kills): well above the median of all players =
 AoE / funnel, well below = single target. Computed: your raid's damage on the adds = every player's DPS in your log x
 their spec's share; the same for every top raid gives the reference range. Rule (not a measurement): if your raid
 without you is within the top raids' range (above their weakest quarter), the others cover the adds and you stay on
 the boss; otherwise you pad. Not promised: how long the adds will live. In the top kills it depends on the mechanics
 and the strategy, not on the raid's DPS (checked: no correlation). Top players pad whatever their raid (they are
-ranked on their own DPS), so their logs alone cannot tell what your raid needs.</p></details></div>"""
+ranked on their own DPS), so their logs alone cannot tell what your raid needs.</p></div>"""
 
 
 @dataclass
@@ -487,8 +487,14 @@ def best_build(d: PrepData):
     return max(d.talents.rows, key=lambda r: r.per_fight.get(fight, (-1e9, None))[0])
 
 
+ADDONS = {"MRT": "to paste in Method Raid Tools", "NSRT": "to paste in Northern Sky Raid Tools"}
+
+
 def copy_button(text: str, label: str) -> str:
-    return f'<button type="button" class="btn ghost copy" data-copy="{e(text)}">{e(label)}</button>'
+    """A copy button; an addon's note says which addon on hover (review 36: a line beside the buttons)."""
+    tip = next((t for k, t in ADDONS.items() if k in label.split()), "")
+    tip = f' title="{e(tip)}"' if tip else ""
+    return f'<button type="button" class="btn ghost copy" data-copy="{e(text)}"{tip}>{e(label)}</button>'
 
 
 def _fallen(p) -> bool:
@@ -634,7 +640,7 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         if d.mrt.get(p.objective):
             lines.append(copy_button(d.mrt[p.objective], "Copy the MRT note")
                          + (" " + copy_button(d.nsrt[p.objective], "Copy for NSRT") if d.nsrt.get(p.objective) else "")
-                         + " <span class='muted small'>to paste in Method Raid Tools or Northern Sky Raid Tools</span>")
+                         )  # the addons named in the buttons' own tooltips (review 36)
         stall = _stall(d, p)
         if stall:
             lines.append(f"<div class='why'>&#9888; {e(stall)}</div>")
