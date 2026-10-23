@@ -1448,7 +1448,7 @@ the simulated plans above.</p>
             noise = i and top - w <= 2 * d.gear_error and w >= 0  # never "about the best" on a loss
             items = "".join(f"<div>{lk(c)}</div>" for c in ch.split("; "))
             body += (f"<tr class='{'noise' if noise else ''}'><td class='small gearset'>{items}"
-                     + f"</td><td class='n'>{_pct(w)}" + (" <span class='pill near'>&asymp; best</span>" if noise else
+                     + f"</td><td class='n'>{_pct(w, err=d.gear_error)}" + (" <span class='pill near'>&asymp; best</span>" if noise else
                                                           " <span class='pill near'>best</span>"
                                                           if not i and w > 2 * d.gear_error else
                                                           " <span class='pill near'>&asymp; keep yours</span>"
@@ -1462,7 +1462,7 @@ the simulated plans above.</p>
 {"<p class='small warn'>&#9888; Every set here loses more than 5%: a sim gone wrong, not a reading. Keep the gear you wear.</p>" if top < -5 else ""}
 <p class="small">Simmed {e(d.gear_plan or 'with the default priority list')}, {e(mine)}.</p>
 <table><tr><th>Swaps vs your equipped gear</th><th>Gain &plusmn;{d.gear_error:.2f}%</th>{head}</tr>{body}</table>
-{"<p class='tiny muted'>&asymp; best: within the error of the best set.</p>" if "near" in body else ""}</div>""")
+{"<p class='tiny muted'>&asymp; best: within the error of the best set; &asymp; keep yours: no set beats yours by twice the error.</p>" if "near" in body else ""}</div>""")
 
     # loot
     if d.loot:
