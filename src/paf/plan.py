@@ -164,7 +164,8 @@ def plan_template(fight: Fight) -> str:
         "#",
         "# The fight, from the template:",
     ]
-    events = [(w.time, f"adds x{w.count} for {w.lifetime:.0f}s ({w.name})") for w in fight.add_waves]
+    events = [(w.time, f"adds x{w.count} for {w.lifetime:.0f}s ({w.name.replace(' (', ', ').rstrip(')')})")
+              for w in fight.add_waves]  # one bracket: "(Echo of Jawae, after Soul Transfer)"
     events += [(w.start, f"boss not attackable for {w.duration:.0f}s") for w in fight.invulnerable]
     events += [(w.start, f"movement {w.duration:.0f}s (top players)") for w in fight.movement]
     for t, what in sorted(events):
