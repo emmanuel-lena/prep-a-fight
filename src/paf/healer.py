@@ -1908,8 +1908,9 @@ def _why_not(c: Cooldown, t: float, found: list | None = None) -> str:
         return f": {c.why}"
     if t <= PULL:
         return ": at the pull"
-    if t in c.windowed and (m := hit_near(t)) is not None:  # the table's own words for it (heal confirm round 4:
-        return f": in the {_mmss(m.t)} hit's window, not kept for it"  # "held past its cooldown" on hover)
+    if t in c.windowed and (m := hit_near(t)) is not None:  # the table's own words for it (heal confirm rounds
+        back = (", back from cooldown" + (" for about half" if t in c.back_half else "")) if t in c.back else ""
+        return f": in the {_mmss(m.t)} hit's window{back}: not kept for it"  # 4-6: the chip's ⟲ said too)
     if c.fates:  # a two-step button's store: where its release lands
         us = [u for s_, u in c.fates if u is not None and abs(s_ - t) <= 8]
         m = hit_near(st.median(us)) if us else None
@@ -2855,6 +2856,10 @@ def render_sheet(h: HealerPrep) -> str:
         answered.add((r.name, t))
         if _mmss(at) != _mmss(t):
             moved[(r.name, t)] = at
+    for c in heals:  # a press named for a hit's window: its hover says that window (heal confirm round 6)
+        for t in [*c.times, *c.alt]:
+            if named.get((c.name, t)) is not None and t not in c.windowed:
+                c.windowed.append(t)
     for c in heals:  # a chip shown at its hit window's time: its chart mark there too (heal confirm round:
         for t in [*c.times, *c.alt]:  # Tranquility "3:36" on the chip, its outline at 3:46)
             at = _named_at(c, t, named, 0.0)
@@ -2885,6 +2890,7 @@ def render_sheet(h: HealerPrep) -> str:
                     drawn = [*drawn, _rep(r, alt=[*r.alt, t_row], alt_near=[*(r.alt_near or [""] * len(r.alt)), ""],
                                           windowed=[t_row])]
                     lanes_extra.add(_shown(r.name))
+                    lanes_extra.add(_shown(c.name))  # its store's lane too, as the sheets with a kept release
     lanes = set(lead_names) | {k[0] for k in named if k[0] != KEPT} | {c.name for c in drawn if _shown(c.name) in lanes_extra}
     # gets its lane and its outline there (heal confirm round 2: Convoke 60% in the 1:15 window, no mark)
     svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight, and the top players' healing "
