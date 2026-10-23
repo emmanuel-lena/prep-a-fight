@@ -527,7 +527,7 @@ def boss_cards(items: list[dict], order: tuple[str, ...] = (), spec: bool = True
     from paf import icons
 
     def row(x: dict) -> str:
-        cls = (x.get("spec") or "").split(" ")[-1].lower()
+        cls = icons.class_key(x.get("spec") or "")
         ic = icons.img(icons.CLASS_ICON.format(cls=cls), "medium", "bc-ic") if cls else "<span class='bc-ic'></span>"
         who = e(x["spec"] or "Your sheet") + " " if spec else ""  # under "Your sheets as X": said once
         ic = ic if spec else ""
@@ -594,7 +594,7 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
             "</a>" for i in xs)  # no sim: the dashed outline, in the legend (never colour alone)
 
     def who(sp: str) -> str:
-        cls = sp.split(" ")[-1].lower()
+        cls = icons.class_key(sp)
         return (icons.img(icons.CLASS_ICON.format(cls=cls), "small", "ics") if cls else "") + e(sp)
     rows = "".join(f"<tr{' class=mine' if sp.lower() == mine.lower() else ''}><th scope='row'>{who(sp)}</th>"
                    + "".join(f"<td>{cell(sp, n)}</td>" for n in names) + "</tr>" for sp in specs)

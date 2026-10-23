@@ -18,6 +18,16 @@ CDN = "https://wow.zamimg.com/images/wow/icons/{size}/{icon}.jpg"
 CLASS_ICON = "classicon_{cls}"
 
 
+def class_key(spec: str) -> str:
+    """"Frost Death Knight" / "Frost DeathKnight" / "Havoc Demon Hunter" -> "deathknight" / "demonhunter"; the last
+    word otherwise ("Arcane Mage" -> "mage"): a two-word class never reads as its last word ("knight")."""
+    low = (spec or "").lower().replace(" ", "")
+    for two in ("deathknight", "demonhunter"):
+        if low.endswith(two):
+            return two
+    return (spec or "").split(" ")[-1].lower()
+
+
 def _cache_path() -> Path:
     return data_dir() / "cache" / "icons.json"
 

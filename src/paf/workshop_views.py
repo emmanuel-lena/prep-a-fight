@@ -251,7 +251,7 @@ def review(d: dict) -> str:
         f"<span class='l-val'>{t['raid']:.0%} <small>/ {t['tops']:.0%}</small></span></li>" for t in targets)
 
     def who(p: dict) -> str:
-        cls = p["spec"].split(" ")[-1].lower()
+        cls = icons.class_key(p["spec"])
         ic = icons.img(icons.CLASS_ICON.format(cls=cls), "medium", "it-ic")
         mine, habit = p["shares"].get(p["target"], 0.0), p["habit"].get(p["target"], 0.0)
         # short pieces, each a whole text (the translation matches whole texts): numbers and names apart
@@ -293,7 +293,7 @@ def comp(d: dict) -> str:
     targets = d.get("targets", [])
 
     def ic(spec: str, size: str = "medium") -> str:
-        return icons.img(icons.CLASS_ICON.format(cls=spec.split(" ")[-1].lower()), size, "it-ic")
+        return icons.img(icons.CLASS_ICON.format(cls=icons.class_key(spec)), size, "it-ic")
 
     def names(lst: list) -> str:
         return "".join(f"<span class='who-chip'>{ic(p['spec'])}<b>{e(p['name'])}</b></span>" for p in lst)

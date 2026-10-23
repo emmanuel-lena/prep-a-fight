@@ -305,7 +305,7 @@ def _ic(spec: str) -> str:
     """A player's class icon from its spec ("Frost DeathKnight" -> the Death Knight's)."""
     from paf import icons
 
-    cls = (spec or "").split(" ")[-1].lower()
+    cls = icons.class_key(spec)
     return icons.img(icons.CLASS_ICON.format(cls=cls), "small", "ics") if cls else ""
 
 
