@@ -318,10 +318,13 @@ def _talents_h4(sh: dict, total: int, said: int = -1) -> str:
     return f"<h4>Talents to change {''.join(parts)}</h4>"
 
 
-def _strip_cell(x, sh, total: int = 0) -> str:
+def _strip_cell(x, sh, total: int = 0, difficulty: str = "heroic") -> str:
     """A boss of the strip: its portrait, then what its card asks: players on adds, talent changes, or no kills."""
-    if sh is None:
-        say = "<span class='rl-sv none'>no kills read</span>"
+    if sh is None:  # its link prepares the raid: no line apart to say it (fresh app review 5)
+        img = (f"<img src='/bossimg/{x.id}.png' alt='' loading='eager' onerror=\"this.remove()\">")
+        return (f"<a class='rl-sb none' href='/raid/prepare?difficulty={e(difficulty)}' title='Prepare the whole raid "
+                f"to read its top kills'>{img}<b>{e(x.name)}</b><span class='rl-sv none'>no kills read &middot; "
+                "prepare &rarr;</span></a>")
     else:
         adds = sum(len(t["players"]) for t in sh["targets"])
         say = (f"<span class='rl-sv'>{adds} on adds</span>" if adds else "") + (
@@ -448,7 +451,7 @@ def page_body(difficulty: str) -> str:
             continue
         if sh is None:
             missing.append(x.name)
-            strip.append(_strip_cell(x, None))
+            strip.append(_strip_cell(x, None, difficulty=difficulty))
             continue
         everything.append(sh)
         strip.append(_strip_cell(x, sh, len(in_raid)))
@@ -487,8 +490,6 @@ def page_body(difficulty: str) -> str:
                   + lust_block(sh, difficulty) + "</article>")
     allbtn = (copy_button("\n\n".join(text(sh, difficulty) for sh in everything), "Copy every boss for Discord")
               if everything else "")
-    miss = (f"<p class='small muted'>No top kills read yet: {e(', '.join(missing))}. "
-            f"<a href='/raid/prepare?difficulty={e(difficulty)}'>Prepare the whole raid</a> first.</p>" if missing else "")
     n = len(everything)
     answer = (f"<p class='lead'>{n} {'boss' if n == 1 else 'bosses'} to copy for Discord"
               + f", for the {len(state['players']) - len(bench)} players of your raid.</p>") if n else ""
@@ -499,7 +500,7 @@ def page_body(difficulty: str) -> str:
              "addon shows in game.</p>"
              ) if everything else ""
     return (head + roster + f"<h2>Boss by boss</h2><nav class='rl-strip' aria-label='Every boss'>{''.join(strip)}</nav>"
-            f"<div class='rl-all'>{allbtn}</div>{miss}{words}<div class='rl-grid'>{cards}</div>"
+            f"<div class='rl-all'>{allbtn}</div>{words}<div class='rl-grid'>{cards}</div>"
             f"{_tools()}{COPY_JS}")
 
 

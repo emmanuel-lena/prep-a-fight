@@ -308,8 +308,8 @@ by step.</p>
 <p class="small measure">{current} <a href="https://www.warcraftlogs.com/api/clients"
 target="_blank" rel="noopener">Use another key &#8599;</a></p>
 <form method="post" action="/credentials" class="row"><input type="hidden" name="back" value="settings">
-<label class="key-l">{"New client ID" if cid else "Client ID"}<input name="id" class="key-in" required{key_ph}></label>
-<label class="key-l">{"New client secret" if cid else "Client Secret"}<input name="secret" class="key-in"
+<label class="key-l">Client ID<input name="id" class="key-in" required{key_ph}></label>
+<label class="key-l">Client Secret<input name="secret" class="key-in"
 type="password" required autocomplete="off"{' placeholder="saved"' if cid else ''}></label>
 <button class="btn ghost">{"Replace and test" if cid else "Save and test"}</button></form>
 <p class="tiny muted">Saved on this computer only, in {e(str(data_dir() / '.env'))}.</p>{alt}</div>

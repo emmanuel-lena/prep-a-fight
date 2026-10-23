@@ -564,7 +564,7 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
         return ""
     spec_of = {x["key"]: (x.get("spec") or "Your sheet") for x in items}
     specs = sorted({spec_of[x["key"]] for x in items}, key=lambda s: (s.lower() != mine.lower(), s))
-    names = [x.name for x in encs if any(i["name"] == x.name for i in items)]
+    names = [x.name for x in encs]  # every boss, in the board's order: an empty column says none yet (fresh review 5)
     names += sorted({i["name"] for i in items} - set(names))
     order = ("mythic", "heroic", "normal")
     head = "".join(
@@ -1350,8 +1350,9 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
 <label class="goal"><input type="radio" name="goal" value="auto" checked><span><b>{raid_ic}Let my raid decide</b>
 <small>The prep reads your raid's log: if the others already cover the adds, you stay on the boss.</small></span></label>
 """ + f'</div><div class="ob-actions">{nxt}</div></section>')
+    est_badge = (f"<p class='est-badge' title='{e(est.lead)}'>&#9201; {e(est.badge)}</p>" if est else "")
     body = f"""<div class="boss-cols"><div class="boss-main"><h1>{e(enc.name)} {diff_pill(difficulty)}</h1>
-<p class="lead">{boss_line(enc, difficulty)}{e(est.lead) if est else ""}</p>{f'<p class="last-sheet">{last.strip()}</p>' if last.strip() else ""}
+<p class="lead">{boss_line(enc, difficulty)}</p>{est_badge}{f'<p class="last-sheet">{last.strip()}</p>' if last.strip() else ""}
 <form method="post" action="/prep" class="ob story" data-boss="{enc.id}-{e(difficulty)}">
 <input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
 <div class="ob-where" aria-hidden="true"><ol class="ob-dots"><li></li><li></li><li></li><li></li></ol><span class="ob-n">Step <b>1</b> of 4</span></div>
