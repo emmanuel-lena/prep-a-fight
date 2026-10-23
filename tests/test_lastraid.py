@@ -175,4 +175,5 @@ def test_the_prepare_line_survives_a_full_comparison_table(home, monkeypatch):
                               {"boss": 1, "name": "Sszorak", "difficulty": "mythic", "kill": False, "pulls": 35,
                                "best": 58.0, "jobs": {"diff": "d1"}}]}})
     html = lastraid.card("me")
-    assert "Prepare Sszorak to see why it did not die" in html and "lr-cmp" in html  # both, the table too
+    assert "<nav class='lr-links'><a href='/boss?boss=1&amp;difficulty=mythic'>Sszorak's prep &rarr; why it" in html
+    assert "lr-cmp" in html  # the table too

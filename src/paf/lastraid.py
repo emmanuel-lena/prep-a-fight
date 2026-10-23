@@ -446,11 +446,9 @@ def card(slug: str, heading: bool = True) -> str:
         links = "".join(f"<a href='/job/{e(jid)}'>{label}</a>" for kind, label in
                         (("rotation", "Your rotation"), ("wipe", "Why it did not die"), ("diff", "These two pulls, in detail"))
                         if (jid := b["jobs"].get(kind)) and not _failed(jid))
-        if not b["kill"] and (_failed(b["jobs"].get("wipe")) or not b["jobs"].get("wipe")):  # needs the boss prepared
-            plain = [x for x in says if not (isinstance(x, dict) and x.get("cmp"))]  # the sentences, never the
-            table = [x for x in says if isinstance(x, dict) and x.get("cmp")]       # table's rows, make room
-            says = [*plain[:2], f"Prepare {b['name']} to see why it did not die, then read the log again.", *table]
-            # (app confirm round 3: three table rows filled the cut and dropped the only route to the wipe analysis)
+        prep = "The prep"
+        if not b["kill"] and (_failed(b["jobs"].get("wipe")) or not b["jobs"].get("wipe")):  # needs the boss prepared:
+            prep = f"{e(b['name'])}'s prep &rarr; why it did not die"  # the link says it, first (app confirm rounds 3-4)
         if not says and not cur["finished"]:
             body = "<p class='lr-wait'><span class='pl-spin'></span> Reading&hellip;</p>"
         else:
@@ -460,8 +458,11 @@ def card(slug: str, heading: bool = True) -> str:
                 "<p class='muted small'>Nothing stands out.</p>"
         card_html = (f"<article class='lr-boss{' kill' if b['kill'] else ''}'><header><b>{e(b['name'])}</b>"
                  f"{diff_pill(b['difficulty'])}" + (f"<span class='lr-state'>{state_txt}</span>" if state_txt else "") + "</header>"
-                 f"{body}<nav class='lr-links'>{links}<a href='/boss?boss={b['boss']}&amp;difficulty={e(b['difficulty'])}'>"
-                 f"The prep</a></nav></article>")
+                 f"{body}<nav class='lr-links'>"
+                 + (f"<a href='/boss?boss={b['boss']}&amp;difficulty={e(b['difficulty'])}'>{prep}</a>{links}"
+                    if prep != "The prep" else
+                    f"{links}<a href='/boss?boss={b['boss']}&amp;difficulty={e(b['difficulty'])}'>{prep}</a>")
+                 + "</nav></article>")
         if b["kill"]:
             folded += card_html
         else:
