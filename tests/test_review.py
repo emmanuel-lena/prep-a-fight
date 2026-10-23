@@ -67,3 +67,22 @@ def test_your_other_spec_in_the_raid_log_is_read_as_the_one_you_prepare(monkeypa
     from paf.prep_report import raid_section
 
     assert "your log: Assassination Rogue" in raid_section(r)
+
+
+def test_your_character_of_another_class_is_swapped_out_and_said(monkeypatch):
+    # Elemental sheet, Nek'zali (DPS round 13): Ixuu the Rogue still listed, "you are not in that log", and the
+    # stand-in at the top half's median (the 4th best of 14), not the damage dealers'
+    from types import SimpleNamespace
+
+    from paf import cli, raidneed
+    from paf.prep_report import raid_section
+
+    rc = raidneed.RaidComp("AbCd", "kill", [("Ixuu", "Subtlety Rogue", 47000.0), ("Ann", "Arcane Mage", 90000.0),
+                                            ("Bo", "Frost Mage", 70000.0), ("Hea", "Holy Priest", 20000.0)])
+    monkeypatch.setattr(raidneed, "raid_from_report", lambda *a, **k: rc)
+    monkeypatch.setattr(raidneed, "spec_profiles", lambda *a, **k: {})
+    monkeypatch.setattr("paf.settings.get", lambda k, d=None: "Shaman" if k == "class" else d)
+    profile = SimpleNamespace(name="Ixuu", class_name="shaman")
+    r = cli._raid_verdict(None, None, SimpleNamespace(id=9), 4, "u", profile, "Elemental", types=[])
+    assert not r.you_found and r.logged_as == "Subtlety Rogue" and r.you[1] == 80000.0  # 70k and 90k: you swapped out
+    assert "you are in that log as Subtlety Rogue, swapped out" in raid_section(r)

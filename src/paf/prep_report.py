@@ -413,7 +413,7 @@ def simmed_note(d: PrepData) -> str:
 def raid_section(r: RaidInfo, gear: bool = True) -> str:
     you = (f"you ({e(r.you[0])}, {r.you[1] / 1000:,.0f}k DPS"
            + (f" <span class='pill'>your log: {e(r.logged_as)}</span>" if r.logged_as else "") + ")" if r.you_found else
-           f"{'an' if r.you[0][:1].lower() in 'aeiou' else 'a'} {e(r.you[0])} at your raid's median DPS ({r.you[1] / 1000:,.0f}k; you are not in that log as {e(r.you[0])})")  # another spec of yours may be
+           f"{'an' if r.you[0][:1].lower() in 'aeiou' else 'a'} {e(r.you[0])} at your raid's median DPS ({r.you[1] / 1000:,.0f}k; " + (f"you are in that log as {e(r.logged_as)}, swapped out)" if r.logged_as else f"you are not in that log as {e(r.you[0])})"))  # another spec of yours may be
     head = (f"<p class='small'>From your raid's log <a href='https://www.warcraftlogs.com/reports/{e(r.report)}' "
             f"target='_blank' rel='noopener'>{e(r.report)}</a> ({e(r.fight)}, {r.players} players), with {you}.</p>")
     if not r.verdicts:
@@ -428,7 +428,7 @@ def raid_section(r: RaidInfo, gear: bool = True) -> str:
                      for k, ps in r.archetypes.items() if ps)
     rest = r.players - sum(len(ps) for ps in r.archetypes.values())
     if groups and rest > 0:  # every player of the log accounted for
-        groups += f"<li><b>healers and tanks</b> ({rest}): not counted for the adds</li>"
+        groups += f"<li><b>healers</b> ({rest}): not counted for the adds</li>"
     what = "the cooldown plan and the gear on this sheet are" if gear else "the cooldown plan on this sheet is"
     verdict = (f"Stay on the boss: {what} the one{'s' if gear else ''} for boss damage." if r.objective == "boss"
                else f"Pad the adds: {what} the one{'s' if gear else ''} for total damage.")

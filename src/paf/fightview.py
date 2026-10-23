@@ -204,7 +204,8 @@ def items(d) -> list[tuple[float, Item]]:
     starts = [s for _n, s in d.phases if s >= 1]
     for w in (d.fight.invulnerable if d.fight is not None else []):
         at = next((s for s in starts if abs(s - w.start) <= 3), w.start)  # an intermission: on its phase's row
-        add(at, Item("boss", "immune", "Boss immune", f"The boss is immune for {w.duration:.0f} s", IMMUNE_ICON,
+        secs = int(w.start + w.duration) - int(w.start)  # from the clock times shown
+        add(at, Item("boss", "immune", "Boss immune", f"The boss is immune for {secs} s", IMMUNE_ICON,
                      float(w.duration)))
     cast_names = {n for n, _ts in d.boss_casts}
     for a in d.actions:  # a mechanic that can be you, at the times the logs give, when no boss cast already says it
@@ -433,7 +434,8 @@ def job_html(d) -> str:
     for w in imm[:1]:
         adds = [_clean(x[3]) for x in d.waves if w.start - 2 <= x[0] <= w.start + w.duration and x[1]]
         what = f": your damage goes on the {e(adds[0])}" if adds else ""
-        lo, hi = min(round(x.duration) for x in imm), max(round(x.duration) for x in imm)
+        shown = [int(x.start + x.duration) - int(x.start) for x in imm]  # from the times shown, so "1:41 to 2:40"
+        lo, hi = min(shown), max(shown)  # reads 59 s (DPS round 13: "(58 s)")
 
         long = _span(lo) if lo == hi else f"{_span(lo)} to {_span(hi)} each"  # every time (the Sentinels: three)
         if len(imm) == 1:
@@ -617,7 +619,7 @@ def _phase_html(name: str, start: float, end: float, pi: int, rows: str, its: li
         said.insert(0, "Bloodlust " + ("at the pull" if lust[0] < 5 else f"at {_mmss(lust[0])}"))
     short = bool(mine) and all(x.kind in ("immune", "phase") for _t, x in mine)  # an immunity alone: its row says it
     adv = f"<p class='ph-adv'>{e(cap('; '.join(said)))}.</p>" if said and not short else ""  # in time order
-    span = _span(end - start)
+    span = _span(int(end) - int(start))  # from the clock times shown (DPS round 13: "1:41" lasting "1 min 42 s")
     m = re.fullmatch(r"(.*) \((\d+ of \d+)\)", name)
     title = f"{e(m[1])} <span class='rep'>({m[2]})</span>" if m else e(name)
     return (f"<section class='stl{' short' if short else ''}' aria-labelledby='ph{pi}-h'><div class='ph-band' "

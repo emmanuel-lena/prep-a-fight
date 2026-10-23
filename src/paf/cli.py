@@ -2352,10 +2352,17 @@ def _raid_verdict(client, con, enc, diff: int, url: str, profile, spec: str, fil
         logged, label = me[1], f"{spec} {me[1].rpartition(' ')[2]}"
         rc.players = [(n, label if (n, s) == me[:2] else s, dps) for n, s, dps in rc.players]
         me = (me[0], label, me[2])
+    other = next((p for p in rc.players if me is None and profile.name and p[0].lower() == profile.name.lower()), None)
+    if other is not None:  # your character of another class in that log: swapped out of every list, said (DPS
+        logged = other[1]  # round 13: Ixuu (Subtlety Rogue) still listed on the Elemental sheet)
+        rc.players = [p for p in rc.players if p is not other]
     if me is not None:
         you, found = (me[1], me[2]), True
     else:  # not in that log: a damage dealer of your spec at the raid's median DPS among damage dealers
-        dealers = sorted(dps for _, _, dps in rc.players)[len(rc.players) // 2:]
+        tanks = {"Blood DeathKnight", "Blood Death Knight", "Vengeance DemonHunter", "Vengeance Demon Hunter",
+                 "Guardian Druid", "Brewmaster Monk", "Protection Paladin", "Protection Warrior"}
+        dealers = [dps for _, s, dps in rc.players if s not in raidneed.HEALERS and s not in tanks]  # the median
+        # of the damage dealers, as it says (DPS round 13: the top half's median read the 4th best of 14)
         you, found = (f"{spec} {settings.get('class')}", st.median(dealers) if dealers else 0.0), False
     if types is None:
         types = raidneed.add_types(con, enc.id, diff)
