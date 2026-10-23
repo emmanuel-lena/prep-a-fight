@@ -1630,7 +1630,8 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float, shown_t
             # every other chip (heal round 10: "in the window of the 2:55 moment: the same 15%")
             return _offset(at, _mmss(hit)) + _base(c, hs, hit) + _pressers(c, sp, t) + tag
         if c.ramp and at < hit - ANSWER[0]:  # a ramp ahead of its hit: its offset, as every chip (heal confirm 9)
-            return f"{_share(sp)}{_still(c, t, sp)}{_offset(at, _mmss(hit))}:{_base(c, hs, hit).replace(' &middot;', '')}" + tag
+            return f"{_offset(at, _mmss(hit))}{_base(c, hs, hit)}" + tag  # its window's share, " · N%" as every
+            # offset chip (heal confirm round 10: "20 s before the 3:35 hit: 38%" beside "21 s before … · 41%")
         return (f"{_share(sp)}{_still(c, t, sp)} &middot; in the window of the {_mmss(hit)} hit:"
                 f"{_base(c, hs, hit).replace(' &middot;', '')}" + tag)  # the chip's time is the window's (round 12)
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
@@ -1957,7 +1958,7 @@ def _split(chip: str) -> tuple[str, str]:
         if mark in chip:
             i = chip.index(mark)
             return chip[:i], chip[i:]
-    m = re.search(r" &middot; \d+ s before the \d+:\d\d hit:", chip)  # a ramp's window, said as its offset
+    m = re.search(r" &middot; \d+ s before the \d+:\d\d hit &middot;", chip)  # a ramp's window, as its offset
     return (chip[:m.start()], chip[m.start():]) if m else (chip, "")
 
 
