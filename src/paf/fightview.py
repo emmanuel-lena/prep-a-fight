@@ -629,7 +629,7 @@ def _side(d) -> str:
             "<div class='clock'><b id='c-time'>0:00</b><span id='c-phase'></span></div>"
             f"<div class='ctl'>{_btn('play', 'Play', 'Space', 'btn primary')}{speed}"
             f"{_btn('pull', 'Start at 10 on the pull timer', 'Alt+P')}</div>"
-            "<h3 id='c-title'></h3><dl class='who'><dt>Boss</dt><dd id='c-boss'></dd><dt>You</dt>"
+            "<h3 id='c-title'></h3><dl class='who'><dt>Fight</dt><dd id='c-boss'></dd><dt>You</dt>"
             "<dd class='yd' id='c-you'></dd></dl><div class='call' id='c-call'></div><p class='then' id='c-then'></p>"
             "<div class='nb'><p><span id='c-next'></span><b id='c-in'></b></p>"
             "<div class='meter'><i id='c-meter'></i></div></div>"

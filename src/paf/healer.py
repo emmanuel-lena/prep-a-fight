@@ -953,8 +953,9 @@ def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list
                     f"<td class='sz'><span class='track'><span class='bar' style='width:{max(8, round((m.ratio - 1) / max(0.01, top - 1) * 100))}%'></span></span>"
                     f"<b>{_x(m.ratio)}&times;</b></td><td class='ans'>{ans}</td></tr>")
     return ("<table class='hits'><thead><tr><th>When</th><th>What hits</th><th>Size <small>(&times; the usual "
-            f"{usual}; the bar from 1&times; to the biggest)</small></th><th>What the top players press</th></tr></thead><tbody>" + "".join(rows)
-            + f"</tbody></table><p class='small muted hits-rule'>{rule}</p>")
+            f"{usual})</small></th><th>What the top players press</th></tr></thead><tbody>" + "".join(rows)
+            + f"</tbody></table><p class='small muted hits-rule'>{rule + '. ' if rule else ''}Bars: from 1&times; to the "
+            "biggest hit.</p>")
 
 
 def _stage_tag(t: float, phases: list | None) -> str:
@@ -2282,13 +2283,13 @@ def roles_more(roles: list, mine: str = "", found: list | None = None, staged: b
                 return f"{ic}<b>{e(_shown(n))}</b> {_mmss(t)}{' <small>(a ramp)</small>' if rp else ''}"
             if got:
                 return "<br>".join(f"{btn(n, t, rp)} &middot; {_pct(sp)}"
-                                   + (f" <small>({_pct(pp)} of its users)</small>" if _pct(pp) != _pct(sp) else "")
-                                   for n, t, sp, rp, pp in got)
+                                   + (f"<small> / {_pct(pp)}</small>" if _pct(pp) != _pct(sp) else "")
+                                   for n, t, sp, rp, pp in got)  # all its healers / its users (the legend)
             low = [u for u in under if len(u) > 4 and u[0] != "back"]
             if low:
                 n, t, sp, pp = low[0][:4]
                 return (f"<span class='under'>{btn(n, t, low[0][4])} &middot; {_pct(sp)}"
-                        + (f" <small>({int(pp * 100)}% of its users)</small>" if f"{int(pp * 100)}%" != _pct(sp)
+                        + (f"<small> / {int(pp * 100)}%</small>" if f"{int(pp * 100)}%" != _pct(sp)
                            else "") + "</span>")
             back = [u for u in under if u[0] == "back"]
             if back:
@@ -2311,8 +2312,8 @@ def roles_more(roles: list, mine: str = "", found: list | None = None, staged: b
             + (" whose stage starts are read (presses in stage time, as the curve)" if staged else "")
             + ", every player of each spec; that spec's own sheet reads its top players, so it can differ.</dd>"
             "<dt>A button</dt><dd>a quarter of the spec's healers who press it do so in the hit's window (5 s before "
-            "to 8 s after; a ramp: 8 to 30 s ahead, never the opener before 0:12); N%: of all that spec's healers, "
-            "then of its users when it differs.</dd><dt>Faded</dt><dd>under a quarter: its most pressed button, when "
+            "to 8 s after; a ramp: 8 to 30 s ahead, never the opener before 0:12); N% / M%: of all that spec's healers "
+            "/ of those who press the button, when it differs.</dd><dt>Faded</dt><dd>under a quarter: its most pressed button, when "
             "a tenth of the spec's healers press it there.</dd><dt>&#10226; none held</dt><dd>its presses there come "
             "back from cooldown (over 40% of them): no answer, as on the fight tab.</dd><dt>&mdash; none shared</dt>"
             "<dd>no button reaches a tenth.</dd><dt>Few players</dt><dd>under 100 of the spec's healers in these "

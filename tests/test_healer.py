@@ -445,7 +445,7 @@ def test_the_other_healers_chip_gives_the_share_the_bar_reads():
     rd = SimpleNamespace(spec="Restoration Druid", raid_cds=1, own_players=150,
                          cd_names=[("Tranquility", 1, [], 0.8, ([[74.0]] * 24 + [[200.0]] * 56, 100, 180.0))])
     out = healer.roles_more([rd], found=[healer.Moment(75.0, 1000.0, 1.6, "Soulcoil Rite")])
-    assert "<b>Tranquility</b> 1:14 &middot; 24% <small>(30% of its users)</small>" in out
+    assert "<b>Tranquility</b> 1:14 &middot; 24%<small> / 30%</small>" in out
 
 
 def test_a_button_on_cooldowns_far_habit_is_dropped():

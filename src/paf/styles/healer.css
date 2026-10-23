@@ -47,10 +47,10 @@ dl.legend{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;max-wi
 dl.legend dt{font-weight:600;color:var(--fg)} dl.legend dd{margin:0}
 table.hits td .tag{display:inline-block;margin:4px 6px 0 0;padding:1px 8px;border-radius:999px;font-size:12px;color:var(--muted);border:1px solid var(--line)}
 /* the other healers' answers: a spec a row, a hit a column (the owner: less text) */
-table.others{max-width:1100px;margin:6px 0} table.others th{font:600 12px/1.4 var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 10px 6px 0}
+table.others{max-width:1000px;margin:6px 0} table.jobs{max-width:1000px} table.others th{font:600 12px/1.4 var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 10px 6px 0}
 table.others td{padding:9px 10px 9px 0;border-top:1px solid var(--line);vertical-align:top;font-size:14px}
 table.others td.who b{display:block} table.others td.who small,table.others td small{color:var(--muted);font-size:12px}
-table.others .ics{margin-right:5px;vertical-align:-3px} table.others .under{opacity:.6} table.others .held{font-weight:600;color:var(--muted)}
+table.others .ics{margin-right:5px;vertical-align:-3px} table.others .under{color:var(--muted)} table.others .under b{font-weight:500;color:var(--muted)} table.others .held{font-weight:600;color:var(--muted)}
 /* where the numbers come from: a chip a source */
 p.sources{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:baseline;max-width:1000px;font-size:13px;color:var(--muted)}
 p.sources .src-lab{font:600 12px var(--font-display);letter-spacing:.06em;text-transform:uppercase;margin-right:4px}
@@ -59,7 +59,7 @@ table.jobs td small{color:var(--muted)}
 /* a share as a bar, a tick at half */
 .sbar{position:relative;display:inline-block;width:120px;height:8px;border-radius:4px;background:var(--surface-2);border:1px solid var(--line);align-self:center}
 .sbar>span{display:block;height:100%;border-radius:4px;background:var(--muted)} /* never the class colour (DESIGN: class signs) */
-.sbar::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--muted)}
+.split .sbar::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--fg)} /* half: talents only */
 .nw{white-space:nowrap} table.jobs td.no{color:var(--muted);font-weight:600}
 .upbar{display:inline-block;width:120px;height:8px;border-radius:4px;background:var(--surface-2);border:1px solid var(--line);align-self:center;overflow:hidden}
 .upbar>span{display:block;height:100%;background:var(--muted)}
