@@ -1549,7 +1549,7 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
            ", all on another player" if c.on_others >= 0.95 else "") + "</small>"
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip((moved or {}).get((c.name, t), _named_at(c, t, named, sp)), tie(c, t, n))}"
                                         + ("" if _window_said(c, t, n, tie(c, t, n), named, sp) else
-                                           _split(_named(c, t, named, tie(c, t, n), sp))[0]
+                                           _split(_named(c, t, named, tie(c, t, n), sp, (moved or {}).get((c.name, t))))[0]
                                            + _also_pressers(c, t, named, tie(c, t, n), sp))
 
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
@@ -1557,7 +1557,7 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
                                            if t in c.back and not (c.why or c.every)  # its line says it; its
                                            and "back from cooldown" not in _named(c, t, named, tie(c, t, n), sp)
                                            else "")  # window's reading alone, as an "or" time's (round 78)
-                                        + _split(_named(c, t, named, tie(c, t, n), sp))[1]  # each time its own
+                                        + _split(_named(c, t, named, tie(c, t, n), sp, (moved or {}).get((c.name, t))))[1]  # each time its own
                                         + _or_then_untied(c, t, n, tie(c, t, n), answered, named, moved)
                                         + "</span>"  # window, then the "or" (r. 68)
                                         for k, (t, n, sp) in enumerate(zip(c.times, c.near,
@@ -1614,12 +1614,13 @@ def _named_at(c: Cooldown, t: float, named: dict | None, sp: float) -> float:
     return _center(inside) if inside else t  # in the window of the 3:35 hit: 34%, about 3:35", two times)
 
 
-def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
+def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float, shown_t: float | None = None) -> str:
     """A chip's share: of the hit's window when the lead names this press for a hit kept for none, said so, as the
     lead's count (round 50: "1:11 · 70%" under a lead saying 61% in the 1:15 window); else _tied_share's."""
     hit = (named or {}).get((c.name, t))
     if hit is not None and (hs := hit_share(c, t, hit)) is not None:
-        where = "ahead of" if c.ramp and t < hit - ANSWER[0] else "in the window of"  # a ramp: around its own time
+        at = shown_t if shown_t is not None else _named_at(c, t, named, sp)  # the time the chip shows: its offset
+        # from there (heal confirm round 9: "1:49 · 8 s before the 2:10 hit", counted from 2:02)
         b = None if c.why == MINUTE else _back_in(c, t, hit)  # its own reading (round 63); a minute button's
         # reason is the lead's, not "back from cooldown" (round 64: Convoke)
         tag = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"
@@ -1627,10 +1628,11 @@ def _named(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
         if _pct(hs) == _pct(sp):  # one count: said once, at the lead's time, the chip's own (round 78: "2:59 ·
             # 2:57", two times); under a quarter, of those who press it too (round 84); its offset from the hit, as
             # every other chip (heal round 10: "in the window of the 2:55 moment: the same 15%")
-            return (_offset(_named_at(c, t, named, sp), _mmss(hit)) + _base(c, hs, hit) + _pressers(c, sp, t)
-                    + tag)
-        return (f"{_share(sp)}{_still(c, t, sp)} &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
-                + tag)  # the chip's time is the window's (_named_at): one time a chip (heal round 12)
+            return _offset(at, _mmss(hit)) + _base(c, hs, hit) + _pressers(c, sp, t) + tag
+        if c.ramp and at < hit - ANSWER[0]:  # a ramp ahead of its hit: its offset, as every chip (heal confirm 9)
+            return f"{_share(sp)}{_still(c, t, sp)}{_offset(at, _mmss(hit))}:{_base(c, hs, hit).replace(' &middot;', '')}" + tag
+        return (f"{_share(sp)}{_still(c, t, sp)} &middot; in the window of the {_mmss(hit)} hit:"
+                f"{_base(c, hs, hit).replace(' &middot;', '')}" + tag)  # the chip's time is the window's (round 12)
     if n and (hs := hit_share(c, t, _secs(n.partition(" ")[0]))) is not None:  # tied: its hit's count, its base
         return _base(c, hs, _secs(n.partition(" ")[0]))
     return _share(sp) + _still(c, t, sp)
@@ -1913,7 +1915,9 @@ def _why_not(c: Cooldown, t: float, found: list | None = None) -> str:
         b = None if c.why == MINUTE else _back_in(c, t, hit_t)  # "back from cooldown" alone; the chip's own
         back = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"  # reading of it, its words)
                 + (" for about half" if b <= BACK_SHARE[1] else ""))
-        where = "ahead of" if c.ramp and t < hit_t - ANSWER[0] else "in the window of"
+        gap = int(hit_t) - int(t)  # its offset, as its chip says it (heal confirm round 9)
+        where = (f"{gap} s before" if c.ramp and t < hit_t - ANSWER[0] else
+                 "in the window of" if abs(gap) > 1 or gap < 0 else f"{gap} s before" if gap else "on")
         return f": {where} the {_mmss(hit_t)} hit{back}, not kept for it"
     if c.why:
         return f": {c.why}"
@@ -1951,7 +1955,8 @@ def _split(chip: str) -> tuple[str, str]:
         if mark in chip:
             i = chip.index(mark)
             return chip[:i], chip[i:]
-    return chip, ""
+    m = re.search(r" &middot; \d+ s before the \d+:\d\d hit:", chip)  # a ramp's window, said as its offset
+    return (chip[:m.start()], chip[m.start():]) if m else (chip, "")
 
 
 def _base(c: Cooldown, hs: float, hit: float) -> str:

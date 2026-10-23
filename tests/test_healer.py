@@ -840,3 +840,11 @@ def test_a_mark_named_for_a_window_says_that_window_on_hover():
                         windowed=[72.0])
     assert healer._why_not(v, 72.0, [healer.Moment(75.0, 1.0, 1.6, "Rite")]) == (
         ": in the window of the 1:15 hit, not kept for it")
+
+
+def test_a_ramp_window_chip_gives_its_offset_from_the_time_it_shows():
+    # Disc, Vashnik (heal confirm round 9): "1:49 · 8 s before the 2:10 hit", counted from 2:02, not from 1:49
+    c = healer.Cooldown("Evangelism", 1, 1.0, 3.0, [109.0], [""], support=[0.30], n_all=100, ramp=True,
+                        presses=[[109.0]] * 41 + [[60.0]] * 59)
+    out = healer._named(c, 109.0, {("Evangelism", 109.0): 130.0}, "", 0.30, 109.0)
+    assert "21 s before the 2:10 hit" in out and "ahead of" not in out
