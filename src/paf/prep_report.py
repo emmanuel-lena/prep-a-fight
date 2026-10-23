@@ -1173,6 +1173,14 @@ def render(d: PrepData) -> str:
             for kind, title in groups.items():
                 rows = [a for a in d.actions if a.kind == kind]
                 gates = gate_kills(d) if kind == "kill" else []  # the unit that ends an immunity comes first
+                if kind == "kill":  # a wave's unit no action names, as Your job says it (Nek'zali's Echo of Jawae)
+                    named = {a.name for a in d.actions} | {re.sub(r"\s*\([^)]*\)", "", n).strip() for n, _t in gates}
+                    for _t0, c, _l, n in d.waves:
+                        base = re.sub(r"\s*\([^)]*\)", "", n).strip()
+                        if c and ":" not in n and base not in named:
+                            named.add(base)
+                            ts = [_mmss(x) for x, c2, _l2, n2 in d.waves if c2 and n2 == n]
+                            gates.append((n, f"Kill the {base} (at {', '.join(ts)})."))
                 if rows or gates:
                     blocks += (f"<h3>{e(title)}</h3><ul>" + "".join(
                         f"<li>{icons.img(_sfallback(d, n), 'small')}{e(t)}</li>" for n, t in gates) + "".join(
