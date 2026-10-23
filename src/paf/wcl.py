@@ -18,6 +18,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +40,10 @@ class WCLError(RuntimeError):
 class WCLDown(WCLError):
     """Warcraft Logs failed every retry several queries in a row: the next ones fail at once for a while, rather than
     each waiting out its retries (issue #36: a 503 outage cost 30 s a kill, 55 min for one step)."""
+
+
+class WCLQuota(WCLError):
+    """The hourly quota is used up and this query does not wait for its reset (WCLClient.no_quota_wait)."""
 
 
 DOWN_AFTER = 2  # queries in a row that failed every retry on a server error: Warcraft Logs is down
@@ -177,6 +182,16 @@ class WCLClient:
         self._down_until = 0.0  # until then Warcraft Logs is taken as down (WCLDown)
         self.clock: Callable[[], float] = time.time
 
+    @contextmanager
+    def no_quota_wait(self):
+        """An optional step: with the hourly quota used up, its queries fail at once (WCLQuota) rather than wait for
+        the reset; the step stops and reads the rest on a later prep (issue #34: 54 min waited for who handles)."""
+        old, self.wait_for_quota = self.wait_for_quota, False
+        try:
+            yield self
+        finally:
+            self.wait_for_quota = old
+
     # --- auth ---------------------------------------------------------------------------------
 
     def _token_file(self) -> Path:
@@ -270,8 +285,8 @@ class WCLClient:
                 continue
             if status == 429:
                 _used_up()
-            if status == 429 and not self.wait_for_quota:  # a page: say it, never wait
-                raise WCLError(quota_sentence())
+            if status == 429 and not self.wait_for_quota:  # a page or an optional step: say it, never wait
+                raise WCLQuota(quota_sentence())
             if status == 429 and attempt == self.max_retries and quota_waits < QUOTA_WAITS:
                 # the hourly quota is used up: wait for its reset instead of failing every query until then
                 wait = self._quota_reset()

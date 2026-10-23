@@ -1181,7 +1181,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
             from paf.corpus.mechanics import fetch_mechanics
 
             step(f"Collecting who handles each mechanic ({mech_missing} kills)")
-            fetch_mechanics(client, con, enc.id, diff, [])
+            with client.no_quota_wait():  # optional: never an hour's wait for it (issue #34)
+                fetch_mechanics(client, con, enc.id, diff, [])
 
         if not args.refine:  # a first pass from part of the ranked kills: the sheet says so
             used, pending = (con.execute(f"SELECT COUNT(*) FROM fight WHERE encounter_id=? AND difficulty=? "
@@ -1205,7 +1206,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
                                          "WHERE f.encounter_id=? AND f.difficulty=?",
                                          (enc.id, diff)).fetchone()[0]) > 0:
             print(f"  reading the top raids' Bloodlust (up to {n} kills, once)...", flush=True)
-            fetch_lust(client, con, enc.id, diff)
+            with client.no_quota_wait():  # read once over several preps if need be
+                fetch_lust(client, con, enc.id, diff)
         raw, info = build_template(con, enc.id, diff, boss, spec, diff_name, title=enc.name)
         kills, phases, moving_share = rep.kills, [(n, m) for n, _, m, _ in rep.phases], info.moving_share
         add_share = rep.ranked_add_share[1]

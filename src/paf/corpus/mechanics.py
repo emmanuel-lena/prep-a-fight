@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from paf.corpus.analyze import kills_filter
-from paf.wcl import WCLClient, WCLDown, WCLError
+from paf.wcl import WCLClient, WCLDown, WCLError, WCLQuota
 
 MECH_QUERY = """
 query($code:String!, $f:[Int]!, $filter:String) { reportData { report(code:$code) {
@@ -48,7 +48,7 @@ def fetch_mechanics(client: WCLClient, con: sqlite3.Connection, encounter_id: in
                 debuffs += list(client.events(r["report"], r["fight_id"], nxt, end, data_type="Debuffs",
                                               hostility="Friendlies", filter_expression=flt, cache=False))
         except (WCLError, KeyError, TypeError, IndexError, OSError) as e:
-            if isinstance(e, WCLDown):  # one line, not one a kill (issue #36)
+            if isinstance(e, (WCLDown, WCLQuota)):  # one line, not one a kill (issue #36)
                 log(f"  stopped at {i}/{len(todo)}: {str(e)[:100]}; the rest is read on a later prep")
                 break
             log(f"  [{i}/{len(todo)}] skipped: {str(e)[:100]}")

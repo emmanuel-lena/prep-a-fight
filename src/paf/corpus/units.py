@@ -8,7 +8,7 @@ import statistics as st
 from collections.abc import Callable
 
 from paf.corpus.analyze import KILLABLE_DEATH_RATE, kills_filter
-from paf.wcl import WCLClient, WCLDown, WCLError
+from paf.wcl import WCLClient, WCLDown, WCLError, WCLQuota
 
 FIGHT_QUERY = """query($code:String!,$f:[Int]!){ reportData { report(code:$code) {
   fights(fightIDs:$f){ startTime endTime } } } }"""
@@ -95,7 +95,7 @@ def fetch_unit_windows(client: WCLClient, con: sqlite3.Connection, encounter_id:
             g = client.query(GRAPH_QUERY, {"code": r[0], "f": [r[1]], "s": fr["startTime"], "e": fr["endTime"]},
                              cache_ttl=0)["reportData"]["report"]["graph"]
         except (WCLError, KeyError, TypeError, IndexError, OSError) as e:
-            if isinstance(e, WCLDown):  # one line, not one a kill (issue #36)
+            if isinstance(e, (WCLDown, WCLQuota)):  # one line, not one a kill (issue #36)
                 log(f"  graph stopped: {str(e)[:100]}; the rest is read on a later prep")
                 break
             log(f"  graph skipped: {str(e)[:100]}")
@@ -149,7 +149,7 @@ def fetch_council_stack(client: WCLClient, con: sqlite3.Connection, encounter_id
             events = list(client.events(r[0], r[1], fr["startTime"], fr["endTime"], data_type="DamageDone",
                                         source_id=r[2], cache=False))
         except (WCLError, KeyError, TypeError, IndexError, OSError) as e:
-            if isinstance(e, WCLDown):  # one line, not one a kill (issue #36)
+            if isinstance(e, (WCLDown, WCLQuota)):  # one line, not one a kill (issue #36)
                 log(f"  council damage stopped: {str(e)[:100]}; the rest is read on a later prep")
                 break
             log(f"  council damage skipped: {str(e)[:100]}")
@@ -249,7 +249,7 @@ def fetch_boss_auras(client: WCLClient, con: sqlite3.Connection, encounter_id: i
             rep = client.query(AURA_QUERY, {"code": r[0], "f": [r[1]], "s": s, "e": e},
                                cache_ttl=0)["reportData"]["report"]
         except (WCLError, KeyError, TypeError, IndexError, OSError) as ex:
-            if isinstance(ex, WCLDown):  # one line, not one a kill (issue #36)
+            if isinstance(ex, (WCLDown, WCLQuota)):  # one line, not one a kill (issue #36)
                 log(f"  auras stopped: {str(ex)[:100]}; the rest is read on a later prep")
                 break
             log(f"  auras skipped: {str(ex)[:100]}")
@@ -466,7 +466,7 @@ def fetch_npc_stack(client: WCLClient, con: sqlite3.Connection, encounter_id: in
             events = list(client.events(r[0], r[1], fr["startTime"], fr["endTime"], data_type="DamageDone",
                                         source_id=r[2], cache=False))
         except (WCLError, KeyError, TypeError, IndexError, OSError) as e:
-            if isinstance(e, WCLDown):  # one line, not one a kill (issue #36)
+            if isinstance(e, (WCLDown, WCLQuota)):  # one line, not one a kill (issue #36)
                 log(f"  add damage stopped: {str(e)[:100]}; the rest is read on a later prep")
                 break
             log(f"  add damage skipped: {str(e)[:100]}")

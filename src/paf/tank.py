@@ -221,7 +221,7 @@ def fetch_stacks(client, con, encounter_id: int, difficulty: int, kills: int = S
     other tank taunts. WCL's targetID filter returns nothing on Debuffs: read them all, keep the tank's."""
     from paf.corpus.analyze import kills_filter
     from paf.healroles import BOUNDS
-    from paf.wcl import WCLDown, WCLError
+    from paf.wcl import WCLDown, WCLError, WCLQuota
 
     ensure_debuff_tables(con)
     where, params = kills_filter(encounter_id, difficulty)
@@ -237,7 +237,7 @@ def fetch_stacks(client, con, encounter_id: int, difficulty: int, kills: int = S
             events = list(client.events(rep, fid, fr["startTime"], fr["endTime"], data_type="Debuffs",
                                         hostility="Friendlies", cache=False))
         except (WCLError, KeyError, TypeError, IndexError, OSError) as e:
-            if isinstance(e, WCLDown):  # one line, not one a kill (issue #36)
+            if isinstance(e, (WCLDown, WCLQuota)):  # one line, not one a kill (issue #36)
                 log(f"  tank debuffs stopped: {str(e)[:100]}; the rest is read on a later prep")
                 break
             log(f"  tank debuffs skipped: {str(e)[:100]}")

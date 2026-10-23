@@ -7,3 +7,5 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 
 - When Warcraft Logs is down, a prep no longer waits out every retry on each kill (it once took 55 min for one
   step): it stops that step with one line and reads the rest on a later prep. (#36)
+- When the hour's Warcraft Logs quota runs out, the optional steps (who handles each mechanic, the raids' Bloodlust)
+  no longer wait up to an hour for it: they stop, the prep finishes, and the rest is read on the next prep. (#34)

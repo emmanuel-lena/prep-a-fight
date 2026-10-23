@@ -205,3 +205,20 @@ def test_an_outage_fails_fast_after_two_queries(tmp_path):
     with pytest.raises(WCLError):
         c.query("{ a }", {})
     assert len(calls) > n  # tried again after the pause
+
+
+def test_an_optional_step_never_waits_for_the_quota(tmp_path):
+    # issue #34: who handles each mechanic waited 54 min for the quota's reset; an optional step stops instead
+    from paf.wcl import WCLClient, WCLQuota
+
+    slept = []
+
+    def transport(url, body, headers):
+        if "oauth" in url:
+            return 200, b'{"access_token": "t", "expires_in": 3600}'
+        return 429, b"too many"
+
+    c = WCLClient("id", "secret", cache_dir=tmp_path, transport=transport, sleep=slept.append, wait_for_quota=True)
+    with c.no_quota_wait(), pytest.raises(WCLQuota):
+        c.query("{ a }", {})
+    assert slept == [] and c.wait_for_quota

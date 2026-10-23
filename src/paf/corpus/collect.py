@@ -19,7 +19,7 @@ from typing import Any
 
 from paf.corpus.db import TWIN, clear_fight_rows
 from paf.encounters import Encounter
-from paf.wcl import WCLClient, WCLDown, WCLError
+from paf.wcl import WCLClient, WCLDown, WCLError, WCLQuota
 
 RANKINGS_QUERY = """
 query($id:Int!, $diff:Int!, $page:Int, $bracket:Int, $region:String, $cls:String!, $spec:String!,
@@ -403,7 +403,7 @@ def backfill_npc_actors(client: WCLClient, con: sqlite3.Connection, encounter_id
         try:
             rep = client.query(NPC_ACTORS_QUERY, {"code": code}, cache_ttl=0)["reportData"]["report"] or {}
         except (WCLError, KeyError, TypeError, OSError) as e:
-            if isinstance(e, WCLDown):  # one line, not one a kill (issue #36)
+            if isinstance(e, (WCLDown, WCLQuota)):  # one line, not one a kill (issue #36)
                 log(f"  enemy units stopped: {str(e)[:100]}; the rest is read on a later prep")
                 break
             log(f"  skipped: {str(e)[:100]}")
@@ -447,7 +447,7 @@ def collect(client: WCLClient, con: sqlite3.Connection, enc: Encounter, difficul
                 f"{adds} adds killed")
         except (WCLError, KeyError, TypeError, ValueError, OSError, sqlite3.Error) as e:
             con.rollback()  # a kill half written is not kept
-            if isinstance(e, WCLDown):  # not the kill's fault: left to collect, one line (issue #36)
+            if isinstance(e, (WCLDown, WCLQuota)):  # not the kill's fault: left to collect, one line (issue #36)
                 log(f"  stopped at {i}/{len(todo)}: {str(e)[:100]}; the rest is collected on a later prep")
                 break
             stats["error"] += 1

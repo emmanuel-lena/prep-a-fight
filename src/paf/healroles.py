@@ -25,7 +25,7 @@ from paf.corpus.analyze import kills_filter
 from paf.corpus.collect import without_twins
 from paf.corpus.db import TWIN
 from paf.gamedata import external_kind
-from paf.wcl import WCLClient, WCLDown, WCLError
+from paf.wcl import WCLClient, WCLDown, WCLError, WCLQuota
 
 KILLS = 150  # kills whose healing tables are read per boss (about 6 points each): at 40, each other spec had 8 to 30
 # healers and no job stood out of the noise on any of 14 sheets (docs/research/healer-roles.md, the jobs audit)
@@ -165,7 +165,7 @@ def fetch_heal_roles(client: WCLClient, con: sqlite3.Connection, encounter_id: i
                 rep, fid, fr["startTime"], fr["endTime"], data_type="Casts", hostility="Friendlies",
                 source_id=x[0], cache=False), x[0])]  # source.id filter returns nothing
         except (WCLError, KeyError, TypeError, IndexError, OSError) as e:
-            if isinstance(e, WCLDown):  # one line, not one a kill (issue #36)
+            if isinstance(e, (WCLDown, WCLQuota)):  # one line, not one a kill (issue #36)
                 log(f"  healing stopped: {str(e)[:100]}; the rest is read on a later prep")
                 break
             log(f"  healing skipped: {str(e)[:100]}")
@@ -205,7 +205,7 @@ def fetch_dispels(client: WCLClient, con: sqlite3.Connection, encounter_id: int,
             events = list(client.events(rep, fid, fr["startTime"], fr["endTime"], data_type="Dispels",
                                         source_id=actor, cache=False))
         except (WCLError, KeyError, TypeError, IndexError, OSError) as e:
-            if isinstance(e, WCLDown):  # one line, not one a kill (issue #36)
+            if isinstance(e, (WCLDown, WCLQuota)):  # one line, not one a kill (issue #36)
                 log(f"  dispels stopped: {str(e)[:100]}; the rest is read on a later prep")
                 break
             log(f"  dispels skipped: {str(e)[:100]}")
