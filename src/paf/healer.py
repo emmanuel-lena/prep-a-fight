@@ -1026,6 +1026,14 @@ def _untied_at(c: Cooldown, t: float, n: str, tied: str, named: dict | None) -> 
     return "" if hs is None else _not_kept(hit, hs, named, c)
 
 
+def _window_said(c: Cooldown, t: float, n: str, tied: str, named: dict | None) -> bool:
+    """A chip whose hit-window share follows: its own timed share left out, one number for one press (heal round
+    11: "4:16 · 19% (26% of its users) · not kept for the 4:15 hit: 20% in its window")."""
+    if _untied_at(c, t, n, tied, named):
+        return True
+    return t in c.back and not (c.why or c.every) and bool(_lead_back(c, t))
+
+
 def _also_pressers(c: Cooldown, t: float, named: dict | None, n: str, sp: float) -> str:
     """A chip's share under a quarter, also of those who press the button: the moment's, or a tied chip's hit share
     (round 89: Shield Wall "0:34 · 1 s before the 0:35 hit · 23%" said none)."""
@@ -1233,11 +1241,17 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
         return (f" &middot; {where} the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}"
                 + (f", about {_about(inside)}" if inside else "") + tag)
     sp_of = {a: sp for a, sp, _n in near}
-    return ", or " + ", ".join(f"{_chip((moved or {}).get((c.name, a), a), n)}" + (f" for {_pct(sp)}{_still(c, a, sp)}{_pressers(c, sp, a)}"
-                                                                                   if sp else " for some")
-                               + ("" if window(a, n) and "back from cooldown" in window(a, n) else
-                                  back(a) if a in c.back and not c.why else "")  # the window's reading alone (r. 72)
-                               + window(a, n) + untied(a, n) for a, sp, n in near)
+
+    def one(a: float, sp: float, n: str) -> str:  # one share a press: its window's when one is said (heal round 11:
+        w, u = window(a, n), untied(a, n)          # "for 29% · in its window: 26%", "for 27% · ⟲, … window: 23%")
+        bk = "" if w and "back from cooldown" in w else back(a) if a in c.back and not c.why else ""
+        own = f" for {_pct(sp)}{_still(c, a, sp)}{_pressers(c, sp, a)}" if sp else " for some"
+        if w.startswith(" &middot; in its window:"):  # tied: the window's share is the chip's
+            own, w = " &middot;" + w[len(" &middot; in its window:"):], ""
+        elif u or "hit's window:" in bk:
+            own = ""
+        return f"{_chip((moved or {}).get((c.name, a), a), n)}{own}{bk}{w}{u}"
+    return ", or " + ", ".join(one(a, sp, n) for a, sp, n in near)
 
 
 BACK = 8.0  # seconds past its cooldown a press still counts as pressed as soon as it is back
@@ -1511,8 +1525,9 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
         + (f", {_pct(c.on_others)} of the presses on another player" if 0 <= c.on_others < 0.95 else
            ", all on another player" if c.on_others >= 0.95 else "") + "</small>"
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip((moved or {}).get((c.name, t), _named_at(c, t, named, sp)), tie(c, t, n))}"
-                                        + _split(_named(c, t, named, tie(c, t, n), sp))[0]
-                                        + _also_pressers(c, t, named, tie(c, t, n), sp)
+                                        + ("" if _window_said(c, t, n, tie(c, t, n), named) else
+                                           _split(_named(c, t, named, tie(c, t, n), sp))[0]
+                                           + _also_pressers(c, t, named, tie(c, t, n), sp))
 
                                         + (f" &middot; back from cooldown{' for about half' if t in c.back_half else ''}"
                                            + _lead_back(c, t)

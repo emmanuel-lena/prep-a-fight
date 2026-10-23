@@ -604,7 +604,7 @@ def test_an_untied_time_in_a_hit_window_says_it_is_not_kept():
     # Mistweaver Monk, Nek'zali (round 90): Invoke Yu'lon "or 0:32 for 30%" in the 0:35 hit's window, no reason
     c = healer.Cooldown("Invoke Yu'lon", 1, 1.0, 2.0, [5.0], [""], alt=[32.0], alt_support=[0.3], alt_of=[5.0],
                         alt_near=["0:35 Soulcoil Rite"], presses=[[32.0]] * 16 + [[5.0]] * 84, n_all=100)
-    assert "or 0:32 for 30% &middot; not kept for the 0:35 hit: 16% in its window" in healer.cooldowns_html([c], set())
+    assert "or 0:32 &middot; not kept for the 0:35 hit: 16% in its window" in healer.cooldowns_html([c], set())
 
 
 def test_a_held_habit_of_a_button_on_cooldown_says_it_is_not_kept():
@@ -612,7 +612,7 @@ def test_a_held_habit_of_a_button_on_cooldown_says_it_is_not_kept():
     c = healer.Cooldown("Celestial Conduit", 1, 1.0, 3.0, [5.0], [""], alt=[37.0], alt_support=[0.25],
                         alt_of=[5.0], alt_near=["0:35 Soulcoil Rite"], every=97.0,
                         presses=[[37.0]] * 25 + [[5.0]] * 75, n_all=100)
-    assert "or 0:37 for 25% &middot; not kept for the 0:35 hit: 25% in its window" in healer.cooldowns_html([c], set())
+    assert "or 0:37 &middot; not kept for the 0:35 hit: 25% in its window" in healer.cooldowns_html([c], set())
 
 
 def test_a_first_press_at_the_pull_says_so_on_hover():
@@ -782,3 +782,12 @@ def test_a_choice_node_is_one_row_with_one_stacked_bar():
     # Protection Warrior (heal round 11): "Bloodborne 48% / Sudden Death 43% (9% take neither)" drawn with no bar
     row = healer.split_html([("Bloodborne 48% / Sudden Death 43% (9% take neither)", -1.0)], 100, "Protection Warrior")
     assert "<li class='pair'>" in row and "width:48%" in row and "width:43%" in row and "9% neither" in row
+
+
+def test_a_press_in_a_hit_window_shows_one_share():
+    # Holy Paladin, Nek'zali (heal round 11): "4:16 · 19% (26% of its users) · not kept for the 4:15 hit: 20% in its
+    # window": three numbers for one press
+    c = healer.Cooldown("Divine Protection", 1, 0.73, 1.0, [256.0], ["4:15 Hit"], support=[0.19], n_all=100,
+                        presses=[[256.0]] * 20 + [[100.0]] * 53)
+    out = healer.cooldowns_html([c], set())
+    assert "4:16 &middot; not kept for the 4:15 hit: 20% in its window" in out and "19%" not in out
