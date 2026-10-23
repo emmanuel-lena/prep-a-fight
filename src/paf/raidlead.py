@@ -436,8 +436,8 @@ def page_body(difficulty: str) -> str:
             f"{'pad build &middot; on an add' if b['side'] == 'pad' else 'boss build'}</span>"
             + "<span class='rl-ts'>" + (
                 # another build altogether (a hero tree): one badge, not 6 chips of 44 (a review: half a build)
-                f"<span class='rl-other'>another build: {_moved(b)} talents apart &middot; play the top players' "
-                f"{'pad' if b['side'] == 'pad' else 'boss'} build</span>" if _moved(b) > OTHER_BUILD else
+                f"<span class='rl-other'>{_moved(b)} talents apart</span>" if _moved(b) > OTHER_BUILD else  # the side
+                # pill on the row names the build (app round 13: 11 words, six times a page)
                 "".join(f"<span class='rl-t take'>+ {e(t)}</span>" for t in b["take"])
                 + "".join(f"<span class='rl-t drop'>&minus; {e(t)}</span>" for t in b["drop"])
                 + (f"<span class='rl-more'>+{b['more']} more in the build</span>" if b.get("more") else ""))
