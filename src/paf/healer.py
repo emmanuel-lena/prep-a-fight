@@ -2863,7 +2863,8 @@ def render_sheet(h: HealerPrep) -> str:
     # every spec the pool reads (paf.healroles.POOL_PLAYERS): the Disc Priest, 3 in a Holy Priest's kills, has 43
     # in the pool; its casts unread here are said so in its cells
     shown = sorted(h.roles, key=lambda r: r.spec != h.spec)
-    others = roles_table(shown, h.spec) + roles_more(shown, h.spec, h.moments, getattr(h, "staged", False),
+    others = roles_table(shown, h.spec) + (nums_note(h.roles, h.own_sample) if shown else "") + roles_more(
+        shown, h.spec, h.moments, getattr(h, "staged", False),
                                                   getattr(h, "role_icons", {}))
     few = [p.spec for p in h.presence if p.spec not in {r.spec for r in shown}]
     deeper_first: list[str] = [jobs_lead(shown, h.spec)]  # the cards below only: a spec too rare has no claim
@@ -2904,7 +2905,7 @@ def render_sheet(h: HealerPrep) -> str:
                       "with it against those without it (a reading, not a verdict).</p>"
                       f"{presence_table(h.presence, h.spec)}")
     deeper = deeper_first + [f"<h2>What each healer spec brings here</h2><p class='small muted'>Measured on {h.role_kills:,} "
-              f"{e(h.role_sample or 'top kills')}.{_pace(h)}</p>{nums_note(h.roles, h.own_sample)}{others or '<p>Not measured yet.</p>'}"
+              f"{e(h.role_sample or 'top kills')}.{_pace(h)}</p>{others or '<p>Not measured yet.</p>'}"
               + (f"<p class='small muted'>Too few healers measured: {e(', '.join(few))}.</p>" if few else ""),
               (f"<h2>The healer compositions played most</h2>{comps_table(h.comps, n_kills)}"
                if comps_table(h.comps, n_kills) else "")]

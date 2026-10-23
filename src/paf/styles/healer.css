@@ -66,3 +66,5 @@ table.jobs td small{color:var(--muted)}
 /* the change tab's bars in one column, names before them (a review: each bar started where its name ended) */
 .hl2.split li:not(:has(.side)),.hl2.bars li{display:grid;grid-template-columns:minmax(200px,280px) 130px auto;align-items:center}
 table.others td{white-space:normal} table.others td small{white-space:nowrap}
+.nw .ics,.lead .ics{margin-right:4px;vertical-align:-3px}
+.hl2 li:has(> .upbar){display:grid;grid-template-columns:200px 130px auto;align-items:center}
