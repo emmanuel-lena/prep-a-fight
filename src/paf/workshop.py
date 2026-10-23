@@ -60,7 +60,7 @@ TOOLS: tuple[Tool, ...] = (
          "The boss's health over your best pull, as played and without the deaths, and what each death cost."),
     Tool("night", "Your raid night, pull by pull", "Deaths, healthstones and potions, pull by pull; live too.", "inv_stone_04", "raid", "1", ("raid",),
          "Each player over the night, then each pull: deaths, healthstones, potions.", needs_prep=False),
-    Tool("diff", "Two pulls side by side", "What went better in one pull than another, raid and you.", "inv_misc_spyglass_02", "raid", "1-2", ("boss", "difficulty", "raid"),
+    Tool("diff", "Pick two pulls, side by side", "What went better in one pull than another, raid and you.", "inv_misc_spyglass_02", "raid", "1-2", ("boss", "difficulty", "raid"),
          "From the log you give: its worst and best pulls without a death (else its best wipe and the kill), with "
          "both pulls' boss health, deaths, damage per target, and your damage, casts and buffs in each.",
          needs_prep=False),
