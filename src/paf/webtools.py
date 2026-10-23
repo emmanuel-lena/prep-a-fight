@@ -255,8 +255,9 @@ def settings_page(message: str = "") -> str:
     simc = path_html(str(exe)) if exe else "<span class='neg'>not installed</span>"
     ok_simc = OK_DOT if exe else ""  # a check only when it holds
     from paf.wcl import fresh_quota
+    from paf.web import has_credentials
 
-    ok_wcl = OK_DOT if fresh_quota() else ""  # read recently: the key works
+    ok_wcl = OK_DOT if fresh_quota() or has_credentials() else ""  # a key or a login set
     # a recent read says it at once; else the line comes from /wcl/quota after the page is shown (issue #30)
     quota = quota_html() if fresh_quota() else (
         "<span class='quota-line muted'>reading&hellip;</span><script>fetch('/wcl/quota').then(function(r){"

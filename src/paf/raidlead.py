@@ -188,10 +188,11 @@ def builds(state: dict, enc_id: int, diff: int, roles: dict[str, str], names: di
         take = [names.get(t) or "" for t in sorted(want - taken)]
         drop = [names.get(t) or "" for t in sorted(other & taken)]
         both = set(take) & set(drop)
-        take = [n for n in dict.fromkeys(take) if n and n not in both][:SHOWN]
-        drop = [n for n in dict.fromkeys(drop) if n and n not in both][:SHOWN]
-        if take or drop:
-            out.append({"name": name, "spec": spec, "side": side, "take": take, "drop": drop})
+        take = [n for n in dict.fromkeys(take) if n and n not in both]
+        drop = [n for n in dict.fromkeys(drop) if n and n not in both]
+        if take or drop:  # the cut said ("+2 more"), never silent (a review: lists that do not balance)
+            out.append({"name": name, "spec": spec, "side": side, "take": take[:SHOWN], "drop": drop[:SHOWN],
+                        "more": max(0, len(take) - SHOWN) + max(0, len(drop) - SHOWN)})
     return out
 
 
@@ -289,9 +290,10 @@ def _talents_h4(sh: dict, total: int) -> str:
     """The heading with its counts, whatever the list below: on their build, no pad/boss build (tanks, healers), not
     read (a review: on a boss with changes, who was not checked vanished)."""
     changing, unread_, other = len(sh["builds"]), sh.get("unread") or [], sh.get("no_split", 0)
+    if other >= total:  # no spec has a pad/boss split on this boss: nothing to compare, said as such
+        return "<h4>Talents to change <span class='rl-unread'>no pad/boss build on this boss</span></h4>"
     ok = total - changing - len(unread_) - other
-    parts = ([f"<span class='rl-ok'>&#10003; {ok} on their build</span>"] if ok > 0 and (changing or unread_) else
-             ["<span class='rl-ok'>&#10003; nobody, from the log</span>"] if not changing and not unread_ else [])
+    parts = [f"<span class='rl-ok'>&#10003; {ok} on their build</span>"] if ok > 0 else []  # always counted
     if other:
         parts.append(f"<span class='rl-unread'>{other} with no pad/boss build (tanks, healers)</span>")
     if unread_:
@@ -424,7 +426,9 @@ def page_body(difficulty: str) -> str:
             f"<span class='rl-side {'pad' if b['side'] == 'pad' else 'boss'}'>"
             f"{'pad build &middot; on an add' if b['side'] == 'pad' else 'boss build'}</span>"
             + "<span class='rl-ts'>" + "".join(f"<span class='rl-t take'>+ {e(t)}</span>" for t in b["take"])
-            + "".join(f"<span class='rl-t drop'>&minus; {e(t)}</span>" for t in b["drop"]) + "</span></li>"
+            + "".join(f"<span class='rl-t drop'>&minus; {e(t)}</span>" for t in b["drop"])
+            + (f"<span class='rl-more'>+{b['more']} more in the build</span>" if b.get("more") else "")
+            + "</span></li>"
             for b in sh["builds"])
         cards += (f"<article class='rl-boss' id='boss-{x.id}'><header><h3>{e(x.name)}</h3>"
                   f"{copy_button(text(sh, difficulty), 'Copy for Discord')}"

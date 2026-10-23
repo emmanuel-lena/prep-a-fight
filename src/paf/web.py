@@ -514,7 +514,8 @@ def ago(mtime: float, now: float | None = None) -> str:
         return f"{int(s // 3600)} h ago"
     if s < 2 * 86400:
         return "yesterday"
-    return time.strftime("%d %b", time.localtime(mtime))
+    lt = time.localtime(mtime)
+    return f"{lt.tm_mday} {time.strftime('%b', lt)}"  # "9 Oct", no leading zero
 
 
 DIFF_LABELS = {"lfr": "LFR", "normal": "Normal", "heroic": "Heroic", "mythic": "Mythic"}
@@ -551,7 +552,8 @@ def short_ago(mtime: float, now: float | None = None) -> str:
         return f"{int(s // 60)} min ago"  # an age, not a duration (a review: "12 min" read as how long)
     if s < 86400:
         return f"{int(s // 3600)} h ago"
-    return time.strftime("%d %b", time.localtime(mtime))
+    lt = time.localtime(mtime)
+    return f"{lt.tm_mday} {time.strftime('%b', lt)}"  # "9 Oct", no leading zero
 
 
 def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:

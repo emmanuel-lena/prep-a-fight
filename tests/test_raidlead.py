@@ -12,7 +12,7 @@ STATE = {
 def test_a_player_on_the_boss_drops_the_padding_talents():
     out = raidlead.builds(STATE, 7, 4, {}, NAMES)
     assert out == [{"name": "Nolow", "spec": "Affliction Warlock", "side": "boss", "take": ["Malefic Grasp"],
-                    "drop": ["Seed of Corruption", "Sow the Seeds"]}]
+                    "drop": ["Seed of Corruption", "Sow the Seeds"], "more": 0}]
 
 
 def test_a_player_on_an_add_keeps_the_padding_talents():
