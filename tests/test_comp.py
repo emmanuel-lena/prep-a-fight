@@ -161,3 +161,15 @@ def test_the_night_finds_the_active_characters_latest_log(tmp_path, monkeypatch)
             return {"characterData": {"character": {"recentReports": {"data": [
                 {"code": "old", "startTime": 1}, {"code": "tonight", "startTime": 9}]}}}}
     assert tracker.character_report(Client(), "Moon", "ysondre", "eu") == "tonight"
+
+
+def test_the_night_lists_only_the_players_with_something_to_say():
+    # DPS round 10: 20 rows, almost all zeros, for "1 pull, no death"
+    from paf import workshop_views
+
+    z = {"deaths": 0, "bare": 0, "healthstone": 0, "health": 0, "pulls_damage_potion": 1}
+    d = {"pulls": [{"kill": True, "boss": "B", "duration": 300.0, "left": 0, "players": {}}],
+         "summary": {"Moon": dict(z), "Dk": dict(z, healthstone=2), "Sun": dict(z, pulls_damage_potion=0)}}
+    out = workshop_views.night(d)
+    assert "<b>Dk</b>" in out.split("night-ok")[0] and "<b>Sun</b>" in out.split("night-ok")[0]
+    assert "1 player: no death" in out and "<b>Moon</b>" in out.split("night-ok")[1]

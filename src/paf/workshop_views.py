@@ -463,7 +463,12 @@ def night(d: dict) -> str:
     head = _verdict("warn" if bare else "ok", f"{len(pulls)} {'pull' if len(pulls) == 1 else 'pulls'}, {said}",
                     f"<span>Died without a healthstone or a health potion first:</span> <span class='num'>{bare}</span>")
     rows = ""
+    clean = [n for n, v in summary.items() if not (v["deaths"] or v["bare"] or v["healthstone"] or v["health"])
+             and v["pulls_damage_potion"] >= len(pulls)]  # a row of zeros says nothing: one line for them (DPS
+    # round 10: 20 rows, almost all zeros, for "1 pull, no death")
     for name, v in sorted(summary.items(), key=lambda x: (-x[1]["bare"], -x[1]["deaths"])):
+        if name in clean:
+            continue
         pot = v["pulls_damage_potion"]
         rows += (f"<tr><td class='who-c{' bad' if v['bare'] else ''}'>{ic(name)}<b>{e(name)}</b></td><td class='n'>{v['deaths']}</td>"
                  f"<td class='n {'bad' if v['bare'] else ''}'>{v['bare']}</td><td class='n'>{v['healthstone']}</td>"
@@ -471,7 +476,11 @@ def night(d: dict) -> str:
     table = (f"<div class='scroll'><table class='night'><tr><th>Player</th><th class='n'>Deaths</th><th class='n'>Without a "
              f"healthstone or potion</th><th class='n'>Healthstones</th><th class='n'>Health potions</th><th class='n'>"
              f"Pulls with a damage potion</th></tr>{rows}"
-             "</table></div>")
+             "</table></div>") if rows else ""
+    if clean:
+        table += (f"<p class='night-ok'>&#10003; {len(clean)} {'player' if len(clean) == 1 else 'players'}: no death, "
+                  "a damage potion every pull: <span class='whos'>"
+                  + "".join(f"<span class='who-chip'>{ic(n)}<b>{e(n)}</b></span>" for n in sorted(clean)) + "</span></p>")
     detail = ""
     for r in pulls:
         dead = sorted(((min(p["deaths"]), n, p["bare"]) for n, p in r["players"].items() if p["deaths"]))
