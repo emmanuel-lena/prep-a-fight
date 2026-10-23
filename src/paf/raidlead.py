@@ -265,6 +265,14 @@ def lust_spot(sh: dict):
         next(iter(sh.get("lust") or []), None)
 
 
+def _ic(spec: str) -> str:
+    """A player's class icon from its spec ("Frost DeathKnight" -> the Death Knight's)."""
+    from paf import icons
+
+    cls = (spec or "").split(" ")[-1].lower()
+    return icons.img(icons.CLASS_ICON.format(cls=cls), "small", "ics") if cls else ""
+
+
 def pretty(spec: str) -> str:
     """"BeastMastery Hunter" -> "Beast Mastery Hunter", "Frost DeathKnight" -> "Frost Death Knight"."""
     import re
@@ -344,7 +352,7 @@ def page_body(difficulty: str) -> str:
     chips = "".join(
         f"<form method='post' action='/raidlead/bench' class='rl-p{' off' if n in bench else ''}'>"
         f"<input type='hidden' name='name' value='{e(n)}'><button type='submit' title='"
-        f"{'Back in the raid' if n in bench else 'Bench'}'><b>{e(n)}</b><small>{e(pretty(s))}</small></button></form>"
+        f"{'Back in the raid' if n in bench else 'Bench'}'>{_ic(s)}<b>{e(n)}</b><small>{e(pretty(s))}</small></button></form>"
         for n, s, _d in sorted(state["players"], key=lambda p: p[1]))
     day = state.get("report_day")
     when = time.strftime(" (%a %d %b)", time.localtime(day / 1000)) if day else ""
@@ -353,6 +361,7 @@ def page_body(difficulty: str) -> str:
               f"this log</a>. Click a player to bench them.</p><div class='rl-chips'>{chips}</div>"
               f"<form method='post' action='/raidlead/read'><input type='hidden' name='difficulty' value='{e(difficulty)}'>"
               f"<button class='btn ghost'>Read the roster again</button></form></section>")
+    spec_of = {n: sp for n, sp, _d in state["players"]}  # a player's class icon beside its name
     cards, missing = "", []
     everything = []
     for x in journal_order(_encounters()):
@@ -368,20 +377,24 @@ def page_body(difficulty: str) -> str:
         tg = "".join(
             f"<li><b>{e(t['name'])}</b>: " + (
                 "everyone" if t["whole_raid"] and not t["players"] else
-                (e(", ".join(t["players"])) if t["players"] else "<span class='muted'>nobody fits</span>"))
-            + (f" <small>({'a second boss' if t['second_boss'] else 'best: ' + e(', '.join(pretty(b) for b in t['best']))})</small>")
+                ("".join(f"<span class='rl-n'>{_ic(spec_of.get(n, ''))}{e(n)}</span>" for n in t["players"])
+                 if t["players"] else "<span class='muted'>nobody fits</span>"))
+            + (" <span class='rl-side'>a second boss</span>" if t["second_boss"] else
+               " <small>best: " + ", ".join(f"{_ic(b)}{e(pretty(b))}" for b in t["best"]) + "</small>")
             + "</li>" for t in sh["targets"])
-        bd = "".join(
-            f"<li><b>{e(b['name'])}</b> <small>{e(pretty(b['spec']))}, "
-            f"{'on an add: padding talents' if b['side'] == 'pad' else 'boss talents'}</small>"
-            + (f"<br>take {e(', '.join(b['take']))}" if b["take"] else "")
-            + (f"<br>drop {e(', '.join(b['drop']))}" if b["drop"] else "") + "</li>" for b in sh["builds"])
+        bd = "".join(  # one line a player: who, which build, then each talent to take (+) or drop (-)
+            f"<li class='rl-b'>{_ic(b['spec'])}<b>{e(b['name'])}</b><small>{e(pretty(b['spec']))}</small>"
+            f"<span class='rl-side {'pad' if b['side'] == 'pad' else 'boss'}'>"
+            f"{'padding &middot; on an add' if b['side'] == 'pad' else 'boss build'}</span>"
+            + "".join(f"<span class='rl-t take'>+ {e(t)}</span>" for t in b["take"])
+            + "".join(f"<span class='rl-t drop'>&minus; {e(t)}</span>" for t in b["drop"]) + "</li>"
+            for b in sh["builds"])
         cards += (f"<article class='rl-boss' id='boss-{x.id}'><header><h3>{e(x.name)}</h3>"
                   f"{copy_button(text(sh, difficulty), 'Copy for Discord')}"
                   f"{copy_button(text(sh, difficulty, mrt=True), 'Copy MRT note')}</header>"
                   f"<h4>Who hits what</h4><ul>{tg or '<li>Everyone on the boss: no add to assign.</li>'}</ul>"
                   + (f"<h4>Talents to change <small>(the top players' builds, not a sim)</small></h4><ul>{bd}</ul>" if bd else
-                     "<h4>Talents to change</h4><p class='small muted'>Nobody, from what the log shows.</p>")
+                     "<h4>Talents to change <span class='rl-ok'>&#10003; nobody, from the log</span></h4>")
                   + lust_block(sh, difficulty) + "</article>")
     allbtn = (copy_button("\n\n".join(text(sh, difficulty) for sh in everything), "Copy every boss for Discord")
               if everything else "")

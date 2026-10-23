@@ -383,3 +383,12 @@ table.mx tbody th{font:500 14px var(--font-body);text-transform:none;letter-spac
 table.mx tr.mine th{font-weight:700} table.mx td{text-align:center}
 table.mx a.mx{display:inline-flex;white-space:nowrap;margin:2px;font:500 11px var(--font-data);text-decoration:none;color:var(--fg)}
 table.mx a.mx:hover{border-color:var(--fg)} table.mx a.mx.nosim{border-style:dashed;opacity:.75}
+/* raid lead: a player's talent changes on one line, + to take, - to drop (the owner: less text) */
+.rl-boss li.rl-b{list-style:none;margin-left:-18px;display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}
+.rl-boss li.rl-b .ics,.rl-p .ics{vertical-align:-3px;margin-right:2px} .rl-p button .ics{align-self:center}
+.rl-side{font:600 11px var(--font-display);letter-spacing:.04em;padding:1px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.rl-side.pad{border-color:color-mix(in srgb,var(--warn) 50%,var(--line));color:var(--warn)}
+.rl-t{font-size:13px;padding:1px 8px;border-radius:6px} .rl-t.take{background:color-mix(in srgb,var(--pos) 14%,transparent);color:var(--fg)}
+.rl-t.drop{background:color-mix(in srgb,var(--neg) 12%,transparent);color:var(--fg);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--neg) 60%,transparent)}
+.rl-ok{font:600 12px var(--font-body);color:var(--pos);margin-left:8px}
+.rl-n{display:inline-flex;align-items:center;gap:3px;margin:0 6px 0 0} .rl-boss li small .ics{width:14px;height:14px;vertical-align:-2px;margin:0 2px}
