@@ -154,7 +154,8 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
     y = 18
     # time axis
     axis = "".join(f'<line x1="{x(s)}" y1="14" x2="{x(s)}" y2="100%" stroke="var(--line)"/>'
-                   f'<text x="{x(s) + 2}" y="11" font-size="10" fill="var(--muted)">{_mmss(s)}</text>'
+                   + (f'<text x="{x(s) + 2}" y="11" font-size="10" fill="var(--muted)">{_mmss(s)}</text>'
+                      if dur - s > 30 else "")  # a tick label near the kill's: the kill's alone ("4:0ll 4:15")
                    for s in range(0, int(dur) + 1, 60)) + (
         f'<line x1="{x(dur)}" y1="14" x2="{x(dur)}" y2="100%" stroke="var(--muted)" stroke-dasharray="3 3"/>'
         f'<text x="{x(dur) - 2}" y="11" font-size="10" fill="var(--muted)" text-anchor="end">kill {_mmss(dur)}</text>')
