@@ -916,7 +916,7 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
         + "".join(f"<rect x='{float(x((moved or {}).get((c.name, t), t))) - 4:.1f}' y='{H - B + 6 + 18 * i}' "
                   f"width='8' height='13' rx='2' "
                   f"class='cp{'' if t in tied else ' off'}'><title>{e(_step_name(c.name))} {c.shown_at.get(t) or _mmss((moved or {}).get((c.name, t), t))}"
-                  f"{'' if t in tied else _mark_reason(c, t, found)}</title></rect>"
+                  f"{'' if t in tied else _mark_reason(c, t, found, (moved or {}).get((c.name, t), t))}</title></rect>"
                   for t in sorted([*c.times, *c.alt, *[pt for pt in [_pull_t(c)] if pt is not None]])
                   if t <= span  # in time order (round 84), the pull group the card shows too (round 99)
                   for tied in [{a for a in [*c.times, *c.alt] if (c.name, a) in answered} if answered is not None
@@ -1244,6 +1244,10 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
     # for 36%" beside a main "0:04 · 31%" mixed a window share with a moment's)
     def back(a: float) -> str:  # tagged as the main time is (Evangelism's 1:42 habit, round 29)
         return f" &middot; back from cooldown{' for about half' if a in c.back_half else ''}{_lead_back(c, a)}"
+    def at(a: float) -> float:  # an "or" time named for a hit's window: shown at the window's own time
+        hit = (named or {}).get((c.name, a))
+        inside = _counted(c, a, hit) if hit is not None and hit_share(c, a, hit) is not None else []
+        return _center(inside) if inside else (moved or {}).get((c.name, a), a)
     def window(a: float, n: str = "") -> str:  # a habit the lead names or ties for a hit: its count, after the
         hit = (named or {}).get((c.name, a))      # habit's own tag, with its own back-from-cooldown reading
         if hit is None and n:                     # (rounds 51, 63, 64)
@@ -1256,14 +1260,10 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
         tag = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"
                + (" for about half" if b <= BACK_SHARE[1] else ""))
         if c.ramp and a < hit - ANSWER[0]:  # a ramp: its offset, as the tied chips say it (heal confirm round 8:
-            return _offset(a, _mmss(hit)) + _base(c, hs, hit) + tag  # "18 s before" beside "ahead of")
+            return _offset(at(a), _mmss(hit)) + _base(c, hs, hit) + tag  # "18 s before"), from the time shown
         return f" &middot; in the window of the {_mmss(hit)} hit:{_base(c, hs, hit).replace(' &middot;', '')}" + tag
     sp_of = {a: sp for a, sp, _n in near}
 
-    def at(a: float) -> float:  # an "or" time named for a hit's window: shown at the window's own time
-        hit = (named or {}).get((c.name, a))
-        inside = _counted(c, a, hit) if hit is not None and hit_share(c, a, hit) is not None else []
-        return _center(inside) if inside else (moved or {}).get((c.name, a), a)
 
     def one(a: float, sp: float, n: str) -> str:  # one share a press: its window's when one is said (heal round 11:
         w, u = window(a, n), untied(a, n)          # "for 29% · in its window: 26%", "for 27% · ⟲, … window: 23%")
@@ -1894,14 +1894,14 @@ def _step_name(name: str) -> str:
     return name.replace(" (Store)", " store").replace(" (Release)", " release")
 
 
-def _mark_reason(c: Cooldown, t: float, found: list | None) -> str:
+def _mark_reason(c: Cooldown, t: float, found: list | None, shown: float | None = None) -> str:
     """An outline's hover: why it is no answer; a store whose release answers a hit says that alone (heal confirm
-    round 5: "tied to no hit: its release goes on the 2:10 hit")."""
-    why = _why_not(c, t, found)
+    round 5: "tied to no hit: its release goes on the 2:10 hit"); an offset from the time the mark shows."""
+    why = _why_not(c, t, found, shown)
     return f" ({why[2:]})" if why.startswith(": its release goes on") else f" (tied to no hit{why})"
 
 
-def _why_not(c: Cooldown, t: float, found: list | None = None) -> str:
+def _why_not(c: Cooldown, t: float, found: list | None = None, shown: float | None = None) -> str:
     """An untied mark's reason on hover, as its card gives it (round 75: an outline on a hit's dot read "tied to no
     hit" with no word why); every outline gives one (round 93: four said none). The pull's first press: "at the pull",
     never "on cooldown" (round 92); a store whose release the lead keeps for a hit says so, and a group of a button on
@@ -1915,7 +1915,9 @@ def _why_not(c: Cooldown, t: float, found: list | None = None) -> str:
         b = None if c.why == MINUTE else _back_in(c, t, hit_t)  # "back from cooldown" alone; the chip's own
         back = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"  # reading of it, its words)
                 + (" for about half" if b <= BACK_SHARE[1] else ""))
-        gap = int(hit_t) - int(t)  # its offset, as its chip says it (heal confirm round 9)
+        said = c.shown_at.get(t, "") if re.fullmatch(r"\d+:\d\d", c.shown_at.get(t, "")) else ""
+        gap = _secs(_mmss(hit_t)) - _secs(said or _mmss(t if shown is None else shown))  # from the time the
+        # mark's title shows, as its chip counts it (heal confirm round 9: 21 s on the chip, 22 on hover)
         where = (f"{gap} s before" if c.ramp and t < hit_t - ANSWER[0] else
                  "in the window of" if abs(gap) > 1 or gap < 0 else f"{gap} s before" if gap else "on")
         return f": {where} the {_mmss(hit_t)} hit{back}, not kept for it"
