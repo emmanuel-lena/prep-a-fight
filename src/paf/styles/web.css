@@ -428,3 +428,5 @@ table.rl-tg{table-layout:fixed} table.rl-tg th:nth-child(1),table.rl-tg td:nth-c
 table.mx a.mx.nosim{border:1px dashed var(--muted);opacity:1;background:transparent}
 .rl-more{font-size:12px;color:var(--muted);padding:1px 6px}
 .rl-boss h4 .rl-ok,.rl-boss h4 .rl-unread{display:inline-block;margin-left:10px;padding:1px 9px;border-radius:999px;border:1px solid var(--line);font:600 12px var(--font-body)}
+table.mx a.mx.old,.mx-legend .pill.old{border:1px solid var(--warn)} .mx-legend .pill.old::before{display:none}
+table.mx .mx-boss{background:#15121c}

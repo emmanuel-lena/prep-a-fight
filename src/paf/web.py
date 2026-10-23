@@ -560,7 +560,9 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
     """Every prepared sheet in one table: a spec a row (yours first), a boss a column (the raid's order, its
     portrait), a cell a link per difficulty, its rarity shape and age (the owner: less text; the date in full on
     hover)."""
-    from paf import icons
+    from datetime import UTC, datetime
+
+    from paf import icons, pack
 
     if not items:
         return ""
@@ -578,8 +580,14 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
     def cell(sp: str, n: str) -> str:
         xs = sorted((i for i in items if i["name"] == n and spec_of[i["key"]] == sp),
                     key=lambda i: order.index(i["difficulty"]) if i["difficulty"] in order else 9)
+        def stale(i) -> bool:  # an older week's sheet: the board's amber, on its cell too
+            try:
+                return pack.is_stale(datetime.fromtimestamp(i["mtime"], UTC).isoformat())
+            except Exception:  # noqa: BLE001
+                return False
         return "".join(
-            f"<a class='pill diff {e(i['difficulty'])} mx{'' if 'prep' in i['files'] else ' nosim'}' "
+            f"<a class='pill diff {e(i['difficulty'])} mx{'' if 'prep' in i['files'] else ' nosim'}"
+            f"{' old' if stale(i) else ''}' "
             f"href='/view/{e(i['key'])}' title='{e(i['difficulty'].capitalize())} &middot; "
             f"{time.strftime('%d %b %H:%M', time.localtime(i['mtime']))}"
             f"{'' if 'prep' in i['files'] else ' &middot; no sim yet'}'>{short_ago(i['mtime'])}"
@@ -591,8 +599,10 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
     rows = "".join(f"<tr{' class=mine' if sp.lower() == mine.lower() else ''}><th scope='row'>{who(sp)}</th>"
                    + "".join(f"<td>{cell(sp, n)}</td>" for n in names) + "</tr>" for sp in specs)
     return (f"<h2>Your sheets</h2><div class='mx-wrap'><table class='mx'><thead><tr><th></th>{head}</tr></thead>"
-            f"<tbody>{rows}</tbody></table></div><p class='mx-legend'>{diff_pill('normal')} {diff_pill('heroic')} "
-            f"{diff_pill('mythic')} <span class='pill diff mx nosim'>no sim yet</span></p>")
+            f"<tbody>{rows}</tbody></table></div><p class='mx-legend'>"
+            + " ".join(diff_pill(k) for k in ("normal", "heroic", "mythic") if any(i["difficulty"] == k for i in items))
+            + (" <span class='pill diff mx nosim'>no sim yet</span>" if any("prep" not in i["files"] for i in items)
+               else "") + " <span class='pill diff mx old'>to redo</span></p>")  # only the marks present
 
 
 TABS = (("prep", "Prep sheet"), ("timeline", "Top players' timelines"))
@@ -1161,7 +1171,7 @@ def raid_board(encs, class_name: str, spec: str) -> str:
             else:
                 href, state, word = f"/boss?boss={x.id}&amp;difficulty={diff}", "no", "prepare"
             if diff == settings.get("difficulty"):  # said under the portrait, without pointing at it
-                said = {"no": "no sim yet" if item else "not prepared", "ok": f"ready {word}",
+                said = {"no": "no sim yet" if item else "not prepared", "ok": "ready",
                         "old": "to redo"}.get(state, word)  # a sheet without a sim (timelines) is no "not prepared"
                 here = f"<small class='rb-st {state}'>{said}</small>"
                 ring = f" st-{state}" + (" st-nosim" if state == "no" and item else "")  # the face's ring says it

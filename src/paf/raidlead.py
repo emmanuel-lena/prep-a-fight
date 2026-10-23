@@ -438,11 +438,11 @@ def page_body(difficulty: str) -> str:
                   + lust_block(sh, difficulty) + "</article>")
     allbtn = (copy_button("\n\n".join(text(sh, difficulty) for sh in everything), "Copy every boss for Discord")
               if everything else "")
-    miss = (f"<p class='small muted'>Not prepared yet, so no sheet: {e(', '.join(missing))}. "
+    miss = (f"<p class='small muted'>No top kills read yet: {e(', '.join(missing))}. "
             f"<a href='/raid/prepare?difficulty={e(difficulty)}'>Prepare the whole raid</a> first.</p>" if missing else "")
     n = len(everything)
     answer = (f"<p class='lead'>{n} {'boss' if n == 1 else 'bosses'} to copy for Discord"
-              + (f", {len(missing)} still to prepare" if missing else "")
+              + (f", {len(missing)} with no top kills read yet" if missing else "")  # not the home's "prepared"
               + f", for the {len(state['players']) - len(bench)} players of your raid.</p>") if n else ""
     if answer:  # the answer is the page's lead; what the page does goes
         head = head.replace(lead, answer)
