@@ -11,3 +11,5 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
   no longer wait up to an hour for it: they stop, the prep finishes, and the rest is read on the next prep. (#34)
 - A character whose /simc export is a week old or more shows its age, on the home page, on its card and on its
   picture in the side bar, with a link to update it. (#32)
+- A prep done while you play: its notification now waits in the Windows notification center until you come back
+  (Windows holds notifications back during a game), and the app's taskbar button lights up. (#33)

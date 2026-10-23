@@ -196,11 +196,39 @@ def in_front(title: str) -> bool:
     return buf.value == title
 
 
-def notify_once(title: str, text: str, app_title: str, linger: float = 60.0) -> None:
-    """A notification from an icon shown for `linger` seconds (a prep done while the app's window was behind
-    others); a click on it brings the app's window to the front."""
+def flash(title: str) -> bool:
+    """The app's taskbar button blinks, then stays lit until its window comes to the front: seen after a game, when
+    Windows held the notification back (issue #33: in full screen, Windows 11 shows none)."""
+    if sys.platform != "win32":
+        return False
+    import ctypes
+    from ctypes import wintypes
+
+    class FLASHWINFO(ctypes.Structure):
+        _fields_ = [("cbSize", wintypes.UINT), ("hwnd", ctypes.c_void_p), ("dwFlags", wintypes.DWORD),
+                    ("uCount", wintypes.UINT), ("dwTimeout", wintypes.DWORD)]
+
+    user32 = ctypes.windll.user32
+    user32.FindWindowW.restype = ctypes.c_void_p
+    hwnd = user32.FindWindowW(None, title)
+    if not hwnd:
+        return False
+    info = FLASHWINFO(ctypes.sizeof(FLASHWINFO), hwnd, 0x3 | 0xC, 0, 0)  # FLASHW_ALL | FLASHW_TIMERNOFG
+    user32.FlashWindowEx(ctypes.byref(info))
+    return True
+
+
+LINGER = 6 * 3600.0  # the longest a notification's icon stays, the app's window never brought to the front
+POLL = 5.0
+
+
+def notify_once(title: str, text: str, app_title: str, linger: float = LINGER, poll: float = POLL) -> None:
+    """A notification from an icon kept until the app's window comes to the front (at most `linger` seconds), so
+    it waits in the notification center when Windows held it back during a game (issue #33: the icon went after a
+    minute, and its notification with it); the taskbar button blinks too. A click brings the app to the front."""
     if sys.platform != "win32":
         return
+    import time
     from pathlib import Path
 
     def show() -> None:
@@ -209,6 +237,12 @@ def notify_once(title: str, text: str, app_title: str, linger: float = 60.0) -> 
     icon = Tray("prep-a-fight", str(Path(__file__).parent / "assets" / "prep-a-fight.ico"),
                 [("Open prep-a-fight", show)], show)
     icon.notify(title, text)
-    timer = threading.Timer(linger, icon.close)
-    timer.daemon = True
-    timer.start()
+    flash(app_title)
+
+    def wait() -> None:
+        end = time.time() + linger
+        while time.time() < end and not in_front(app_title):
+            time.sleep(poll)
+        icon.close()
+
+    threading.Thread(target=wait, daemon=True).start()

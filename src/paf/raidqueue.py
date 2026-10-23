@@ -265,6 +265,9 @@ def run(log=print) -> int:
                 word = "boss" if total == 1 else "bosses"
                 tray.notify("Your raid is ready", f"{total} {word} prepared. Open prep-a-fight to read them."
                             if not failed else f"{total - failed} of {total} {word} prepared.")
+                from paf.tray import flash
+
+                flash("prep-a-fight")  # the app's taskbar button too, seen after a game (issue #33)
             _keep(q)
     finally:
         q["pid"] = None
