@@ -337,7 +337,7 @@ fight.</p>
 <ul class="hl2"><li><span class='when'>{swap}</span></li></ul></section>
 <section class="hp-sec"><h2>Your mitigation</h2><ul class="hl2">{mit or '<li>Not measured yet.</li>'}</ul></section>
 <section class="hp-sec"><h2>Talents</h2><ul class="hl2">{builds_html(p.builds) or '<li>No build yet.</li>'}</ul></section>
-<section class="hp-sec"><h2>Trinkets the top tanks play</h2><ul class="hl2">{trinkets_html(p.trinkets) or '<li>No gear yet.</li>'}</ul></section>
+<section class="hp-sec"><h2>Trinkets the top tanks equip</h2><ul class="hl2">{trinkets_html(p.trinkets) or '<li>No gear yet.</li>'}</ul></section>
 {f'<section class="hp-sec"><h2>What the Encounter Journal asks tanks</h2><ul class="hl2">{jr}</ul></section>' if jr else ''}"""
     return page(f"{p.boss} prep", body)
 
@@ -483,12 +483,16 @@ def render_sheet(p: TankPrep) -> str:
         return "".join(f"<li><b>{ic(n)}{e(n)}</b><span class='upbar' aria-hidden='true'><span style='width:"
                        f"{u * 100:.0f}%'></span></span><b class='upn'>{u:.0%}</b><small>uptime</small></li>"
                        for n, u in p.mitigation) + "".join(
-            f"<li><b>{ic(n)}{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top players"
+            f"<li><b>{ic(n)}{e(n)}</b><small>pressed by {u:.0%} of the top players &middot; {count(k)} a kill"  # the
+            # cards' one form (heal round 16)
             + (f" &middot; on cooldown, about every {ev:.0f} s" if ev else "") + "</small>"
             + ("<span class='when'>" + "".join(f"<span class='chip'>{_chip(moved_t.get((n, t), t), hit_of(n, t))}"
                                                f"{_share(x := tied.get((n, t), sp) if hit_of(n, t) else sp)}"
                                                f"{_of_pressers(x, u)}{why(n, t) or ('' if hit_of(n, t) else ' &middot; not on a big hit')}</span>"
-                                               for t, sp in zip(ts, sps, strict=False)) + "</span>" if ts else "")
+                                               for t, sp in zip(ts, sps, strict=False))
+               + (f"<small class='alt'>+{round(k) - len(ts)} more at varying times</small>"  # every press counted, as
+                  if not ev and round(k) > len(ts) else "")  # the cards (heal round 16: "3 a kill", two chips)
+               + "</span>" if ts else "")
             + "</li>" for n, u, k, ts, ev, sps, *_rest in p.short_defs)
     defs = [c for c in p.cooldowns if is_defensive(c.spell_id, c.name)]
 
@@ -695,7 +699,7 @@ def render_sheet(p: TankPrep) -> str:
               talents_html(p.builds, p.split_players or p.kills, f"{p.spec}s", p.hero),
               split_html(p.split, p.split_players, p.spec, p.split_wide, getattr(p, "talent_icons", None))
               if p.split else "",
-              f"<h2>Trinkets the top {e(p.spec)}s play</h2><ul class='hl2 bars'>"
+              f"<h2>Trinkets the top {e(p.spec)}s equip</h2><ul class='hl2 bars'>"
               f"{trinkets_html(p.trinkets, getattr(p, 'item_icons', None)) or '<li>No gear yet.</li>'}</ul>",
               ]  # the lead says no sim weighs them
     top_share = max((s_ for _n, s_ in p.hitters), default=1.0) or 1.0

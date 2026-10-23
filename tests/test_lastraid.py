@@ -146,3 +146,11 @@ def test_the_pull_comparison_is_a_table(monkeypatch):
     assert ("<tr class='good'><td>You: damage on the boss</td><td><b>252k</b></td><td>209k</td>"
             "<td class='gap'>+21%</td></tr>") in table
     assert lastraid._row_of("Ixuu: active 99% of the pull in B, 89% in A.") == ["Ixuu: time casting", "99%", "89%"]
+
+
+def test_the_comparison_headers_keep_the_time_when_the_health_is_a_row():
+    # app round 16: "wipe at 66% after 2:38" in the header, "Boss health left at 2:38 | 66%" right below
+    rows = [{"cmp": ("Boss health left at 2:38", "66%", "69%"), "kind": "good",
+             "pulls": ["wipe at 66% after 2:38", "wipe at 69% after 2:44"]}]
+    out = lastraid._cmp_table(rows)
+    assert "Better <small>2:38</small>" in out and "wipe at 66%" not in out

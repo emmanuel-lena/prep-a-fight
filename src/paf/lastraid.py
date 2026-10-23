@@ -344,6 +344,8 @@ def _cmp_table(rows: list[dict]) -> str:
     if not rows:
         return ""
     lab = rows[0].get("pulls") or ["", ""]  # which pulls: "Pull 27 (2:38)", so an expert can check them
+    if any(r["cmp"][0].startswith("Boss health left") for r in rows):  # the health is a row: the header
+        lab = [re.sub(r"^wipe at \d+% after ", "", x) for x in lab]  # keeps the time (app round 16: said twice)
     # the comparison's own pulls: its best and worst without a death (paf.pulldiff), not the night's best pull
     return ("<table class='lr-cmp fit'><thead><tr><th>No-death pulls</th>"
             f"<th>Better{' <small>' + e(lab[0]) + '</small>' if lab[0] else ''}</th>"

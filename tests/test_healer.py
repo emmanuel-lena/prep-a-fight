@@ -823,7 +823,8 @@ def test_a_main_time_with_its_reason_then_its_or():
 def test_trinkets_and_split_talents_show_their_icons():
     # heal rounds 12-15: the Change tab had no icon at all
     out = healer.trinkets_html([("Soulcoiler Ritual Vessel", 1, 0.8)], {"Soulcoiler Ritual Vessel": "inv_x"})
-    assert "inv_x" in out and "80% equip it" in out
+    assert "inv_x" in out and "<small>80%</small>" in out
+    assert "questionmark" not in healer.trinkets_html([("X", 1, 0.5)], {"X": "inv_misc_questionmark"})
     split = healer.split_html([("Lightburst", 0.48), ("Bloodborne 48% / Sudden Death 43%", -1.0)], 100, "X",
                               icons={"Lightburst": "spell_a", "Sudden Death": "spell_b"})
     assert "spell_a" in split and "spell_b" in split

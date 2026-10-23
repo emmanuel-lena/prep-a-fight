@@ -61,6 +61,6 @@ def test_a_saved_plan_shows_the_current_template_and_keeps_the_players_lines():
            "# assign Soulcoil Well   # 4 players per kill; 4s moving each time; at 0:05\nassign Essence Rend\n")
     f = Fight("X", 300.0, invulnerable=[Window(101.6, 58.0)])
     text = refresh(old, f)
-    assert "Old" not in text and "4 players per kill" not in text and "1:41  boss not attackable" in text
+    assert "Old" not in text and "4 players per kill" not in text and "1:41  boss not attackable for 58s" in text
     assert text.endswith("2:45 move 6\nassign Essence Rend\n")
     assert mmss(52.7) == "0:52" and mmss(59.6) == "0:59"  # as the MRT notes and the fight tab

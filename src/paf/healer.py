@@ -2065,13 +2065,13 @@ def _bar(share: float) -> str:
 def _pic(icons: dict | None, name: str) -> str:
     from paf.icons import img
 
-    got = (icons or {}).get(name, "")
-    return img(got, "small", "ics", "") if got else ""
+    got = (icons or {}).get(name, "")  # Wowhead's "?" for a spell it does not know: no icon (heal round 16:
+    return img(got, "small", "ics", "") if got and "questionmark" not in got else ""  # Fearless)
 
 
 def trinkets_html(trinkets: list[tuple[str, int, float]], icons: dict | None = None) -> str:
     return "".join(f"<li><a href='https://www.wowhead.com/item={i}' target='_blank' rel='noopener'>{_pic(icons, n)}"
-                   f"{e(n)}</a>{_bar(s)}<small>{s:.0%} equip it</small></li>" for n, i, s in trinkets)
+                   f"{e(n)}</a>{_bar(s)}<small>{s:.0%}</small></li>" for n, i, s in trinkets)  # the heading says "equip"
 
 
 def page(title: str, body: str) -> str:
@@ -2096,7 +2096,7 @@ fight.</p>
 <section class="hp-sec"><h2>Your healing cooldowns, where the top healers press them</h2>
 <ul class="hl2">{cds or '<li>Not enough top players in the corpus yet.</li>'}</ul></section>
 <section class="hp-sec"><h2>Talents</h2><ul class="hl2">{builds or '<li>No build yet.</li>'}</ul></section>
-<section class="hp-sec"><h2>Trinkets the top healers play</h2><ul class="hl2">{trk or '<li>No gear yet.</li>'}</ul></section>
+<section class="hp-sec"><h2>Trinkets the top healers equip</h2><ul class="hl2">{trk or '<li>No gear yet.</li>'}</ul></section>
 {f'<section class="hp-sec"><h2>What the Encounter Journal asks healers</h2><ul class="hl2">{jr}</ul></section>' if jr else ''}
 <section class="hp-sec"><h2>The numbers</h2><p>SimulationCraft does not sim healing well: for the value of a talent or an
 item for your healing, use <a href="{QE_LIVE}" target="_blank" rel="noopener">QE Live</a>.</p></section>"""
@@ -2891,7 +2891,7 @@ def render_sheet(h: HealerPrep) -> str:
     if h.split:
         change.append(split_html(h.split, h.split_players, h.spec, h.split_wide, getattr(h, "talent_icons", None)))
     trk = trinkets_html(h.trinkets, getattr(h, "item_icons", None)) or "<li>No gear yet.</li>"
-    change.append(f"<h2>Trinkets the top {e(h.spec)}s play</h2><ul class='hl2 bars'>{trk}</ul>"
+    change.append(f"<h2>Trinkets the top {e(h.spec)}s equip</h2><ul class='hl2 bars'>{trk}</ul>"
                   f"<p class='small muted'>"
                   f"To weigh a talent or an item for your character, use <a href=\"{QE_LIVE}\" target=\"_blank\" "
                   f"rel=\"noopener\">QE Live</a>.</p>")
