@@ -424,8 +424,8 @@ TANK_HOW_TO_READ = (
     "too, under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long."
     "</dd><dt>&#10226; back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, "
     "not counted for it (&#10226;&nbsp;about half: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
-    "time some top players press it instead.</dd><dt>not kept</dt><dd>pressed in a moment's window, but the table "
-    "answers it with another press.</dd></dl>")
+    "time some top players press it instead.</dd><dt>not kept</dt><dd>pressed in a moment's window, but not that "
+    "moment's answer in the table.</dd></dl>")
 
 
 def render_sheet(p: TankPrep) -> str:

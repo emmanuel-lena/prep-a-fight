@@ -828,15 +828,16 @@ def defensives_html(d: PrepData) -> str:
         "<p class='small'>The top players do not press their defensives at one shared moment on this boss: use them "
         "when you take damage.</p>")
     usage = "".join(f"<span class='chip{' rare' if per < 0.2 else ''}'>{icons.img(d.icons.get(n, ''), 'small')}"
-                    f"{link(n, f'spell={sid}')} <b>{per:.1f}</b>/kill &middot; {share:.0%} of the kills</span>"
+                    f"{link(n, f'spell={sid}')} <b>{per:.1f}</b>/kill on average &middot; {share:.0%} of the kills</span>"
                     for n, sid, per, share in df.usage[:6])  # chips, the rare ones muted, never dropped (DPS c. 14)
     return (f"<h2>Defensives <span class='pill near'>advice, not simmed</span></h2><div class='card'>{table}"  # the
-            + (f"<div class='small chips'><span class='muted'>Used:</span><span>{usage}</span></div>" if usage
+            + (f"<div class='small chips'><span class='muted'>Used{'' if df.moments else f', {df.kills} ranked kills'}:"
+               f"</span><span>{usage}</span></div>" if usage
                else "")  # the label its own column, the chips wrapping beside it (DPS confirm round 14)
             + (f"<p class='small muted'>When the top players of your spec press one ({df.kills} kills) and the boss "
                "ability it answers (cast within about 10 s, or long before for damage that lands later); the fight tab "
                f"calls the moments where {fightview_support():.0%} or more of them press one.</p>" if df.moments else
-               f"<p class='small muted'>From {df.kills} ranked kills.</p>") + "</div>")  # no table: no columns told
+               "") + "</div>")  # no table: no columns told, the source in the chips' label (DPS confirm round 15)
 
 
 def nsrt_block(note: str) -> str:

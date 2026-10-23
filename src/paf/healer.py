@@ -190,12 +190,13 @@ HOW_TO_READ = (
     "going then (a hit's window: those lasting through it); &ldquo;of its users&rdquo;: of the top players who "
     "press the button.</dd><dt>Tied to a hit</dt>"
     "<dd>pressed in the hit's window (5 s before to 8 s after; a ramp: 8 to 30 s ahead) by a quarter of its users; "
-    "its share is the window's. One button a hit (a second within the noise), else the most pressed under a quarter.</dd><dt>A time</dt><dd>shared by a quarter of those who press the button; its share: the top players pressing within 8 s of it (&ldquo;of its users&rdquo; too, "
+    "its share is the window's. One button a hit (a second within the noise), else the most pressed under a quarter; "
+    "a button pressed on a rhythm never is.</dd><dt>A time</dt><dd>shared by a quarter of those who press the button; its share: the top players pressing within 8 s of it (&ldquo;of its users&rdquo; too, "
     "under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long.</dd>"
     "<dt>&#10226; back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, not "
     "counted for it (&#10226;&nbsp;about half: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
-    "time some top players press it instead.</dd><dt>not kept</dt><dd>pressed in a hit's window, but the table answers "
-    "that hit with another press.</dd></dl>")
+    "time some top players press it instead.</dd><dt>not kept</dt><dd>pressed in a hit's window, but not that hit's "
+    "answer in the table.</dd></dl>")
 
 # stage time, as a legend term: every rule of STAGED, in fewer words
 STAGE_TERM = ("after a dashed line: each kill's damage and presses counted from that stage's start, placed at its "
@@ -1540,6 +1541,7 @@ def _tidy(html: str) -> str:
     """Two brackets in a row on a chip, one: "(99 kills going) (29% of its users)" -> "(99 kills going; 29% ...)"."""
     html = re.sub(r"\((\d+ kills going)\) \(([^()]*)\)", r"(\1; \2)", html)
     # "back from cooldown" on a chip: the glyph the legend defines (a review: said twice in one chip, 16 sheets)
+    html = re.sub(r" &middot; not kept(?= ?(?:&middot;|,) back from cooldown)", "", html)  # ⟲ says it (heal c. 15)
     html = re.sub(r" ?(?:&middot;|,) back from cooldown for about half", " &middot; &#10226;&nbsp;about half", html)
     return re.sub(r" ?(?:&middot;|,) back from cooldown", "&nbsp;&middot;&nbsp;&#10226;", html)  # never alone on a line
 
