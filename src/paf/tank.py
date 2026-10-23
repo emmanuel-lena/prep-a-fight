@@ -662,7 +662,20 @@ def render_sheet(p: TankPrep) -> str:
         answered = set()
     window_named = {c.name for c in defs if any(f"press {e(c.name)} in its window" in v
                                                 for v in (bare.values() if p.moments else []))}  # its lane (heal
-    # confirm round 3: "only 15% press Shield Wall in its window", no mark on the chart)
+    # confirm round 3: "only 15% press Shield Wall in its window", no mark on the chart), drawn at the row's time
+    # with the row's reason on hover (confirm round 4: an outline at 3:00 "back from cooldown" for "about 2:58")
+    import re as _re
+
+    from paf.healer import _secs
+    for v in (bare.values() if p.moments else []):
+        for n, at in _re.findall(r"press (.+?) in its window[^()]*?about (\d+:\d\d)", _re.sub(r"<[^>]+>", "", v)):
+            for c in defs:
+                if e(c.name) == n:
+                    for t in [*c.times, *c.alt]:
+                        if abs(t - _secs(at)) <= 10:
+                            moved_t[(c.name, t)] = float(_secs(at))
+                            if t not in c.windowed:
+                                c.windowed.append(t)
     svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight, their defensives and "
                     "the swaps", [*defs, *shorts, *lane], {"Tank swaps", *(n for n, _t in answered), *window_named},
                     answered,
@@ -673,8 +686,8 @@ def render_sheet(p: TankPrep) -> str:
     marks = [*(["the table's answers" + (" (an outline: another press, or one in a hit's window that is not its "
                                           "answer)" if outline else "")]
                if answered else ["an outline: a press in a hit's window, not its answer"] if window_named else []),
-             *(["the swaps"] if lane else [])]
-    marks = f"Marks: {' and '.join(marks)}. " if marks else ""
+             *(["a tick: a tank swap" if window_named and not answered else "the swaps"] if lane else [])]
+    marks = f"Marks: {('; ' if window_named and not answered else ' and ').join(marks)}. " if marks else ""
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + ([table] if table else []) + [
         f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Median damage per "
         f"second on the ranked tank of each top kill, {p.damage_kills or 'the top'} kills (that tank alone: a swap "

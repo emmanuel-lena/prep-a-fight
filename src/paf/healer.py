@@ -107,6 +107,7 @@ class Cooldown:
     hits: list = field(default_factory=list)  # the big hits' times, for a release chip's window
     icon: str = ""  # its game icon's file name (paf.icons), "" offline
     shown_at: dict = field(default_factory=dict)  # a mark's time as its card says it ("1:50 to 2:04"), for its hover
+    windowed: list = field(default_factory=list)  # times the table names in a hit's window: their reason on hover
     lead_back: dict = field(default_factory=dict)  # a time back from cooldown the lead says in a hit's window: its hit
 
 
@@ -1895,6 +1896,8 @@ def _why_not(c: Cooldown, t: float, found: list | None = None) -> str:
         return f": {c.why}"
     if t <= PULL:
         return ": at the pull"
+    if t in c.windowed and (m := hit_near(t)) is not None:  # the table's own words for it (heal confirm round 4:
+        return f": in the {_mmss(m.t)} hit's window, not kept for it"  # "held past its cooldown" on hover)
     if c.fates:  # a two-step button's store: where its release lands
         us = [u for s_, u in c.fates if u is not None and abs(s_ - t) <= 8]
         m = hit_near(st.median(us)) if us else None
@@ -2605,6 +2608,7 @@ def render_sheet(h: HealerPrep) -> str:
     lead, lead_names, answered, rel_marks = "", [], set(), []
     named: dict = {}  # the press the lead names for each hit kept for none: its chip counts that window too
     moved: dict = {}  # a tied press whose counted presses sit 5 s or more from its moment: drawn and said there
+    bare_said: dict = {}  # each hit no cooldown is kept for: its row's words (what is pressed in its window)
     if h.moments:  # the highest, in time order (round 100: the first three in time kept Stage Two's 3:50, 1.42x, and
         shown = sorted(sorted(h.moments, key=lambda m: -m.ratio)[:LEAD_HITS], key=lambda m: m.t)  # lost its 4:15)
         ratios = (f"{'both' if len(shown) == 2 else 'each'} {_x(shown[0].ratio)}&times;"
@@ -2828,7 +2832,7 @@ def render_sheet(h: HealerPrep) -> str:
                              for c in {c.name: c for c in rel_named}.values()]) if lead_names or rel_named
                    else f"; the top {e(h.spec)}s keep no cooldown for {'it' if len(shown) == 1 else 'them'}")
                 + f".{long}{from_dispel}</p>"
-                + hits_table(h.moments, shown, pairs, {b: landed(b) for b in bare}, h.phases, by_icon,
+                + hits_table(h.moments, shown, pairs, (bare_said := {b: landed(b) for b in bare}), h.phases, by_icon,
                              rule.strip(" ()")[:1].upper() + rule.strip(" ()")[1:]))
     drawn = list(heals)  # the chart's lanes: the cards' cooldowns, and a two-step button's release the lead ties
     for r, t, at in rel_marks:  # (its own lane, a full mark; on the store's card, not a card of its own)
@@ -2844,12 +2848,29 @@ def render_sheet(h: HealerPrep) -> str:
                 moved[(c.name, t)] = at
     from dataclasses import replace as _rep
 
+    lanes_extra: set = set()
     for (n, key), v in list(named.items()):  # a window line ("about 2:13"): its time drawn as an outline too
         if isinstance(key, tuple) and isinstance(v, tuple) and isinstance(v[1], str) and re.fullmatch(r"\d+:\d\d", v[1]):
             t_line = float(_secs(v[1]))
-            drawn = [_rep(c, alt=[*c.alt, t_line], alt_near=[*(c.alt_near or [""] * len(c.alt)), ""])
-                     if c.name == n and t_line not in c.alt else c for c in drawn]
-    lanes = set(lead_names) | {k[0] for k in named if k[0] != KEPT}  # a button the table names in a hit's window
+            drawn = [_rep(c, alt=[*c.alt, t_line] if t_line not in c.alt else c.alt,
+                          alt_near=[*(c.alt_near or [""] * len(c.alt)), ""] if t_line not in c.alt else c.alt_near,
+                          windowed=[*c.windowed, t_line])
+                     if c.name == n else c for c in drawn]
+    for txt in bare_said.values():  # "press X in its window …, about 4:18": that mark's hover gives the row's reason
+        for n, at in re.findall(r"press (.+?) in its window[^()]*?about (\d+:\d\d)", re.sub(r"<[^>]+>", "", txt)):
+            t_row = float(_secs(at))
+            drawn = [_rep(c, windowed=[*c.windowed, *(t for t in [*c.times, *c.alt] if abs(t - t_row) <= 10)])
+                     if _shown(c.name) == html.unescape(n) else c for c in drawn]
+            lanes_extra.add(html.unescape(n))
+        for _n, at in re.findall(r"release a (.+?), whichever store it was,[^()]*?about (\d+:\d\d)",
+                                  re.sub(r"<[^>]+>", "", txt)):  # a release in the window: its lane and outline
+            t_row = float(_secs(at))  # (heal confirm round 4: Nek'zali's Evoker 3:53, no mark)
+            for c in heals:
+                r = c.release
+                if r is not None and r not in drawn and any(abs(t - t_row) <= 10 for t in [*r.times, *r.alt]):
+                    drawn = [*drawn, _rep(r, windowed=[t for t in [*r.times, *r.alt] if abs(t - t_row) <= 10])]
+                    lanes_extra.add(_shown(r.name))
+    lanes = set(lead_names) | {k[0] for k in named if k[0] != KEPT} | {c.name for c in drawn if _shown(c.name) in lanes_extra}
     # gets its lane and its outline there (heal confirm round 2: Convoke 60% in the 1:15 window, no mark)
     svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight, and the top players' healing "
                     "cooldowns", drawn, lanes, answered, moved)
