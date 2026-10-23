@@ -2504,10 +2504,10 @@ def render_sheet(h: HealerPrep) -> str:
         hits += f": {ratios} the usual damage"
         rule = ""
         if any(m.ratio < SPIKE for m in shown):  # said, not left to a reader of the 1.5x rule (round 29)
-            rule = (" (no hit reaches 1.5&times; here: these are the highest waves)"  # the rule moments() applied,
-                     if max(m.ratio for m in h.moments) < SPIKE else  # not the rounded figures (1.45 shows 1.5)
-                     f" (a hit at {_x(max(SPIKE * 0.9, RELATIVE * max(m.ratio for m in h.moments)))}&times; or more"
-                     " counts too, 0.85 of the highest)")  # the bar applied (round 101: 1.35x said, 1.42x applied)
+            rule = (" (none reaches 1.5&times;: the highest waves)"  # the rule moments() applied, not the rounded
+                    if max(m.ratio for m in h.moments) < SPIKE else  # figures (1.45 shows 1.5)
+                    f" (big from {_x(max(SPIKE * 0.9, RELATIVE * max(m.ratio for m in h.moments)))}&times; here: "
+                    "0.85 of the highest)")  # the bar applied (round 101: 1.35x said, 1.42x applied)
         # a cooldown said for a hit only when the top players' usual press answers it (paf.healer.ANSWER), at the
         # press's own time
         bare = []
