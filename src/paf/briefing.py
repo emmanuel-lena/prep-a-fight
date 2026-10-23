@@ -71,10 +71,14 @@ def _moves(d) -> list[tuple[float, str, str, str]]:
     if d.talents:
         g = best.per_fight.get(d.talents.fights[0], (0.0, None))[0] if best else 0.0
         if best is not None and g > 2 * d.talents.error:
-            add = ", ".join(dict.fromkeys([x for x in best.add if x not in best.drop][:6]))  # one name both ways
-            # (a rank or another node of it): no change to say (Earthquake "taken" while it stays)
+            takes = list(dict.fromkeys(x for x in best.add if x not in best.drop))  # one name both ways (a rank
+            drops = list(dict.fromkeys(x for x in best.drop if x not in best.add))  # or another node): no change
+            add = ", ".join(takes)
+            say = (f"It takes {e(add)}." if takes and len(takes) + len(drops) <= 6 else  # a few: named; more: counted,
+                   f"+{len(takes)} / &minus;{len(drops)} talents: see What to change." if takes or drops else "")
+            # never a cut list read as the whole swap (DPS round 12: 6 of 10 named, the drops unsaid)
             out.append((g, f"Switch to <b>{e(best.build.label)}</b>, the talents of {best.build.count} top players.",
-                        f"It takes {e(add)}." if add else "",
+                        say,
                         copy_button(best.build.code, "Copy the talent string") if best.build.code else ""))
         else:
             out.append((0.0, f"Keep your talents: no build of the top players beats yours by more than "

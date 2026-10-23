@@ -414,7 +414,8 @@ def job_html(d) -> str:
     kills = [a for a in d.actions if a.kind == "kill"][:2]
     if len(kills) == 2 and at(kills[0].name) and at(kills[0].name) == at(kills[1].name):  # one wave, two units:
         # one line (DPS round 11: "Kill the Shrouded Venom at 0:24, 1:48, 3:12", then the Burning Venom's same)
-        both = " and ".join(e(a.text.split(':')[0].split(' (')[0]) for a in kills).replace(" and Kill ", " and ")
+        kills.sort(key=lambda a: next((i for i, w in enumerate(d.waves) if _clean(w[3]) == a.name), 99))
+        both = "Kill " + " and ".join(e(a.name) for a in kills)  # the timeline's words and order (DPS round 12)
         rows = [r for r in rows if r[0] not in {a.name for a in kills}]
         rows.insert(0, (kills[0].name, f"<b>{both}</b>{at(kills[0].name)}"))
     hints = {it.name: it.hint for _t, it in items(d) if it.hint}

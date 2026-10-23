@@ -144,4 +144,4 @@ def test_two_adds_of_one_wave_are_one_kill_row(monkeypatch):
     you = [it.text for t, it in fightview.items(d) if t == 24.0 and it.side == "you"]
     assert you == ["Kill Burning Venom and Shrouded Venom"]
     job = fightview.job_html(d)
-    assert "Kill the Burning Venom and the Shrouded Venom at 0:24" in re.sub("<[^>]+>", "", job)
+    assert "Kill Burning Venom and Shrouded Venom at 0:24" in re.sub("<[^>]+>", "", job)

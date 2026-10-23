@@ -1347,8 +1347,8 @@ and the gear for that.</p></div>""")
                    if best_g[0] <= 2 * tc.error else
                    f"<p><b>{e(best_g[1])} beats yours by {best_g[0]:+.1f}%</b> on this fight.</p>")
         tabs["gear"].append(f"""<h2>Talents of the top players, on your character</h2><div class="card scroll">
-{verdict}<p class="small muted">Each top build simmed on your character, &plusmn;{tc.error:.2f}% error: a gap under
-{2 * tc.error:.1f}% is noise. A build can lose on the dummy and win on this fight.</p>
+{verdict}<p class="small muted">Each top build simmed on your character at &plusmn;{2 * tc.error:.1f}% (SimC's error, as
+its target_error): a gap under that is noise. A build can lose on the dummy and win on this fight.</p>
 <table><tr><th>Build</th>{head}<th>Changes vs your talents</th></tr>{body}</table></div>""")
 
     # cooldown plans
