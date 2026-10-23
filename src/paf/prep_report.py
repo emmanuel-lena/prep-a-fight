@@ -594,7 +594,9 @@ def suggestions(d: PrepData) -> list[Suggestion]:
                              "Every build compared below, in Talents of the top players.</span>")
             out.append(Suggestion(_severity(g), f"Switch to the talents of <b>{e(best.build.label)}</b> "
                                   f"<span class='muted'>(played by {best.build.count} top players)</span>", lines, g,
-                                  d.icons.get("__spec__", "")))
+                                  d.icons.get("__spec__", ""),
+                                  "total damage" if any(c for _t, c, _l, _n in d.waves) else "boss damage",
+                                  "your talents"))  # its base, as the plans' (DPS confirm round 10)
     want = wanted(d)
 
     def costly(p) -> bool:
@@ -849,7 +851,8 @@ def suggestions_html(d: PrepData) -> str:
         if s.severity == "info" and s.gain is not None:  # a gain only for some raids (a burst they may not need)
             label = "Situational"
         unit = f"<small>{e(s.metric)}, vs {e(s.base)}</small>" if s.metric else ""  # the baseline, said
-        gain = f'<div class="gain">{s.gain:+.1f}%{unit}</div>' if s.gain is not None else '<div class="gain"></div>'
+        gain = (f'<div class="gain{" muted" if s.severity == "alt" else ""}">{s.gain:+.1f}%{unit}</div>'  # not played:
+                if s.gain is not None else '<div class="gain"></div>')  # grey (DPS confirm round 10)
         pic = icons.img(s.icon or "inv_misc_groupneedmore", "medium")
         details = "".join(f"<div>{x}</div>" for x in s.details)
         rec = " rec" if "recommended for your raid" in s.title or "your choice" in s.title else ""
