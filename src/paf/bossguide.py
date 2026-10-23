@@ -8,6 +8,7 @@ import re
 
 from paf import icons, theme
 from paf.mechanics import Section, dedupe, encounter_sections, walk
+from paf.wowhead import link, spell_ref
 
 e = html.escape
 ROLE_TITLES = {"damage": "Damage Dealers", "healer": "Healers", "tank": "Tank"}
@@ -220,13 +221,17 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
         facts.append(e(ctx["also"][s.title]))
     if s.title.lower() in ctx["burst"]:
         facts.append(f"<b>burst window: the boss takes x{ctx['burst'][s.title.lower()]:g} damage</b>")
-    text = readable(s.text, ctx["difficulty"]).strip() if s.text else ""
-    if not text:  # no journal text, or only another difficulty's sentence: the spell's own description
+    # the journal's words only on what the journal flags for your role (or hits you too); the rest: its name, icon,
+    # tags and times, the name a Wowhead link to read it (the owner, 2026-10-24: less prose)
+    told = not ctx["role"] or ctx["role"] in s.flags or s.title in ctx["also"]
+    text = readable(s.text, ctx["difficulty"]).strip() if s.text and told else ""
+    if not text and told:  # no journal text, or only another difficulty's sentence: the spell's own description
         text = readable(ctx["describe"](s.spell_id), ctx["difficulty"])
     body = f"<div class='small ab-d'>{e(text)}</div>" if text else ""
     pic = icons.img(ctx["icons"].get(s.title, ""), "small")
     fact = f"<div class='small muted'>{' &middot; '.join(facts)}</div>" if facts else ""
-    return (f'<div class="ab" style="margin-left:{min(depth, 1) * 14}px"><div>{pic}<b>{e(s.title)}</b> {tags}</div>'
+    name = link(s.title, spell_ref(s.spell_id) if s.spell_id else None)
+    return (f'<div class="ab" style="margin-left:{min(depth, 1) * 14}px"><div>{pic}<b>{name}</b> {tags}</div>'
             f"{fact}{body}</div>")
 
 
@@ -248,7 +253,7 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
     ctx = {"timings": {k.lower(): v for k, v in (timings or {}).items()},
            "mechanics": {m.name.lower(): m for m in (mechanics or [])},
            "burst": {k.lower(): v for k, v in (burst or {}).items()}, "icons": icon_map or {},
-           "describe": describe, "difficulty": difficulty, "also": also or {}}
+           "describe": describe, "difficulty": difficulty, "also": also or {}, "role": role}
     def key(s: Section) -> tuple:
         return s.kind, s.title, readable(s.text), tuple(s.flags)
 
@@ -309,12 +314,14 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
                             + (f"<p class='small muted unit-d' style='margin-left:{min(depth, 1) * 14}px'>"
                                + (f"As in {e(seen[key(s)])}; what changes:" if told
                                   else e(readable(s.text, difficulty)))
-                               + "</p>" if s.text else ""))
+                               + "</p>" if s.text and (told or not role) else ""))  # a unit's story: not told
+                # on a role's page (the owner, 2026-10-24); its abilities below say what it does
         head = e(top.title) + "".join(f' <span class="pill">{SHOWN_FLAGS[f]}</span>'
                                        for f in top.flags if f in SHOWN_FLAGS)
         if top.kind == "stage" and phases:  # when it starts, from the logs (round 79: no time in the headings)
             head += start(top.title)
-        intro = f"<p class='small muted'>{e(readable(top.text)[:300])}</p>" if top.text and top.kind != "stage" else ""
+        intro = (f"<p class='small muted'>{e(readable(top.text)[:300])}</p>"
+                 if top.text and top.kind != "stage" and not role else "")
         if top.kind == "ability":
             rows.insert(0, _ability(top, 0, ctx))
         title = "" if top.kind == "ability" else f"<h3>{head}</h3>"  # an ability's card: its row names it

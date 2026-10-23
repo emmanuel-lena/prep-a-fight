@@ -65,7 +65,8 @@ def test_another_roles_abilities_are_named_not_told():
         sec(8, "Soulcoil Ignition", "ability", "Raid damage.", ["healer"]),
         sec(9, "Soulcoil Well", "ability", "A well of necrotic energy.")])
     a = abilities_html([stage], role="damage")
-    assert "Pulls several players in." in a and "A well of necrotic energy." in a
+    # your role's ability told; one the journal flags for no role: its name only, a link to read it (the owner)
+    assert "Pulls several players in." in a and "A well of necrotic energy." not in a and "Soulcoil Well" in a
     assert "Echoes burst on impact." not in a and "An echo of her soul." not in a
     assert "For the tanks: Possession Barrage." in a and "For the healers: Soulcoil Ignition." in a
     assert "Echoes burst on impact." in abilities_html([stage])  # no role (the sheet's boss tab): everything
