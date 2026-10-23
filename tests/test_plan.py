@@ -50,3 +50,17 @@ def test_offsets_grid_and_template():
     p = parse_plan(TEXT)
     assert [o[1] for o in all_offsets(p)] == [-4, -2, 0, 2, 4]
     assert "1:00  adds x3" in plan_template(fight())
+
+
+def test_a_saved_plan_shows_the_current_template_and_keeps_the_players_lines():
+    # app round 11: a plan saved on Oct 18 showed "4 players per kill; 4s moving" under a journal saying 5 and ~1 s
+    from paf.fight import Fight, Window
+    from paf.plan import mmss, refresh
+
+    old = ("# Personal plan for X. Edit and save\n#   0:53  adds x6 for 18s (Old)\n2:45 move 6\n"
+           "# assign Soulcoil Well   # 4 players per kill; 4s moving each time; at 0:05\nassign Essence Rend\n")
+    f = Fight("X", 300.0, invulnerable=[Window(101.6, 58.0)])
+    text = refresh(old, f)
+    assert "Old" not in text and "4 players per kill" not in text and "1:42  boss not attackable" in text
+    assert text.endswith("2:45 move 6\nassign Essence Rend\n")
+    assert mmss(52.7) == "0:53" and mmss(59.6) == "1:00"

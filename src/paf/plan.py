@@ -35,7 +35,9 @@ def parse_time(s: str) -> float:
 
 
 def mmss(t: float) -> str:
-    return f"{int(t // 60)}:{int(round(t % 60)):02d}"
+    """0:52.7 -> "0:53": rounded once, so 59.6 s is "1:00", never "0:60" (one form for every page: app round 11)."""
+    s = int(round(t))
+    return f"{s // 60}:{s % 60:02d}"
 
 
 @dataclass
@@ -169,6 +171,14 @@ def plan_template(fight: Fight) -> str:
         lines.append(f"#   {mmss(t):>5}  {what}")
     lines.append("")
     return "\n".join(lines) + "\n"
+
+
+def refresh(text: str, fight: Fight) -> str:
+    """A saved plan as the page shows it: the player's own lines kept, the comments (the fight's events, the
+    mechanics' hints) from the current template, never a stale copy (app round 11: "4 players per kill; 4s moving"
+    saved on Oct 18 under a journal saying 5 and ~1 s)."""
+    own = [line for line in text.splitlines() if line.strip() and not line.lstrip().startswith("#")]
+    return plan_template(fight) + ("\n".join(own) + "\n" if own else "")
 
 
 @dataclass

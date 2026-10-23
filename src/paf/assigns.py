@@ -17,6 +17,7 @@ from paf.corpus.analyze import canonical_waves, kills_filter
 from paf.corpus.memo import by_corpus
 from paf.corpus.template import moving_seconds
 from paf.fight import Fight, Window
+from paf.plan import mmss
 
 WINDOW_BEFORE = 3.0  # seconds before the debuff / kick included in the cost window
 WINDOW_AFTER = 8.0
@@ -176,7 +177,7 @@ def load_mechanics(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
 def assigns_template(mechanics: list[Mechanic], spec: str) -> str:
     lines = ["", f"# Boss mechanics you may be assigned to (uncomment yours). Cost measured on {spec} players:"]
     for m in mechanics:
-        when = ", ".join(f"{int(t // 60)}:{int(t % 60):02d}" for t in m.times[:8])
+        when = ", ".join(mmss(t) for t in m.times[:8])
         what = "kick" if m.kind == "interrupt" else f"{m.players_per_kill:.0f} players per kill"
         cost = f"{m.cost:g}s moving each time" if m.samples >= MIN_SAMPLES else f"~{m.cost:g}s (few samples)"
         lines.append(f"# assign {m.name:<28} # {what}; {cost}; at {when}")

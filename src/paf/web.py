@@ -1512,8 +1512,8 @@ def boss_line(enc, difficulty: str) -> str:
     except (OSError, ValueError, KeyError, TypeError):
         return ""
 
-    def mmss(t: float) -> str:
-        return f"{int(t // 60)}:{int(t % 60):02d}"
+    from paf.plan import mmss  # rounded, as the plan box below (app round 11: 0:52 here, 0:53 there)
+
     adds = sorted({mmss(w.time) for w in f.add_waves if w.scalable}, key=lambda x: tuple(map(int, x.split(":"))))
     away = [f"{mmss(w.start)} to {mmss(w.start + w.duration)}" for w in f.invulnerable]
     parts = ([f"adds at {', '.join(adds[:4])}" + (" and later" if len(adds) > 4 else "")] if adds else []) + (
@@ -1584,20 +1584,20 @@ def plan_block(enc, difficulty: str) -> str:
     """The player's own fight plan (moves, lust, PI), editable; assignments are the ticked mechanics above."""
     from paf.corpus.template import template_path
     from paf.fight import Fight
-    from paf.plan import plan_template
+    from paf.plan import plan_template, refresh
 
     p = _plan_path(enc, difficulty)
-    if p.is_file():
+    tpl = template_path(enc.name, difficulty)
+    if tpl.is_file():
+        fight = Fight.load(tpl)
+        text = refresh(p.read_text(encoding="utf-8-sig"), fight) if p.is_file() else plan_template(fight)
+    elif p.is_file():
         text = _fresh_header(p.read_text(encoding="utf-8-sig"))
-    elif template_path(enc.name, difficulty).is_file():
-        text = plan_template(Fight.load(template_path(enc.name, difficulty)))
     else:
         return ('<p class="muted small">Available after the first prep: your own movements (a soak at 2:45, a '
                 "dodge...), Bloodlust and Power Infusion timings, on top of the rebuilt fight.</p>")
-    return f"""<p class="small muted">What you do on this fight that the logs cannot guess, one line each: <code>2:45 move 6</code>
-(6 s of movement), <code>5:30 move 8 shift -5..+5</code> (the optimizer picks the best moment), <code>lust 0:00</code>,
-<code>pi 0:20 2:30</code>, <code>no boss-movement</code>. The mechanics ticked in "Are you assigned to something?" are added as <code>assign</code> lines.
-Every sim of the prep (gear, talents, cooldowns) runs on this fight.</p>
+    return f"""<p class="small muted">Every sim of the prep runs on this fight; the mechanics you tick above are added as
+<code>assign</code> lines.</p>
 <form method="post" action="/plan"><input type="hidden" name="boss" value="{enc.id}">
 <input type="hidden" name="difficulty" value="{e(difficulty)}"><textarea name="plan" aria-label="Fight plan lines">{e(text)}</textarea>
 <p><button class="btn ghost">Save the plan</button></p></form>"""
