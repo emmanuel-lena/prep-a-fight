@@ -137,7 +137,7 @@ def alive(fight, t: float, life: float) -> float:
 
 def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: int, px: float = 1.4,
                       names: dict[str, str] | None = None, phases: list | None = None,
-                      links: dict[str, str] | None = None) -> str:
+                      links: dict[str, str] | None = None, legend: bool = True) -> str:
     """Lorrgs-like strip for a plan: the fight (phases, add waves, vulnerability windows, lust) then one row per
     cooldown with the plan's casts (dots) over the top players' casts of the same cooldown (bars)."""
     if fight is None or not plan.timeline:
@@ -210,14 +210,15 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
         y += 22
     return (f'<div class="scroll"><svg class="plan-tl" viewBox="0 0 {W} {y + 4}" width="100%" '
             f'style="font-family:system-ui;max-width:{W * 1.15:.0f}px">{axis}'
-            f'{"".join(rows)}</svg></div><p class="small muted">Dots: this plan (one simulated pull). Pale bars: '
-            f'when the top players cast the same cooldown.'
+            f'{"".join(rows)}</svg></div>' + ("" if not legend else  # once a tab (the owner: less text)
+            '<p class="small muted">Dots: this plan (one simulated pull). Pale bars: '
+            'when the top players cast the same cooldown.'
             + (" Green: add waves." if fight.add_waves else "")
             + (" Gold: boss vulnerability windows (x = damage taken)." if fight.vulnerable else "")
             + (" Grey: boss away." if fight.invulnerable else "")
             + (" Orange line: Bloodlust." if fight.lust_time is not None else "")
             + (" Dashed lines: stage changes." if phases and len(phases) > 1 else "")
-            + (" A press before the pull is drawn at 0:00." if any(t < 0.5 for t, _l in plan.timeline) else "") + "</p>")
+            + (" A press before the pull is drawn at 0:00." if any(t < 0.5 for t, _l in plan.timeline) else "") + "</p>"))
 
 
 def _base(name: str) -> str:
@@ -1374,7 +1375,7 @@ for reference: a build can be worse there and much better on this fight. Each ru
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span>{" <span class='pill gold'>the sheet plays this plan</span>" if p.objective == first else ""}</h3>
 {("<p class='small'>Played because " + ("your raid pads the adds" if p.objective == "total" else "your raid stays on the boss" if p.objective == "boss" else "it is your choice") + " (see Your raid and the adds, below)." + (" When the plan presses a burst while the boss is immune, the fight tab moves it onto the adds that spawn then." if d.fight is not None and d.fight.invulnerable else "") + "</p>") if p.objective == first and p.objective in ("boss", "total") else ""}
 {"<p class='small muted'>Burst damage counts only the damage on " + e(burst_names(d)[1] or "the burst targets") + ": worth it only if your raid needs " + e(burst_names(d)[1] or "them") + " dead fast" + ("." if _stall(d, p) else ", at the cost of the boss and total damage above.") + "</p>" if p.objective == "secondary" else ""}
-{checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases, links=d.links)}
+{checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases, links=d.links, legend=not blocks)}
 <table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
 {"<p class='small muted'>The cooldowns not listed follow SimC's default priority list: their times can move with the ones the plan holds.</p>" if changed else ""}
 <div class="pp-grid"><div><h4>Play-by-play of one simulated pull</h4><div class="scroll pp"><table>
