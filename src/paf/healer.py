@@ -795,7 +795,8 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
     guides = "".join(f"<line class='gd' x1='{x(m.t)}' x2='{x(m.t)}' y1='{y(m.dtps)}' y2='{H - 22}'/>"
                      for m in found) if rows else ""  # from each hit down through the lanes
     marks = guides + "".join(f"<circle cx='{x(m.t)}' cy='{y(m.dtps)}' r='4' class='mk'><title>{_mmss(m.t)}"
-                    + (f" &middot; mostly {e(m.boss_spell)}" if m.boss_spell else "")
+                    + (f" &middot; {'' if m.boss_spell.startswith('mostly') else 'mostly '}{e(m.boss_spell)}"
+                       if m.boss_spell else "")
                     + f" &middot; {_x(m.ratio)}&times; the usual damage"  # each dot its hover (round 114)
                     + (f" &middot; {_stage_tag(m.t, phases)}" if _stage_tag(m.t, phases) else "") + "</title></circle>"
                     f"<text x='{float(x(m.t)) + 6:.1f}' y='{float(y(m.dtps)) - 8:.1f}' class='ml'>{_mmss(m.t)}</text>"
@@ -899,7 +900,7 @@ def _also_pressers(c: Cooldown, t: float, named: dict | None, n: str, sp: float)
         end = _secs(n.partition(" ")[0]) + ANSWER[1]  # the window's base: its kills reaching the window's end
         u = _users_at(c, end)  # (round 109: "24% of those who press it" on a chip the window admitted at 25%)
         if hs and u and hs / u < 0.25 - 1e-9 and (ut := _users_at(c, t)):  # a kept time the window's share
-            return f" ({_pct(min(1.0, sp / ut))} of those who press it about {_mmss(t)})"  # reads under: its own
+            return f" ({_pct(min(1.0, sp / ut))} of those who press it share its time)"  # reads under: its own
         return _pressers(c, hs, end)  # (round 114: Aura Mastery 4:20 "24%", kept by its time at 28%)
     return ""
 
