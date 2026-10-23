@@ -2761,7 +2761,7 @@ def render_sheet(h: HealerPrep) -> str:
                    + _and([f"<span class='nw'>{_ic(by_icon.get(_shown(n)))}<b>{e(_shown(n))}</b></span>"
                            for n in lead_names]
                           + [f"<span class='nw'>{_ic(c)}<b>a {e(_shown(c.name))} release</b></span>"
-                             for c in dict.fromkeys(rel_named)]) if lead_names or rel_named
+                             for c in {c.name: c for c in rel_named}.values()]) if lead_names or rel_named
                    else f"; the top {e(h.spec)}s keep no cooldown for {'it' if len(shown) == 1 else 'them'}")
                 + f".{long}{from_dispel}</p>"
                 + hits_table(h.moments, shown, pairs, {b: landed(b) for b in bare}, h.phases, by_icon,

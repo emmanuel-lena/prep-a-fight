@@ -761,3 +761,17 @@ def test_one_none_kept_reason_on_several_rows_is_said_once():
                             None, {}, "")
     assert out.count("pressed by a tenth") == 1 and "None kept: no long defensive of theirs" in out
     assert "<span class='none'>None kept</span> (12% press Shield Wall)" in out
+
+
+def test_a_release_kept_for_two_hits_is_named_once_in_the_lead():
+    # Preservation Evoker, Vashnik (round 11): Stasis released in the 2:10 and 3:35 windows crashed the sheet
+    # (a Cooldown deduplicated as a dict key)
+    found = [healer.Moment(130.0, 1000.0, 1.6, "Caustic Surge"), healer.Moment(215.0, 1000.0, 1.6, "Caustic Surge")]
+    rel = healer.Cooldown("Stasis (Release)", 2, 0.9, 2.0, [131.0, 216.0], ["", ""],
+                          presses=[[131.0, 216.0]] * 9, n_all=10)
+    st_ = healer.Cooldown("Stasis (Store)", 1, 1.0, 2.0, [100.0, 190.0], ["", ""],
+                          presses=[[100.0, 190.0]] * 10, n_all=10, release=rel)
+    h = healer.HealerPrep("Boss", "heroic", "Preservation Evoker", 10, 270.0, [100.0] * 54, found, [st_], [], [],
+                          [], [])
+    sheet = healer.render_sheet(h)
+    assert sheet.count("release</b>") == 1
