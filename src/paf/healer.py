@@ -14,6 +14,7 @@ healers of the spec on this boss (a corpus ranked by healing per second, paf.cor
 from __future__ import annotations
 
 import functools
+import html
 import json
 import re
 import sqlite3
@@ -130,6 +131,17 @@ def add_icons(prep) -> None:
     except Exception:  # noqa: BLE001 - offline
         got = {}
     prep.role_icons = got
+    # a tank's short defensives and active mitigation, known by name only (Spell Reflection): their spell's icon
+    named = [n for n, *_r in getattr(prep, "short_defs", []) or []] + [n for n, _u in getattr(prep, "mitigation", []) or []]
+    if named:
+        try:
+            from paf.gamedata import same_name_spells
+
+            same = same_name_spells()
+            ids = {n: same[n][0] for n in named if same.get(n)}
+            prep.name_icons = icons_for({n: f"spell={i}" for n, i in ids.items()})
+        except Exception:  # noqa: BLE001 - offline
+            prep.name_icons = {}
 
 
 def _ic(c: Cooldown | None) -> str:
@@ -149,7 +161,7 @@ HOW_TO_READ = (
     "under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long.</dd>"
     "<dt>Back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, not "
     "counted for it (&ldquo;for about half&rdquo;: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
-    "time some top players press it at instead.</dd></dl>")
+    "time some top players press it instead.</dd></dl>")
 
 LEAD_HITS = 4  # the big moments the lead says at most: Nek'zali's two rites and Stage Two's two waves
 # the stage clock said, on a boss with stages (paf.stagetime, round 100)
@@ -908,8 +920,20 @@ def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list
         first = next((x for x in ts), None) or _mmss(_t)
         cell = re.sub(r"^for the \d+:\d\d hit, ", "", text)
         cell = re.sub(r" \((\d+) kills going\) \(about ([^)]*)\)", r" (about \2; \1 kills going)", cell)  # one bracket
-        icons = "".join(_ic(c) for n, c in by_icon.items() if f"{e(n)}" in cell and c is not None)
-        said[first] = f"{icons}{cell[:1].upper() + cell[1:]}"
+        cell = _unnest(cell[:1].upper() + cell[1:])
+        names = sorted((n for n, c in by_icon.items() if c is not None and getattr(c, "icon", "")), key=len, reverse=True)
+        if names:  # each button's icon before its own name, in the text's order (a review: one icon, the wrong one)
+            pat = re.compile(r"(?<![\w>])(" + "|".join(re.escape(e(n)) for n in names) + r")(?!\w)")
+            seen: set[str] = set()
+
+            def pic(m, seen=seen) -> str:
+                n = html.unescape(m.group(1))
+                if n in seen:
+                    return m.group(1)
+                seen.add(n)
+                return _ic(by_icon[n]) + m.group(1)
+            cell = pat.sub(pic, cell)
+        said[first] = cell
         for x in dict.fromkeys(ts):
             if x != first:
                 said.setdefault(x, f"<span class='muted'>the same press as at {first}</span>")
@@ -1373,11 +1397,48 @@ def _or_then_untied(c: Cooldown, t: float, n: str, tied: str, answered, named, m
     return why + alt
 
 
+LEGEND_USE = {"On cooldown": "on cooldown", "Back from cooldown": "back from cooldown", "&ldquo;or&rdquo;": ", or ",
+              "of its users": "of its users"}
+
+
+def legend_for(dl: str, page: str) -> str:
+    """A legend with only the terms its page uses (a review: "On cooldown" defined where no card is)."""
+    low = page.lower()
+    def keep(m) -> str:
+        term = m.group(1)
+        need = LEGEND_USE.get(term)
+        return m.group(0) if need is None or need in low else ""
+    return re.sub(r"<dt>(.*?)</dt><dd>.*?</dd>", keep, dl)
+
+
+def _unnest(text: str) -> str:
+    """A bracket inside a bracket, a clause: "(only 22% ... (99 kills going), about 3:49" -> "...; 99 kills going, ..."."""
+    out, depth = [], 0
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if ch == "(":
+            if depth:  # an inner bracket: its content as a clause
+                j = text.find(")", i)
+                if j > 0 and "(" not in text[i + 1:j]:
+                    if out and out[-1] == " ":
+                        out.pop()
+                    out.append("; " + text[i + 1:j])
+                    i = j + 1
+                    continue
+            depth += 1
+        elif ch == ")":
+            depth = max(0, depth - 1)
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def _src_chip(x: str) -> str:
     """A source as a chip: what, then its kill count; the qualifiers on hover (they add, never answer)."""
     what, _, rest = x.partition(": ")
     m = re.search(r"[\d,]+(?: top)? kills", rest)
-    shown = m.group(0) if m else rest
+    shown = rest if len(rest) <= 90 else m.group(0) if m else rest  # short: whole (149 top kills from 100: why)
     more = f" title='{e(rest)}'" if m and rest.strip() != shown else ""
     return f"<span class='src'{more}><b>{e(what[:1].upper() + what[1:])}</b> {e(shown)}</span>"
 
@@ -2686,8 +2747,8 @@ def render_sheet(h: HealerPrep) -> str:
                                  for c in rare) + " on this boss.</p>")
     # the rule, once, under the long cooldowns and their "fewer than half" line (Zephyr's read as part of it)
     # one definition a line, the term first (round 76: 120 words in one paragraph read as no reference)
-    fight.append(HOW_TO_READ.replace("</dl>", f"<dt>Stage time</dt><dd>{STAGED.rstrip('; ')}.</dd></dl>")
-                 if getattr(h, "staged", False) else HOW_TO_READ)  # the chart's caption points here
+    fight.append(legend_for(HOW_TO_READ.replace("</dl>", f"<dt>Stage time</dt><dd>{STAGED.rstrip('; ')}.</dd></dl>")
+                            if getattr(h, "staged", False) else HOW_TO_READ, "".join(fight)))  # its used terms only
     exts = [c for c in heals if _external(c.spell_id) == "protective"]
 
     def fewer(cs: list) -> str:

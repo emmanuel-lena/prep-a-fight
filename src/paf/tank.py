@@ -423,7 +423,7 @@ TANK_HOW_TO_READ = (
     "too, under a quarter).</dd><dt>On cooldown</dt><dd>pressed every time it comes back, all kill long."
     "</dd><dt>Back from cooldown</dt><dd>most of its players press it as soon as it is back: not saved for the hit, "
     "not counted for it (&ldquo;for about half&rdquo;: 40 to 60% of them).</dd><dt>&ldquo;or&rdquo;</dt><dd>another "
-    "time some top players press it at instead.</dd></dl>")
+    "time some top players press it instead.</dd></dl>")
 
 
 def render_sheet(p: TankPrep) -> str:
@@ -473,9 +473,15 @@ def render_sheet(p: TankPrep) -> str:
             if not any(magic_only(i) for i in same_name_spells().get(n, [])):
                 return ""
             return f" &middot; no answer to the physical {_mmss(m.t)} hit (magic only)"
-        return "".join(f"<li><b>{e(n)}</b><small>up {u:.0%} of the kill for the top tanks</small></li>"
+        from paf.icons import img
+
+        def ic(n: str) -> str:  # its spell's icon (paf.healer.add_icons), none offline
+            got = getattr(p, "name_icons", {}).get(n, "")
+            return img(got, "small", "ics") if got else ""
+        return "".join(f"<li><b>{ic(n)}{e(n)}</b><span class='upbar' aria-hidden='true'><span style='width:"
+                       f"{u * 100:.0f}%'></span></span><small>up {u:.0%} of the kill for the top tanks</small></li>"
                        for n, u in p.mitigation) + "".join(
-            f"<li><b>{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top players"
+            f"<li><b>{ic(n)}{e(n)}</b><small>pressed {count(k)} times a kill by {u:.0%} of the top players"
             + (f" &middot; on cooldown, about every {ev:.0f} s" if ev else "") + "</small>"
             + ("<span class='when'>" + "".join(f"<span class='chip'>{_chip(moved_t.get((n, t), t), hit_of(n, t))}"
                                                f"{_share(x := tied.get((n, t), sp) if hit_of(n, t) else sp)}"
@@ -587,12 +593,18 @@ def render_sheet(p: TankPrep) -> str:
                 moved_t[(a[0], a[1])] = st.median(inside)
         bare = {_mmss(x.t): landed_in(x, defs, named, 'long defensive') for x in p.moments if x.t not in cells}
         names = list(dict.fromkeys(n for n, _t in answered))
-        by_icon = {c.name: c for c in defs}
+        from types import SimpleNamespace
+
+        by_icon = {c.name: c for c in defs}  # the short defensives too (Spell Reflection), by name
+        by_icon.update({n: SimpleNamespace(icon=ic) for n, ic in getattr(p, "name_icons", {}).items()
+                        if n not in by_icon})
         from paf.healer import _and as and_
         from paf.healer import _ic, hits_table
 
+        kept = len(p.moments) - len(bare)  # never more than the table's rows answer (a review: "answer them",
+        them = "them" if kept == len(p.moments) else f"{kept} of them"  # 3:10 "None kept")
         lead.append(f"{len(p.moments)} big moments for the tanks"
-                    + (f": the top {e(p.spec)}s answer them with "
+                    + (f": the top {e(p.spec)}s answer {them} with "
                        + and_([f"<span class='nw'>{_ic(by_icon.get(n))}<b>{e(n)}</b></span>" for n in names]) + "."
                        if names
                        else f"; the top {e(p.spec)}s keep no long defensive for them."))

@@ -57,7 +57,9 @@ p.sources .src-lab{font:600 12px var(--font-display);letter-spacing:.06em;text-t
 p.sources .src{padding:2px 10px;border:1px solid var(--line);border-radius:999px} p.sources .src b{color:var(--fg);font-weight:600}
 table.jobs td small{color:var(--muted)}
 /* a share as a bar, a tick at half */
-.sbar{position:relative;display:inline-block;width:120px;height:8px;border-radius:4px;background:color-mix(in srgb,var(--accent) 12%,transparent);align-self:center}
-.sbar>span{display:block;height:100%;border-radius:4px;background:var(--accent)}
+.sbar{position:relative;display:inline-block;width:120px;height:8px;border-radius:4px;background:var(--surface-2);border:1px solid var(--line);align-self:center}
+.sbar>span{display:block;height:100%;border-radius:4px;background:var(--muted)} /* never the class colour (DESIGN: class signs) */
 .sbar::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--muted)}
 .nw{white-space:nowrap} table.jobs td.no{color:var(--muted);font-weight:600}
+.upbar{display:inline-block;width:120px;height:8px;border-radius:4px;background:var(--surface-2);border:1px solid var(--line);align-self:center;overflow:hidden}
+.upbar>span{display:block;height:100%;background:var(--muted)}
