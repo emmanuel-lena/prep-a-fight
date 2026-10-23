@@ -1645,10 +1645,11 @@ def notes_block(enc, difficulty: str) -> str:
         return ('<p class="muted small">Available after the first prep: the detected mechanics (units sharing the '
                 "boss's health, damage amps...) with their evidence.</p>")
     text = _fresh_header(p.read_text(encoding="utf-8-sig"))
-    return f"""<p class="small muted">Detected in the logs, with the evidence. Correct what the logs cannot tell (e.g. the
-real damage amp of a unit: <code>amp &lt;unit&gt; 2.0</code>), save, then prepare the fight again.</p>
-<form method="post" action="/notes"><input type="hidden" name="boss" value="{enc.id}">
-<input type="hidden" name="difficulty" value="{e(difficulty)}"><textarea name="notes" aria-label="Boss notes">{e(text)}</textarea>
+    rows = min(18, text.count("\n") + 2)  # sized to what it holds (app round 15: two lines in a 260 px box); its
+    # own comment lines say how to use it, so no paragraph above repeats them
+    return f"""<form method="post" action="/notes"><input type="hidden" name="boss" value="{enc.id}">
+<input type="hidden" name="difficulty" value="{e(difficulty)}"><textarea name="notes" rows="{rows}"
+class="fit-rows" aria-label="Boss notes">{e(text)}</textarea>
 <p><button class="btn ghost">Save the notes</button></p></form>"""
 
 

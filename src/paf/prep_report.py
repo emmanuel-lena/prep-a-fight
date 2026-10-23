@@ -198,12 +198,13 @@ def plan_timeline_svg(plan, fight, tops: dict[str, list[float]], tops_players: i
         if tt and tops_players:
             bins: dict[int, int] = {}
             for t in tt:
-                bins[int(t // 5)] = bins.get(int(t // 5), 0) + 1
-            peak = max(bins.values())
+                if t <= dur:  # a slower kill's casts past this one's end: off the drawing (DPS round 14)
+                    bins[int(t // 5)] = bins.get(int(t // 5), 0) + 1
+            peak = max(bins.values(), default=1)
             for b, n in bins.items():
                 h = 16 * n / peak
                 row.append(f'<rect x="{x(b * 5)}" y="{y + 16 - h:.1f}" width="{5 * px - 0.5:.1f}" height="{h:.1f}" '
-                           f'fill="{color}" opacity="0.25"><title>top players: {n} casts at {_mmss(b * 5)}</title></rect>')
+                           f'fill="{color}" opacity="0.25"><title>top players: {n} cast{"s" if n != 1 else ""} at {_mmss(b * 5)}</title></rect>')
         for t, lab in plan.timeline:
             if lab == label:
                 row.append(f'<circle cx="{x(t)}" cy="{y + 8}" r="5" fill="{color}" stroke="var(--card)" stroke-width="1.5">'

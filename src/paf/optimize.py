@@ -513,7 +513,8 @@ def mrt_note(boss: str, plan: Plan, fight: Fight, names: dict[str, str] | None =
     lines = [f"prep-a-fight: {boss}, cooldowns for {GOALS.get(plan.objective, plan.objective)} "
              f"({plan.gain:+.1f}%)"]
     for t, labels in plan_moments(plan, fight, names):
-        ctx = _short_context(fight, t)
+        ctx = _short_context(fight, t) or ("before the kill" if t > fight.duration - 25 else "")  # its rule waived
+        # at the end, said (DPS round 14: "only on Echo of Jawae" beside a 3:56 press, the Echo gone by 2:28)
         lines.append(f"{{time:{int(t // 60)}:{int(t % 60):02d}}} {', '.join(dict.fromkeys(labels))}"
                      + (f" - {ctx}" if ctx else ""))
     return "\n".join(lines)

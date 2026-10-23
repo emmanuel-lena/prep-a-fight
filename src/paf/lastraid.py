@@ -461,11 +461,14 @@ def card(slug: str, heading: bool = True) -> str:
         else:
             rows += card_html
     killed = sum(b["kill"] for b in cur["bosses"])
+    both = bool(folded and rows)  # a heading tells two groups apart, never one alone (app round 15)
+    left = len(cur["bosses"]) - killed
     if folded:  # the bosses killed, after the ones still to kill: in view too (no fold, the user's rule)
-        folded = f"<div><h3 class='lr-killed'>Killed ({killed})</h3><div class='lr-grid'>{folded}</div></div>"
+        h3 = f"<h3 class='lr-killed'>Killed ({killed})</h3>" if both else ""
+        folded = f"<div>{h3}<div class='lr-grid'>{folded}</div></div>"
     if rows:
-        rows = (f"<div><h3 class='lr-killed'>Not killed ({len(cur['bosses']) - killed})</h3>"
-                f"<div class='lr-grid'>{rows}</div></div>")
+        h3 = f"<h3 class='lr-killed'>Not killed ({left})</h3>" if both else ""
+        rows = f"<div>{h3}<div class='lr-grid'>{rows}</div></div>"
     progress = (f"<p class='lr-wait'><span class='pl-spin'></span> Reading your raid: {done} of {total} analyses"
                 f"&hellip;</p>" if not cur["finished"] else "")
     again_btn = ("" if not cur["finished"] or reading else

@@ -131,6 +131,8 @@ def test_mrt_note_keeps_what_matters():
     assert lines[1] == "{time:0:00} Ascendance, Stormkeeper"  # the second Stormkeeper charge is merged
     assert lines[2] == "{time:2:00} Ascendance, Vile Vial of Volatile Venom, Potion - Venomous Heart x2, lust"
     assert "Ancestral Swiftness" not in note and "move soon" not in note and "(after" not in note
+    late = Plan("boss", {}, 1.0, 0.1, timeline=[(590.0, "potion")])  # DPS round 14: a last press, its rule waived
+    assert mrt_note("Ula'tek", late, f).splitlines()[1] == "{time:9:50} Potion - before the kill"
 
 
 def test_a_held_cooldown_reads_as_on_cooldown_for_the_other_lines():

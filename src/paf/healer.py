@@ -2944,7 +2944,7 @@ def render_sheet(h: HealerPrep) -> str:
                  else "") if h.role_kills
               else "",
               f"the raid's damage: {h.raid_kills} kills" if h.raid_kills else "",
-              "each job: count per row",
+              "each job: its own kill count, per row",
               f"dispel timings: {h.dispel_kills} kills" if getattr(h, "dispel_kills", 0) else ""]
     deeper_first.append("<p class='sources'><span class='src-lab'>Read on</span>"  # one chip a source (the owner:
                         + "".join(_src_chip(x) for x in counts if x) + "</p>")  # less text)
