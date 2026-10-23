@@ -828,3 +828,14 @@ def test_trinkets_and_split_talents_show_their_icons():
     split = healer.split_html([("Lightburst", 0.48), ("Bloodborne 48% / Sudden Death 43%", -1.0)], 100, "X",
                               icons={"Lightburst": "spell_a", "Sudden Death": "spell_b"})
     assert "spell_a" in split and "spell_b" in split
+
+
+def test_a_mark_named_for_a_window_says_that_window_on_hover():
+    # heal confirm round 6: Tranquility drawn at 3:36 for the 3:35 hit, its hover "back from cooldown" alone;
+    # Convoke 1:12 "about every minute" beside its chip "in the window of the 1:15 hit"
+    c = healer.Cooldown("Tranquility", 1, 1.0, 2.0, [218.0], [""], back=[218.0], window_of={218.0: 215.0})
+    assert healer._why_not(c, 218.0, []) == ": in the 3:35 hit's window, back from cooldown: not kept for it"
+    v = healer.Cooldown("Convoke the Spirits", 2, 1.0, 4.0, [72.0], [""], why=healer.MINUTE, back=[72.0],
+                        windowed=[72.0])
+    assert healer._why_not(v, 72.0, [healer.Moment(75.0, 1.0, 1.6, "Rite")]) == (
+        ": in the 1:15 hit's window: not kept for it")

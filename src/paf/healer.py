@@ -108,6 +108,7 @@ class Cooldown:
     icon: str = ""  # its game icon's file name (paf.icons), "" offline
     shown_at: dict = field(default_factory=dict)  # a mark's time as its card says it ("1:50 to 2:04"), for its hover
     windowed: list = field(default_factory=list)  # times the table names in a hit's window: their reason on hover
+    window_of: dict = field(default_factory=dict)  # such a time -> its hit's time, when the press sits past it
     lead_back: dict = field(default_factory=dict)  # a time back from cooldown the lead says in a hit's window: its hit
 
 
@@ -1904,13 +1905,17 @@ def _why_not(c: Cooldown, t: float, found: list | None = None) -> str:
     cooldown that holds it past its cooldown is held, not on cooldown (round 93: Stasis 1:57)."""
     def hit_near(x: float):
         return next((m for m in found or [] if -ANSWER[0] <= x - m.t <= ANSWER[1]), None)
+    hit_t = c.window_of.get(t)
+    if hit_t is None and t in c.windowed and (m := hit_near(t)) is not None:
+        hit_t = m.t
+    if hit_t is not None:  # the table's own words for it, first (heal confirm rounds 4-6: "about every minute",
+        back = ((", back from cooldown" + (" for about half" if t in c.back_half else ""))
+                if t in c.back and not (c.why or c.every) else "")  # as its chip says it (a rhythm: none)
+        return f": in the {_mmss(hit_t)} hit's window{back}: not kept for it"  # "back from cooldown" alone)
     if c.why:
         return f": {c.why}"
     if t <= PULL:
         return ": at the pull"
-    if t in c.windowed and (m := hit_near(t)) is not None:  # the table's own words for it (heal confirm rounds
-        back = (", back from cooldown" + (" for about half" if t in c.back_half else "")) if t in c.back else ""
-        return f": in the {_mmss(m.t)} hit's window{back}: not kept for it"  # 4-6: the chip's ⟲ said too)
     if c.fates:  # a two-step button's store: where its release lands
         us = [u for s_, u in c.fates if u is not None and abs(s_ - t) <= 8]
         m = hit_near(st.median(us)) if us else None
@@ -2858,8 +2863,8 @@ def render_sheet(h: HealerPrep) -> str:
             moved[(r.name, t)] = at
     for c in heals:  # a press named for a hit's window: its hover says that window (heal confirm round 6)
         for t in [*c.times, *c.alt]:
-            if named.get((c.name, t)) is not None and t not in c.windowed:
-                c.windowed.append(t)
+            if named.get((c.name, t)) is not None:
+                c.window_of[t] = named[(c.name, t)]
     for c in heals:  # a chip shown at its hit window's time: its chart mark there too (heal confirm round:
         for t in [*c.times, *c.alt]:  # Tranquility "3:36" on the chip, its outline at 3:46)
             at = _named_at(c, t, named, 0.0)
