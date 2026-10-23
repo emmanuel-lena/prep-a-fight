@@ -2331,7 +2331,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None, staged: b
         if r.spec == mine:
             continue
         if getattr(r, "raid_cds", 0) < 0:  # read in the pool only: too few of its healers in this sheet's kills for their casts
-            out += (f"<tr><td class='who'><b>{e(r.spec)}</b><small>{getattr(r, 'own_players', 0)} healers</small></td>"
+            out += (f"<tr><td class='who'><b>{_spec_ic(r.spec)}{e(r.spec)}</b><small>{getattr(r, 'own_players', 0)} healers</small></td>"
                     f"<td colspan='{len(hits)}' class='muted'>too few in these kills to read its casts</td></tr>")
             continue
         # a ramp as the fight tab reads one: its players press it 8 to 30 s ahead of two hits at least (a quarter
@@ -2377,7 +2377,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None, staged: b
                         f"{_pct(u[3])}{' (a ramp)' if len(u) > 5 and u[5] else ''}</small>")
             return "<span class='muted'>&mdash; none shared</span>"
         n = getattr(r, "own_players", 0)  # under 100: a few players' habit, said (Disc: 43; round 46)
-        out += (f"<tr><td class='who'><b>{e(r.spec)}</b>"
+        out += (f"<tr><td class='who'><b>{_spec_ic(r.spec)}{e(r.spec)}</b>"
                 + (f"<small>{n} healers{', few players' if n < 100 else ''}</small>" if n else "") + "</td>"
                 + "".join(f"<td>{cell(got, under)}</td>" for _h, got, under in per_hit) + "</tr>")
     if not out:
@@ -2883,11 +2883,14 @@ def render_sheet(h: HealerPrep) -> str:
         [f"<h2>What the Encounter Journal asks healers</h2><ul class='hl2'>{jr}</ul>"] if jr else [])
     if h.dispelled and (len(h.dispelled) > 1 or h.dispelled[0][1] < 1):  # the others than the lead's job, measured
         inside = set(re.findall(r'<b>([^<]+)</b>', h.abilities))  # the abilities the journal lists below
-        boss.append(f"<h2>What the top {e(h.spec)}s dispel here</h2><p>"
-                    + _and([f"{e(n)} ({k:.1f} a kill" + ("" if n in inside else ", not in the Encounter Journal")
-                            + ")" for n, k in h.dispelled])
-                    + f": means over {h.dispel_kills} of their kills read; the rates a minute on the other tabs are"
-                    " medians over every kill.</p>")  # (round 114: 6.0 a kill here beside "1.0 a minute")
+        said = h.dispelled[0][1] >= 1  # the lead's note says how it is counted (heal round 11: said twice)
+        boss.append(f"<h2>What the top {e(h.spec)}s dispel here</h2><p class='dispels'>"
+                    + "".join(f"<span class='chip'><b>{e(n)}</b> &middot; {k:.1f} a kill"
+                              + ("" if n in inside else " &middot; <small>not in the Encounter Journal</small>")
+                              + "</span>" for n, k in h.dispelled) + "</p>"
+                    + ("" if said else f"<p class='small muted'>Means over {h.dispel_kills} of their kills read; the "
+                       "rates a minute on the other tabs are medians over every kill.</p>"))  # (round 114: 6.0 a
+                    # kill here beside "1.0 a minute")
     elif h.dispellable and not h.dispelled:  # where the dispels most likely go: the Journal's flags and the game data, not a measure
         boss.append("<h2>What you can dispel here</h2><p>Dispellable on this boss at this difficulty: "
                     + _and([f"{e(n)} ({e(t)})" for n, t in h.dispellable])
