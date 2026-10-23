@@ -808,3 +808,12 @@ def test_an_or_time_named_for_a_hit_shows_one_time_and_one_share():
                         presses=[[111.0]] * 40 + [[131.0]] * 25 + [[124.0]] * 7 + [[60.0]] * 28)
     out = healer.cooldowns_html([c], set(), {("Celestial Conduit", 130.0): 130.0})
     assert "or 2:11 &middot; in the window of the 2:10 hit: 25%</span>" in out and "32%" not in out
+
+
+def test_a_main_time_with_its_reason_then_its_or():
+    # Preservation Evoker, Nek'zali (heal round 12): "4:17, or 3:49 for 17% … · 4:17 not kept for the 4:15 hit"
+    c = healer.Cooldown("Obsidian Scales", 1, 0.9, 2.0, [257.0], ["4:15 Hit"], support=[0.19], alt=[229.0],
+                        alt_support=[0.17], alt_of=[257.0], n_all=100,
+                        presses=[[257.0]] * 22 + [[229.0]] * 17 + [[100.0]] * 51)
+    out = healer.cooldowns_html([c], set())
+    assert "4:17 &middot; not kept for the 4:15 hit: 22% in its window, or 3:49 &middot; 17%" in out

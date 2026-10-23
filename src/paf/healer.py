@@ -1249,8 +1249,8 @@ def _or(c: Cooldown, t: float, answered: set | None = None, named: dict | None =
     def one(a: float, sp: float, n: str) -> str:  # one share a press: its window's when one is said (heal round 11:
         w, u = window(a, n), untied(a, n)          # "for 29% · in its window: 26%", "for 27% · ⟲, … window: 23%")
         bk = "" if w and "back from cooldown" in w else back(a) if a in c.back and not c.why else ""
-        own = (f"{' &middot;' if n else ' for'} {_pct(sp)}{_still(c, a, sp)}{_pressers(c, sp, a)}" if sp
-               else " for some")  # after an offset, as a main chip ("· 26%"), never "for 28%" beside it
+        own = (f" &middot; {_pct(sp)}{_still(c, a, sp)}{_pressers(c, sp, a)}" if sp
+               else " &middot; some")  # one form, as a main chip ("or 2:02 · 30%"; heal round 12: three forms)
         if w.startswith(" &middot; in its window:"):  # tied: the window's share is the chip's
             own, w = " &middot;" + w[len(" &middot; in its window:"):], ""
         elif u or w or "in the window of" in bk:  # a window's share said: the only one (heal round 12: "or 2:10 for
@@ -1445,9 +1445,8 @@ def _or_then_untied(c: Cooldown, t: float, n: str, tied: str, answered, named, m
     """A chip's "or" time, then why its time is not kept, led by that time: the reason after the "or" read as a third
     reason glued to it (round 114: Obsidian Scales "… no raid answer, or 3:49 for 17%")."""
     alt, why = _or(c, t, answered, named, moved), _untied_at(c, t, n, tied, named)
-    if alt and why.startswith(" &middot; not kept"):
-        return alt + why.replace(" &middot; not kept", f" &middot; {_mmss(t)} not kept", 1)
-    return why + alt
+    return why + alt  # its own time's reason first, then the "or" (heal round 12: "4:17, or 3:49 … · 4:17 not
+    # kept for the 4:15 hit", the main time said twice and its share last)
 
 
 LEGEND_USE = {"On cooldown": "on cooldown", "&#10226; back from cooldown": "&#10226;", "&ldquo;or&rdquo;": ", or ",
@@ -2890,10 +2889,11 @@ def render_sheet(h: HealerPrep) -> str:
     if h.dispelled and (len(h.dispelled) > 1 or h.dispelled[0][1] < 1):  # the others than the lead's job, measured
         inside = set(re.findall(r'<b>([^<]+)</b>', h.abilities))  # the abilities the journal lists below
         said = h.dispelled[0][1] >= 1  # the lead's note says how it is counted (heal round 11: said twice)
-        boss.append(f"<h2>What the top {e(h.spec)}s dispel here</h2><p class='dispels'>"
+        boss.append(f"<h2>{'What else' if said else 'What'} the top {e(h.spec)}s dispel here</h2><p class='dispels'>"
                     + "".join(f"<span class='chip'><b>{e(n)}</b> &middot; {k:.1f} a kill"
                               + ("" if n in inside else " &middot; <small>not in the Encounter Journal</small>")
-                              + "</span>" for n, k in h.dispelled) + "</p>"
+                              + "</span>" for n, k in (h.dispelled[1:] if said else h.dispelled)) + "</p>"  # the
+                    # lead's own said once (heal round 12: Exploding Infection 4.2 in the lead and its chip)
                     + ("" if said else f"<p class='small muted'>Means over {h.dispel_kills} of their kills read; the "
                        "rates a minute on the other tabs are medians over every kill.</p>"))  # (round 114: 6.0 a
                     # kill here beside "1.0 a minute")

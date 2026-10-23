@@ -628,7 +628,7 @@ def render_sheet(p: TankPrep) -> str:
         tags: dict[str, list[str]] = {}
         for x in p.moments:
             if x.ratio < 1.5:  # the healers' rule said (round 98: 1.45x "hits" with no word)
-                tags.setdefault(_mmss(x.t), []).append("under 1.5&times;: among the tanks' three highest")
+                tags.setdefault(_mmss(x.t), []).append("under 1.5&times;")  # its reason once, under the table
         # a hit that comes with a swap (Vashnik's 1:35 and 2:55, after Dripping Fangs): the time is the link
         with_swap = [(x, w) for x in p.moments for w in p.swaps if abs(w - x.t) <= ANSWER[0]]
         # said only when swaps are rare enough for it to mean something: one every 28 s (Vashnik) lands within 5 s
@@ -639,7 +639,8 @@ def render_sheet(p: TankPrep) -> str:
             for x, w in with_swap:
                 tags.setdefault(_mmss(x.t), []).append(f"tank swap at {_mmss(w)}")
         table = hits_table(p.moments, p.moments, [(t, f"for the {_mmss(t)} hit, {c}") for t, c in cells.items()],
-                           bare, p.phases, by_icon, "", tags, usual="damage the tank takes")
+                           bare, p.phases, by_icon, "Under 1.5&times;: among the tanks' three highest all the same"
+                           if any(x.ratio < 1.5 for x in p.moments) else "", tags, usual="damage the tank takes")
     swap_said = ""
     if p.swaps:
         # a tank's share of the kill's swaps, at least half the shared moments (round 43: "about 4" beside 9 swaps)
