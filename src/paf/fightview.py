@@ -221,6 +221,8 @@ def items(d) -> list[tuple[float, Item]]:
             add(t, Item("boss", "tank" if tank else "cast", name, f"{name} (tank)" if tank else name, _icon(d, name)))
             if name in act:
                 add(t, Item("you", "do", name, act[name].format(name), _icon(d, name)))
+    kills: dict[float, list[tuple[str, str]]] = {}  # one "you" row a wave moment (DPS round 10: "Kill Burning
+    # Venom at 0:24" and "Kill Shrouded Venom at 0:24", two rows for one wave)
     for t, count, life, name in d.waves:
         if not count:
             continue
@@ -232,7 +234,14 @@ def items(d) -> list[tuple[float, Item]]:
                 stop = min(stop, w.start + w.duration)
         add(t, Item("boss", "adds", name, label, _icon(d, name), float(min(life or 0, max(0.0, stop - t)))))
         if name not in skip and _clean(name) not in skip:
-            add(t, Item("you", "do", name, act.get(name, "Kill {}").format(shown), _icon(d, name)))
+            kills.setdefault(t, []).append((name, shown))
+    for t, ns in kills.items():
+        verbs = {act.get(n, "Kill {}") for n, _s in ns}
+        if len(ns) > 1 and verbs == {"Kill {}"}:
+            add(t, Item("you", "do", ns[0][0], "Kill " + " and ".join(sh for _n, sh in ns), _icon(d, ns[0][0])))
+        else:
+            for n, sh in ns:
+                add(t, Item("you", "do", n, act.get(n, "Kill {}").format(sh), _icon(d, n)))
     for f in (d.fight.focus if d.fight is not None else []):
         add(f.start, Item("you", "do", f.name, f"Hit {f.name}", _icon(d, f.name)))
     if d.lust is not None:
