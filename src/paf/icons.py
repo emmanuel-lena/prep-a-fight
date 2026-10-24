@@ -82,6 +82,15 @@ def spec_icon(spec: str) -> str:
     return SPEC_ICON.get((sp, cls), "")
 
 
+def spec_any(spec: str, size: str = "medium", cls: str = "it-ic") -> str:
+    """A spec's icon from "Subtlety Rogue" or Warcraft Logs' "Rogue-Subtlety"; its class's when the spec is unknown."""
+    if "-" in (spec or ""):
+        c, _, sp = spec.partition("-")
+        spec = f"{sp} {c}"
+    key = class_key(spec)
+    return img(spec_icon(spec) or CLASS_ICON.format(cls=key), size, cls) if key else ""
+
+
 def spec_img(spec: str, cls: str = "ics") -> str:
     """A spec's small icon with a ring of its class's colour, so purple and blue squares read apart at 16 px (fresh
     app review 7); its class icon when the spec is unknown; '' when there is no class."""

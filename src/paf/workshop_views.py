@@ -251,8 +251,7 @@ def review(d: dict) -> str:
         f"<span class='l-val'>{t['raid']:.0%} <small>/ {t['tops']:.0%}</small></span></li>" for t in targets)
 
     def who(p: dict) -> str:
-        cls = icons.class_key(p["spec"])
-        ic = icons.img(icons.CLASS_ICON.format(cls=cls), "medium", "it-ic")
+        ic = icons.spec_any(p["spec"])  # the spec's own icon (DPS round 47)
         mine, habit = p["shares"].get(p["target"], 0.0), p["habit"].get(p["target"], 0.0)
         # short pieces, each a whole text (the translation matches whole texts): numbers and names apart
         def line(target: str, you: float, tops: float) -> str:
@@ -293,7 +292,7 @@ def comp(d: dict) -> str:
     targets = d.get("targets", [])
 
     def ic(spec: str, size: str = "medium") -> str:
-        return icons.img(icons.CLASS_ICON.format(cls=icons.class_key(spec)), size, "it-ic")
+        return icons.spec_any(spec, size)  # the spec's own icon (DPS round 47)
 
     def names(lst: list) -> str:
         return "".join(f"<span class='who-chip'>{ic(p['spec'])}<b>{e(p['name'])}</b></span>" for p in lst)
@@ -402,8 +401,7 @@ def wipe(d: dict) -> str:
            "<span class='dm'>A death</span></div>") if n else ""
 
     def who(x: dict) -> str:
-        cls, _, spec = x["spec"].partition("-")
-        ic = icons.img(icons.CLASS_ICON.format(cls=cls.lower()), "medium", "it-ic")
+        ic = icons.spec_any(x["spec"])
         back = (f"<span>back at</span> {_mmss(x['back'])}" if x["back"] is not None else "<span>never back</span>")
         return (f"<li>{ic}<span class='l-name'><b>{e(x['name'])}</b><small><span>died at</span> {_mmss(x['t'])} "
                 f"&middot; {back}</small></span><span class='l-val neg'>&minus;{x['lost']:.1%}</span></li>")
@@ -417,8 +415,7 @@ def wipe(d: dict) -> str:
     culprits = [c for c in d.get("culprits", []) if c["lost_alive"] + c["lost_dead"] >= 0.002]
 
     def culprit(c: dict) -> str:
-        cls = c["spec"].partition("-")[0]
-        ic = icons.img(icons.CLASS_ICON.format(cls=cls.lower()), "medium", "it-ic")
+        ic = icons.spec_any(c["spec"])
         why = []
         if c["tops_dps"]:
             why.append(f"<span class='p-num'><span>on the boss while alive:</span> <b>{c['alive_dps'] / 1000:,.0f}k</b> "
@@ -453,8 +450,7 @@ def night(d: dict) -> str:
     ic_of = d.get("icons", {})
 
     def ic(name: str) -> str:
-        cls = ic_of.get(name, "").partition("-")[0]
-        return icons.img(icons.CLASS_ICON.format(cls=cls.lower()), "medium", "it-ic") if cls else _img("")
+        return icons.spec_any(ic_of[name]) if ic_of.get(name) else _img("")
     deaths = sum(v["deaths"] for v in summary.values())
     bare = sum(v["bare"] for v in summary.values())
     wipes = any(not r["kill"] for r in pulls)  # the deaths of a wipe itself are left out; a kill keeps them all
@@ -526,8 +522,7 @@ def pulldiff(d: dict) -> str:
                 "<span class='c-now'>Pull A</span><span class='c-best'>Pull B</span></div>")
     if not pl:
         return out + "<p class='ws-fine'>Pick a player to see their own damage, casts and buffs in both pulls.</p>"
-    cls = pl["icon"].partition("-")[0]
-    ic = icons.img(icons.CLASS_ICON.format(cls=cls.lower()), "medium", "it-ic") if cls else ""
+    ic = icons.spec_any(pl["icon"]) if pl.get("icon") else ""
 
     def k(v: float | None) -> str:
         return "&ndash;" if v is None else f"{v / 1000:,.0f}k"
@@ -579,8 +574,7 @@ def rotation(d: dict) -> str:
     """A player's rotation: the points to work on, each context's spells next to the rotation's, DoTs, cooldowns."""
     from paf import icons
 
-    cls = d.get("spec", "").rpartition(" ")[2]
-    ic = icons.img(icons.CLASS_ICON.format(cls=cls.lower()), "large", "it-ic") if cls else ""
+    ic = icons.spec_any(d.get("spec", ""), "large") if d.get("spec") else ""
     hl = d.get("highlights", [])
     head = _verdict("go" if hl else "ok", f"{d['player']}: your rotation",
                     f"<span>{e(d.get('spec', ''))}</span> &middot; <span>{e(d.get('boss', ''))}</span> &middot; "

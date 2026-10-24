@@ -430,7 +430,8 @@ def raid_section(r: RaidInfo, gear: bool = True) -> str:
     rows = "".join(
         f"<tr><td>{e(v.add.name)}</td><td class='n'>{v.without_you:.0%}</td><td class='n'>{v.with_you:.0%}</td>"
         f"<td class='n'>{v.low:.0%}</td><td><b>{'boss' if v.verdict == 'boss' else 'pad'}</b>: "
-        f"{e(re.sub(r'^(pad them|stay on the boss)[:,] *', '', raidneed.readable(v.reason)))}</td></tr>"
+        f"{_without_shares(e(re.sub(r'^(pad them|stay on the boss)[:,] *', '', raidneed.readable(v.reason))))}"
+        "</td></tr>"  # its shares are the row's columns (DPS round 47: said twice)
         for v in r.verdicts)
     groups = "".join(f"<li><b>{e(k)}</b> ({len(ps)}): {e(re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', ', '.join(ps)))}</li>"
                      for k, ps in r.archetypes.items() if ps)
