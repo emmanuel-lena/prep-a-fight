@@ -472,3 +472,4 @@ section.adv textarea{max-width:920px} /* the content column, never to the window
 .fs-k.move::before{background:var(--warn);opacity:.7} .fs-k.lust::before{background:var(--neg);width:8px;clip-path:polygon(0 0,100% 0,50% 100%)}
 .rl-allrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:4px 0 10px}
 .mx-legend .pill.chk::before{display:none} .rl-num{font:700 17px var(--font-data);color:var(--fg);margin-right:3px}
+.rl-sb{grid-template-rows:auto 1fr auto} .rl-rows{display:grid;gap:2px;align-self:end}

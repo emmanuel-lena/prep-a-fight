@@ -333,11 +333,16 @@ def _strip_cell(x, sh, total: int = 0, difficulty: str = "heroic") -> str:
         adds = sum(len(t["players"]) for t in sh["targets"])
         n = len(sh["builds"])  # players, not talents (fresh app review 6: "4 talent changes" for 2 players' 6)
         nobuild = bool(total) and sh.get("no_split", 0) >= total  # nothing compared: said as the card says it
-        say = (f"<span class='rl-sv'><b class='rl-num'>{adds}</b> on adds</span>" if adds else "") + (  # the numbers
-            f"<span class='rl-sv'><b class='rl-num'>{n}</b> to change talents</span>" if n else "") + (  # big
-            f"<span class='rl-sv none' title='{NO_BUILD}'><b class='rl-num'>&mdash;</b> no build</span>" if nobuild
-            else "") or (  # a mark in the number's place, the words short (round 42: grey sentences)
-            "<span class='rl-sv ok' title='nothing to change'><b class='rl-num ok'>&#10003;</b> all set</span>")
+        # two rows a tile, always: the adds, then the talents (fresh app review 7: states drawn three ways)
+        adds_row = (f"<span class='rl-sv'><b class='rl-num'>{adds}</b> on adds</span>" if adds else
+                    "<span class='rl-sv ok' title='nobody to put on an add'><b class='rl-num ok'>&#10003;</b> "
+                    "boss only</span>")
+        talent_row = (f"<span class='rl-sv'><b class='rl-num'>{n}</b> talents</span>" if n else
+                      f"<span class='rl-sv none' title='{NO_BUILD}'><b class='rl-num'>n/a</b> talents</span>"
+                      if nobuild else
+                      "<span class='rl-sv ok' title='everyone on their build'><b class='rl-num ok'>&#10003;</b> "
+                      "talents</span>")
+        say = f"<span class='rl-rows'>{adds_row}{talent_row}</span>"
     img = (f"<img src='/bossimg/{x.id}.png' alt='' loading='eager' onerror=\"this.remove()\">")
     return (f"<a class='rl-sb{' none' if sh is None else ''}' href='#boss-{x.id}'>{img}<b>{e(x.name)}</b>{say}</a>")
 
