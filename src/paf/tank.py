@@ -719,8 +719,10 @@ def render_sheet(p: TankPrep) -> str:
         + ("<span title='the presses the table gives as each moment&#39;s answer'>&#9646; the table&#39;s answers</span> "
            if answered else "")  # the outline has its own chip (fresh heal review)
         + ("<span title='or one in a moment&#39;s window that is not its answer; fainter: fewer of the top players "
-           "press it then'>&#9647; another press</span> "
+           "press it then'><i class='o1'>&#9647;</i><i class='o2'>&#9647;</i>&#9647; another press</span> "
            if outline or window_named or faint else "")  # its own chip, as the healers' (fresh heal review)
+        + ("<span title='pressed as soon as it is back from cooldown'>&#10226; dashed: back from cooldown</span> "
+           if " bk'" in svg else "")
         + ("<span>| a tank swap</span> " if lane else "")
         + "<span title='one of the tanks&#39; three biggest moments, whatever casts it (another as high may be left "
         "out)'>&#9679; a big moment</span></p><ul class='hl2'>"

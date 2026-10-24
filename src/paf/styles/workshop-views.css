@@ -141,3 +141,6 @@ table.night td.pos{color:var(--pos)} table.night td.neg{color:var(--neg)}
 .ws-answer .tal.none{color:var(--muted);justify-content:center}
 table.night th.n{text-align:right}
 .night-ok{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:10px 0;color:var(--pos);font-weight:600} .night-ok .whos{display:contents;color:var(--fg);font-weight:400}
+/* Who hits what: one roster, each player's state a mark (→ put on it, ✓ on it, ✗ hardly hit it) */
+.st{font-style:normal;font-weight:700;margin-left:2px} .st.go{color:var(--accent)} .st.ok{color:var(--pos)} .st.warn{color:var(--neg)}
+.who-chip.st-go{border-color:var(--accent)} .roster-key{display:flex;flex-wrap:wrap;gap:4px 14px}

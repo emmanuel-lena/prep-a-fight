@@ -930,7 +930,8 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
         f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(_shown(c.name).split(',')[0][:32])}</text>"
         + "".join(f"<rect x='{float(x((moved or {}).get((c.name, t), t))) - 4:.1f}' y='{H - B + 6 + 18 * i}' "
                   f"width='8' height='13' rx='2' "
-                  f"class='cp{'' if t in tied else ' off'}'{_faint(c, t) if id(c) in faint else ''}><title>{e(_step_name(c.name))} {c.shown_at.get(t) or _mmss((moved or {}).get((c.name, t), t))}"
+                  f"class='cp{'' if t in tied else ' off'}{' bk' if t in c.back else ''}'"
+                  f"{_faint(c, t) if id(c) in faint else ''}><title>{e(_step_name(c.name))} {c.shown_at.get(t) or _mmss((moved or {}).get((c.name, t), t))}"
                   f"{'' if t in tied else _mark_reason(c, t, found, (moved or {}).get((c.name, t), t))}</title></rect>"
                   for t in sorted([*c.times, *c.alt, *[pt for pt in [_pull_t(c)] if pt is not None]])
                   if t <= span  # in time order (round 84), the pull group the card shows too (round 99)
@@ -3069,12 +3070,14 @@ def render_sheet(h: HealerPrep) -> str:
         + ("<span>&#9478; stage time after a dashed line</span> " if getattr(h, "staged", False) else "")
         + ("<span>&#9646; the table's answers</span> " + ("<span title='or one in a hit&#39;s window that is not "
                                                            "its answer; fainter: fewer of the top players press it "
-                                                           "then'>&#9647; another press</span> " if extra or any(
+                                                           "then'><i class='o1'>&#9647;</i><i class='o2'>&#9647;</i>&#9647; another press</span> " if extra or any(
             (c.name, t) not in answered for c in drawn if c.name in lanes for t in [*c.times, *c.alt])
             else "") if lead_names
            else "<span>No cooldown is kept for these hits</span> <span title='fainter: fewer of the top players "
-           "press it then'>&#9647; a press</span> "
+           "press it then'><i class='o1'>&#9647;</i><i class='o2'>&#9647;</i>&#9647; a press</span> "
            if lanes or extra else "<span>No cooldown is kept for these hits, so none is drawn</span> ")
+        + ("<span title='pressed as soon as it is back from cooldown, as the chips&#39; &#10226;'>"
+           "&#10226; dashed: back from cooldown</span> " if " bk'" in svg else "")
         + "<span title='" + ("named after what deals most of the damage there" if h.named_by_damage else
                              "named after the boss cast just before it (&quot;after X&quot;: 8 to 30 s before, "
                              "matched by timing)") + "'>&#9679; a big hit</span></p><ul class='hl2'>"

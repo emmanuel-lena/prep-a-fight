@@ -61,7 +61,8 @@ def test_a_whole_raid_add_lists_who_missed_it_and_the_ranked_player_is_left_out(
 
 def test_the_page():
     page = workshop_views.render({"kind": "comp", **comp.to_dict("Boss", "this boss, kill of 1:40", rows())})
-    assert "the most damage on" in page and "Put them on it" in page and "Hardly hit it" in page
+    assert "the most damage on" in page and "put them on it" in page and "hardly hit it" in page
+    assert page.count("<b>Moon</b>") == 1 and "title='Moon: hardly hit it in your pull'" in page  # one roster
 
 
 def test_the_spec_damage_of_the_tops_never_turns_into_a_spec_change():
@@ -105,7 +106,7 @@ def test_the_raid_tab_of_the_sheet_shows_the_raid_tools():
     d = PrepData("Boss", "mythic", "Elemental", "X", duration=300)
     d.raid_tools = {"comp": comp.to_dict("Boss", "this boss, kill of 1:40", rows())}
     html = render(d)
-    assert "Who hits what in your raid" in html and "Put them on it" in html
+    assert "Who hits what in your raid" in html and "put them on it" in html
     assert "Your best pull, in detail" not in html  # no wipe in that log: nothing shown
 
 

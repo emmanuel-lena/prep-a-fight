@@ -93,3 +93,6 @@ dl.legend{max-width:1036px} dl.legend>.lg{display:inline-flex;align-items:baseli
 .when.inline .chip{padding:2px 9px;font-size:12px;line-height:inherit}
 p > .vary{display:inline-block;padding:1px 7px;border-radius:999px;border:1px dashed var(--line);font-size:12px;
   font-weight:600;color:var(--muted);letter-spacing:.02em;vertical-align:1px}
+.rd .cp.bk{stroke-dasharray:2.5 1.5} /* pressed as soon as it is back (the chips' ⟲): a dashed outline */
+/* the outline key: its opacity scale shown (fewer top players, fainter), as the lanes draw it */
+.chart-key i.o1,.chart-key i.o2{font-style:normal} .chart-key i.o1{opacity:.3} .chart-key i.o2{opacity:.6}

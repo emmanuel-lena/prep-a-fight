@@ -297,6 +297,27 @@ def comp(d: dict) -> str:
     def names(lst: list) -> str:
         return "".join(f"<span class='who-chip'>{ic(p['spec'])}<b>{e(p['name'])}</b></span>" for p in lst)
 
+    def roster(t: dict) -> str:
+        """One row of players, each with its state (fresh DPS review: three chip groups, a player in two): → put on
+        it, ✓ on it in your pull, ✗ hardly hit it in your pull."""
+        sets = {k: {p["name"] for p in t.get(k) or []} for k in ("proposed", "pulled", "missed")}
+        people = list({p["name"]: p for k in ("proposed", "pulled", "missed") for p in t.get(k) or []}.values())
+        if not people:
+            return ""
+        chips = []
+        for p in people:
+            n = p["name"]
+            marks = ([("go", "&rarr;", "put them on it")] if n in sets["proposed"] and n not in sets["pulled"] else [])
+            marks += [("ok", "&#10003;", "on it in your pull")] if n in sets["pulled"] else []
+            marks += [("warn", "&#10007;", "hardly hit it in your pull")] if n in sets["missed"] else []
+            chips.append(f"<span class='who-chip st-{marks[0][0]}' title='{e(n)}: {', '.join(m[2] for m in marks)}'>"
+                         f"{ic(p['spec'])}<b>{e(n)}</b>" + "".join(f"<i class='st {c}'>{g}</i>" for c, g, _w in marks)
+                         + "</span>")
+        said = [(c, g, w) for c, g, w in (("go", "&rarr;", "put them on it"), ("ok", "&#10003;", "on it in your pull"),
+                                          ("warn", "&#10007;", "hardly hit it")) if f"class='st {c}'" in "".join(chips)]
+        key = " ".join(f"<span><i class='st {c}'>{g}</i> {w}</span>" for c, g, w in said)
+        return f"<p class='lab roster-key'>{key}</p><div class='whos'>{''.join(chips)}</div>"
+
     assigned = [t for t in targets if t["players"]]
     if not targets:
         return _verdict("ok", "Nothing to assign on this boss", "<span>The top raids put their damage on the boss.</span>")
@@ -328,15 +349,7 @@ def comp(d: dict) -> str:
             say = ("<p>In the top raids, the whole raid hits it.</p>"
                    "<p class='lab'>The specs of your raid that do the most damage on it</p>")
         block = f"<ul class='rank'>{ranking}</ul>" if ranking else ""
-        if t["proposed"]:
-            block += f"<p class='lab go'>Put them on it</p><div class='whos'>{names(t['proposed'])}</div>"
-        if t["pulled"]:
-            block += (f"<p class='lab'>On it in your pull ({len(t['pulled'])})</p>"  # a heading, not a fold
-                      f"<div class='whos'>{names(t['pulled'])}</div>")
-        if t["missed"]:
-            both = {p["name"] for p in t["missed"]} & {p["name"] for p in t["proposed"] or []}
-            block += (f"<p class='lab warn'>Hardly hit it in your pull{' (some of those put on it above)' if both else ''}"
-                      f"</p><div class='whos'>{names(t['missed'])}</div>")
+        block += roster(t)
         cards += (f"<div class='job'><div class='j-head'><b>{e(t['name'])}</b><small>{kind}</small></div>{say}{block}"
                   "</div>")
     both = (" (those assigned to it for an assigned target" if any(t["players"] and not t["whole_raid"] for t in targets)

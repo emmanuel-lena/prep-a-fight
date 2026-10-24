@@ -217,7 +217,7 @@ def test_a_press_back_from_cooldown_in_a_hit_is_said_and_drawn_as_none():
     assert ("<span class='none'>None kept</span> (100% press Tranquility in its window, about 2:45&nbsp;&middot;&nbsp;"
             "&#10226;)") in sheet  # the 2:40 hit's row, the legend's glyph as the chips
     assert "2:45 &middot; 5 s after the 2:40 hit starts &middot; 100%&nbsp;&middot;&nbsp;&#10226;</span>" in sheet
-    assert "class='cp off'><title>Tranquility 2:45" in sheet and "class='cp'><title>Tranquility 0:42" in sheet
+    assert "class='cp off bk'><title>Tranquility 2:45" in sheet and "class='cp'><title>Tranquility 0:42" in sheet
 
 
 def test_an_external_says_how_many_go_on_another_player():
