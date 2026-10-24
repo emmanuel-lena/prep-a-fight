@@ -1647,7 +1647,7 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
                       "above." if units else "")
         burst_th = '<th class="n">On burst targets</th>' if units else ""
         tabs["cooldowns"].append(f"""<h2>What the top players do with their cooldowns</h2><div class="card scroll">
-<p class="small">Share of their casts (after the opener) during add waves, which cover {a0.adds_cover:.0%} of the fight in the top kills{burst_said}. Much more
+<p class="small">Share of their casts (after the opener) during add waves, which cover <span title="each top kill's own waves, not the fight tab's median ones">{a0.adds_cover:.0%}</span> of the fight in the top kills{burst_said}. Much more
 than the coverage means they hold the cooldown.{burst_note}</p>
 <table><tr><th>Cooldown</th><th class="n">During adds</th>{burst_th}<th>Reading</th></tr>{rows}</table></div>""")
 

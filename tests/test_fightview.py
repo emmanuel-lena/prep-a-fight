@@ -192,3 +192,14 @@ def test_two_add_waves_at_one_moment_are_one_row():
     adds = [x for _t, x in fightview.items(d) if x.kind == "adds"]
     text = adds[0].text.replace("\u00a0", " ")  # each unit unbreakable
     assert len(adds) == 1 and text == "2 × Burning Venom (21 s) · 5 × Shrouded Venom (8 s)"
+
+
+def test_a_press_most_top_players_make_elsewhere_is_flagged_on_its_row(monkeypatch):
+    # Subtlety Rogue, Vashnik (fresh DPS review): Shadow Blades 3:20, 64% of the top players at about 3:13
+    d = sheet(monkeypatch)
+    d.tops_casts, d.tops_players = {"shadow_blades": [193.0] * 64 + [200.0] * 5}, 100
+    assert fightview._tops_off(d, "Shadow Blades", 200.0) == "⚠ 64% of the top players at about 3:13"
+    why = fightview._why(d, "Shadow Blades", 200.0, [2.0, 100.0, 200.0])  # 3:13 out of reach after 1:40: no
+    assert why.endswith("⚠ 64% of the top players at about 3:13, a cycle ahead")  # "press it earlier", said
+    d.tops_casts = {"shadow_blades": [193.0] * 64 + [200.0] * 30}
+    assert fightview._tops_off(d, "Shadow Blades", 200.0) == ""  # a fair share press it then too

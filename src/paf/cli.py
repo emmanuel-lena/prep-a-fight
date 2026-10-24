@@ -869,7 +869,8 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
         also[p.swap_debuff] = ("measured on the top tanks: " + (
             f"they swap at about {peak} stacks, reached in about {secs:.0f} s" if peak >= 2 else
             f"they never take a second stack; the debuff lasts about {secs:.0f} s") + hit)
-    p.abilities = _role_journal(enc.id, diff_name, "tank", tl, also, tls.phases, hits=[m.t for m in found])
+    p.abilities = _role_journal(enc.id, diff_name, "tank", tl, also, tls.phases,
+                                hits=[m.t for m in found])
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     healer.add_icons(p)
@@ -917,6 +918,12 @@ def _primary() -> dict:
         return {}
 
 
+def stage_time(t: float, pull: list[float], stage: list[float]) -> float:
+    """A pull-time cast in stage time: its offset into its stage, from that stage's median start in stage time."""
+    i = max((k for k, p0 in enumerate(pull) if p0 <= t), default=0)
+    return round(t - pull[i] + stage[i], 1)
+
+
 def _role_journal(encounter_id: int, diff_name: str, role: str, tl, also: dict[str, str] | None = None,
                   phases: list | None = None, shares: dict[str, float] | None = None,
                   hits: list[float] | None = None) -> str:
@@ -931,6 +938,11 @@ def _role_journal(encounter_id: int, diff_name: str, role: str, tl, also: dict[s
     # the boss's casts up to the median kill: a later one is in a few kills only (round 95: Imbibe "4:36" on a
     # sheet whose median kill is 4:26)
     timings = {n: [t for t in ts if t <= tl.duration] for n, ts in tl.boss_casts}
+    pull = sorted(t for _n, t, *_r in tl.phases)
+    stage = sorted(t for _n, t, *_r in (phases or []))
+    if len(pull) == len(stage) > 1 and pull != stage:  # a staged fight: each cast in stage time, the clock of its
+        # big hits and of the fight tab (fresh heal review: Barrage drawn at 3:57, its hit at 3:50)
+        timings = {n: [stage_time(t, pull, stage) for t in ts] for n, ts in timings.items()}
     return bossguide.abilities_html(sections, timings={n: ts for n, ts in timings.items() if ts},
                                     icon_map=icons_for(bossguide.spell_refs(sections)), role=role,
                                     difficulty=diff_name, also=also,  # the fight tab's stage starts (heal round

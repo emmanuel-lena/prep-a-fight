@@ -301,6 +301,9 @@ def items(d) -> list[tuple[float, Item]]:
     for t, it in out:
         if it.kind in ("cd", "pot") and t >= 5 and not _ctx(t, out, it.kind):
             it.why = _why(d, it.name, t, order.get(it.name, []))
+        elif it.kind in ("cd", "pot") and t >= 5:  # a press with its reason on the row: the top players' other
+            it.why = _tops_off(d, it.name, t)  # moment still said, as Dig deeper warns (fresh DPS review: Shadow
+            # Blades 3:20, the top players 3:13)
     hints = journal_hints(d, {_clean(it.name) for _t, it in out if it.side == "boss"})
     told: set[str] = set()
     for _t, it in sorted(out, key=lambda x: x[0]):  # said once, on the first event it names (the cause first)
@@ -343,8 +346,12 @@ def _why(d, name: str, t: float, presses: list[float]) -> str:
         prev = [x for x in presses if x < t - 1]
         gaps = [b - a for a, b in zip(presses, presses[1:], strict=False)]
         if there is not None and there[1] < t and prev and gaps and there[1] < prev[-1] + min(gaps) - 3:
-            there = None  # an earlier moment the cooldown cannot reach after the previous press: it is that
-            # press's (a review: "earlier, at 1:37" on a 2:03 row whose previous press is 1:33)
+            # an earlier moment the cooldown cannot reach after the previous press: not "press it earlier" (a
+            # review: "earlier, at 1:37" on a 2:03 row whose previous press is 1:33), but said when few press it
+            # here: the top players run a cycle ahead (fresh DPS review: Shadow Blades 3:20, them 3:13)
+            if here < 0.25:
+                why += f"; ⚠ {there[0]:.0%} of the top players at about {_mmss(there[1])}, a cycle ahead"
+            there = None
         if there is not None and here < 0.25:
             when = "wait until" if there[1] > t else "press it earlier, at"  # a deviation said as one (a review:
             why += f"; {there[0]:.0%} of the top players {when} {_mmss(there[1])}"  # "press it at 1:37" on a 2:03 row)
@@ -353,6 +360,19 @@ def _why(d, name: str, t: float, presses: list[float]) -> str:
         elif here >= 0.5:
             why += f"; {here:.0%} of the top players press it then"  # a share, not the rule's backing (DPS c. 8)
     return why.lstrip(";, ")  # a later press with no rule said: its top players' part alone
+
+
+def _tops_off(d, name: str, t: float) -> str:
+    """Most top players press it at another moment close by, few at this one (prep_report.off_tops' rule)."""
+    from paf.prep_report import _key, tops_moment
+
+    ts, n = d.tops_casts.get(_key(name)), d.tops_players
+    if not ts or not n:
+        return ""
+    here, there = tops_moment(ts, n, t)
+    if there is None or here >= 0.25:
+        return ""
+    return f"⚠ {there[0]:.0%} of the top players at about {_mmss(there[1])}"
 
 
 def moments(d) -> list[Moment]:

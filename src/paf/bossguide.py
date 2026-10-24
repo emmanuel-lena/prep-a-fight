@@ -408,18 +408,24 @@ def _span(title: str, phases: list | None, duration: float) -> tuple[float, floa
 
 def _cast_strip(tops: list[Section], span: tuple[float, float], ctx: dict, hits: list[float] | None) -> str:
     """A stage's casts on its own time line (span: its start and end): each ability's icon at its times, a dot at
-    each big hit (fresh heal review: "around 0:34, 1:10, 3:57" lines, two clocks). Overlapping icons take a second
-    row."""
+    each big hit, a tick each minute (fresh heal review: "around 0:34, 1:10, 3:57" lines, two clocks). A cast just
+    before its stage widens the line, the stage's start marked (Soul Transfer 1:40, an intermission from 1:49).
+    Overlapping icons take a second row; another role's ability is dimmed (its job, as the list's chips)."""
     if span[1] <= span[0]:
         return ""
     a, b = span
+    role = ctx.get("role")
+    other = {s.title for _d, s in walk(tops) if role and s.kind == "ability"
+             and any(f in ROLE_OTHERS and f != role for f in s.flags) and role not in s.flags
+             and s.title not in ctx["also"]}
     marks = sorted({(t, s.title) for _d, s in walk(tops) if s.kind == "ability"
                     for t in ctx["timings"].get(s.title.lower(), []) if a - 15 <= t < b})
     if not marks:
         return ""
+    a0 = min(a, marks[0][0])
 
     def x(t: float) -> float:
-        return max(0.0, min(100.0, (t - a) / (b - a) * 100))
+        return max(0.0, min(100.0, (t - a0) / (b - a0) * 100))
     rows: list[float] = []  # each row's last icon position: a new icon closer than 4% takes the next row
     icons_html = []
     for t, n in marks:
@@ -428,15 +434,20 @@ def _cast_strip(tops: list[Section], span: tuple[float, float], ctx: dict, hits:
             rows[r] = x(t)
         else:
             rows.append(x(t))
-        icons_html.append(f"<span class='cs-ic' style='left:{x(t):.1f}%;top:{r * 24}px' title='{e(n)} "
-                          f"{_mmss(t)}'>{icons.img(ctx['icons'].get(n, ''), 'small')}</span>")
+        icons_html.append(f"<span class='cs-ic{' dim' if n in other else ''}' style='left:{x(t):.1f}%;top:{r * 24}px' "
+                          f"title='{e(n)} {_mmss(t)}'>{icons.img(ctx['icons'].get(n, ''), 'small')}</span>")
     dots = "".join(f"<span class='cs-hit' style='left:{x(t):.1f}%' title='a big hit {_mmss(t)}'></span>"
                    for t in hits or [] if a <= t < b)
-    ends = (f"<span class='cs-t' style='left:0;top:{24 * len(rows) + 10}px'>{_mmss(a)}</span>"
-            f"<span class='cs-t end' style='left:100%;top:{24 * len(rows) + 10}px'>{_mmss(b)}</span>")
-    return (f"<div class='cstrip' style='height:{24 * len(rows) + 30}px' role='img' aria-label='the stage&#39;s "
-            f"casts over time'>{''.join(icons_html)}<div class='cs-axis' style='top:{24 * len(rows) + 4}px'>{dots}"
-            f"</div>{ends}</div>")
-
+    low = 24 * len(rows) + 10
+    minutes = [m for m in range(60 * (int(a0) // 60 + 1), int(b), 60) if x(m) <= 94]  # clear of the end label
+    ticks = "".join(f"<span class='cs-tick' style='left:{x(m):.1f}%;top:{low - 8}px'></span>"
+                    f"<span class='cs-t mid' style='left:{x(m):.1f}%;top:{low}px'>{_mmss(m)}</span>" for m in minutes)
+    pre = (f"<span class='cs-pre' style='width:{x(a):.1f}%;top:{low - 10}px' title='before the stage starts'></span>"
+           if a0 < a else "")
+    ends = (f"<span class='cs-t' style='left:{x(a):.1f}%;top:{low}px'>{_mmss(a)}</span>"
+            f"<span class='cs-t end' style='left:100%;top:{low}px'>{_mmss(b)}</span>")
+    return (f"<div class='cstrip' style='height:{low + 20}px' role='img' aria-label='the stage&#39;s casts over "
+            f"time'>{''.join(icons_html)}{pre}<div class='cs-axis' style='top:{low - 6}px'>{dots}</div>{ticks}"
+            f"{ends}</div>")
 
 CSS = theme.style("bossguide")

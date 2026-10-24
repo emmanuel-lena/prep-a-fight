@@ -211,3 +211,25 @@ def test_a_fight_of_one_stage_draws_one_strip_on_top():
                           role="healer", duration=280.0, hits=[40.0])
     assert html.startswith('<section class="stage strip-only"><h3>Over the fight</h3><div class=\'cstrip\'')
     assert html.count("class='cs-ic'") == 2 and "title='a big hit 0:40'" in html
+
+
+def test_a_staged_fights_casts_take_the_stage_clock():
+    # Nek'zali (fresh heal review): Barrage drawn at 3:57 in pull time, its big hit at 3:50 in stage time
+    from paf.cli import stage_time
+
+    pull, stage = [0.0, 109.0, 186.0], [0.0, 109.0, 178.0]  # Stage Two 3:06 in pull time, 2:58 in stage time
+    assert stage_time(237.0, pull, stage) == 229.0 and stage_time(70.0, pull, stage) == 70.0
+
+
+def test_a_strip_dims_another_roles_cast_and_shows_a_cast_before_its_stage():
+    # Vashnik (fresh heal review): Dripping Fangs, a tank's, 9 of 26 icons; Soul Transfer 1:40 pinned to 1:49
+    fangs = sec(1, "Dripping Fangs", "ability", flags=("tank",), spell=6)
+    html = abilities_html([fangs, sec(2, "Toxic Vapor", "ability", spell=5)], role="healer", duration=280.0,
+                          timings={"Dripping Fangs": [10.0], "Toxic Vapor": [30.0]})
+    assert "class='cs-ic dim' style='left:3.6%" in html and "class='cs-ic' style=" in html
+    one = sec(3, "Stage One", "stage", children=[sec(4, "Possession Barrage", "ability", spell=9)])
+    mid = sec(5, "Intermission", "stage", children=[sec(6, "Soul Transfer", "ability", spell=7)])
+    staged = abilities_html([one, mid], role="healer", phases=[("Stage One", 0.0), ("Intermission", 109.0)],
+                            duration=178.0, timings={"Soul Transfer": [100.0, 157.0], "Possession Barrage": [34.0]})
+    inter = staged.split('<section class="stage">')[2]
+    assert "class='cs-pre'" in inter and "title='Soul Transfer 1:40'" in inter and "style='left:0.0%;top:0px'" in inter

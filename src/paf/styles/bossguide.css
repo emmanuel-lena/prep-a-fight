@@ -45,3 +45,6 @@
 .cstrip .cs-axis{position:absolute;left:0;right:0;height:2px;background:var(--line)}
 .cstrip .cs-hit{position:absolute;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--warn);transform:translateX(-50%)}
 .cstrip .cs-t{position:absolute;font-size:11px;color:var(--muted)} .cstrip .cs-t.end{transform:translateX(-100%)}
+.cstrip .cs-ic.dim{opacity:.4;filter:grayscale(.6)} .cstrip .cs-t.mid{transform:translateX(-50%)}
+.cstrip .cs-tick{position:absolute;width:1px;height:6px;background:var(--line)}
+.cstrip .cs-pre{position:absolute;left:0;height:10px;background:repeating-linear-gradient(135deg,var(--line) 0 2px,transparent 2px 6px);opacity:.7}
