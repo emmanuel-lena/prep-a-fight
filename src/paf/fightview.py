@@ -242,9 +242,9 @@ def items(d) -> list[tuple[float, Item]]:
         dur = float(min(life or 0, max(0.0, stop - t)))
         same = next((x for tt, x in out if x.kind == "adds" and round(tt) == round(t)), None)
         if same is not None:  # another wave at that moment: one row, each with its length (fresh DPS review: two
-            if not same.said_dur:  # rows for the 0:24 venoms)
-                same.text, same.said_dur = f"{same.text} ({same.dur:.0f} s)", True
-            same.text += f" · {label} ({dur:.0f} s)"
+            if not same.said_dur:  # rows for the 0:24 venoms); each unit never split across lines (no-break spaces)
+                same.text, same.said_dur = f"{same.text} ({same.dur:.0f} s)".replace(" ", "\u00a0"), True
+            same.text += " · " + f"{label} ({dur:.0f} s)".replace(" ", "\u00a0")
             same.dur = max(same.dur, dur)
         else:
             add(t, Item("boss", "adds", name, label, _icon(d, name), dur))
@@ -335,7 +335,7 @@ def _why(d, name: str, t: float, presses: list[float]) -> str:
     else:
         before = [x for x in presses if x < t - 1]
         gaps = [b - a for a, b in zip(presses, presses[1:], strict=False)]
-        why = "as soon as it is ready again" if before and gaps and t - before[-1] <= min(gaps) + 3 else \
+        why = "◷ on cooldown" if before and gaps and t - before[-1] <= min(gaps) + 3 else \
             "when your rotation calls it"
     ts, n = d.tops_casts.get(_key(name)), d.tops_players
     if ts and n:

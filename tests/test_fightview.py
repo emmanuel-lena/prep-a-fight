@@ -104,8 +104,8 @@ def test_a_press_no_boss_event_explains_says_why(monkeypatch):
     d.tops_casts = {"shadow_blades": [2.0] * 20 + [98.0] * 16 + [182.0] * 15}
     why = {t: it.why for t, it in fightview.items(d) if it.name == "Shadow Blades"}
     assert why[2] == ""  # the pull says it
-    assert why[92] == "as soon as it is ready again; 80% of the top players wait until 1:38"
-    assert why[182] == "as soon as it is ready again; 75% of the top players press it then"
+    assert why[92] == "◷ on cooldown; 80% of the top players wait until 1:38"
+    assert why[182] == "◷ on cooldown; 75% of the top players press it then"
     acts = fightview.data(d, fightview.moments(d), 300)["acts"]
     assert next(a for a in acts if a["t"] == 92)["w"] == why[92]
     d.optimized = [Plan("boss", {"shadow_blades": Rule("hold_adds_10", "", None)}, 0.0, 0.2)]  # a held rule: said once
@@ -188,4 +188,5 @@ def test_two_add_waves_at_one_moment_are_one_row():
                         ability_roles={}, optimized=[], tops_casts={}, tops_players=0, goal="auto", raid=None,
                         plans=[], timeline=None, links={})
     adds = [x for _t, x in fightview.items(d) if x.kind == "adds"]
-    assert len(adds) == 1 and "2 × Burning Venom (21 s) · 5 × Shrouded Venom (8 s)" in adds[0].text
+    text = adds[0].text.replace("\u00a0", " ")  # each unit unbreakable
+    assert len(adds) == 1 and text == "2 × Burning Venom (21 s) · 5 × Shrouded Venom (8 s)"

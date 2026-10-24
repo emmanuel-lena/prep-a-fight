@@ -248,6 +248,8 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
         facts.append(who + (f", ~{m.cost:g} s of movement for you" if m.cost else ""))
     if s.title in ctx["also"]:
         facts.append(e(ctx["also"][s.title]))
+    if ctx["shares"].get(s.title):  # its share of the raid's damage taken, as the bars above (fresh heal review)
+        facts.append(f"{ctx['shares'][s.title]:.0%} of the raid&#39;s damage")
     if s.title.lower() in ctx["burst"]:
         facts.append(f"<b>burst window: the boss takes x{ctx['burst'][s.title.lower()]:g} damage</b>")
     # the journal's words only on what the journal flags for your role (or hits you too); the rest: its name, icon,
@@ -278,7 +280,7 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
                    mechanics: list | None = None, burst: dict[str, float] | None = None,
                    icon_map: dict[str, str] | None = None, role: str | None = None,
                    difficulty: str = "heroic", also: dict[str, str] | None = None,
-                   phases: list[tuple[str, float]] | None = None) -> str:
+                   phases: list[tuple[str, float]] | None = None, shares: dict[str, float] | None = None) -> str:
     """Every stage and unit of the journal with its abilities; facts from the logs when known. phases: the logs'
     phase names and median starts, said in the stage headings they match ("Stage Two" for "Stage Two: Uncoiling")."""
     def start(title: str) -> str:
@@ -291,7 +293,7 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
            "burst": {k.lower(): v for k, v in (burst or {}).items()}, "icons": icon_map or {},
            "describe": describe, "difficulty": difficulty, "also": also or {}, "role": role,
            "named": _named_in_summary(sections, role) if role else set(),
-           "mentioned": _mentioned_in_summary(sections, role) if role else set()}
+           "mentioned": _mentioned_in_summary(sections, role) if role else set(), "shares": shares or {}}
     def key(s: Section) -> tuple:
         return s.kind, s.title, readable(s.text), tuple(s.flags)
 
