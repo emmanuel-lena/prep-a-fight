@@ -5,6 +5,8 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 
 ## Unreleased
 
+## 0.8.25 (2026-10-24)
+
 - The fight tab shows the opener: every cast of the first 40 seconds in order, as SimulationCraft plays your plan,
   each with its icon and time (and whether Bloodlust goes out at the pull). (#39)
 - Your class's other specs are compared with your own items: each spec's best set from your bags (the items of its
