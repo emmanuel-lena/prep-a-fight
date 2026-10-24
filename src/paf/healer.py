@@ -1633,7 +1633,7 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
                                                                            c.support or [0.0] * len(c.times),
                                                                            strict=False)))
                                 or ("" if any(k[0] == c.name and isinstance(k[1], tuple) for k in (named or {}))
-                                    else "<span class='vary'>no shared time</span>"))  # a badge where the chips go
+                                    else "<span class='vary' title='no time shared by a quarter of its users'>&mdash; varying times</span>"))  # a badge where the chips go
         # (none when a window chip follows: heal round 12, Spirit Link Totem's 2:13 under "no shared time"),
         # a named line may follow (round 91; heal round 10: "timing varies: no shared moment" three times a sheet)
         + _pull_chip(c)
