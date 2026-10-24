@@ -2385,7 +2385,7 @@ def split_html(split: list, players: int, spec: str, wide: bool = False, icons: 
     return ((f"<h2>The talents the top players split on</h2><p>{(f'Only {e(near[0])} splits' if (near := [n for n, x in split if 0.35 <= x <= 0.65]) else 'No talent splits')} "
              f"them near half; {'the others listed are' if near else 'these are'} the ones 15 to 85% of the "
              f"{players} players read take, closest to half first:</p>" if wide else
-             "<h2>The talents the top players split on</h2><p>The share of the {players} players read "
+             f"<h2>The talents the top players split on</h2><p>The share of the {players} players read "
              "who take each, closest to half first:</p>") + "<ul class='hl2 split'>"
             + "".join((f"<li><b>{_pic(icons, n)}{e(n)}</b>{_bar(s)}<small>{s:.0%}</small></li>" if s >= 0 else
                        _pair(n, icons)).replace("</small></li>", f"{_mark_html(marks, n)}</small></li>", 1)  # inline,

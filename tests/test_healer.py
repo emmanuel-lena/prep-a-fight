@@ -864,3 +864,9 @@ def test_the_most_played_builds_side_is_marked_on_the_split_rows():
     assert marks == {"Weal and Woe": "Weal and Woe", "Searing Light": "", "Lightburst 48% / Dawnlight 43%": "Dawnlight"}
     html = healer.split_html(split, 100, "Holy Paladin", marks=marks)
     assert html.count("class='top take'") == 2 and html.count("class='top skip'") == 1 and "&#10003; Dawnlight" in html
+
+
+def test_the_split_list_says_its_number_of_players():
+    """Fresh heal review: '{players}' shown raw on 12 sheets (an f-string lost its prefix)."""
+    html = healer.split_html([("Lightburst", 0.5), ("Searing Light", 0.45)], 100, "Holy Paladin")
+    assert "The share of the 100 players read" in html and "{" not in html

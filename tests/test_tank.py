@@ -44,6 +44,8 @@ def test_tank_busters_hitters_and_swaps():
     assert "What hits the top tanks the most" not in sheet and "<b>0:30</b></td><td>Crush</td>" in sheet
     import re
     assert not re.search(r"round \d+", re.sub(r"<[^>]+>", " ", sheet))  # no review note in the page's text
+    text = re.sub(r"<script.*?</script>|<style.*?</style>|<[^>]+>", " ", sheet, flags=re.S)
+    assert not re.search(r"\{[a-z_]+\}", text)  # no placeholder left raw (fresh heal review: "{players}")
 
 
 
