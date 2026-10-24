@@ -1657,16 +1657,18 @@ equipped set">Single swap</th></tr>{body}</table>
         rest = [x for x in rest if x is not defs]
         sections["boss"] = [f"<div class='boss-top'><div>{b[0]}{defs}</div><div>{b[1]}</div></div>"] + rest
     byline = f"{e(d.character)} &middot; {e(d.spec)} &middot; {d.kills} ranked kills"
-    return sheet_page(d.boss, d.difficulty, byline, d.class_name, sections)
+    return sheet_page(d.boss, d.difficulty, byline, d.class_name, sections, spec=d.spec)
 
 
 def sheet_page(boss: str, difficulty: str, byline: str, class_name: str, sections: dict[str, list[str]],
-               extra_css: str = "", labels: dict[str, str] | None = None) -> str:
+               extra_css: str = "", labels: dict[str, str] | None = None, spec: str = "") -> str:
     """A prep sheet's page: the hero with the section tabs (SECTIONS), one panel per section with content. Every
     role's sheet (damage, healer, tank) has this skeleton. byline: html."""
     from paf import briefing, fightview, simple
 
-    cls_icon = icons.img(icons.CLASS_ICON.format(cls=class_name.lower()), "large", "hero-ic") if class_name else ""
+    cls_icon = ((icons.spec_any(f"{spec} {class_name}", "large", "hero-ic") if spec else  # the spec named beside it
+                 icons.img(icons.CLASS_ICON.format(cls=class_name.lower()), "large", "hero-ic"))  # (DPS round 49)
+                if class_name else "")
     header = f"""<header class="sheet-hero"><div class="in">{cls_icon}<div class="txt">
 <h1>{e(boss)} {diff_pill(difficulty)}</h1>
 <p>{byline} <span class="nw">&middot; {datetime.now():%d %b %Y %H:%M}</span></p>

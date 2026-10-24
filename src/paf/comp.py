@@ -196,5 +196,6 @@ def to_dict(boss: str, fight: str, rows: list[Assigned]) -> dict:
          "tops": a.tops_share, "main": a.main_share, "raid": a.raid_share,
          "ranking": [{"spec": s, "dps": d, "players": n} for s, d, n in a.ranking[:SHOWN]],
          "proposed": [{"name": n, "spec": s} for n, s in a.proposed],
-         "pulled": [{"name": n, "spec": s, "share": x} for n, s, x in a.pulled],
-         "missed": [{"name": n, "spec": s, "share": x, "habit": h} for n, s, x, h in a.missed]} for a in rows]}
+         "pulled": [{"name": n, "spec": s, "share": x} for n, s, x in sorted(a.pulled, key=lambda p: (-p[2], p[0]))],
+         "missed": [{"name": n, "spec": s, "share": x, "habit": h}  # a fixed order: by share, then name (round 49)
+                    for n, s, x, h in sorted(a.missed, key=lambda p: (-p[2], p[0]))]} for a in rows]}

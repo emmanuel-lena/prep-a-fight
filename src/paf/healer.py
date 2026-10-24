@@ -1521,6 +1521,8 @@ def brief(dl: str) -> str:
     def short(m) -> str:
         term, full = m.group(1), m.group(2)
         word = LEGEND_SHORT.get(re.sub(r"<[^>]+>|&[^;]+;", "", term).strip().lower())
+        if word is None and full.startswith("left out:"):  # a store left out (Stasis): its reason on hover (round 49)
+            word = "left out"
         if word is None:
             return m.group(0)
         plain = html.unescape(re.sub(r"<[^>]+>", "", full)).replace("'", "&#39;")
@@ -1540,7 +1542,9 @@ LEGEND_SHORT = {"n%": "of the top players read", "tied to a hit": "pressed in th
                 "none shared": "no button reaches a tenth", "few players": "under 100 healers: a few's habit",
                 "a row": "the spec's median player", "a job": "a fifth more, beyond chance",
                 "a spike": "5 s at 1.5&times; the median damage", "the shares": "from different kills: no sum",
-                "externals, buffs": "a mean, cast on others", "dispels": "the boss tab: its top player"}
+                "externals, buffs": "a mean, cast on others", "dispels": "the boss tab: its top player",
+                "marked": "a gap beyond three errors", "deaths": "per 20 players", "a wide reading": "a few kills: never "
+                "marked", "too few kills": "no number"}
 
 
 def _unnest(text: str) -> str:
@@ -2657,7 +2661,7 @@ def presence_table(pres: list, mine: str = "", what: str = "Healer") -> str:
     wide = any(FEW_KILLS <= p.kills < WIDE_KILLS for p in pres)  # never tested: not said within the noise
     noise = (f"<p>With or without any {e(what.lower())} spec{f' in {WIDE_KILLS} kills or more' if wide else ''} "
              "here, kill time and deaths stay within the noise.</p>")
-    return ((noise if not marked else "")
+    return brief((noise if not marked else "")  # its legend in a few words, the rules on hover (round 49)
             + f"<table class='hcomp'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"
             "<dl class='legend'>" + ("<dt>Marked</dt><dd>a gap with and without the spec beyond three standard "
             "errors (clear with every number tested at once): a reading of these kills, not a reason to bring it."

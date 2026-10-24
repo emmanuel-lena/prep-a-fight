@@ -169,7 +169,7 @@ def change_card(d) -> str:
     if d.talents and best is not None:
         g = best.per_fight.get(d.talents.fights[0], (0.0, None))[0]
         if g > 2 * d.talents.error:
-            spec_ic = icons.img(icons.CLASS_ICON.format(cls=d.class_name.lower()), "medium") if d.class_name else ""
+            spec_ic = icons.spec_any(f"{d.spec} {d.class_name}", "medium", "ic") if d.class_name else ""  # its spec
             button = copy_button(best.build.code, "Copy the talents") if best.build.code else ""
             talents_said = g
             rows.append(f"<li>{spec_ic}<div><b>Change your talents</b><span class='sz {_size(g)}'>"
@@ -188,7 +188,7 @@ def change_card(d) -> str:
 
         best = next(((name, gap) for name, gap, kind in spec_gaps(s) if kind == "go"), None)
         if best:
-            spec_ic = icons.img(icons.CLASS_ICON.format(cls=d.class_name.lower()), "medium") if d.class_name else ""
+            spec_ic = icons.spec_any(f"{d.spec} {d.class_name}", "medium", "ic") if d.class_name else ""  # its spec
             rows.append(f"<li>{spec_ic}<div><b>{e(best[0])} could do {best[1]:+.0f}%</b><span class='what'>We simmed "
                         f"your character in each spec: for {e(spec_role(s))}, on this boss. The top "
                         f"{e(best[0])} players are ahead too.</span></div></li>")

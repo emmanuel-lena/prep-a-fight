@@ -400,7 +400,8 @@ def archetypes(types: list[AddType], comp: list[tuple[str, str, float]]) -> dict
     out: dict[str, list[str]] = {AOE: [], FLEX: [], SINGLE: [], UNKNOWN: []}
     if types:
         dealers = [p for p in comp if p[1] not in HEALERS]
-        for name, spec, _ in sorted(dealers, key=lambda p: -types[0].focus.get(p[1], types[0].default_focus)):
+        for name, spec, _ in sorted(dealers, key=lambda p: (-types[0].focus.get(p[1], types[0].default_focus),
+                                                            -p[2], p[0])):  # ties: by DPS, then name (round 49)
             out[archetype(types[0], spec)].append(f"{name} ({spec})")
     return out
 
