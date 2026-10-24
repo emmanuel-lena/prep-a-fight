@@ -142,10 +142,12 @@ def add_icons(prep) -> None:
                for x in (n.split(" / ") if sh < 0 else [n])}
     if talents:
         try:
-            from paf.gamedata import same_name_spells
+            from paf.gamedata import same_name_spells, talent_entries
 
-            same = same_name_spells()
-            prep.talent_icons = icons_for({n: f"spell={same[n][0]}" for n in talents if same.get(n)})
+            same = same_name_spells()  # the talent's own spell first: a same-name spell can have no icon (heal
+            own = {v[0]: v[1] for v in talent_entries().values() if v[0] in talents and v[1]}  # round 51: Fearless)
+            prep.talent_icons = icons_for({n: f"spell={own.get(n) or same[n][0]}" for n in talents
+                                           if own.get(n) or same.get(n)})
         except Exception:  # noqa: BLE001 - offline
             prep.talent_icons = {}
     # a tank's short defensives and active mitigation, known by name only (Spell Reflection): their spell's icon
