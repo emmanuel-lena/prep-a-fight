@@ -86,3 +86,7 @@ def test_your_character_of_another_class_is_swapped_out_and_said(monkeypatch):
     r = cli._raid_verdict(None, None, SimpleNamespace(id=9), 4, "u", profile, "Elemental", types=[])
     assert not r.you_found and r.logged_as == "Subtlety Rogue" and r.you[1] == 80000.0  # 70k and 90k: you swapped out
     assert "you are in that log as Subtlety Rogue, swapped out" in raid_section(r)
+    from paf.prep_report import healers_left
+
+    r.archetypes = {"AoE": ["Ann", "Bo"]}  # the log's 4: 2 grouped, a healer, and you as your rogue (DPS round 47)
+    assert healers_left(r) == (1, True)

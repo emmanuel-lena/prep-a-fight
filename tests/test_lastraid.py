@@ -154,7 +154,7 @@ def test_the_comparison_headers_keep_the_time_when_the_health_is_a_row():
     rows = [{"cmp": ("Boss health left at 2:38", "66%", "69%"), "kind": "good",
              "pulls": ["wipe at 66% after 2:38", "wipe at 69% after 2:44"]}]
     out = lastraid._cmp_table(rows)
-    assert "Best pull &middot; 0 deaths <small>&#9201;&nbsp;2:38</small>" in out and "wipe at 66%" not in out
+    assert "Best 0-death pull <small>&#9201;&nbsp;2:38</small>" in out and "wipe at 66%" not in out
 
 
 def test_a_one_boss_wipe_night_has_no_empty_state_line(home, monkeypatch):

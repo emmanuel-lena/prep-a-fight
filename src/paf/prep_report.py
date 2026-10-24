@@ -411,6 +411,13 @@ def simmed_note(d: PrepData) -> str:
             "the sims' boss share toward the top players' (SimC hits every add in range).")
 
 
+def healers_left(r) -> tuple[int, bool]:
+    """The log's players no add group counts (its healers), and whether your other character is one of the log's:
+    then it is you, not a healer (DPS round 47: Ixuu the rogue counted among the healers)."""
+    swapped = bool(r.logged_as) and not r.you_found
+    return r.players - sum(len(ps) for ps in r.archetypes.values()) - int(swapped), swapped
+
+
 def raid_section(r: RaidInfo, gear: bool = True) -> str:
     you = (f"you ({e(r.you[0])}, {r.you[1] / 1000:,.0f}k DPS"
            + (f" <span class='pill'>your log: {e(r.logged_as)}</span>" if r.logged_as else "") + ")" if r.you_found else
@@ -427,9 +434,11 @@ def raid_section(r: RaidInfo, gear: bool = True) -> str:
         for v in r.verdicts)
     groups = "".join(f"<li><b>{e(k)}</b> ({len(ps)}): {e(re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', ', '.join(ps)))}</li>"
                      for k, ps in r.archetypes.items() if ps)
-    rest = r.players - sum(len(ps) for ps in r.archetypes.values())
+    rest, swapped = healers_left(r)
     if groups and rest > 0:  # every player of the log accounted for
         groups += f"<li><b>healers</b> ({rest}): not counted for the adds</li>"
+    if groups and swapped:
+        groups += f"<li><b>you</b> (1): in the log as {e(r.logged_as)}, swapped for the spec you prepare</li>"
     what = "the cooldown plan and the gear on this sheet are" if gear else "the cooldown plan on this sheet is"
     verdict = (f"Stay on the boss: {what} the one{'s' if gear else ''} for boss damage." if r.objective == "boss"
                else f"Pad the adds: {what} the one{'s' if gear else ''} for total damage.")

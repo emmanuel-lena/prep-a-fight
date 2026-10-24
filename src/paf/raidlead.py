@@ -351,8 +351,7 @@ def _ic(spec: str) -> str:
     """A player's class icon from its spec ("Frost DeathKnight" -> the Death Knight's)."""
     from paf import icons
 
-    cls = icons.class_key(spec)  # its spec's own icon, else its class's (fresh app review 7: three DKs alike)
-    return icons.img(icons.spec_icon(spec) or icons.CLASS_ICON.format(cls=cls), "small", "ics") if cls else ""
+    return icons.spec_img(spec)  # its spec's own icon, a class-colour ring (fresh app review 7: three DKs alike)
 
 
 def pretty(spec: str) -> str:

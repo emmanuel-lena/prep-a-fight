@@ -173,8 +173,7 @@ def _spec_ic(spec: str) -> str:
     """A spec's class icon before its name in the tables (heal round 10: bare spec names, the cheapest visual)."""
     from paf import icons
 
-    cls = icons.class_key(spec)  # its spec's own icon, else its class's
-    return icons.img(icons.spec_icon(spec) or icons.CLASS_ICON.format(cls=cls), "small", "ics", "") if cls else ""
+    return icons.spec_img(spec)  # its spec's own icon, a class-colour ring
 
 
 def _comp_label(c) -> str:

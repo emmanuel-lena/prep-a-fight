@@ -82,6 +82,19 @@ def spec_icon(spec: str) -> str:
     return SPEC_ICON.get((sp, cls), "")
 
 
+def spec_img(spec: str, cls: str = "ics") -> str:
+    """A spec's small icon with a ring of its class's colour, so purple and blue squares read apart at 16 px (fresh
+    app review 7); its class icon when the spec is unknown; '' when there is no class."""
+    from paf.theme import CLASS_COLORS
+
+    key = class_key(spec)
+    if not key:
+        return ""
+    colour = CLASS_COLORS.get(key, "")
+    ring = f' style="box-shadow:0 0 0 1.5px {colour}"' if colour else ""
+    return img(spec_icon(spec) or CLASS_ICON.format(cls=key), "small", cls, "").replace("<img ", f"<img{ring} ", 1)
+
+
 def _cache_path() -> Path:
     return data_dir() / "cache" / "icons.json"
 

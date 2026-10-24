@@ -754,10 +754,13 @@ def render_sheet(p: TankPrep) -> str:
                     f"<div class='stages'>{p.abilities}</div>")
     have = next((x for x in p.presence if x.spec == p.spec), None)
     deeper = []
+    from paf.icons import spec_img
+
     if have and p.presence:
         mates = [x for x in p.presence if x.spec != p.spec and x.kills >= 8]
         deeper.append(f"<p class='lead'>Beside a {e(p.spec)}, the top raids play "
-                      + (", ".join(f"{e(x.spec)} (in {x.share:.0%} of the kills)"
+                      + (", ".join(f"<span class='nw'>{spec_img(x.spec)}{e(x.spec)}</span> (in {x.share:.0%} of "
+                                   "the kills)"
                                    for x in sorted(mates, key=lambda x: (-x.share, -x.kills, x.spec))[:3])
                          if mates else "no other tank spec often") + "."
                       + "".join(f" Kills with a {e(x.spec)} beside them are "

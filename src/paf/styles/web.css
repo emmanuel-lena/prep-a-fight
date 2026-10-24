@@ -469,7 +469,8 @@ section.adv textarea{max-width:920px} /* the content column, never to the window
 .fstrip figcaption{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:2px}
 .fs-k::before{content:"";display:inline-block;width:12px;height:8px;border-radius:2px;margin-right:5px;vertical-align:0}
 .fs-k.add::before{background:color-mix(in srgb,var(--accent) 55%,transparent)} .fs-k.away::before{border:1px dashed var(--line);background:color-mix(in srgb,var(--muted) 14%,transparent)}
-.fs-k.move::before{background:var(--warn);opacity:.7} .fs-k.lust::before{background:var(--neg);width:8px;clip-path:polygon(0 0,100% 0,50% 100%)}
+.fs-k.move::before{background:var(--warn);opacity:.7} .fs-k.lust::before{background:var(--neg);width:8px;clip-path:polygon(50% 0,100% 100%,0 100%)}
 .rl-allrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:4px 0 10px}
 .mx-legend .pill.chk::before{display:none} .rl-num{font:700 17px var(--font-data);color:var(--fg);margin-right:3px}
 .rl-sb{grid-template-rows:auto 1fr auto} .rl-rows{display:grid;gap:2px;align-self:end}
+.set-status .meter{margin-right:8px}

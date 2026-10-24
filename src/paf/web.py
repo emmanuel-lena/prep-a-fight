@@ -592,8 +592,7 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
         return "&#8635;" if old else "&#10003;"  # today here); to redo: a redo mark; the date on hover
 
     def who(sp: str) -> str:
-        cls = icons.class_key(sp)  # the spec's own icon (fresh app review 7)
-        return (icons.img(icons.spec_icon(sp) or icons.CLASS_ICON.format(cls=cls), "small", "ics") if cls else "") + e(sp)
+        return icons.spec_img(sp) + e(sp)  # the spec's own icon (fresh app review 7)
     rows = "".join(f"<tr{' class=mine' if sp.lower() == mine.lower() else ''}><th scope='row'>{who(sp)}</th>"
                    + "".join(f"<td>{cell(sp, n)}</td>" for n in names) + "</tr>" for sp in specs)
     return (f"<h2>Your sheets</h2><div class='mx-wrap'><table class='mx'><thead><tr><th></th>{head}</tr></thead>"
@@ -1585,15 +1584,15 @@ def fight_strip(enc, difficulty: str) -> str:
     out.append(f"<line class='fs-axis' x1='{x0}' x2='{x1}' y1='{axis}' y2='{axis}'/>")
     if f.lust_time is not None:  # on the axis, pointing at its moment
         lt = f.lust_time if f.lust_time >= 0 else f.duration + f.lust_time
-        out.append(f"<path class='fs-lust' d='M{max(x0, x(lt) - 6):.1f} {axis - 12} l12 0 l-6 10 z'>"  # above the
-                   # axis, pointing down at its moment, as the legend's (fresh review 7: up, on the "0:00")
+        out.append(f"<path class='fs-lust' d='M{max(x0, x(lt) - 6):.1f} {axis + 30} l12 0 l-6 -9 z'>"  # under the
+                   # time labels, pointing up at its moment, as the legend's (fresh review 7: on the moves, the 0:00)
                    f"<title>Bloodlust at {mmss(lt)}</title></path>")
     key = ("<span class='fs-k add'>adds &#215;count</span>"
            + ("<span class='fs-k away'>boss away</span>" if f.invulnerable else "")
            + ("<span class='fs-k move'>moves</span>" if f.movement else "")
            + ("<span class='fs-k lust'>Bloodlust</span>" if f.lust_time is not None else ""))
     label = html.unescape(boss_line(enc, difficulty)).strip()
-    return (f"<figure class='fstrip'><svg viewBox='0 0 {w} {axis + 22}' role='img' aria-label='{e(label)}'>"
+    return (f"<figure class='fstrip'><svg viewBox='0 0 {w} {axis + 32}' role='img' aria-label='{e(label)}'>"
             f"{''.join(out)}</svg><figcaption>{key}</figcaption></figure>")
 
 
