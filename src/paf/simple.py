@@ -156,8 +156,36 @@ def _role(d) -> str:
     return {"total": ", padding the adds", "boss": ", on boss damage"}.get(wanted(d) or "", "")
 
 
+def card_plan(d):
+    """The plan the change card shows (its condition), or None: the suggestions list leaves it out."""
+    plan = _plan(d)
+    if (plan is not None and plan.gain > 2 * plan.error and any(r.name != "default" for r in plan.choice.values())
+            and getattr(plan, "robust", True)):
+        return plan
+    return None
+
+
+def _rule_badges(d, plan) -> str:
+    """Each held cooldown with its rule as a badge (paf.fightview's words), the rule's sentence on hover."""
+    import re as _re
+
+    from paf.fightview import RULE_BADGE
+    from paf.prep_report import cd_name, rule_phrase
+
+    out = []
+    for k, r in plan.choice.items():
+        if r.name == "default":
+            continue
+        hold = _re.fullmatch(r"hold_(adds|vulnerable)_(\d+)", r.name)
+        badge = (f"hold &le;{hold[2]} s for {'adds' if hold[1] == 'adds' else 'the damage amp'}" if hold else
+                 RULE_BADGE.get(r.name, e(rule_phrase(d, r.name))))
+        out.append(f"<span class='rb'>{_ic(d, cd_name(d, k))}{e(cd_name(d, k))} <span class='pill hold' "
+                   f"title='{e(rule_phrase(d, r.name))}'>{badge}</span></span>")
+    return f"<span class='rbs'>{''.join(out)}</span>" if out else ""
+
+
 def change_card(d) -> str:
-    from paf.prep_report import best_build, copy_button, linkify
+    from paf.prep_report import best_build, copy_button, linkify, wanted
 
     rows = []
     talents_said = 0.0  # a talent gain above the plan's: said not to add (DPS confirm round 2: two +6.6%)
@@ -203,6 +231,11 @@ def change_card(d) -> str:
                     f"{_size(plan.gain)}'>{SIZE_WORDS[_size(plan.gain)]}, "
                     f"{plan.gain:+.{same(talents_said) if talents_said else 1}f}% vs SimC's default list"
                     + "</span><span class='what'>"  # the pill says the rest (DPS round 42: a sentence of caveats)
+                    + ((" <span class='pill gold'>your choice</span>" if d.goal in ("boss", "total") else
+                        " <span class='pill gold'>recommended for your raid</span>")  # who picked it: said where the
+                       if wanted(d) == plan.objective else "")  # plan now is (the list below no longer has it)
+                    + _rule_badges(d, plan)  # its rules here, as Your job's badges: the list below no longer
+                    # repeats this plan (fresh DPS review: said twice)
                     + ("<span class='pill'>simmed apart from the talents: the gains do not add up</span>"
                        if talents_said else "")  # plain words, the figure said (DPS confirm round 12: "≠ adds to")
                     + ("" if getattr(plan, "robust", True) else " Not robust: the gain can vanish on a harder fight "

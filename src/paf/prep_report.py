@@ -630,8 +630,11 @@ def suggestions(d: PrepData) -> list[Suggestion]:
         """A burst plan that loses boss or total damage: worth it only when the raid needs that target dead."""
         return p.objective == "secondary" and any(v < -2 * p.error for o, v in p.totals.items() if o in ("boss", "total"))
 
+    from paf.simple import card_plan
+
+    shown = card_plan(d)  # the change card's plan, with its rules and MRT button: not said twice (fresh DPS review)
     for p in sorted(d.optimized, key=lambda p: (p.objective != want, costly(p), -p.gain)):
-        if p.objective == "adds" or p.gain <= 2 * p.error:
+        if p.objective == "adds" or p.gain <= 2 * p.error or p is shown:
             continue
         by_rule: dict[str, list[str]] = {}
         for k, r in p.choice.items():

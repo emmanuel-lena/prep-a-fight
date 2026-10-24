@@ -129,3 +129,4 @@ a.tal:hover{background:var(--surface-2)}
 .simple .cards .sw-strip.free{grid-column:1/-1;display:flex;flex-direction:row;flex-wrap:wrap;justify-content:flex-start;gap:4px 14px;text-align:left} /* one row across both columns */
 .simple .cards li.sw-list>.sw-strip:not(.free){display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));justify-items:start} /* the wrapped grid it says, not a centred column */
 .simple .cards li.sw-list{width:100%;max-width:none;box-sizing:border-box} /* not the reading measure: a row of chips */
+.simple .rbs{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px} .simple .rb{display:inline-flex;align-items:center;gap:5px;font-size:14px} .simple .rb img{width:20px;height:20px}
