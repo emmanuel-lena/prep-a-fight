@@ -882,6 +882,16 @@ def _pad_bar(text: str) -> str:
             f"<span>your raid {you}%</span><span class='lo' style='left:{low / top * 100:.0f}%'>{low}%</span></div>")
 
 
+def _without_shares(text: str) -> str:
+    """The pad line without the two shares its bar draws (DPS round 44: said twice): "Pad them: it lacks cleave.".
+    The line with you and without you keeps its words: the bar draws only the share with you."""
+    if "without you, " in text and " with you (" in text:
+        return text
+    out = re.sub(r"(?:(?:with|without) you, )?your raid (?:already )?does \d+%.*?\(the weakest top raids do \d+%\)(?:; )?", "",
+                 text)
+    return re.sub(r":\s*$", ".", re.sub(r":\s+(?=[.;]|$)", "", out)).replace(": .", ".")
+
+
 def places(g: float, gains: list[float]) -> int:
     """Decimals for a gain: two when another gain rounds alike at one (never one figure copied: DPS rounds 13, 38)."""
     return 2 if any(f"{g:.1f}" == f"{x:.1f}" and abs(g - x) >= 0.005 for x in gains) else 1
@@ -900,7 +910,7 @@ def suggestions_html(d: PrepData) -> str:
                 f'{unit}</div>'  # not played:
                 if s.gain is not None else '<div class="gain"></div>')  # grey (DPS confirm round 10)
         pic = icons.img(s.icon or "inv_misc_groupneedmore", "medium")
-        details = "".join(f"<div>{x}</div>{_pad_bar(x)}" for x in s.details)
+        details = "".join(f"<div>{_without_shares(x) if _pad_bar(x) else x}</div>{_pad_bar(x)}" for x in s.details)
         rec = " rec" if "recommended for your raid" in s.title or "your choice" in s.title else ""
         rows.append(f'<div class="sugg {s.severity}{rec}">{pic}<div><div class="t"><span class="sev">{label}</span> '
                     f'{s.title}</div><div class="d">{details}</div></div>{gain}</div>')
