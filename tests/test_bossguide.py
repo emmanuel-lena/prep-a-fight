@@ -88,7 +88,7 @@ def test_a_unit_told_before_shows_only_what_changes():
     # under the unit's "As in Stage One", its rows say only what changed (round 38: three times in four lines)
     assert 'now</span> <span class="pill warn">deadly</span>' in inter and NOW_DEADLY not in inter
     assert "A corpse lingers." not in inter
-    assert "Also, as in Stage One: Corpse Blight." in inter
+    assert "Also unchanged: Corpse Blight." in inter  # the unit's line says the stage (round 39)
 
 
 def test_another_difficultys_sentences_are_left_out():

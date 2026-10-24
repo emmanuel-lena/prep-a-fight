@@ -293,7 +293,7 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
     for top in sections:
         if top.kind == "overview":
             continue
-        rows, repeated, others, skip, under = [], {}, {}, None, None
+        rows, repeated, others, skip, under, unit_said = [], {}, {}, None, None, False
         for depth, s in walk(top.children):
             if skip is not None and depth > skip:  # under an ability of another role: named with it
                 continue
@@ -339,6 +339,7 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
             elif s.kind == "creature":  # a unit told before: its name, then only what changed under it
                 told = seen.get(key(s), top.title) != top.title
                 under = depth if told else None  # its rows need not say "as in" again
+                unit_said = unit_said or told
                 ts = None if told else ctx["timings"].get(s.title.lower())  # when it comes, at its first stage
                 at = f" <span class='muted small'>around {_when(ts)}</span>" if ts else ""  # only (app rounds 13-14:
                 # the adds had no time, then the intermission's repeat gave the Stage One spawns)
@@ -358,7 +359,9 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
             rows.insert(0, _ability(top, 0, ctx))
         title = "" if top.kind == "ability" else f"<h3>{head}</h3>"  # an ability's card: its row names it
         notes = "".join("<p class='small muted also'>" + (  # not `also`: the parameter (review 36: lost from stage 2)
-            f"Also, as in {e(_short(where))}: {e(', '.join(dict.fromkeys(names)))}." if len(set(names)) <= 4 else
+            (f"Also unchanged: {e(', '.join(dict.fromkeys(names)))}." if unit_said and len(repeated) == 1 else  # its
+             f"Also, as in {e(_short(where))}: {e(', '.join(dict.fromkeys(names)))}.")  # unit said it (round 39)
+            if len(set(names)) <= 4 else
             f"{len(set(names))} abilities {'you deal with ' if role else ''}from {e(_short(where))} stay as they were.")
             + "</p>"  # the role's own count, the others' named below (round 79: 7 on a healer sheet, 9 on a tank's)
             for where, names in repeated.items())
