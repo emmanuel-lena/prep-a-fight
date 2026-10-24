@@ -246,6 +246,7 @@ class HealerPrep:
     rare: list = field(default_factory=list)  # long cooldowns few top players press (Cooldown): said, not hidden
     casts: dict = field(default_factory=dict)  # boss ability -> its casts in the typical kill (timing evidence)
     split: list = field(default_factory=list)  # (talent, share picked) the top players split on (contested)
+    split_marks: dict = field(default_factory=dict)  # the most played build's side of each split row (top_marks)
     split_players: int = 0
     split_wide: bool = False  # no talent 35-65%: the split is the talents they differ on most (15-85%)
     potions: list = field(default_factory=list)  # potions a quarter of them or more drink (Cooldown)
@@ -2091,8 +2092,10 @@ def build_rows(builds: list, split: list | None = None) -> list[tuple[int, str, 
         return max(set(trees), key=trees.count) if trees else ""
     out = []
     for i, b in enumerate(builds):
-        if i == 0 or not names:
-            out.append((b.count, b.label, b.code or "", _sides(b.key, names, split or []) if names else ""))
+        if i == 0 or not names:  # the most played: its side of each split row is marked there (✓ ✗, heal round 51)
+            said = ("its side of each talent below: &#10003; or &#10007;" if i == 0 and split and names
+                    and side_marks(b.key, names, split) else _sides(b.key, names, split or []) if names else "")
+            out.append((b.count, b.label, b.code or "", said))
             continue
         mine, base = hero(b.key), hero(builds[0].key)
         other = mine and base and mine != base  # another hero tree: named, its own talents not listed one by one
@@ -2110,18 +2113,35 @@ def build_rows(builds: list, split: list | None = None) -> list[tuple[int, str, 
     return out
 
 
-def _sides(key, names: dict, split: list) -> str:
-    """The build's side of each talent the top players split on: "of the talents they split on, takes Lightburst
-    and Weal and Woe; skips Searing Light"."""
+def side_marks(key, names: dict, split: list) -> dict[str, str]:
+    """The build's side of each split row, by the row's label: the talent it takes, or '' (skips it). Lists, never a
+    joined sentence (heal round 51: "Weal and Woe" in a sentence of names)."""
     mine = {names[t] for t in key if names.get(t)}
-    takes, skips = [], []
+    out = {}
     for n, sh in split:
         sides = [x.rpartition(" ")[0] for x in n.split(" / ")] if sh < 0 else [n]
         got = [x for x in sides if x in mine]
-        if got:
-            takes += got
-        elif sh >= 0:
-            skips.append(n)
+        if got or sh >= 0:
+            out[n] = got[0] if got else ""
+    return out
+
+
+def top_marks(builds: list, split: list) -> dict[str, str]:
+    """The most played build's side of each split row (side_marks), for the rows' ✓ and ✗; {} offline."""
+    try:
+        from paf.gamedata import talent_entry_names
+
+        return side_marks(builds[0].key, talent_entry_names(), split) if builds and split else {}
+    except Exception:  # noqa: BLE001 - offline: no marks
+        return {}
+
+
+def _sides(key, names: dict, split: list) -> str:
+    """The build's side of each talent the top players split on: "of the talents they split on, takes Lightburst
+    and Weal and Woe; skips Searing Light"."""
+    marks = side_marks(key, names, split)
+    takes = [v for v in marks.values() if v]
+    skips = [n for n, v in marks.items() if not v]
     if not takes and not skips:
         return ""
     return "of the talents listed below, " + "; ".join(
@@ -2135,10 +2155,14 @@ BUILD_SHARE = 0.10  # a build fewer of the players read play is no shared build:
 def talents_html(builds: list, players: int, who: str, hero: list | None = None) -> str:
     """The hero tree the top players pick (the first choice), then their builds played by enough of them."""
     line = ""
+    rare = [t for t, sh in (hero or [])[1:] if sh < 0.05]  # a tree a few play: no choice drawn, said on hover
+    hero = [(t, sh) for i, (t, sh) in enumerate(hero or []) if i == 0 or sh >= 0.05]  # (heal round 51: 98% / 2%)
     if hero:
         line = ("<ul class='hl2 split'>"  # one tree too: its bar, as the sheets with two (heal round 49: text)
                 + _pair(" / ".join(f"{t} {round(sh * 100)}%" for t, sh in hero[:2]))  # the
-                .replace("<li class='pair'><span>", "<li class='pair hero'><span><small>Hero tree</small> ", 1)  # choice
+                .replace("<li class='pair'><span>", "<li class='pair hero'" + (f" title='a few play {e(_and(rare))}'"
+                                                                                if rare else "")
+                         + "><span><small>Hero tree</small> ", 1)  # choice
                 + "</ul>")  # rows' stacked bar (heal round 16: plain text), with no half tick (round 17)
     if builds and builds[0][0] < BUILD_SHARE * players:  # 3 of 100 is no build to show, empty row and all
         return f"<h2>Talents the top {e(who)} play</h2>{line}" if line else ""  # the lead said there is no build
@@ -2346,7 +2370,8 @@ def _side(x: str) -> str:
     return f"<b>{e(m.group(1))}</b> <small>{m.group(2)}{e(m.group(3) or '')}</small>"
 
 
-def split_html(split: list, players: int, spec: str, wide: bool = False, icons: dict | None = None) -> str:
+def split_html(split: list, players: int, spec: str, wide: bool = False, icons: dict | None = None,
+               marks: dict | None = None) -> str:
     """The talents the top players split on, with how often each is picked: what the builds above hide. wide: none
     or one is taken by 35 to 65% of them (Holy Paladin, Holy Priest), so the talents they differ on most, 15 to 85%."""
     return ((f"<h2>The talents the top {e(spec)}s differ on most</h2><p>{(f'Only {e(near[0])} splits' if (near := [n for n, x in split if 0.35 <= x <= 0.65]) else 'No talent splits')} "
@@ -2354,8 +2379,20 @@ def split_html(split: list, players: int, spec: str, wide: bool = False, icons: 
              f"{players} players read take, closest to half first:</p>" if wide else
              f"<h2>The talents the top {e(spec)}s split on</h2><p>The share of the {players} players read "
              "who take each, closest to half first:</p>") + "<ul class='hl2 split'>"
-            + "".join(f"<li><b>{_pic(icons, n)}{e(n)}</b>{_bar(s)}<small>{s:.0%}</small></li>" if s >= 0 else _pair(n, icons)
-                      for n, s in split) + "</ul>")
+            + "".join((f"<li><b>{_pic(icons, n)}{e(n)}</b>{_bar(s)}<small>{s:.0%}</small></li>" if s >= 0 else
+                       _pair(n, icons)).replace("</li>", f"{_mark_html(marks, n)}</li>", 1) for n, s in split)
+            + "</ul>")
+
+
+def _mark_html(marks: dict | None, n: str) -> str:
+    """The most played build's side of a split row: ✓ (the side it takes, on a choice) or ✗ (heal round 51)."""
+    if not marks or n not in marks:
+        return ""
+    side = marks[n]
+    if not side:
+        return "<span class='top skip' title='the most played build skips it'>&#10007;</span>"
+    named = f" {e(side)}" if " / " in n else ""
+    return f"<span class='top take' title='the most played build takes it'>&#10003;{named}</span>"
 
 
 def _pair(n: str, icons: dict | None = None) -> str:
@@ -3035,7 +3072,8 @@ def render_sheet(h: HealerPrep) -> str:
     change = [build_lead(h.builds, h.spec, h.split_players or h.kills, h.split, h.split_wide)]
     change.append(talents_html(h.builds, h.split_players or h.kills, f"{h.spec}s", h.hero))
     if h.split:
-        change.append(split_html(h.split, h.split_players, h.spec, h.split_wide, getattr(h, "talent_icons", None)))
+        change.append(split_html(h.split, h.split_players, h.spec, h.split_wide, getattr(h, "talent_icons", None),
+                                 getattr(h, "split_marks", None)))
     trk = trinkets_html(h.trinkets, getattr(h, "item_icons", None)) or "<li>No gear yet.</li>"
     change.append(f"<h2>Trinkets the top {e(h.spec)}s equip</h2><ul class='hl2 bars'>{trk}</ul>"
                   f"<p class='small muted'>"

@@ -77,6 +77,7 @@ class TankPrep:
     short_defs: list = field(default_factory=list)  # (spell, share of the top tanks, casts a kill): too frequent
     # for a cooldown, too short for an uptime (Spell Reflection, Demoralizing Shout)
     split: list = field(default_factory=list)  # (talent, share picked) the top players split on
+    split_marks: dict = field(default_factory=dict)  # the most played build's side of each split row
     split_players: int = 0
     split_wide: bool = False  # no talent 35-65%: the talents they differ on most (paf.healer.split_html)
 
@@ -720,7 +721,8 @@ def render_sheet(p: TankPrep) -> str:
                   for n, t, hit, k in p.no_taunt if hit or not k)]  # never reached: one line on the boss tab
     change = [build_lead(p.builds, p.spec, p.split_players or p.kills, p.split, p.split_wide),
               talents_html(p.builds, p.split_players or p.kills, f"{p.spec}s", p.hero),
-              split_html(p.split, p.split_players, p.spec, p.split_wide, getattr(p, "talent_icons", None))
+              split_html(p.split, p.split_players, p.spec, p.split_wide, getattr(p, "talent_icons", None),
+                         getattr(p, "split_marks", None))
               if p.split else "",
               f"<h2>Trinkets the top {e(p.spec)}s equip</h2><ul class='hl2 bars'>"
               f"{trinkets_html(p.trinkets, getattr(p, 'item_icons', None)) or '<li>No gear yet.</li>'}</ul>",

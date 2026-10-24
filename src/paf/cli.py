@@ -844,6 +844,7 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
         p.split, p.split_players = healer.contested(con, enc.id, diff, spec, *healer.SPLIT, shown=6)
         p.split_wide = bool(p.split)
     p.builds = healer.build_rows(builds, p.split)  # the most played build's side of each split
+    p.split_marks = healer.top_marks(builds, p.split)  # marked on the split rows (heal round 51)
     p.short_defs = short_defs
     p.hero = healer.hero_split(con, enc.id, diff, spec)
     p.no_taunt = [(n, t, *tank.reached(con, enc.id, diff, n))
@@ -1021,6 +1022,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         h.split, h.split_players = healer.contested(con, enc.id, diff, spec, *healer.SPLIT, shown=6)
         h.split_wide = bool(h.split)
     h.builds = healer.build_rows(builds, h.split)  # the most played build's side of each split
+    h.split_marks = healer.top_marks(builds, h.split)  # marked on the split rows (heal round 51)
     from paf.gamedata import dispel_type
     from paf.mechanics import walk
 

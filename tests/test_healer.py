@@ -855,3 +855,12 @@ def test_the_hero_tree_row_is_drawn_for_one_tree_and_for_two():
     two = healer.talents_html([], 100, "Discipline Priests", [("Voidweaver", 0.63), ("Oracle", 0.37)])
     assert "Totemic" in one and "Hero tree" in one and "sbar pair" in one
     assert "Voidweaver" in two and "Oracle" in two and "63%" in two
+
+
+def test_the_most_played_builds_side_is_marked_on_the_split_rows():
+    """Heal round 51: its side as ✓ and ✗ on the rows, from lists (names like "Weal and Woe" never split)."""
+    split = [("Weal and Woe", 0.5), ("Searing Light", 0.45), ("Lightburst 48% / Dawnlight 43%", -1)]
+    marks = healer.side_marks({1, 3}, {1: "Weal and Woe", 2: "Searing Light", 3: "Dawnlight"}, split)
+    assert marks == {"Weal and Woe": "Weal and Woe", "Searing Light": "", "Lightburst 48% / Dawnlight 43%": "Dawnlight"}
+    html = healer.split_html(split, 100, "Holy Paladin", marks=marks)
+    assert html.count("class='top take'") == 2 and html.count("class='top skip'") == 1 and "&#10003; Dawnlight" in html
