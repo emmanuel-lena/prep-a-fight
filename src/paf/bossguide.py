@@ -369,18 +369,20 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
         if top.kind == "ability":
             rows.insert(0, _ability(top, 0, ctx))
         title = "" if top.kind == "ability" else f"<h3>{head}</h3>"  # an ability's card: its row names it
-        notes = "".join("<p class='small muted also'>" + (  # not `also`: the parameter (review 36: lost from stage 2)
-            (f"Also unchanged: {e(', '.join(dict.fromkeys(names)))}." if unit_said and len(repeated) == 1 else  # its
-             f"Also, as in {e(_short(where))}: {e(', '.join(dict.fromkeys(names)))}.")  # unit said it (round 39)
-            if len(set(names)) <= 4 else
-            f"As in {e(_short(where))}: " + "".join(  # named with their icons, not counted (round 43: the 3:50
-                f"<span class='ab-chip'>{icons.img(ctx['icons'].get(n, ''), 'small')}{e(n)}</span>"  # hit's ability
-                for n in dict.fromkeys(names)))  # hidden in "8 abilities")
-            + "</p>"  # the role's own count, the others' named below (round 79: 7 on a healer sheet, 9 on a tank's)
-            for where, names in repeated.items())
+        body = "".join(rows)
+
+        def chips(names: list[str], body: str = body) -> str:  # with icons, never counted (r. 43: the 3:50 hit's
+            return "".join(f"<span class='ab-chip'>{icons.img(ctx['icons'].get(n, ''), 'small')}{e(n)}</span>"
+                           for n in dict.fromkeys(names)  # ability hidden in "8 abilities"); one with a row here
+                           if not re.search(rf">{re.escape(e(n))}(?:</a>)?</b>", body))  # is not a chip (round 44)
+        notes = "".join(  # not `also`: the parameter (review 36: lost from stage 2)
+            "<p class='small muted also'>"
+            + ("Also unchanged: " if unit_said and len(repeated) == 1 else f"As in {e(_short(where))}: ")  # its unit
+            + chips(names) + "</p>"  # said the stage (round 39)
+            for where, names in repeated.items() if chips(names))
         notes += "".join(f"<p class='small muted also'>For {ROLE_OTHERS[r]}: {e(', '.join(dict.fromkeys(names)))}.</p>"
                         for r, names in others.items())
-        cards.append(f'<section class="stage">{title}{intro}{grouped("".join(rows))}{notes}</section>')
+        cards.append(f'<section class="stage">{title}{intro}{grouped(body)}{notes}</section>')
     return "".join(cards)
 
 

@@ -51,7 +51,7 @@ def test_a_stage_names_what_it_repeats():
         sec(14, "Invoke", "ability", "She calls the cultists.")])
     a = abilities_html([one, two])
     second = a[a.index("Stage Two"):]
-    assert "Also, as in Stage One: Soulcoil Well, Soulcoil Rite, Uncoiled Rage." in second
+    assert "As in Stage One: <span class='ab-chip'>" in second and second.count("class='ab-chip'") == 3  # chips
     assert "A well of necrotic energy." not in second and "She calls the cultists." in second
     assert "A corpse lingers." not in second and NOW_DEADLY in second  # only the new tag
 
@@ -88,7 +88,7 @@ def test_a_unit_told_before_shows_only_what_changes():
     # under the unit's "As in Stage One", its rows say only what changed (round 38: three times in four lines)
     assert 'now</span> <span class="pill warn">deadly</span>' in inter and NOW_DEADLY not in inter
     assert "A corpse lingers." not in inter
-    assert "Also unchanged: Corpse Blight." in inter  # the unit's line says the stage (round 39)
+    assert "Also unchanged: <span class='ab-chip'>" in inter and "Corpse Blight</span>" in inter  # its unit said it
 
 
 def test_another_difficultys_sentences_are_left_out():
