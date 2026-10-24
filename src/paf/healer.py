@@ -1333,6 +1333,10 @@ SLACK = 3.0  # seconds past the answer window a moment may sit when its presses 
 PULL = 12.0  # seconds: a press before this is the pull's opener, never a ramp for the first hit (round 45)
 OR_NEAR = 20.0  # seconds: the farthest "or" time of a button pressed about every minute or on cooldown
 MINUTE = "about every minute"  # the reason a button pressed four times a kill or more is tied to no hit
+# a reason a press is tied to no hit, as its pill (the words on hover)
+RHYTHM = {MINUTE: "&#8635; ~1 min, no hit", "a cast-while-moving button": "while moving, no hit",
+          "a movement button": "movement, no hit", "a trinket, placed by its rhythm": "trinket rhythm, no hit",
+          "a potion": "potion, no hit", "cast on another player": "on another player, no hit"}
 
 
 def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: str = "raid cooldown") -> str:
@@ -1618,9 +1622,10 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
            and _rest(c, named) >= 0.15  # only a window line too (round 110: Spirit Link Totem's other 76% unsaid)
            else "")
         + _released(c)
-        + (f"<small class='alt'>{'mostly ' if c.why.startswith('cast on another') and 0 <= c.on_others < 0.95 else ''}"
-           f"{e(c.why)}: not tied to a hit"
-           + ("; its players' times differ, so more times than presses" if c.why == MINUTE  # (round 89: 6 chips for
+        + (f"<small class='alt'><span class='pill rhythm' title='"
+           f"{'mostly ' if c.why.startswith('cast on another') and 0 <= c.on_others < 0.95 else ''}{e(c.why)}: not "
+           f"tied to a hit'>{RHYTHM.get(c.why, e(c.why))}</span>"  # one pill, the reason on hover (heal round 43)
+           + (" its players' times differ, so more times than presses" if c.why == MINUTE  # (round 89: 6 chips for
               and len(c.times) > round(c.per_kill) else "")  # Nature's Swiftness "4 a kill")
            + "</small>" if c.why and c.times else "")
         + ("<small class='alt'>its players' times differ, so more times than presses</small>"  # any button (round
