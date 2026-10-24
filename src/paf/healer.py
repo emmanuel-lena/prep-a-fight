@@ -2136,7 +2136,8 @@ def talents_html(builds: list, players: int, who: str, hero: list | None = None)
     """The hero tree the top players pick (the first choice), then their builds played by enough of them."""
     line = ""
     if hero:
-        line = ("<ul class='hl2 split'>"  # one tree too: its bar, as the sheets with two (heal round 49: text) + _pair(" / ".join(f"{t} {round(sh * 100)}%" for t, sh in hero[:2]))  # the
+        line = ("<ul class='hl2 split'>"  # one tree too: its bar, as the sheets with two (heal round 49: text)
+                + _pair(" / ".join(f"{t} {round(sh * 100)}%" for t, sh in hero[:2]))  # the
                 .replace("<li class='pair'><span>", "<li class='pair hero'><span><small>Hero tree</small> ", 1)  # choice
                 + "</ul>")  # rows' stacked bar (heal round 16: plain text), with no half tick (round 17)
     if builds and builds[0][0] < BUILD_SHARE * players:  # 3 of 100 is no build to show, empty row and all

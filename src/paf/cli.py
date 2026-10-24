@@ -1622,7 +1622,10 @@ def cmd_prep(args: argparse.Namespace) -> int:
         from paf import names
 
         names.build(enc.id, diff_name, d.links, i18n.wow_locale())
-    d.icons["__spec__"] = CLASS_ICON.format(cls=profile.class_name.lower())
+    from paf.icons import spec_icon
+
+    d.icons["__spec__"] = (spec_icon(f"{spec} {profile.class_name}")  # the spec's own (DPS round 50)
+                           or CLASS_ICON.format(cls=profile.class_name.lower()))
     out = reports / f"prep-{report_key(enc.name, diff_name)}.html"
     slow_out = out.with_name(f"{out.stem}-slow.html")
     if slow is not None and d.optimized:  # two kill times, two sheets: the fight tab switches between them

@@ -847,3 +847,11 @@ def test_a_ramp_window_chip_gives_its_offset_from_the_time_it_shows():
                         presses=[[109.0]] * 41 + [[60.0]] * 59)
     out = healer._named(c, 109.0, {("Evangelism", 109.0): 130.0}, "", 0.30, 109.0)
     assert "21 s before the 2:10 hit" in out and "ahead of" not in out
+
+
+def test_the_hero_tree_row_is_drawn_for_one_tree_and_for_two():
+    """Round 50: the hero tree row vanished from every sheet (a comment swallowed the code after it)."""
+    one = healer.talents_html([], 100, "Restoration Shamans", [("Totemic", 1.0)])
+    two = healer.talents_html([], 100, "Discipline Priests", [("Voidweaver", 0.63), ("Oracle", 0.37)])
+    assert "Totemic" in one and "Hero tree" in one and "sbar pair" in one
+    assert "Voidweaver" in two and "Oracle" in two and "63%" in two
