@@ -79,5 +79,5 @@ table.others .under .ics{filter:grayscale(1);opacity:.55} /* a share under the b
 .dispels{display:flex;flex-wrap:wrap;gap:6px} .dispels .chip{padding:3px 9px;border-radius:999px;border:1px solid var(--line);font-size:13px}
 .hl2.split li.pair.hero .sbar::after{display:none} /* two trees, no half to read */
 .chart-key{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center}
-.hl2 .use{display:inline-flex;align-items:center;gap:5px} .hl2 .ubar{display:inline-block;width:46px;height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;border:1px solid var(--line)}
-.hl2 .ubar>span{display:block;height:100%;background:var(--muted)}
+.hl2 .use{display:inline-flex;align-items:center;gap:5px} .hl2 .ubar{display:inline-block;width:46px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.hl2 .ubar>span{display:block;height:100%;background:var(--fg);opacity:.55}

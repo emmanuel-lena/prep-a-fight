@@ -2950,7 +2950,7 @@ def render_sheet(h: HealerPrep) -> str:
         # a key of glyphs, the method on hover (review 36: three lines of caption)
         f"<span class='pill' title='Median raid damage per second; up to 40 kills a spec read: the same hits on every "
         f"healer sheet; fewer kills past the median one'>{h.raid_kills or 'the top'} kills</span> "
-        + ("<span>&#9474; stage time after a dashed line</span> " if getattr(h, "staged", False) else "")
+        + ("<span>&#9478; stage time after a dashed line</span> " if getattr(h, "staged", False) else "")
         + ("<span>&#9646; the table's answers</span> " + ("<span>&#9647; another press, or one in a hit's window "
                                                            "that is not its answer</span> " if any(
             (c.name, t) not in answered for c in drawn if c.name in lanes for t in [*c.times, *c.alt])
