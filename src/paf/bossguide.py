@@ -373,7 +373,7 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
 
         def chips(names: list[str], body: str = body) -> str:  # with icons, never counted (r. 43: the 3:50 hit's
             return "".join(f"<span class='ab-chip'>{icons.img(ctx['icons'].get(n, ''), 'small')}{e(n)}</span>"
-                           for n in dict.fromkeys(names)  # ability hidden in "8 abilities"); one with a row here
+                           for n in sorted(dict.fromkeys(names))  # hidden in "8"); sorted (r. 46); one with a row
                            if not re.search(rf">{re.escape(e(n))}(?:</a>)?</b>", body))  # is not a chip (round 44)
         notes = "".join(  # not `also`: the parameter (review 36: lost from stage 2)
             "<p class='small muted also'>"

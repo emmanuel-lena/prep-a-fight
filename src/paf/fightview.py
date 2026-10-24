@@ -320,7 +320,9 @@ def _why(d, name: str, t: float, presses: list[float]) -> str:
     if rule is not None and rule.name not in ("default", "on_cooldown"):
         # the rule said on its first press after the pull only: the same words seven times read as noise (the
         # owner: less text)
-        why = rule_phrase(d, rule.name) if not [x for x in presses if 5 <= x < t - 1] else ""
+        hold = re.fullmatch(r"hold_(adds|vulnerable)_(\d+)", rule.name)  # Your job's badge words (round 46)
+        why = ((f"hold ≤{hold[2]} s for {'adds' if hold[1] == 'adds' else 'the damage amp'}" if hold else
+                rule_phrase(d, rule.name)) if not [x for x in presses if 5 <= x < t - 1] else "")
     else:
         before = [x for x in presses if x < t - 1]
         gaps = [b - a for a, b in zip(presses, presses[1:], strict=False)]

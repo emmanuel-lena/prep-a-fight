@@ -110,7 +110,7 @@ def test_a_press_no_boss_event_explains_says_why(monkeypatch):
     assert next(a for a in acts if a["t"] == 92)["w"] == why[92]
     d.optimized = [Plan("boss", {"shadow_blades": Rule("hold_adds_10", "", None)}, 0.0, 0.2)]  # a held rule: said once
     why = {t: it.why for t, it in fightview.items(d) if it.name == "Shadow Blades"}
-    assert why[92].startswith("hold for the next add wave if within 10 s, else use it")
+    assert why[92].startswith("hold ≤10 s for adds")
     assert why[182] == "75% of the top players press it then"  # the rule not said again
 
 

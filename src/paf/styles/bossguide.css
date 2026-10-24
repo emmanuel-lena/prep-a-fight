@@ -36,3 +36,4 @@
 .ab:not(:has(>div+div)){padding:3px 0;border-top:0} /* a name alone: a tight line, not a full row's space */
 .stage:not(:has(h3)):not(:has(.ab-d)){margin-bottom:6px} .stage:not(:has(h3)):not(:has(.ab-d))>.abg{margin-bottom:0} /* an ability alone, its name only: one tight line */
 .ab-chip{display:inline-flex;align-items:center;gap:3px;margin:2px 8px 2px 0;font-style:normal;white-space:nowrap}
+.stage .also{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px}

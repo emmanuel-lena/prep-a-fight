@@ -588,9 +588,8 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
             f"{_cell_word(i, stale(i)) if 'prep' in i['files'] else 'no sim'}"  # a date reads as done (fresh review 4)
             "</a>" for i in xs)  # no sim: the dashed outline, in the legend (never colour alone)
 
-    def _cell_word(i, old: bool) -> str:  # today's: a check; to redo: a redo mark in its amber outline (round 42);
-        w = short_ago(i["mtime"])  # the date on hover
-        return "&#10003;" if w == "today" else "&#8635;" if old else w
+    def _cell_word(i, old: bool) -> str:  # this week's: a check, as the board's "ready" (fresh review 7: ✓ meant
+        return "&#8635;" if old else "&#10003;"  # today here); to redo: a redo mark; the date on hover
 
     def who(sp: str) -> str:
         cls = icons.class_key(sp)
@@ -601,8 +600,7 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
             f"<tbody>{rows}</tbody></table></div><p class='mx-legend'>"
             + " ".join(diff_pill(k) for k in ("normal", "heroic", "mythic") if any(i["difficulty"] == k for i in items))
             + (" <span class='pill diff mx nosim'>no sim yet</span>" if any("prep" not in i["files"] for i in items)
-               else "") + (" <span class='pill diff mx chk'>&#10003; today</span>"
-                           if any(short_ago(i["mtime"]) == "today" for i in items) else "")
+               else "") + " <span class='pill diff mx chk'>&#10003; ready</span>"
             + " <span class='pill diff mx old'>&#8635; to redo</span></p>")  # only the marks present
 
 
@@ -1587,7 +1585,8 @@ def fight_strip(enc, difficulty: str) -> str:
     out.append(f"<line class='fs-axis' x1='{x0}' x2='{x1}' y1='{axis}' y2='{axis}'/>")
     if f.lust_time is not None:  # on the axis, pointing at its moment
         lt = f.lust_time if f.lust_time >= 0 else f.duration + f.lust_time
-        out.append(f"<path class='fs-lust' d='M{max(x0, x(lt) - 6):.1f} {axis + 9} l12 0 l-6 -9 z'>"
+        out.append(f"<path class='fs-lust' d='M{max(x0, x(lt) - 6):.1f} {axis - 12} l12 0 l-6 10 z'>"  # above the
+                   # axis, pointing down at its moment, as the legend's (fresh review 7: up, on the "0:00")
                    f"<title>Bloodlust at {mmss(lt)}</title></path>")
     key = ("<span class='fs-k add'>adds &#215;count</span>"
            + ("<span class='fs-k away'>boss away</span>" if f.invulnerable else "")
