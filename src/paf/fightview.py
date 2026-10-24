@@ -218,6 +218,11 @@ def items(d) -> list[tuple[float, Item]]:
     for name, times in d.boss_casts:
         # the journal flags it for the tank only (and you need no defensive for it): shown dimmed, never confirmed
         tank = roles.get(name) == ["tank"] and name not in hits_you
+        if tank and len(times) >= 4:  # the tank's, often: one dim row, its rhythm said (round 38: 7 grey rows)
+            gap = (times[-1] - times[0]) / (len(times) - 1)
+            add(times[0], Item("boss", "tank", name, f"{name} (tank, {len(times)} times, every ~{gap:.0f} s)",
+                               _icon(d, name)))
+            times = []
         for t in times:
             add(t, Item("boss", "tank" if tank else "cast", name, f"{name} (tank)" if tank else name, _icon(d, name)))
             if name in act:
@@ -271,9 +276,8 @@ def items(d) -> list[tuple[float, Item]]:
             spans.append([w.start, w.start + w.duration, w])
     for a, b, w in spans:  # the strategy's movement: a bar, never an event
         for s0, s1 in zip([a] + [c for c in cuts if a < c < b], [c for c in cuts if a < c < b] + [b], strict=True):
-            long = s1 - s0 > MOVE_LONG
-            add(s0, Item("boss", "move", "Movement", f"Movement from {_mmss(s0)} to {_mmss(s1)}" if long else
-                         f"Movement, {s1 - s0:.0f} s", MOVE_ICON, float(s1 - s0)))
+            add(s0, Item("boss", "move", "Movement", f"Movement, {int(s1) - int(s0)} s", MOVE_ICON,  # one form
+                         float(s1 - s0)))  # (round 38: "Movement, 7 s" beside "Movement from 0:23 to 0:49")
             if MOVE_CUE <= s1 - s0 <= MOVE_LONG and w.spells:
                 s = w.spells[0][0]
                 add(s0, Item("you", "move", s, f"{s} for the move", _icon(d, s)))
