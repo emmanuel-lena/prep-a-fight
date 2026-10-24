@@ -150,6 +150,7 @@ def add_icons(prep) -> None:
             prep.talent_icons = {}
     # a tank's short defensives and active mitigation, known by name only (Spell Reflection): their spell's icon
     named = [n for n, *_r in getattr(prep, "short_defs", []) or []] + [n for n, _u in getattr(prep, "mitigation", []) or []]
+    named += [n for n, _s in getattr(prep, "hitters", []) or []]  # what hits the tanks: its bars' icons (round 44)
     if named:
         try:
             from paf.gamedata import same_name_spells
@@ -159,6 +160,7 @@ def add_icons(prep) -> None:
             prep.name_icons = icons_for({n: f"spell={i}" for n, i in ids.items()})
         except Exception:  # noqa: BLE001 - offline
             prep.name_icons = {}
+        prep.name_icons.setdefault("Melee", "ability_meleedamage")  # the boss's swings: no spell of its own
 
 
 def _ic(c: Cooldown | None) -> str:
