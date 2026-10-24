@@ -1535,7 +1535,8 @@ and the gear for that.</p></div>""")
             if choice and len(add) + len(drop) <= OTHER_BUILD:
                 diff = ("" if diff.endswith("from yours</span>") and not (add or drop) else diff + "<br>") + (
                     "<span class='muted'>your choice: " + ", ".join(choice) + "</span>")  # each name escaped above
-            noise = all(abs(r.per_fight.get(f, (0.0, None))[0] or 0.0) <= 2 * tc.error for f in tc.fights)
+            noise = all(round(abs(r.per_fight.get(f, (0.0, None))[0] or 0.0), 1) <= round(2 * tc.error, 1)
+                        for f in tc.fights)  # on the figures shown: -0.2% under a "±0.2%" header is noise (a review)
             tr = "<tr class='noise' title='within the sims&#39; noise of yours'>" if noise else "<tr>"  # dimmed, never
             # folded: what differs per build stays readable (the owner, 2026-10-24)
             body += (f"{tr}<td>{e(r.build.label)}<br><span class='small muted'>{r.build.count} players, median rank "

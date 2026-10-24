@@ -76,8 +76,10 @@ def mark_unsure(found: list[Moment], casts: dict[str, list[float]]) -> None:
         for n in moment_names(m):
             ts = casts.get(n)
             if ts and not any(m.t - 25 <= t <= m.t + 2 for t in ts):
+                from paf.plan import mmss  # the journal strip's times, cut to the second as it writes them
+
                 m.unsure = (f"named after the damage taken there; no {n} cast is shared within 25 s before it "
-                            f"(its casts: about {', '.join(_mmss(t) for t in ts)}): maybe a cast fewer kills share")
+                            f"(its casts: about {', '.join(mmss(t) for t in ts)}): maybe a cast fewer kills share")
                 break
 
 
@@ -930,7 +932,8 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
                     + (" ?" if getattr(m, "unsure", "") else "")  # its name not backed by a cast (the table's ?)
                     + f" &middot; {_x(m.ratio)}&times; the usual damage"  # each dot its hover (round 114)
                     + (f" &middot; {_stage_tag(m.t, phases)}" if _stage_tag(m.t, phases) else "") + "</title></circle>"
-                    f"<text x='{float(x(m.t)) + 6:.1f}' y='{float(y(m.dtps)) - 8:.1f}' class='ml'>{_mmss(m.t)}</text>"
+                    f"<text x='{float(x(m.t)) + 6:.1f}' y='{float(y(m.dtps)) - 8:.1f}' class='ml'>{_mmss(m.t)}"
+                    f"{' ?' if getattr(m, 'unsure', '') else ''}</text>"  # its name uncertain: as the table's ?
                     for m in found)
     lines = "".join(f"<line class='ph' x1='{x(t)}' x2='{x(t)}' y1='22' y2='{H - B}'/>"
                     f"<text x='{float(x(t)) + 4:.1f}' y='18' class='pn'>{e(n.split(':')[0])} &middot; {_mmss(t)}</text>"
@@ -1642,7 +1645,7 @@ def _tidy(html: str) -> str:
     return re.sub(r" ?(?:&middot;|,) back from cooldown", "&nbsp;&middot;&nbsp;&#10226;", html)  # never alone on a line
 
 
-PLAIN_CHIP = re.compile(r"\d+:\d\d &middot; \d+%(?: \(\d+ kills going\))?")
+PLAIN_CHIP = re.compile(r"\d+:\d\d &middot; \d+%(?: \((?:\d+ kills going|\d+% of its users)(?:; \d+% of its users)?\))?")
 
 
 def chart_names(svg: str) -> set[str]:
