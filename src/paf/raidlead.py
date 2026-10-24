@@ -307,7 +307,7 @@ def _talents_h4(sh: dict, total: int, said: int = -1) -> str:
     read (a review: on a boss with changes, who was not checked vanished)."""
     changing, unread_, other = len(sh["builds"]), sh.get("unread") or [], sh.get("no_split", 0)
     if other >= total:  # no spec has a pad/boss split on this boss: nothing to compare, said as such
-        return f"<h4>Talents to change <span class='rl-unread'>{NO_BUILD} on this boss</span></h4>"
+        return f"<h4>Talents <span class='rl-unread'>{NO_BUILD} on this boss</span></h4>"
     ok = total - changing - len(unread_) - other
     parts = [f"<span class='rl-ok'>&#10003; {ok} on their build</span>"] if ok > 0 else []  # always counted
     if other and other != said:  # the roster says the tanks and healers once (fresh app review 4: nine times a page)
@@ -335,8 +335,9 @@ def _strip_cell(x, sh, total: int = 0, difficulty: str = "heroic") -> str:
         nobuild = bool(total) and sh.get("no_split", 0) >= total  # nothing compared: said as the card says it
         say = (f"<span class='rl-sv'><b class='rl-num'>{adds}</b> on adds</span>" if adds else "") + (  # the numbers
             f"<span class='rl-sv'><b class='rl-num'>{n}</b> to change talents</span>" if n else "") + (  # big
-            f"<span class='rl-sv none'>{NO_BUILD}</span>" if nobuild else "") or (
-            "<span class='rl-sv ok'>&#10003; nothing to change</span>")
+            f"<span class='rl-sv none' title='{NO_BUILD}'><b class='rl-num'>&mdash;</b> no build</span>" if nobuild
+            else "") or (  # a mark in the number's place, the words short (round 42: grey sentences)
+            "<span class='rl-sv ok' title='nothing to change'><b class='rl-num ok'>&#10003;</b> all set</span>")
     img = (f"<img src='/bossimg/{x.id}.png' alt='' loading='eager' onerror=\"this.remove()\">")
     return (f"<a class='rl-sb{' none' if sh is None else ''}' href='#boss-{x.id}'>{img}<b>{e(x.name)}</b>{say}</a>")
 

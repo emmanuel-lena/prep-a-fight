@@ -339,7 +339,7 @@ def comps(con: sqlite3.Connection, encounter_id: int, difficulty: int, min_kills
         ds = [x for _d, x in rows if x is not None]
         out.append(Comp(specs, len(rows), len(rows) / n, st.median(d for d, _x in rows),
                         round(st.mean(ds), 1) if len(ds) >= DEATH_KILLS else None))  # a mean, on enough kills
-    return sorted(out, key=lambda c: -c.kills)
+    return sorted(out, key=lambda c: (-c.kills, str(getattr(c, "spec", ""))))
 
 
 @dataclass
@@ -384,7 +384,7 @@ def presence(con: sqlite3.Connection, encounter_id: int, difficulty: int,
                             med([k[1] for k in with_]), med([k[1] for k in without]), mean([k[2] for k in with_]),
                             mean([k[2] for k in without]), close, tclose))  # deaths: a mean (a median of 0s and 1s
                                                                           # reads as a verdict)
-    return sorted(out, key=lambda p: -p.share)
+    return sorted(out, key=lambda p: (-p.share, p.spec))  # ties in a fixed order (round 42: swapped between runs)
 
 
 def spec_counts(con: sqlite3.Connection, encounter_id: int, difficulty: int,

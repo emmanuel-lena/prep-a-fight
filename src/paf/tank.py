@@ -758,7 +758,7 @@ def render_sheet(p: TankPrep) -> str:
         mates = [x for x in p.presence if x.spec != p.spec and x.kills >= 8]
         deeper.append(f"<p class='lead'>Beside a {e(p.spec)}, the top raids play "
                       + (", ".join(f"{e(x.spec)} (in {x.share:.0%} of the kills)"
-                                   for x in sorted(mates, key=lambda x: -x.share)[:3])
+                                   for x in sorted(mates, key=lambda x: (-x.share, -x.kills, x.spec))[:3])
                          if mates else "no other tank spec often") + "."
                       + "".join(f" Kills with a {e(x.spec)} beside them are "
                                 f"{abs(round(x.duration_with) - round(x.duration_without))} s "  # as the table's rounded
