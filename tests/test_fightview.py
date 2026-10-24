@@ -47,8 +47,9 @@ def test_the_page_carries_its_data_and_one_script(monkeypatch):
     assert any(s["k"] == "cd" and s["d"] == 16.0 for s in data["strips"])
     assert page.count("id='c-sync'") == 1 and "aria-keyshortcuts='Control+Shift+Space'" in page
     assert "Your job on this boss" in page and "<b>Kill the Amani</b>" in page
-    assert ("<b>Shadow Blades</b> at 0:52, 3:20: keep for the next add wave if it comes within 45 s, otherwise use "
-            "it." in page) and "<b>Potion</b> before the pull." in page
+    assert ("<b>Shadow Blades</b> at 0:52, 3:20 <span class='pill hold' title='keep for the next add wave if it comes "
+            "within 45 s, otherwise use it'>hold &le;45 s for adds</span>." in page)
+    assert "<b>Potion</b> before the pull." in page
     blades = [a for a in data["acts"] if a["n"] == "Shadow Blades"]
     assert blades[0]["t"] == 52 and blades[0]["c"] == "on the 4 × Amani"  # called at its own time, not the row's
     assert [a["k"] for a in data["anchors"]] == ["pull", "cast", "adds", "phase", "cast"]  # what a press can confirm

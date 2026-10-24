@@ -506,13 +506,16 @@ def job_html(d) -> str:
             when = f"at {when}"
         if all(t < 5 for t in order[n]) and "potion" not in n.lower():  # a short cooldown: the opener, then rotation
             when += ", then with your rotation"
-        why = f": {rule_phrase(d, rules[n])}" if n in rules else ""
+        hold = re.fullmatch(r"hold_(adds|vulnerable)_(\d+)", rules.get(n, ""))
+        why = (f" <span class='pill hold' title='{e(rule_phrase(d, rules[n]))}'>hold &le;{hold[2]} s for "
+               f"{'adds' if hold[1] == 'adds' else 'the damage amp'}</span>" if hold else  # a badge (DPS round 42)
+               f": {e(rule_phrase(d, rules[n]))}" if n in rules else "")
         same = next((r for r in rows if isinstance(r[0], list) and r[2] == (when, why)), None)
         if same is not None:  # pressed together, by the same rule: one line, both icons (Ancestral Call and
             same[0].append(n)  # Ascendance at 0:51, 2:52: the ninth line cut Ascendance off; a review)
             continue
         rows.append(([n], None, (when, why)))
-    rows = [((r[0][0], f"<b>{e(_and_names(r[0]))}</b> {e(r[2][0])}{e(r[2][1])}.", r[0]) if isinstance(r[0], list)
+    rows = [((r[0][0], f"<b>{e(_and_names(r[0]))}</b> {e(r[2][0])}{r[2][1]}.", r[0]) if isinstance(r[0], list)
              else (*r, None)) for r in rows]
     if not rows:
         return ""
