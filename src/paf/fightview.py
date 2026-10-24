@@ -428,6 +428,11 @@ def _cadence(ts: list[float]) -> str:
             + (f"; then {', '.join(rest)}" if rest else ""))
 
 
+# a cooldown plan's rule as Your job's badge (its sentence on the badge's hover)
+RULE_BADGE = {"add_waves": "adds only", "secondary_targets": "burst targets only", "vulnerable_windows": "in the amp",
+              "lust_pi": "with Bloodlust", "on_cooldown": "on cooldown", "not_before_move": "not before a move"}
+
+
 def job_html(d) -> str:
     """Your job on this boss, a dozen lines at most: what kills a raid first, then your cooldowns and when."""
     from paf.prep_report import rule_phrase
@@ -474,8 +479,9 @@ def job_html(d) -> str:
             if it.hint and it.hint in hints.values() and it.name not in done and len(rows) < 3:
                 done.add(it.name)
                 times = [_mmss(max(0.0, x)) for x, y in items(d) if y.side == "boss" and y.name == it.name]
-                rows.append((it.name, f"<b>{e(_clean(it.name))}</b> at {', '.join(times[:5])}: {e(it.hint)} "
-                                      "<span class='src'>(Journal)</span>"))  # the job itself: its words stay here
+                rows.append((it.name, f"<b>{e(_clean(it.name))}</b> at {', '.join(times[:5])} "  # its words on the
+                                      f"<span class='src' title='Journal: {e(it.hint)}'>&#128214;</span>"))  # book's
+                # hover: a description of the mechanic, not an order (fresh DPS review: the most-read card)
     defs = _defensives(d)
     if defs:
         s, why = defs[0][1], defs[0][2]
@@ -513,8 +519,9 @@ def job_html(d) -> str:
         if all(t < 5 for t in order[n]) and "potion" not in n.lower():  # a short cooldown: the opener, then rotation
             when += ", then with your rotation"
         hold = re.fullmatch(r"hold_(adds|vulnerable)_(\d+)", rules.get(n, ""))
-        why = (f" <span class='pill hold' title='{e(rule_phrase(d, rules[n]))}'>hold &le;{hold[2]} s for "
-               f"{'adds' if hold[1] == 'adds' else 'the damage amp'}</span>" if hold else  # a badge (DPS round 42)
+        badge = (f"hold &le;{hold[2]} s for {'adds' if hold[1] == 'adds' else 'the damage amp'}" if hold else
+                 RULE_BADGE.get(rules.get(n, "")))  # every rule a badge, its words on hover (fresh DPS review)
+        why = (f" <span class='pill hold' title='{e(rule_phrase(d, rules[n]))}'>{badge}</span>" if badge else
                f": {e(rule_phrase(d, rules[n]))}" if n in rules else "")
         same = next((r for r in rows if isinstance(r[0], list) and r[2] == (when, why)), None)
         if same is not None:  # pressed together, by the same rule: one line, both icons (Ancestral Call and
