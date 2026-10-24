@@ -866,6 +866,20 @@ def nsrt_block(note: str) -> str:
     return f'<div class="nb"><h4>Northern Sky Raid Tools reminders {copy_button(note, "Copy for NSRT")}</h4></div>'
 
 
+def _pad_bar(text: str) -> str:
+    """The raid's share of the top raids' damage on the adds as a bar, a mark at the weakest top raids' (DPS rounds
+    36-42: "53% vs 84%" in words). '' when the line says no such pair."""
+    m = re.search(r"(?:with you, your raid does|already does|,) (\d+)% (?:of the top raids' damage on them|with you)"
+                  r".*?the weakest top raids do (\d+)%", text)
+    if not m:
+        return ""
+    you, low = int(m[1]), int(m[2])
+    top = max(100, you, low)
+    return (f"<div class='padbar' title='your raid {you}%, the weakest top raids {low}% of the top raids&#39; damage'>"
+            f"<i style='width:{you / top * 100:.0f}%'></i><b style='left:{low / top * 100:.0f}%'></b>"
+            f"<span>your raid {you}%</span><span class='lo' style='left:{low / top * 100:.0f}%'>{low}%</span></div>")
+
+
 def places(g: float, gains: list[float]) -> int:
     """Decimals for a gain: two when another gain rounds alike at one (never one figure copied: DPS rounds 13, 38)."""
     return 2 if any(f"{g:.1f}" == f"{x:.1f}" and abs(g - x) >= 0.005 for x in gains) else 1
@@ -884,7 +898,7 @@ def suggestions_html(d: PrepData) -> str:
                 f'{unit}</div>'  # not played:
                 if s.gain is not None else '<div class="gain"></div>')  # grey (DPS confirm round 10)
         pic = icons.img(s.icon or "inv_misc_groupneedmore", "medium")
-        details = "".join(f"<div>{x}</div>" for x in s.details)
+        details = "".join(f"<div>{x}</div>{_pad_bar(x)}" for x in s.details)
         rec = " rec" if "recommended for your raid" in s.title or "your choice" in s.title else ""
         rows.append(f'<div class="sugg {s.severity}{rec}">{pic}<div><div class="t"><span class="sev">{label}</span> '
                     f'{s.title}</div><div class="d">{details}</div></div>{gain}</div>')

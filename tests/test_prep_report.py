@@ -156,3 +156,14 @@ def test_two_gains_that_round_alike_get_two_decimals():
 
     assert places(6.56, [6.56, 6.64]) == 2 and places(6.64, [6.56, 6.64]) == 2  # both "+6.6%" at one decimal
     assert places(6.56, [6.56, 3.1]) == 1 and places(6.56, [6.56, 6.561]) == 1  # the same figure: one
+
+
+def test_the_pad_verdict_draws_its_bar():
+    from paf.prep_report import _pad_bar
+
+    bar = _pad_bar("Pad them: with you, your raid does 53% of the top raids' damage on them (the weakest top raids "
+                   "do 84%); it lacks cleave.")
+    assert "width:53%" in bar and "left:84%" in bar
+    made = _pad_bar("pad them, you make the difference: your raid does 70% of the top raids' damage on them without "
+                    "you, 90% with you (the weakest top raids do 84%)")
+    assert "width:90%" in made and _pad_bar("Kill the adds.") == ""
