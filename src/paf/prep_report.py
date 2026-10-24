@@ -861,15 +861,22 @@ def nsrt_block(note: str) -> str:
     return f'<div class="nb"><h4>Northern Sky Raid Tools reminders {copy_button(note, "Copy for NSRT")}</h4></div>'
 
 
+def places(g: float, gains: list[float]) -> int:
+    """Decimals for a gain: two when another gain rounds alike at one (never one figure copied: DPS rounds 13, 38)."""
+    return 2 if any(f"{g:.1f}" == f"{x:.1f}" and abs(g - x) >= 0.005 for x in gains) else 1
+
+
 def suggestions_html(d: PrepData) -> str:
     rows = []
+    gains = [x.gain for x in suggestions(d) if x.gain is not None]
     for s in suggestions(d):
         label = {"major": "Major", "moderate": "Moderate", "minor": "Minor", "info": "Info",
                  "alt": "Alternative"}[s.severity]
         if s.severity == "info" and s.gain is not None:  # a gain only for some raids (a burst they may not need)
             label = "Situational"
         unit = f"<small>{e(s.metric)}, vs {e(s.base)}</small>" if s.metric else ""  # the baseline, said
-        gain = (f'<div class="gain{" muted" if s.severity == "alt" else ""}">{s.gain:+.1f}%{unit}</div>'  # not played:
+        gain = (f'<div class="gain{" muted" if s.severity == "alt" else ""}">{s.gain:+.{places(s.gain, gains)}f}%'
+                f'{unit}</div>'  # not played:
                 if s.gain is not None else '<div class="gain"></div>')  # grey (DPS confirm round 10)
         pic = icons.img(s.icon or "inv_misc_groupneedmore", "medium")
         details = "".join(f"<div>{x}</div>" for x in s.details)
@@ -1572,8 +1579,9 @@ rearranged around it (its real value). "Single swap": the classic droptimizer va
     if d.validation:
         lo, med, hi = d.validation
         notes.insert(0, f"Validation: the top players' own characters simmed on this rebuilt fight give {med:.0%} of "
-                        f"their real DPS with the movement as calibrated ({lo:.0%} to {hi:.0%} across the movement "
-                        f"levels tried).")
+                        "their real DPS with the movement as calibrated"
+                        + ("." if f"{lo:.0%}" == f"{hi:.0%}" else  # one value: no range (round 38: "94% to 94%")
+                           f" ({lo:.0%} to {hi:.0%} across the movement levels tried)."))
     notes += [
         "A rebuilt fight is an approximation: good to choose between builds, items and plans, not a prediction "
         "of your exact DPS.",

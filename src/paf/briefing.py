@@ -120,14 +120,18 @@ def moves_html(d) -> str:
     moves = _moves(d)
     if not moves:
         return ""
+    from paf.prep_report import places
+
     items = []
+    gains = [m[0] for m in moves]
     for i, (gain, say, more, button) in enumerate(moves, 1):
+        g = f"{gain:+.{places(gain, gains)}f}%"  # two that round alike: two decimals
         if gain >= 3:
-            tag = f"<span class='gain big'>{gain:+.1f}%</span>"
+            tag = f"<span class='gain big'>{g}</span>"
         elif gain >= 1:
-            tag = f"<span class='gain'>{gain:+.1f}%</span>"
+            tag = f"<span class='gain'>{g}</span>"
         elif gain > 0:
-            tag = f"<span class='gain tiny' title='barely matters'>{gain:+.1f}%</span>"
+            tag = f"<span class='gain tiny' title='barely matters'>{g}</span>"
         else:
             tag = "<span class='gain ok'>&#10003;</span>"
         body = f"<p class='say'>{say}</p>" + (f"<div class='why'>{more}{(' ' + button) if button else ''}</div>"

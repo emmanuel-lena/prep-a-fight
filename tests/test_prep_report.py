@@ -149,3 +149,10 @@ def test_a_mechanics_times_find_its_name_in_a_wowhead_link():
             "<div class='small muted'>11 players hit per kill</div></div>")
     d = SimpleNamespace(boss_casts=[], mech_times={"Essence Rend": [20.0, 60.0]})
     assert "around 0:20, 1:00" in mech_around(html, d)
+
+
+def test_two_gains_that_round_alike_get_two_decimals():
+    from paf.prep_report import places
+
+    assert places(6.56, [6.56, 6.64]) == 2 and places(6.64, [6.56, 6.64]) == 2  # both "+6.6%" at one decimal
+    assert places(6.56, [6.56, 3.1]) == 1 and places(6.56, [6.56, 6.561]) == 1  # the same figure: one
