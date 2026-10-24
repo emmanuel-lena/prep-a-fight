@@ -346,8 +346,8 @@ def _ic(spec: str) -> str:
     """A player's class icon from its spec ("Frost DeathKnight" -> the Death Knight's)."""
     from paf import icons
 
-    cls = icons.class_key(spec)
-    return icons.img(icons.CLASS_ICON.format(cls=cls), "small", "ics") if cls else ""
+    cls = icons.class_key(spec)  # its spec's own icon, else its class's (fresh app review 7: three DKs alike)
+    return icons.img(icons.spec_icon(spec) or icons.CLASS_ICON.format(cls=cls), "small", "ics") if cls else ""
 
 
 def pretty(spec: str) -> str:
@@ -469,7 +469,8 @@ def page_body(difficulty: str) -> str:
                 if t["whole_raid"] and not t["players"] else
                 ("".join(f"<span class='rl-n'>{_ic(spec_of.get(n, ''))}{e(n)}</span>" for n in t["players"])
                  if t["players"] else "<span class='muted'>nobody fits</span>"))
-            + "</td><td>" + " ".join(f"<span class='rl-best'>{_ic(b)}{e(pretty(b))}</span>" for b in t["best"])
+            + "</td><td>" + " ".join(f"<span class='rl-best' title='{e(pretty(b))}'>{_ic(b)}</span>"  # spec icons,
+                                     for b in t["best"])  # the names on hover (fresh app review 7: 30 rows of names)
             + "</td></tr>" for t in sh["targets"])
         everyone = sh["targets"] and all(t["whole_raid"] and not t["players"] for t in sh["targets"])
         seconds = [t for t in sh["targets"] if t["second_boss"]]
@@ -482,7 +483,8 @@ def page_body(difficulty: str) -> str:
         alone = (f"<p class='rl-allrow'><span class='rl-everyone' title='the whole raid'>&#128101; all {len(in_raid)}"
                  f"</span> on {e(x.name)}</p>")  # no add: the same badge as the others (round 40)
         bd = "".join(  # one line a player: who, which build, then each talent to take (+) or drop (-)
-            f"<li class='rl-b'>{_ic(b['spec'])}<b>{e(b['name'])}</b><small>{e(pretty(b['spec']))}</small>"
+            f"<li class='rl-b'><span title='{e(pretty(b['spec']))}'>{_ic(b['spec'])}</span><b>{e(b['name'])}</b>"  # the
+            "<small></small>"  # spec its icon (fresh app review 7)
             f"<span class='rl-side {'pad' if b['side'] == 'pad' else 'boss'}'>"
             f"{'pad build &middot; on an add' if b['side'] == 'pad' else 'boss build'}</span>"
             + "<span class='rl-ts'>" + (

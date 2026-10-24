@@ -592,8 +592,8 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
         return "&#8635;" if old else "&#10003;"  # today here); to redo: a redo mark; the date on hover
 
     def who(sp: str) -> str:
-        cls = icons.class_key(sp)
-        return (icons.img(icons.CLASS_ICON.format(cls=cls), "small", "ics") if cls else "") + e(sp)
+        cls = icons.class_key(sp)  # the spec's own icon (fresh app review 7)
+        return (icons.img(icons.spec_icon(sp) or icons.CLASS_ICON.format(cls=cls), "small", "ics") if cls else "") + e(sp)
     rows = "".join(f"<tr{' class=mine' if sp.lower() == mine.lower() else ''}><th scope='row'>{who(sp)}</th>"
                    + "".join(f"<td>{cell(sp, n)}</td>" for n in names) + "</tr>" for sp in specs)
     return (f"<h2>Your sheets</h2><div class='mx-wrap'><table class='mx'><thead><tr><th></th>{head}</tr></thead>"

@@ -28,6 +28,60 @@ def class_key(spec: str) -> str:
     return (spec or "").split(" ")[-1].lower()
 
 
+# a spec's own icon (the talent window's), so Blood, Frost and Unholy read apart (fresh app review 7); each checked
+# on the icon CDN
+SPEC_ICON = {
+    ("blood", "deathknight"): "spell_deathknight_bloodpresence",
+    ("frost", "deathknight"): "spell_deathknight_frostpresence",
+    ("unholy", "deathknight"): "spell_deathknight_unholypresence",
+    ("havoc", "demonhunter"): "ability_demonhunter_specdps",
+    ("vengeance", "demonhunter"): "ability_demonhunter_spectank",
+    ("devourer", "demonhunter"): "classicon_demonhunter_void",
+    ("balance", "druid"): "spell_nature_starfall",
+    ("feral", "druid"): "ability_druid_catform",
+    ("guardian", "druid"): "ability_racial_bearform",
+    ("restoration", "druid"): "spell_nature_healingtouch",
+    ("devastation", "evoker"): "classicon_evoker_devastation",
+    ("preservation", "evoker"): "classicon_evoker_preservation",
+    ("augmentation", "evoker"): "classicon_evoker_augmentation",
+    ("beastmastery", "hunter"): "ability_hunter_bestialdiscipline",
+    ("marksmanship", "hunter"): "ability_hunter_focusedaim",
+    ("survival", "hunter"): "ability_hunter_camouflage",
+    ("arcane", "mage"): "spell_holy_magicalsentry",
+    ("fire", "mage"): "spell_fire_firebolt02",
+    ("frost", "mage"): "spell_frost_frostbolt02",
+    ("brewmaster", "monk"): "spell_monk_brewmaster_spec",
+    ("mistweaver", "monk"): "spell_monk_mistweaver_spec",
+    ("windwalker", "monk"): "spell_monk_windwalker_spec",
+    ("holy", "paladin"): "spell_holy_holybolt",
+    ("protection", "paladin"): "ability_paladin_shieldofthetemplar",
+    ("retribution", "paladin"): "spell_holy_auraoflight",
+    ("discipline", "priest"): "spell_holy_powerwordshield",
+    ("holy", "priest"): "spell_holy_guardianspirit",
+    ("shadow", "priest"): "spell_shadow_shadowwordpain",
+    ("assassination", "rogue"): "ability_rogue_deadlybrew",
+    ("outlaw", "rogue"): "ability_rogue_waylay",
+    ("subtlety", "rogue"): "ability_stealth",
+    ("elemental", "shaman"): "spell_nature_lightning",
+    ("enhancement", "shaman"): "spell_shaman_improvedstormstrike",
+    ("restoration", "shaman"): "spell_nature_magicimmunity",
+    ("affliction", "warlock"): "spell_shadow_deathcoil",
+    ("demonology", "warlock"): "spell_shadow_metamorphosis",
+    ("destruction", "warlock"): "spell_shadow_rainoffire",
+    ("arms", "warrior"): "ability_warrior_savageblow",
+    ("fury", "warrior"): "ability_warrior_innerrage",
+    ("protection", "warrior"): "ability_warrior_defensivestance",
+}
+
+
+def spec_icon(spec: str) -> str:
+    """"Frost Death Knight" / "Frost DeathKnight" / "BeastMastery Hunter" -> its spec's icon; '' when unknown."""
+    cls = class_key(spec)
+    words = (spec or "").replace(" ", "").lower()
+    sp = words[: len(words) - len(cls)] if words.endswith(cls) else ""
+    return SPEC_ICON.get((sp, cls), "")
+
+
 def _cache_path() -> Path:
     return data_dir() / "cache" / "icons.json"
 
