@@ -373,7 +373,9 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
             (f"Also unchanged: {e(', '.join(dict.fromkeys(names)))}." if unit_said and len(repeated) == 1 else  # its
              f"Also, as in {e(_short(where))}: {e(', '.join(dict.fromkeys(names)))}.")  # unit said it (round 39)
             if len(set(names)) <= 4 else
-            f"{len(set(names))} abilities {'you deal with ' if role else ''}from {e(_short(where))} stay as they were.")
+            f"As in {e(_short(where))}: " + "".join(  # named with their icons, not counted (round 43: the 3:50
+                f"<span class='ab-chip'>{icons.img(ctx['icons'].get(n, ''), 'small')}{e(n)}</span>"  # hit's ability
+                for n in dict.fromkeys(names)))  # hidden in "8 abilities")
             + "</p>"  # the role's own count, the others' named below (round 79: 7 on a healer sheet, 9 on a tank's)
             for where, names in repeated.items())
         notes += "".join(f"<p class='small muted also'>For {ROLE_OTHERS[r]}: {e(', '.join(dict.fromkeys(names)))}.</p>"

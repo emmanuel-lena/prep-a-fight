@@ -177,3 +177,14 @@ def test_an_ability_the_summary_names_in_passing_is_marked_not_told_twice():
     a = abilities_html([over, stage], role="damage")
     # flagged for the role and named in passing: its own words say more than the line (round 41: Toxic Vapor)
     assert "Fortified" in a and ">dps<" in a and "Bursts on all" not in a and a.count("&uarr; for you") == 1
+
+
+def test_many_repeated_abilities_are_named_with_icons_not_counted():
+    """Round 43: "8 abilities you deal with from Stage One stay as they were" hid Possession Barrage, the 3:50 hit."""
+    kids = [sec(10 + i, f"Spell {i}", "ability", f"Text {i}.") for i in range(5)]
+    one = sec(1, "Stage One: Start", "stage", children=kids)
+    two = sec(2, "Stage Two: End", "stage", children=[sec(20 + i, f"Spell {i}", "ability", f"Text {i}.")
+                                                       for i in range(5)])
+    a = abilities_html([one, two])
+    second = a[a.index("Stage Two"):]
+    assert "stay as they were" not in second and second.count("class='ab-chip'") == 5 and "As in Stage One: " in second
