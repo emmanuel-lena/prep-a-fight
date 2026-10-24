@@ -2329,7 +2329,11 @@ def _raid_tools(client, con, enc, diff: int, url: str, me: tuple[str, str] = (""
                               for n, sp, dps in rc.players]  # rogue on the Elemental's sheet)
             if rc.same_boss:
                 refs = comp.references(con, enc.id, diff, targets)
-                out["comp"] = comp.to_dict(boss, rc.fight, comp.assign(rc, refs))
+                rows = comp.assign(rc, refs)
+                for a in rows:  # your pull as you played it: not judged as the spec you prepare (fresh DPS review:
+                    a.pulled = [x for x in a.pulled if x[0].lower() != me[0].lower()]  # "Hardly hit it" listed you
+                    a.missed = [x for x in a.missed if x[0].lower() != me[0].lower()]  # as an Elemental)
+                out["comp"] = comp.to_dict(boss, rc.fight, rows)
         except Exception as ex:  # noqa: BLE001 - an extra of the prep: never fails it
             print(f"  who hits what: skipped ({str(ex)[:100]})")
         try:
