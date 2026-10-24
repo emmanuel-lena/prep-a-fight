@@ -325,9 +325,9 @@ CAST_GAP = 0.03  # casting this much less than the top players is worth saying
 MOVE_GAP = 0.08  # moving this much more than them in a phase is worth saying
 
 
-def _bars(label: str, you: float, tops: float | None, good_high: bool) -> str:
+def _bars(label: str, you: float, tops: float | None, good_high: bool, who: str = "Top players") -> str:
     worse = tops is not None and ((tops - you) if good_high else (you - tops)) >= (CAST_GAP if good_high else MOVE_GAP)
-    top = (f"<div class='bar tops'><span style='width:{tops * 100:.0f}%'></span><em>Top players {tops:.0%}</em></div>"
+    top = (f"<div class='bar tops'><span style='width:{tops * 100:.0f}%'></span><em>{e(who)} {tops:.0%}</em></div>"
            if tops is not None else "")
     return (f"<div class='cmp'><b>{e(label)}</b><div class='bar you{' worse' if worse else ''}'>"
             f"<span style='width:{you * 100:.0f}%'></span><em>You {you:.0%}</em></div>{top}</div>")
@@ -361,10 +361,13 @@ def review_card(d) -> str:
     pauses = (f"<p class='what pauses'>{longest} without casting:</p><div class='times'>{gaps}</div>"
               if gaps else "")
     logged = getattr(getattr(d, "raid", None), "logged_as", "")  # played as another spec: said (DPS round 10)
+    who = f"Top {d.spec}" if logged else "Top players"  # whose bars these are, when your pull is another spec
     return (f"<article class='card s-review'><h2>Your last pull</h2><p class='what'>{e(r.fight)}, from your raid's "
             f"log." + (f" <span class='pill'>as {e(logged)}</span>" if logged else "") + "</p>"
-            f"<div class='cmps'>{_bars('Casting', r.active, r.tops_active, True)}"
-            f"{_bars('Moving', r.moving, r.tops_moving, False)}</div>"
+            f"<div class='cmps'>{_bars('Casting', r.active, r.tops_active, True, who)}"
+            f"{_bars('Moving', r.moving, r.tops_moving, False, who)}</div>"
+            + (f"<p class='small muted'>Your pull as {e(logged)} beside the top {e(d.spec)} players: another spec, a "
+               "rough comparison.</p>" if logged else "")  # said, never read as like for like (fresh DPS review)
             + "".join(f"<p class='say'>{e(s)}</p>" for s in says) + pauses + "</article>")
 
 
