@@ -307,7 +307,7 @@ def _talents_h4(sh: dict, total: int, said: int = -1) -> str:
     read (a review: on a boss with changes, who was not checked vanished)."""
     changing, unread_, other = len(sh["builds"]), sh.get("unread") or [], sh.get("no_split", 0)
     if other >= total:  # no spec has a pad/boss split on this boss: nothing to compare, said as such
-        return f"<h4 class='rl-h'>Talents <span class='rl-unread'>{NO_BUILD} on this boss</span></h4>"
+        return f"<p class='rl-tl'><b>Talents</b> <span class='rl-unread'>{NO_BUILD} on this boss</span></p>"
     ok = total - changing - len(unread_) - other
     parts = [f"<span class='rl-ok'>&#10003; {ok} on their build</span>"] if ok > 0 else []  # always counted
     if other and other != said:  # the roster says the tanks and healers once (fresh app review 4: nine times a page)
@@ -316,7 +316,7 @@ def _talents_h4(sh: dict, total: int, said: int = -1) -> str:
     if unread_:
         parts.append(f"<span class='rl-unread'>{len(unread_)} not read: {e(', '.join(unread_))}</span>")
     head = "Talents to change" if changing or unread_ else "Talents"  # nothing to change: the badge says it alone
-    return f"<h4 class='rl-h'>{head} {''.join(parts)}</h4>"
+    return f"<p class='rl-tl'><b>{head}</b> {''.join(parts)}</p>"  # a row, not a heading (fresh app review 7)
 
 
 NO_BUILD = "no pad/boss build"  # one phrase wherever nothing is compared (fresh app review 6)
@@ -512,7 +512,7 @@ def page_body(difficulty: str) -> str:
         cards += (f"<article class='rl-boss' id='boss-{x.id}'><header><h3>{e(x.name)}</h3>"
                   f"{copy_button(text(sh, difficulty), 'Copy for Discord')}"
                   f"{copy_button(text(sh, difficulty, mrt=True), 'Copy MRT note')}</header>"
-                  f"<h4 class='rl-h'>Who hits what</h4>{tg or alone}"
+                  f"{tg or alone}"  # the table's header says what it is (fresh app review 7: nine headings)
                   + _talents_h4(sh, len(state["players"]) - len(bench), said) + (f"<ul>{bd}</ul>" if bd else "")
                   + lust_block(sh, difficulty) + "</article>")
     allbtn = (copy_button("\n\n".join(text(sh, difficulty) for sh in everything), "Copy every boss for Discord")
