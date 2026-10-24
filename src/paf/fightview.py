@@ -45,6 +45,7 @@ class Item:
     dur: float = 0.0  # seconds it lasts (a bar along the clock), 0 = none
     t: float = 0.0  # its own time (a row groups items a few seconds apart)
     why: str = ""  # a press no boss event explains: the plan's rule or its cooldown, and what the top players do
+    said_dur: bool = False  # its text says its length(s) already (two waves at one moment, one row)
     hint: str = ""  # a boss event: the Encounter Journal's line for damage dealers that names it
 
 
@@ -211,7 +212,7 @@ def items(d) -> list[tuple[float, Item]]:
     for a in d.actions:  # a mechanic that can be you, at the times the logs give, when no boss cast already says it
         if a.kind == "mechanic" and a.name not in cast_names:
             for t in (getattr(d, "mech_times", None) or {}).get(a.name, []):
-                add(t, Item("boss", "mech", a.name, f"{a.name} (it can be you)", _icon(d, a.name)))
+                add(t, Item("boss", "mech", a.name, f"{a.name} · you?", _icon(d, a.name)))
     roles = getattr(d, "ability_roles", None) or {}
     hits_you = {why.removesuffix("'s damage") for _t, _s, why in _defensives(d)}
     hits_you |= {m.boss_ability for m in (d.defensives.moments if d.defensives else []) if m.boss_ability}  # any
@@ -238,7 +239,15 @@ def items(d) -> list[tuple[float, Item]]:
         for w in (d.fight.invulnerable if d.fight is not None else []):  # adds of an intermission die with it
             if w.start - 3 <= t <= w.start + w.duration:
                 stop = min(stop, w.start + w.duration)
-        add(t, Item("boss", "adds", name, label, _icon(d, name), float(min(life or 0, max(0.0, stop - t)))))
+        dur = float(min(life or 0, max(0.0, stop - t)))
+        same = next((x for tt, x in out if x.kind == "adds" and round(tt) == round(t)), None)
+        if same is not None:  # another wave at that moment: one row, each with its length (fresh DPS review: two
+            if not same.said_dur:  # rows for the 0:24 venoms)
+                same.text, same.said_dur = f"{same.text} ({same.dur:.0f} s)", True
+            same.text += f" · {label} ({dur:.0f} s)"
+            same.dur = max(same.dur, dur)
+        else:
+            add(t, Item("boss", "adds", name, label, _icon(d, name), dur))
         if name not in skip and _clean(name) not in skip:
             kills.setdefault(round(t), []).append((name, shown, t))  # by the second shown: 24.0 and 24.1 are one
     for _s, got in kills.items():
@@ -385,7 +394,7 @@ def _ev(it: Item, row_t: float | None = None) -> str:
     # any time its row does not show says so: the page never snaps an event to a time it does not have
     notes = [f"at {_mmss(it.t)}"] if (row_t is not None and it.t >= 1 and _mmss(it.t) != _mmss(row_t)
                                       and f"from {_mmss(it.t)}" not in it.text) else []
-    if it.dur and it.kind not in ("move", "immune"):
+    if it.dur and it.kind not in ("move", "immune") and not it.said_dur:
         notes.append(f"lasts {it.dur:.0f} s")
     if it.why:
         notes.append(it.why)

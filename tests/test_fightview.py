@@ -174,3 +174,18 @@ def test_the_kill_and_a_press_a_few_seconds_on_open_their_own_rows(monkeypatch):
            (241.0, fightview.Item("boss", "kill", "The kill", "The kill, around 4:01"))]
     monkeypatch.setattr(fightview, "items", lambda d: its)
     assert [m.t for m in fightview.moments(None)] == [94.0, 100.0, 237.0, 241.0]
+
+
+def test_two_add_waves_at_one_moment_are_one_row():
+    """Fresh DPS review: '2 × Burning Venom lasts 21 s' and '5 × Shrouded Venom lasts 8 s' on two rows at 0:24."""
+    from types import SimpleNamespace
+
+    from paf import fightview
+
+    d = SimpleNamespace(waves=[(24.0, 2, 21.0, "Burning Venom"), (24.0, 5, 8.0, "Shrouded Venom")], fight=None,
+                        duration=241, actions=[], boss_casts=[], icons={}, phases=[], lust=None, movement=None,
+                        defensives=None, cd_names={}, precast=set(), plan_timeline=[], mech_times={},
+                        ability_roles={}, optimized=[], tops_casts={}, tops_players=0, goal="auto", raid=None,
+                        plans=[], timeline=None, links={})
+    adds = [x for _t, x in fightview.items(d) if x.kind == "adds"]
+    assert len(adds) == 1 and "2 × Burning Venom (21 s) · 5 × Shrouded Venom (8 s)" in adds[0].text
