@@ -661,7 +661,7 @@ def legend(its: list) -> str:
     spans = "".join(f"<span><i class='s-{k}'></i>{label}</span>" for k, label in LEGEND_KINDS if k in kinds)
     grey = "<span>grey = the tank's</span>" if any(x.kind == "tank" for _t, x in its) else ""
     # the rows are not spaced to scale: a bar runs down to its end's row, not a length in seconds (a review)
-    return (f"<div class='fv-legend' aria-hidden='true'>{spans}<span>a bar runs until it ends</span>{grey}</div>")
+    return f"<div class='fv-legend' aria-hidden='true'>{spans}{grey}</div>"  # a bar's end: its row (review 36)
 
 
 def _side(d) -> str:
@@ -712,8 +712,8 @@ def kill_switch(d) -> str:
         f"<a href='{e(f)}#fight' class='ks{' on' if i == now else ''}'{' aria-current=page' if i == now else ''}>"
         f"<b>{_mmss(t)}</b><small>{e(who)}</small></a>" for i, (who, t, f) in enumerate(kt))
     return (f"<nav class='kill-switch' aria-label='Plan for a kill of'><span class='ks-lab'>Plan for a kill of</span>"
-            f"{links}<span class='ks-hint'>Pick the closest to your raid's kill; slower than {_mmss(kt[-1][1])}, "
-            f"take {_mmss(kt[-1][1])} (its later timings are then approximate).</span></nav>")
+            f"{links}<span class='ks-hint' title='Slower than {_mmss(kt[-1][1])}: take {_mmss(kt[-1][1])}, its later "
+            f"timings then approximate'>the closest to your kill</span></nav>")  # the rest on hover (review 36)
 
 
 def html(d) -> str:

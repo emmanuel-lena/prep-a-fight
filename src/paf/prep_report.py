@@ -1532,7 +1532,7 @@ than the coverage means they hold the cooldown.{burst_note}</p>
         tabs["gear"].insert(0, f"""<h2>Best gear from your bags, for this fight</h2><div class="card scroll">
 {"<p class='small warn'>&#9888; Every set here loses more than 5%: a sim gone wrong, not a reading. Keep the gear you wear.</p>" if top < -5 else ""}
 <p class="small">Simmed {e(d.gear_plan or 'with the default priority list')}, {e(mine)}.</p>
-<table><tr><th>Swaps vs your equipped gear</th><th>Gain &plusmn;{d.gear_error:.2f}%</th>{head}</tr>{body}</table>
+<table><tr><th>Swaps vs your equipped gear</th><th class="n">Gain &plusmn;{d.gear_error:.2f}%</th>{head}</tr>{body}</table>
 {"<p class='tiny muted'>" + "; ".join(t for k, t in (("&asymp; best<", "&asymp; best: within the error of the best set"), ("keep yours<", "&asymp; keep yours: no set beats yours by twice the error")) if k in body) + ".</p>" if "near" in body else ""}</div>""")
 
     # loot
@@ -1544,7 +1544,7 @@ than the coverage means they hold the cooldown.{burst_note}</p>
 {'<p class="notice small">Nothing this boss drops is an upgrade for you at item level ' + str(d.loot_ilvl) + ': every value below is a loss vs what you already have.</p>' if all((real if real is not None else v) <= 0 for _, _, v, real in d.loot) else ''}
 <p class="small muted">"In your best sets": the item inserted in your best Top Gear sets, the rest of your gear
 rearranged around it (its real value). "Single swap": the classic droptimizer value, on your equipped set.</p>
-<table><tr><th>Item</th><th>Slot</th><th>In your best sets</th><th>Single swap</th></tr>{body}</table>
+<table><tr><th>Item</th><th>Slot</th><th class="n">In your best sets</th><th class="n">Single swap</th></tr>{body}</table>
 <p class="small muted">At item level {d.loot_ilvl}{_track_top(d)}; statistical error about &plusmn;{d.loot_error:.2f}%.</p></div>""")
 
     notes = [re.sub(r"^SimC puts (\d+%) of your damage on the boss vs (\d+%) in the top players' logs, even with more "

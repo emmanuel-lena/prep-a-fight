@@ -2968,9 +2968,10 @@ def render_sheet(h: HealerPrep) -> str:
                      f"</h2><ul class='hl2'>"
                      f"{cooldowns_html(exts, answered, named)}{rare_html(rare_ext, answered, named)}</ul>"
                      + (f"<p class='small muted'>{buff_note.strip()}</p>" if buff_note else ""))
-    else:  # none, said (round 92: the Shaman's sheet had no line, the Dig deeper table a "–")
-        fight.append(f"<h2>Your externals</h2><p class='small muted'>The top {e(h.spec)}s cast no long protective "
-                     f"cooldown on another player here.{buff_note}</p>")
+    else:  # none, said (round 92: the Shaman's sheet had no line), as a badge on its heading (review 36: a sentence)
+        fight.append("<h2>Your externals <span class='pill'>none here</span>"
+                     + "".join(f" <span class='pill'>{e(_shown(c.name))}: with your cooldowns above</span>"
+                               for c in buffers) + "</h2>")
     if defs or rare_def:
         fight.append(f"<h2>Your defensives</h2><ul class='hl2'>{cooldowns_html(defs, answered, named)}"
                      f"{rare_html(rare_def, answered, named)}</ul>")
