@@ -163,3 +163,17 @@ def test_a_mechanic_that_lands_on_players_is_told():
         sec(6, "Plague Froth", "ability", "Froth.")])
     a = abilities_html([stage], role="damage", mechanics=[Mech()])
     assert "Erupts on nearby players." in a and "Froth." not in a
+
+
+def test_an_ability_the_summary_names_in_passing_is_marked_not_told_twice():
+    """Rounds 39-40: Sanguineous Fortitude, named in passing by the DPS summary and flagged dps, told its words
+    again; Malignant Burst, named in passing, a bare name. Both: the marker, no words."""
+    over = sec(1, "Overview", "overview", children=[sec(2, "Damage Dealers", "overview",
+               "- Clotting Venom is protected by Sanguineous Fortitude. - Venoms explode in Malignant Burst.",
+               ["damage"])])
+    stage = sec(4, "Stage One", "stage", children=[
+        sec(5, "Sanguineous Fortitude", "ability", "Fortified as it emerges.", ["damage"]),
+        sec(6, "Malignant Burst", "ability", "Bursts on all players.", ["deadly"])])
+    a = abilities_html([over, stage], role="damage")
+    assert "Fortified" not in a and "Bursts on all" not in a and a.count("&uarr; for you") == 2
+    assert ">dps<" not in a  # one marker, not the role's flag too
