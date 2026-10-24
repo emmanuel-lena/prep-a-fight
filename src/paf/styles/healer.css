@@ -88,3 +88,4 @@ dl.legend{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 6px;max-width
 dl.legend dt{padding:1px 8px;border:1px solid var(--line);border-radius:999px;background:var(--surface-2);font-size:12px}
 dl.legend dd{margin:0 14px 0 0} dl.legend dd[title]{cursor:help;text-decoration:underline dotted color-mix(in srgb,var(--muted) 50%,transparent)}
 dl.legend{max-width:1036px} dl.legend>.lg{display:inline-flex;align-items:baseline;gap:6px;white-space:nowrap}
+.when.inline{display:inline-flex;flex-wrap:wrap;gap:6px;margin-left:6px;vertical-align:middle}

@@ -248,8 +248,10 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
         facts.append(who + (f", ~{m.cost:g} s of movement for you" if m.cost else ""))
     if s.title in ctx["also"]:
         facts.append(e(ctx["also"][s.title]))
-    if ctx["shares"].get(s.title):  # its share of the raid's damage taken, as the bars above (fresh heal review)
-        facts.append(f"{ctx['shares'][s.title]:.0%} of the raid&#39;s damage")
+    if ctx["shares"].get(s.title):  # its share of the raid's damage taken, a mini bar as the bars above (fresh
+        sh, top = ctx["shares"][s.title], max(ctx["shares"].values())  # heal review)
+        facts.append(f"<span class='sbm' aria-hidden='true'><span style='width:{sh / top * 100:.0f}%'></span></span>"
+                     f"{sh:.0%} of the raid&#39;s damage")
     if s.title.lower() in ctx["burst"]:
         facts.append(f"<b>burst window: the boss takes x{ctx['burst'][s.title.lower()]:g} damage</b>")
     # the journal's words only on what the journal flags for your role (or hits you too); the rest: its name, icon,

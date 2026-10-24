@@ -712,7 +712,8 @@ def render_sheet(p: TankPrep) -> str:
         f"<span class='pill' title='Median damage per second on the ranked tank of each top kill (that tank alone: a "
         f"swap moves it; fewer kills past the median one)'>{p.damage_kills or 'the top'} kills</span> "
         + ("<span>&#9478; stage time after a dashed line</span> " if getattr(p, "staged", False) else "")
-        + (f"<span title='{e(marks)}'>&#9646; the table&#39;s answers</span> " if answered else "")
+        + ("<span title='the presses the table gives as each moment&#39;s answer'>&#9646; the table&#39;s answers</span> "
+           if answered else "")  # the outline has its own chip (fresh heal review)
         + ("<span>&#9647; another press, or one in a moment&#39;s window that is not its answer</span> "
            if outline or window_named else "")  # its own chip, as the healers' (fresh heal review)
         + ("<span>| a tank swap</span> " if lane else "")
@@ -728,8 +729,8 @@ def render_sheet(p: TankPrep) -> str:
         + (_cause_badge(common, p.stacks) if swap and one else "")  # heal review: badges beside sentences)
         + (f" <span class='pill' title='about {extra} more swaps a kill come at varying times'>+{extra} varying</span>"
            if swap and (extra := round(2 * p.taunts_per_kill) - len(p.swaps)) > 0 else "")
-        + ("" if swap else "No swap moment most top raids share.") + "</p>"
-        + (f"<ul class='hl2'><li><span class='when'>{swap}</span></li></ul>" if swap else "")
+        + (f" <span class='when inline'>{swap}</span>" if swap else "No swap moment most top raids share.")
+        + "</p>"  # the times on the badges' line (fresh heal review: a row of their own)
         # the rule said (round 87: a swap tied on Nek'zali, none on Vashnik's swap every 28 s, with no word why)
         + ("<p class='small muted'><span class='pill' title='The table ties a swap to a hit only when swaps are rare "
            "enough not to land within 5 s of it by chance one time in three or more.'>? when a swap is tied to a hit"

@@ -37,3 +37,4 @@
 .stage:not(:has(h3)):not(:has(.ab-d)){margin-bottom:6px} .stage:not(:has(h3)):not(:has(.ab-d))>.abg{margin-bottom:0} /* an ability alone, its name only: one tight line */
 .ab-chip{display:inline-flex;align-items:center;gap:3px;margin:2px 8px 2px 0;font-style:normal;white-space:nowrap}
 .stage .also{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px}
+.sbm{display:inline-block;width:40px;height:5px;margin-right:5px;border-radius:3px;vertical-align:middle;background:color-mix(in srgb,var(--fg) 12%,transparent);overflow:hidden} .sbm>span{display:block;height:100%;background:var(--fg);opacity:.55}
