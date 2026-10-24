@@ -89,3 +89,7 @@ dl.legend dt{padding:1px 8px;border:1px solid var(--line);border-radius:999px;ba
 dl.legend dd{margin:0 14px 0 0} dl.legend dd[title]{cursor:help;text-decoration:underline dotted color-mix(in srgb,var(--muted) 50%,transparent)}
 dl.legend{max-width:1036px} dl.legend>.lg{display:inline-flex;align-items:baseline;gap:6px;white-space:nowrap}
 .when.inline{display:inline-flex;flex-wrap:wrap;gap:6px;margin-left:6px;vertical-align:middle}
+/* the tank swaps' line: the time chips at the badges' height, the dim varying pill as the cooldown rows' */
+.when.inline .chip{padding:2px 9px;font-size:12px;line-height:inherit}
+p > .vary{display:inline-block;padding:1px 7px;border-radius:999px;border:1px dashed var(--line);font-size:12px;
+  font-weight:600;color:var(--muted);letter-spacing:.02em;vertical-align:1px}

@@ -870,3 +870,12 @@ def test_the_split_list_says_its_number_of_players():
     """Fresh heal review: '{players}' shown raw on 12 sheets (an f-string lost its prefix)."""
     html = healer.split_html([("Lightburst", 0.5), ("Searing Light", 0.45)], 100, "Holy Paladin")
     assert "The share of the 100 players read" in html and "{" not in html
+
+
+def test_twice_reads_the_shares_as_shown():
+    # Preservation Evoker, Nek'zali (fresh heal review): Zephyr 10% + "19% varying" under its 30%, yet the caveat
+    # said a player counts in two shares (unrounded sums past it)
+    c = healer.Cooldown("Zephyr", 1, 0.296, 1.0, [130.0], [""], support=[0.104], n_all=100,
+                        presses=[[130.0, 250.0]] * 10 + [[50.0]] * 19)
+    assert c.support[0] + healer._rest(c) > c.users
+    assert healer._twice(c) == ""

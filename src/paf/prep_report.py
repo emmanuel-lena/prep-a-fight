@@ -1321,8 +1321,10 @@ def render(d: PrepData) -> str:
                 # (fresh DPS review: a bullet under the table)
                 unit_waves = [(n, w) for n, _say in gates for w in d.waves if w[1] and w[3] == n][:4] if parsed else []
                 unit_rows = [f"<tr><td>{icons.img(_sfallback(d, n), 'small')}{e(re.sub(r' *[(].*', '', n))}</td>"
-                             f"<td class='n'>&times;{w[1]}</td><td class='n' title='alive this long in the top kills'>"
-                             f"{w[2]:.0f} s</td><td><span class='muted'>&mdash;</span></td></tr>" for n, w in unit_waves]
+                             f"<td class='n'>&times;{w[1]}</td><td class='n' title='alive this long in the top kills, "
+                             f"not a kill time: it goes with its phase'>{w[2]:.0f} s alive</td><td><span class='muted' "
+                             f"title='not measured: the share is read on the adds, not on a boss unit'>&mdash;</span>"
+                             f"</td></tr>" for n, w in unit_waves]
                 if parsed:  # the adds as a table: how many, how fast the top raids kill them, your share on them
                     # (fresh DPS review: bullet sentences)
                     done = [x for x, _m in parsed]  # by identity: an Action is no set member (it crashed a prep)

@@ -727,7 +727,7 @@ def render_sheet(p: TankPrep) -> str:
         f"{nouned(mit_html(answered)) or '<li>Not measured yet.</li>'}</ul>",
         f"<h2>Tank swaps</h2><p>{swap_said + ' ' if swap_said else ''}"  # badges, the sentences on hover (fresh
         + (_cause_badge(common, p.stacks) if swap and one else "")  # heal review: badges beside sentences)
-        + (f" <span class='pill' title='about {extra} more swaps a kill come at varying times'>+{extra} varying</span>"
+        + (f" <span class='vary' title='about {extra} more swaps a kill come at varying times'>&mdash; +{extra} varying</span>"
            if swap and (extra := round(2 * p.taunts_per_kill) - len(p.swaps)) > 0 else "")
         + (f" <span class='when inline'>{swap}</span>" if swap else "No swap moment most top raids share.")
         + "</p>"  # the times on the badges' line (fresh heal review: a row of their own)

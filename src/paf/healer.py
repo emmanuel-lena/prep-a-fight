@@ -1151,8 +1151,9 @@ def _twice(c: Cooldown, named: dict | None = None) -> str:
     if not c.presses or not c.n_all:
         return ""
     lines = [v[0] for k, v in (named or {}).items() if k[0] == c.name and isinstance(k[1], tuple)]
-    if sum([*(c.support or []), *(c.alt_support or []), *lines]) + _rest(c, named) <= c.users + 0.005:
-        return ""
+    shown = [*(c.support or []), *(c.alt_support or []), *lines, _rest(c, named)]
+    if sum(int(100 * x + 0.5) for x in shown) <= int(100 * c.users + 0.5):  # the shares as shown: rounding is no overlap
+        return ""  # (fresh heal review: Zephyr 10 + 19 under its 30%, the caveat explained nothing)
     two = c.twice if c.twice >= 0 else sum(1 for ts in c.presses if len(ts) >= 2) / c.n_all  # every cast (r. 111)
     return f" ({_pct(two)} press it twice: a player can count in two shares)" if two >= 0.1 else ""
 
@@ -1663,7 +1664,7 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
            "times</small>" if c.every else
            f"<small class='alt'><span class='vary' title='{_more(c, named)} presses at varying times'>&mdash; "
            f"{_more(c, named)} varying</span></small>" if c.times and _more(c, named) else  # one form (fresh review)
-           f"<small class='alt'><span class='vary' title='the other {_pct(_rest(c, named))} of its users press it at "
+           f"<small class='alt'><span class='vary' title='the other {_pct(_rest(c, named))} of the top players press it at "
            f"varying times'>&mdash; {_pct(_rest(c, named))} varying</span>{_twice(c, named)}</small>"
            if (c.times or any(k[0] == c.name and isinstance(k[1], tuple) for k in (named or {})))  # a card with
            and _rest(c, named) >= 0.15  # only a window line too (round 110: Spirit Link Totem's other 76% unsaid)
@@ -1672,10 +1673,12 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
         + (f"<small class='alt'><span class='pill rhythm' title='"
            f"{'mostly ' if c.why.startswith('cast on another') and 0 <= c.on_others < 0.95 else ''}{e(c.why)}'>"
            f"{RHYTHM.get(c.why, e(c.why))}</span>"  # one pill, its reason on hover, never denying a chip's tie
-           + (" its players' times differ, so more times than presses" if c.why == MINUTE  # (round 89: 6 chips for
+           + (" <span class='vary' title='its players&#x27; times differ, so more times than presses'>&#8800; "
+              "presses</span>" if c.why == MINUTE  # on hover (fresh heal review); (round 89: 6 chips for
               and len(c.times) > round(c.per_kill) else "")  # Nature's Swiftness "4 a kill")
            + "</small>" if c.why and c.times else "")
-        + ("<small class='alt'>its players' times differ, so more times than presses</small>"  # any button (round
+        + ("<small class='alt'><span class='vary' title='its players&#x27; times differ, so more times than "
+           "presses'>&#8800; presses</span></small>"  # any button, on hover (fresh heal review) (round
            if not c.why and len(c.times) > round(c.per_kill) else "")  # 109: Tranquility "2 a kill", three chips)
         + "</span></li>"
         for c in cds)

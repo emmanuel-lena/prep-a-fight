@@ -184,6 +184,16 @@ def _rule_badges(d, plan) -> str:
     return f"<span class='rbs'>{''.join(out)}</span>" if out else ""
 
 
+def _trade(plan) -> str:
+    """What the plan costs on the other goals, as chips: the trade-off behind padding (fresh DPS review)."""
+    from paf.prep_report import _goal
+
+    chips = [f"<span class='pill{' warn' if v < 0 else ''}' title='vs SimC&#x27;s default list'>"
+             f"{e(_goal(o).split(' ')[0])} {v:+.1f}%</span>"
+             for o, v in plan.totals.items() if o not in (plan.objective, "adds")]
+    return f"<span class='rbs'>{''.join(chips)}</span>" if chips else ""
+
+
 def change_card(d) -> str:
     from paf.prep_report import best_build, copy_button, linkify, wanted
 
@@ -236,12 +246,14 @@ def change_card(d) -> str:
                        if wanted(d) == plan.objective else "")  # plan now is (the list below no longer has it)
                     + _rule_badges(d, plan)  # its rules here, as Your job's badges: the list below no longer
                     # repeats this plan (fresh DPS review: said twice)
+                    + _trade(plan)
                     + ("<span class='pill'>simmed apart from the talents: the gains do not add up</span>"
                        if talents_said else "")  # plain words, the figure said (DPS confirm round 12: "≠ adds to")
                     + ("" if getattr(plan, "robust", True) else " Not robust: the gain can vanish on a harder fight "
                        "(see its checks in Dig deeper).") + "</span></div></li>"
-                    + (f"<li class='sw-copy'>{copy_button(d.mrt[plan.objective], 'Copy the MRT note')}</li>"
-                       if d.mrt.get(plan.objective) else ""))  # acted on here, as the talents (DPS confirm round 3)
+                    + (f"<li class='sw-copy'>{copy_button(d.mrt[plan.objective], 'Copy the MRT note')}"
+                       + (" " + copy_button(d.nsrt[plan.objective], "Copy for NSRT") if d.nsrt.get(plan.objective) else "")
+                       + "</li>" if d.mrt.get(plan.objective) else ""))  # acted on here, as the talents (DPS confirm round 3)
     if getattr(d, "imported", False):  # no bags: the best gear and the loot need the /simc export
         rows.append("<li><span class='ok bad' aria-hidden='true'>!</span><div><b>Paste your /simc export</b>"
                     "<span class='what'>Your character was read from a log, without your bags: with /simc the "
