@@ -2095,7 +2095,8 @@ def build_rows(builds: list, split: list | None = None) -> list[tuple[int, str, 
     out = []
     for i, b in enumerate(builds):
         if i == 0 or not names:  # the most played: its side of each split row is marked there (✓ ✗, heal round 51)
-            said = ("its side of each talent below: &#10003; or &#10007;" if i == 0 and split and names
+            said = ("its side of each talent below: ✓ or ✗" if i == 0 and split and names  # characters: the row is
+                    # escaped once more (heal round 52: "&#10003;" shown)
                     and side_marks(b.key, names, split) else _sides(b.key, names, split or []) if names else "")
             out.append((b.count, b.label, b.code or "", said))
             continue
@@ -2128,12 +2129,15 @@ def side_marks(key, names: dict, split: list) -> dict[str, str]:
     return out
 
 
-def top_marks(builds: list, split: list) -> dict[str, str]:
-    """The most played build's side of each split row (side_marks), for the rows' ✓ and ✗; {} offline."""
+def top_marks(builds: list, split: list, players: int = 0) -> dict[str, str]:
+    """The most played build's side of each split row (side_marks), for the rows' ✓ and ✗; {} offline, and {} when
+    no build is shared (the sheet shows none: heal round 52, marks on a build of 3 of 100 never shown)."""
+    if not builds or not split or (players and builds[0].count < BUILD_SHARE * players):
+        return {}
     try:
         from paf.gamedata import talent_entry_names
 
-        return side_marks(builds[0].key, talent_entry_names(), split) if builds and split else {}
+        return side_marks(builds[0].key, talent_entry_names(), split)
     except Exception:  # noqa: BLE001 - offline: no marks
         return {}
 
@@ -2382,7 +2386,8 @@ def split_html(split: list, players: int, spec: str, wide: bool = False, icons: 
              f"<h2>The talents the top {e(spec)}s split on</h2><p>The share of the {players} players read "
              "who take each, closest to half first:</p>") + "<ul class='hl2 split'>"
             + "".join((f"<li><b>{_pic(icons, n)}{e(n)}</b>{_bar(s)}<small>{s:.0%}</small></li>" if s >= 0 else
-                       _pair(n, icons)).replace("</li>", f"{_mark_html(marks, n)}</li>", 1) for n, s in split)
+                       _pair(n, icons)).replace("</small></li>", f"{_mark_html(marks, n)}</small></li>", 1)  # inline,
+                      for n, s in split)  # after its share (heal round 52: a line of its own)
             + "</ul>")
 
 
