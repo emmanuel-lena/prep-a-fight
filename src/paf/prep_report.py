@@ -441,9 +441,10 @@ def raid_section(r: RaidInfo, gear: bool = True) -> str:
                      for k, ps in r.archetypes.items() if ps)
     rest, swapped = healers_left(r)
     if groups and rest > 0:  # every player of the log accounted for
-        groups += f"<li><b>healers ({rest})</b><span>not counted for the adds</span></li>"
+        groups += f"<li><b>healers ({rest})</b><span class='plain'>not counted for the adds</span></li>"
     if groups and swapped:
-        groups += f"<li><b>you (1)</b><span>in the log as {e(r.logged_as)}, swapped for the spec you prepare</span></li>"
+        groups += (f"<li><b>you (1)</b><span class='plain'>in the log as {e(r.logged_as)}, swapped for the spec you "
+                   "prepare</span></li>")
     what = "the cooldown plan and the gear on this sheet are" if gear else "the cooldown plan on this sheet is"
     verdict = (f"Stay on the boss: {what} the one{'s' if gear else ''} for boss damage." if r.objective == "boss"
                else f"Pad the adds: {what} the one{'s' if gear else ''} for total damage.")

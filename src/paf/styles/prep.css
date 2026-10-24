@@ -117,3 +117,4 @@ div.chips .chip{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;m
 ul.grp{list-style:none;padding:0} ul.grp>li{display:grid;grid-template-columns:150px 1fr;gap:4px 10px;align-items:start;margin:4px 0}
 ul.grp>li>b{grid-row:span 1} ul.grp .chip{margin:0 6px 4px 0}
 ul.grp>li>b{padding-top:9px} /* centred on the first chip row: a chip is 38 px, the label 21 (measured) */
+ul.grp .plain{display:block;padding-top:9px} /* a text row on its label's line, as the chip rows */
