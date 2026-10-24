@@ -1600,7 +1600,7 @@ def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict
 def rare_html(cds: list[Cooldown], answered: set | None = None, named: dict | None = None) -> str:
     """The buttons fewer than half of the top players press: rows like the others, muted, with a "< half" badge
     (heal round 10: Time Dilation at 50% a row, at 48% a sentence on the next boss's sheet)."""
-    return "".join(r.replace("<li>", "<li class='rare'>", 1).replace("</b>", "<span class='half'>&lt; half</span></b>", 1)
+    return "".join(r.replace("<li>", "<li class='rare'>", 1)  # muted; its bar says under half (fresh heal review)
                    for c in sorted(cds, key=lambda c: -c.users)
                    for r in [cooldowns_html([c], answered, named)])
 
@@ -1664,8 +1664,8 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
            else "")
         + _released(c)
         + (f"<small class='alt'><span class='pill rhythm' title='"
-           f"{'mostly ' if c.why.startswith('cast on another') and 0 <= c.on_others < 0.95 else ''}{e(c.why)}: not "
-           f"tied to a hit'>{RHYTHM.get(c.why, e(c.why))}</span>"  # one pill, the reason on hover (heal round 43)
+           f"{'mostly ' if c.why.startswith('cast on another') and 0 <= c.on_others < 0.95 else ''}{e(c.why)}'>"
+           f"{RHYTHM.get(c.why, e(c.why))}</span>"  # one pill, its reason on hover, never denying a chip's tie
            + (" its players' times differ, so more times than presses" if c.why == MINUTE  # (round 89: 6 chips for
               and len(c.times) > round(c.per_kill) else "")  # Nature's Swiftness "4 a kill")
            + "</small>" if c.why and c.times else "")
@@ -3061,10 +3061,10 @@ def render_sheet(h: HealerPrep) -> str:
                      f"{cooldowns_html(exts, answered, named)}{rare_html(rare_ext, answered, named)}</ul>"
                      .replace("</h2>", "".join(f" <span class='pill'>{e(_shown(c.name))}: with your cooldowns above"
                                                "</span>" for c in buffers) + "</h2>", 1))  # a pill (round 38)
-    else:  # none, said (round 92: the Shaman's sheet had no line), as a badge on its heading (review 36: a sentence)
-        fight.append("<h2>Your externals <span class='pill'>none here</span>"
-                     + "".join(f" <span class='pill'>{e(_shown(c.name))}: with your cooldowns above</span>"
-                               for c in buffers) + "</h2>")
+    elif buffers:  # none: no section (fresh heal review: an empty heading); a buff on a dealer said where it is
+        fight.append("<h2>Your externals</h2><p class='small'>"
+                     + "".join(f"<span class='pill'>{e(_shown(c.name))}: with your cooldowns above</span>"
+                               for c in buffers) + "</p>")
     if defs or rare_def:
         fight.append(f"<h2>Your defensives</h2><ul class='hl2'>{cooldowns_html(defs, answered, named)}"
                      f"{rare_html(rare_def, answered, named)}</ul>")
@@ -3169,7 +3169,7 @@ def render_sheet(h: HealerPrep) -> str:
     if h.presence:
         have = next((x for x in h.presence if x.spec == h.spec), None)
         if have and have.share >= 0.99:  # the corpus is your spec's top players' kills: they all have one
-            line = (f"These are the top {e(h.spec)}s' kills, so every one has a {e(h.spec)} ({have.per_kill:.1f} a "
+            line = (f"These are the top players' kills, so every one has a {e(h.spec)} ({have.per_kill:.1f} a "
                     f"kill).")
         elif have:
             line = f"{_pct(have.share)} of the top kills bring a {e(h.spec)} ({have.per_kill:.1f} a kill when they do)."
