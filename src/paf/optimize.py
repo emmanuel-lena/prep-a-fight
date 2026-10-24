@@ -210,6 +210,8 @@ class Plan:
     timeline: list[tuple[float, str]] = field(default_factory=list)
     sensitivity: dict[str, float] = field(default_factory=dict)  # uncertain-parameter variant -> gain %
     flags: list[str] = field(default_factory=list)  # reasons to double-check this plan
+    opener: list[tuple[float, str, int]] = field(default_factory=list)  # the first OPENER_SPAN s, every cast
+    default_opener: list[tuple[float, str, int]] = field(default_factory=list)  # the default list's, as above
     default_timeline: list[tuple[float, str]] = field(default_factory=list)  # the default list's pull, played
     # instead when the plan is not robust (paf.simple._plan)
 
@@ -400,6 +402,48 @@ def play_by_play(profile_text: str, apl: OrderedDict[str, list[str]], plan: Plan
             seen.add((round(t, 1), label))
             events.append((t, label.replace("_", " ")))
     return events
+
+
+OPENER_SPAN = 40.0  # the opener said on the fight tab: a Bloodlust's length (issue #39)
+NOT_CASTS = {"auto_attack", "auto_shot", "flask", "food", "augmentation", "snapshot_stats", "apply_poison",
+             "variable", "wait", "pool_resource", "use_items", "run_action_list", "call_action_list"}
+
+
+def opener(log: Path, upto: float = OPENER_SPAN) -> list[tuple[float, str, int]]:
+    """The casts of one simulated pull's first `upto` seconds, in order: (time, spell name, spell id), from a
+    play_by_play log (issue #39: the 40 s opener as SimC plays it). Your character's only (no pet), the precombat
+    ones, then what the action list schedules: a proc or an overload is no press."""
+    from paf.gamedata import spell_names
+
+    try:
+        names = spell_names()
+    except Exception:  # noqa: BLE001 - offline: the action's own name
+        names = {}
+    pat = re.compile(r"^(\d+\.\d+) Player '([^']+)' (performs|schedules execute for) Action '([a-z0-9_]+)' \((\d+)\)")
+    out: list[tuple[float, str, int]] = []
+    me, scheduled = None, False
+    for line in log.read_text(encoding="utf-8", errors="replace").splitlines() if log.is_file() else []:
+        m = pat.match(line)
+        if not m:
+            continue
+        t, who, how, action, sid = float(m[1]), m[2], m[3], m[4], int(m[5])
+        me = me or who
+        if who != me:
+            continue
+        if t > upto:
+            break
+        if how == "schedules execute for":
+            scheduled = True
+        precombat = how == "performs" and not scheduled  # before the first press the list schedules
+        if not (precombat or how == "schedules execute for") or action in NOT_CASTS or "overload" in action:
+            continue
+        if not sid and action != "potion":
+            continue
+        name = "Potion" if action == "potion" else names.get(sid) or action.replace("_", " ").capitalize()
+        if name.endswith(" Overload"):  # an overload the list schedules under another action's name: no press
+            continue
+        out.append((t, name, sid))
+    return out
 
 
 def fight_context(fight: Fight, t: float) -> str:
@@ -652,10 +696,12 @@ def optimize_all(profile_text: str, fight: Fight, run_dir: Path, *, objectives: 
     confirm(profile_text, apl, plans, fight, run_dir)
     sensitivity(profile_text, apl, plans, fight, run_dir, extra=extra_variants)
     default_pull = play_by_play(profile_text, apl, Plan("default", {}, 0, 0), fight, run_dir, cds)
+    default_open = opener(run_dir / "default-pull.log")
     if alignment:
         alignment = adjust_alignment(alignment, default_pull, fight)
     for p in plans:
         p.flags = sanity_flags(p, alignment or [], validation)
         p.timeline = play_by_play(profile_text, apl, p, fight, run_dir, cds)
-        p.default_timeline = default_pull
+        p.opener = opener(run_dir / f"{p.objective}-pull.log")
+        p.default_timeline, p.default_opener = default_pull, default_open
     return plans, cds

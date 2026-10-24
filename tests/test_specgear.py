@@ -1,4 +1,4 @@
-from paf import specgear, workshop, workshop_views
+from paf import briefing, specgear, workshop, workshop_views
 from paf.specgear import MyKills, Result, SpecRow
 
 
@@ -132,3 +132,18 @@ def test_padding_compares_total_damage():
     boss, total = N(mean=160013.0), N(mean=265675.0)
     assert measured(boss, total, boss=False) == 265675.0 and measured(boss, total, boss=True) == 160013.0
     assert measured(None, total, boss=True) == 265675.0  # no adds: no boss-only number
+
+
+def test_with_your_items_the_verdict_is_the_switch_you_can_make():
+    # issue #35 (the owner's call): your own items in the other spec against you as you are; the top players' set
+    # at 334 said beside, as a ceiling
+    r = result(100.0, 106.0, other_tops=104.0)  # in the tops' set: +6%
+    r.rows[1].own, r.rows[1].own_error = 88.2, 0.1  # with your items: 88.2 vs 90 as you are, -2%
+    kind, text = specgear.verdict(r)
+    assert kind == "ok" and "it sims 2.0% over Enhancement with your items" in text
+    r.rows[1].own = 95.4  # +6% with your items
+    kind, text = specgear.verdict(r)
+    assert kind == "go" and "with your items it sims +6.0% over your Elemental as you are" in text
+    assert "in the top players' gear at 334, +6.0%" in text
+    gaps = briefing.spec_gaps(specgear.to_json(r) | {"role": "boss"})
+    assert gaps[1][0] == "Enhancement" and round(gaps[1][1], 1) == 6.0  # the tile: your items too

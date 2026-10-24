@@ -359,9 +359,16 @@ def spec_gaps(s: dict) -> list[tuple[str, float | None, str]]:
     if mine is None:
         return []
     out: list[tuple[str, float | None, str]] = [(mine["label"], None, "mine")]
-    for r in sorted((r for r in rows if r is not mine), key=lambda r: -r["sim"]):
-        gap = 100 * (r["sim"] / mine["sim"] - 1)
-        noise = 2 * ((r.get("error") or 0) ** 2 + (mine.get("error") or 0) ** 2) ** 0.5
+    others = [r for r in rows if r is not mine]
+    own = bool(s.get("now")) and all(r.get("own") for r in others)  # your items in each spec, against you as you
+    # are: the switch you can make (issue #35, the owner's call); else the top players' set on both
+
+    def value(r: dict) -> float:
+        return r["own"] if own else r["sim"]
+    for r in sorted(others, key=lambda r: -value(r)):
+        gap = 100 * (value(r) / (s["now"] if own else mine["sim"]) - 1)
+        noise = 2 * (((r.get("own_error") if own else r.get("error")) or 0) ** 2
+                     + ((s.get("now_error") if own else mine.get("error")) or 0) ** 2) ** 0.5
         out.append((r["label"], gap, "go" if gap > noise and s.get("verdict") == "go" else
                     "same" if abs(gap) <= noise else "low" if gap < 0 else "up"))
     return out
@@ -406,8 +413,24 @@ def spec_html(d) -> str:
     missing: set[str] = set()  # (DPS confirm rounds 6-7: your own spec short makes every gap rough, no dagger)
     short_specs: list[str] = []
     mine_label = gaps[0][0]
+    by_label = {r.get("label"): r for r in s.get("rows") or []}
+    mine_row = by_label.get(mine_label) or {}
+    own = bool(s.get("now")) and all(r.get("own") for r in s.get("rows") or [] if r is not mine_row and r.get("sim"))
+
+    def how(name: str) -> str:  # its tile's hover: the swaps from what you wear, a slot none of yours fits, and
+        r = by_label.get(name) or {}  # the top players' set as the ceiling (issue #35)
+        if not own or r is mine_row or not r.get("own"):
+            return ""
+        bits = []
+        if r.get("own_changes"):
+            bits.append("your best set: " + "; ".join(r["own_changes"]))
+        if r.get("own_missing"):
+            bits.append("none of your items fits: " + ", ".join(x.replace("_", " ") for x in r["own_missing"]))
+        if r.get("sim") and mine_row.get("sim"):
+            bits.append(f"in the top players' gear at {s.get('ilvl', 334)}: {100 * (r['sim'] / mine_row['sim'] - 1):+.0f}%")
+        return f" title='{e('. '.join(bits))}'" if bits else ""
     tiles = "".join(
-        f"<div class='spt {kind}'><span class='spt-n'>{e(name)}</span><span class='spt-v'>"
+        f"<div class='spt {kind}'{how(name)}><span class='spt-n'>{e(name)}</span><span class='spt-v'>"
         f"{'your spec' if gap is None else 'same' if kind == 'same' else f'{gap:+.0f}%'}{short(name)}</span></div>"
         for name, gap, kind in gaps)
     failed = " ".join(s.get("notes") or [])
@@ -418,7 +441,7 @@ def spec_html(d) -> str:
                      f"<span class='spt-v'>not simmed: {why(r)}</span></div>"
                      for r in s.get("rows") or [] if not r.get("sim"))
     return (f"<div class='specs rv'><p class='specs-head'><b>We simmed your character in each damage spec of your class"
-            f"</b> <span class='muted'>for {e(spec_role(s))}, on this fight</span></p>"
+            f"</b> <span class='muted'>for {e(spec_role(s))}, on this fight{', with your items' if own else ''}</span></p>"
             f"<div class='spt-row'>{tiles}</div>"
             + _short_note(missing, short_specs, mine_label) + "</div>")
 

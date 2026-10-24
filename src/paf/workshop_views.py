@@ -743,7 +743,23 @@ def specgear(d: dict) -> str:
             f"your spec.</p>")
 
 
-VIEWS = {"talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review, "comp": comp, "wipe": wipe, "night": night, "diff": pulldiff, "rotation": rotation, "bonusroll": bonusroll, "specgear": specgear}
+def gear(d: dict) -> str:
+    """What to equip (Top Gear), then what to farm (the drops on top of that set), on the fight picked."""
+    from paf.results import fight_label
+
+    def said(name: str) -> str:  # "a training dummy, 1 target 3 min" or the boss's fight ("Nek Zali … Heroic")
+        return fight_label(name) if name.startswith("dummy ") else name.replace("-", " ").title()
+    fights = ", ".join(said(f) for f in d.get("fights") or [])
+    out = f"<p class='ws-lead'>Simmed on {e(fights)}.</p>" if fights else ""
+    if d.get("equip"):
+        out += "<h2>Equip</h2>" + topgear(d["equip"])
+    if d.get("farm"):
+        out += "<h2>Farm</h2>" + loot(d["farm"])
+    return out or _verdict("ok", "Nothing to change", "<span>No item of your bags or of this loot beats what you "
+                                                       "wear.</span>")
+
+
+VIEWS = {"gear": gear, "talents": talents, "loot": loot, "topgear": topgear, "cooldowns": cooldowns, "review": review, "comp": comp, "wipe": wipe, "night": night, "diff": pulldiff, "rotation": rotation, "bonusroll": bonusroll, "specgear": specgear}
 
 
 def render(data: dict) -> str | None:

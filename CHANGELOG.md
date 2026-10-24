@@ -5,6 +5,14 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 
 ## Unreleased
 
+- The fight tab shows the opener: every cast of the first 40 seconds in order, as SimulationCraft plays your plan,
+  each with its icon and time (and whether Bloodlust goes out at the pull). (#39)
+- Your class's other specs are compared with your own items: each spec's best set from your bags (the items of its
+  main stat), against you as you are; the top players' set at 334 stays on the tile's hover as the ceiling. (#35)
+- New "Gear" tool, in the side bar: paste a /simc (or use your character), pick a fight (a training dummy with 1 to 8
+  targets and 3, 5 or 7 minutes, or a boss you prepared: its real fight), and it tells you what to equip from your
+  bags and vault, then which drops of that boss (or the whole raid) to farm, ranked by their gain on top of that
+  set. Top Gear gets the same dummy options and the paste box.
 - When Warcraft Logs is down, a prep no longer waits out every retry on each kill (it once took 55 min for one
   step): it stops that step with one line and reads the rest on a later prep. (#36)
 - When the hour's Warcraft Logs quota runs out, the optional steps (who handles each mechanic, the raids' Bloodlust)

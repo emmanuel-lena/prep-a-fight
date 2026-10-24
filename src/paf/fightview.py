@@ -749,7 +749,25 @@ def _side(d) -> str:
             "<div class='meter'><i id='c-meter'></i></div></div>"
             f"{_btn('c-sync', '', 'Control+Shift+Space', hidden=True)}"
             f"<div class='foot'>{_btn('ss-open', 'Second screen', cls='btn ghost')}{copy}</div></section>"
-            f"{job_html(d)}</aside>")  # no pointer to the Dig deeper tab: it is right there (review 36)
+            f"{job_html(d)}{opener_html(d)}</aside>")  # no pointer to the Dig deeper tab: it is right there (review 36)
+
+
+def opener_html(d) -> str:
+    """The first 40 s of the plan the fight tab plays, every cast in order as SimC plays it: an icon each, its time
+    under it, its name on hover; Bloodlust at the pull said (issue #39)."""
+    plan = simple._plan(d)
+    if plan is None:
+        return ""
+    casts = getattr(plan, "default_opener" if simple.plays_default(d) else "opener", None) or []
+    if not casts:
+        return ""
+    from paf.optimize import OPENER_SPAN
+
+    lust = " <span class='pill'>Bloodlust at the pull</span>" if d.lust is not None and d.lust < 5 else ""
+    cells = "".join(f"<li title='{e(n)} {_mmss(t)}'>{_ic(_icon(d, n))}<small>{_mmss(t)}</small></li>"
+                    for t, n, _sid in casts)
+    return (f"<section class='fbox opener'><h2>Opener <span class='muted small'>the first {OPENER_SPAN:.0f} s, as "
+            f"SimC plays it</span>{lust}</h2><ol class='op'>{cells}</ol></section>")
 
 
 def _second_screen(d) -> str:

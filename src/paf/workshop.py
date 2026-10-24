@@ -32,8 +32,12 @@ class Tool:
 GROUPS = (("gear", "Your gear and talents"), ("cds", "Your cooldowns and rotation"), ("raid", "Your raid"), ("boss", "The boss"))
 
 TOOLS: tuple[Tool, ...] = (
+    Tool("gear", "What to equip, what to farm", "Your /simc on one fight: your best set, then the drops worth farming.",
+         "inv_misc_bag_10", "gear", "15-60", ("boss~", "targets", "length", "difficulty", "goal", "simc"),
+         "Your best set from your bags and vault, then every usable drop of the boss (or the raid) ranked by its "
+         "gain on top of it.", needs_prep=False),  # a local Raidbots (the owner, 2026-10-24)
     Tool("topgear", "Best gear from your bags", "Your bags' best set for this boss.",
-         "inv_misc_bag_10", "gear", "5-15", ("boss~", "difficulty", "goal"),
+         "inv_misc_bag_08", "gear", "5-15", ("boss~", "targets", "length", "difficulty", "goal", "simc"),
          "Your best sets, each with its gain in % over what you wear.", needs_prep=False),
     Tool("droptimizer", "What a boss drops for you", "Which drops of this boss, or the raid, upgrade you.", "inv_misc_coin_02", "gear", "5-10", ("boss?", "difficulty", "goal"),
          "Every item worth it for you, with its gain in %, best first.", needs_prep=False),
@@ -74,7 +78,7 @@ TOOLS: tuple[Tool, ...] = (
          "Each assignable mechanic with its timings and the damage it costs.", needs_prep=False),  # reads the kills
 )
 BY_CMD = {t.cmd: t for t in TOOLS}
-CURATED_FIELDS = {"boss", "difficulty", "objective", "raid", "fight"}  # set by the curated form, not under "options"
+CURATED_FIELDS = {"boss", "difficulty", "objective", "raid", "fight", "targets", "length", "simc"}  # set by the curated form, not under "options"
 
 
 def _icon(name: str, cls: str = "") -> str:
@@ -194,6 +198,14 @@ def _field(kind: str, encounters: list) -> str:
     if kind == "goal3":
         return _segs("objective", "Your goal", [("boss", "Boss damage", ""), ("total", "Pad the adds", ""),
                                                 ("all", "Both, a plan for each", "")], "all")  # the wizard's words
+    if kind == "targets":  # a training dummy's, as Raidbots asks them (the owner, 2026-10-24)
+        return _segs("targets", "Targets (dummy)", [(str(n), str(n), "") for n in (1, 2, 3, 5, 8)], "1")
+    if kind == "length":
+        return _segs("length", "Fight length (dummy)", [("180", "3 min", ""), ("300", "5 min", ""),
+                                                         ("420", "7 min", "")], "300")
+    if kind == "simc":
+        return ("<label class='ws-f'><span>Another character</span><textarea name='simc' rows='4' placeholder='Paste "
+                "a /simc export here to sim it instead of your character'></textarea></label>")
     if kind == "raid":
         g = settings.get("guild")
         hint = f"Empty: the latest public log of {g}." if g else "Or set your guild in Settings."
@@ -249,6 +261,17 @@ def args(cmd: str, form: dict[str, list[str]]) -> list[str] | None:
         out += ["--objective", one("objective")]
     if one("raid"):
         out += ["--raid", one("raid")]
+    if not boss and one("targets") and one("targets") != "1":  # the dummy's options: a boss is its own fight
+        out += ["--targets", one("targets")]
+    if not boss and one("length") and one("length") != "300":
+        out += ["--length", one("length")]
+    if one("simc"):  # a pasted export: saved apart, never over your character's profile
+        from paf.config import data_dir
+
+        pasted = data_dir() / "profiles" / "pasted.simc"
+        pasted.parent.mkdir(parents=True, exist_ok=True)
+        pasted.write_text(one("simc") + "\n", encoding="utf-8")
+        out += ["--profile", str(pasted)]
     rest = tool_args(cmd, {k: v for k, v in form.items() if k not in CURATED_FIELDS and k != "_curated"}) or [cmd]
     return out + [a for a in rest[1:] if a not in out[1:]]  # the folded options set by the player
 

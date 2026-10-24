@@ -226,6 +226,10 @@ class SpecRow:
     items: list[dict] = field(default_factory=list)  # the set's items: slot, item_id, name
     talents: str = ""  # the build kept (the best in the sim): "tops", "yours" or "simc" (the profile simc ships)
     builds: dict[str, float] = field(default_factory=dict)  # every build simmed: its DPS (the ranking's metric)
+    own: float | None = None  # your character in this spec with your own items, its best set (paf.specown, #35)
+    own_error: float = 0.0
+    own_changes: list[str] = field(default_factory=list)  # the swaps from what you wear
+    own_missing: list[str] = field(default_factory=list)  # slots none of your items fits (another main stat)
 
 
 @dataclass
@@ -261,24 +265,31 @@ def verdict(r: Result) -> tuple[str, str]:
     if not others:
         return "ok", (f"{spec_label(r.mine)} fits this boss: no other damage spec of your class has enough ranked "
                       f"players on it to compare.")
-    best = max(others, key=lambda x: x.sim)
-    gap = 100 * (best.sim / mine.sim - 1)
-    noise = _noise(best.error, mine.error)
+    own = r.now is not None and all(x.own for x in others)  # your items in each spec: the switch you can make
+    # (issue #35, the owner's call: the verdict on what you own; the top players' set said beside, as a ceiling)
+    best = max(others, key=lambda x: x.own if own else x.sim)
+    gap = 100 * (best.own / r.now - 1) if own else 100 * (best.sim / mine.sim - 1)
+    noise = _noise(best.own_error, r.now_error) if own else _noise(best.error, mine.error)
     tops_gap = 100 * (best.tops / mine.tops - 1)
     me, it = spec_label(r.mine), spec_label(best.spec)
+    ceiling = (f"; in the top players' gear at {TOP_ILVL}, {100 * (best.sim / mine.sim - 1):+.1f}%" if own and
+               best.sim else "")
+    how = f"with your items it sims {gap:+.1f}% over your {me} as you are" if own else \
+        f"in the top players' gear at {TOP_ILVL} it sims {gap:+.1f}% over your {me}"
     if gap > noise and tops_gap > 0:
-        return "go", (f"{it} could do more here: in the top players' gear at {TOP_ILVL} it sims {gap:+.1f}% over "
-                      f"your {me} on this fight (noise ±{noise:.1f}%), and the top {it} players do "
-                      f"{tops_gap:+.0f}% over the top {me}. Worth a try if you play it.")
+        return "go", (f"{it} could do more here: {how} on this fight (noise ±{noise:.1f}%{ceiling}), and the top "
+                      f"{it} players do {tops_gap:+.0f}% over the top {me}. Worth a try if you play it.")
     if gap > noise:
-        return "warn", (f"{it} sims {gap:+.1f}% over your {me} (noise ±{noise:.1f}%), but the top {it} "
+        return "warn", (f"{it} sims {gap:+.1f}% over your {me}{' with your items' if own else ''} (noise "
+                        f"±{noise:.1f}%), but the top {it} "
                         f"players do {tops_gap:+.0f}% against the top {me}: the sim and the logs disagree: {me} "
                         f"is the safer choice unless you try it.")
     logs = f"; the top {it} players do {tops_gap:+.0f}% against the top {me}"
-    return "ok", (f"{me} fits this boss: {it}, the best other spec, sims {gap:+.1f}% on this fight, within the "
-                  f"noise (±{noise:.1f}%){logs}." if gap > -noise else
-                  f"{me} fits this boss: it sims {-gap:.1f}% over {it}, the best other spec, on this fight (noise "
-                  f"±{noise:.1f}%){logs}.")
+    mine_items = " with your items" if own else ""
+    return "ok", (f"{me} fits this boss: {it}, the best other spec, sims {gap:+.1f}%{mine_items} on this fight, "
+                  f"within the noise (±{noise:.1f}%){logs}." if gap > -noise else
+                  f"{me} fits this boss: it sims {-gap:.1f}% over {it}{mine_items}, the best other spec, on this "
+                  f"fight (noise ±{noise:.1f}%){logs}.")
 
 
 def gear_sentence(r: Result) -> str:
@@ -327,7 +338,7 @@ def measured(boss_dps, dps, boss: bool) -> float:
 
 def compare(profile: str, client, enc, difficulty: int, diff_name: str, cls: str, mine: str, fight_lines: list[str],
             run_dir: Path, *, character: tuple[str, str, str] = ("", "", ""), target_error: float = 0.2,
-            metric: str = "bossdps", log=print) -> Result:
+            metric: str = "bossdps", own: bool = True, log=print) -> Result:
     """The whole comparison (sims run here: one per spec, and your character as you are)."""
     from paf import simc
 
@@ -390,6 +401,17 @@ def compare(profile: str, client, enc, difficulty: int, diff_name: str, cls: str
         row.builds = got
         if "yours" in got:
             res.own_talents_sim = got["yours"]
+        if own and spec != mine:  # what switching gives you, with your items (issue #35; the owner, 2026-10-24)
+            from paf.specown import own_gear
+
+            log(f"  {spec_label(spec)} with your own items...")
+            try:
+                og = own_gear(profile, cls, spec, builds[best], fight_lines, run_dir / simc_spec(spec) / "own",
+                              boss=metric != "dps", log=log)
+                row.own, row.own_error, row.own_changes, row.own_missing = (og.sim, og.error, og.changes,
+                                                                            og.missing)
+            except Exception as ex:  # noqa: BLE001 - the top players' set still compares the specs
+                res.notes.append(f"{spec_label(spec)} with your items could not be simmed ({str(ex)[-120:]}).")
         if "tops" in got and got["tops"] < 0.9 * got[best]:
             other = "the build it ships" if best == "simc" else "your build"
             res.notes.append(f"{spec_label(spec)}: SimulationCraft plays the top players' build "
@@ -412,9 +434,11 @@ def to_json(r: Result) -> dict:
     title = (text.split(":")[0] if kind in ("go", "ok") else "Not compared" if "could not be simmed" in text else
              "The sim and the logs disagree")  # "Outlaw could do more here", "Subtlety fits this boss"
     rows = [{"spec": x.spec, "label": spec_label(x.spec), "tops": x.tops, "tops_lo": x.tops_lo, "tops_hi": x.tops_hi,
-             "sim": x.sim, "error": x.error, "gear": x.gear, "items": x.items} for x in r.rows]
+             "sim": x.sim, "error": x.error, "gear": x.gear, "items": x.items, "own": x.own,
+             "own_error": x.own_error, "own_changes": x.own_changes, "own_missing": x.own_missing} for x in r.rows]
     return {"boss": r.boss, "difficulty": r.difficulty, "mine": r.mine, "ilvl": TOP_ILVL, "metric": r.metric,
             "gear_tops": GEAR_TOPS, "verdict": kind, "title": title, "sentence": text,
             "gear_sentence": gear_sentence(r), "kills_sentence": kills_sentence(r), "now": r.now, "rows": rows,
+            "now_error": r.now_error,
             "kills": {"best": r.kills.best, "median": r.kills.median, "n": len(r.kills.amounts)} if r.kills else None,
             "notes": r.notes}

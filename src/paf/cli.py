@@ -387,27 +387,99 @@ def _objective(raw: str) -> float:
     return v
 
 
-def cmd_topgear(args: argparse.Namespace) -> int:
-    from paf import simc
+def _gear_fights(args: argparse.Namespace) -> list | None:
+    """The fights a gear sim runs on: each boss's rebuilt fight (its prep's template), else a training dummy as the
+    player sets it (targets, length: Raidbots' options), else the presets. None: a boss has no template yet."""
     from paf.corpus.template import template_path
     from paf.fight import PRESETS
-    from paf.gamedata import item_inventory_types, item_sets
-    from paf.profile import parse_simc_export
-    from paf.topgear import FightProfile, GearPool, best_set_simc, format_result, run_topgear
+    from paf.topgear import FightProfile
 
-    profile_text, origin = _load_profile(args.profile)
-    profile = parse_simc_export(profile_text)
-    pool = GearPool(profile, item_inventory_types(), item_sets())
     fights: list[FightProfile] = []
     for boss in args.boss or []:
         _, enc, diff_name, _ = _encounter_and_difficulty(argparse.Namespace(boss=boss, difficulty=args.difficulty))
         fpath = template_path(enc.name, diff_name)
         if not fpath.is_file():
-            print(f"No fight template for {enc.name} {diff_name}: run `paf template \"{enc.name}\"` first.")
-            return 1
+            print(f"No fight template for {enc.name} {diff_name}: prepare that boss first (or run `paf template "
+                  f"\"{enc.name}\"`).")
+            return None
         fights.append(FightProfile(fpath.stem, load_fight(fpath).to_simc()))
+    if not fights and (getattr(args, "targets", None) or getattr(args, "length", None)) and not args.preset:
+        n, secs = args.targets or 1, args.length or 300
+        fights.append(FightProfile(f"dummy {n} target{'s' if n > 1 else ''} {secs // 60} min",  # a folder name too:
+                                   # no comma or colon (simc reads its output paths as options)
+                                   ["fight_style=Patchwerk", f"max_time={secs}", f"desired_targets={n}"]))
     for preset in args.preset or ([] if fights else ["patchwerk"]):
         fights.append(FightProfile(preset, PRESETS[preset]))
+    return fights
+
+
+def cmd_gear(args: argparse.Namespace) -> int:
+    """What to equip, then what to farm (the owner, 2026-10-24: "a /simc, a fight, an hour if need be, then what to
+    wear and what to farm"): Top Gear on your bags and vault, then every usable drop of the boss (or of the whole raid)
+    simmed on top of that best set, on the fight picked."""
+    from paf import results, settings, simc
+    from paf.droptimizer import boss_ev, loot_ilvl, run_droptimizer, usable_loot
+    from paf.encounters import find_encounter, raid_encounters
+    from paf.gamedata import encounter_loot, item_classes, item_inventory_types, item_names, item_sets
+    from paf.profile import parse_simc_export
+    from paf.topgear import GearPool, best_set_simc, run_topgear
+    from paf.wcl import WCLClient
+
+    profile_text, origin = _load_profile(args.profile)
+    profile = parse_simc_export(profile_text)
+    fights = _gear_fights(args)
+    if fights is None:
+        return 1
+    weights = {f.name: f.weight for f in fights}
+    root = simc.new_run_dir(label="gear")
+    print(f"{profile.name} ({origin}); fights: {', '.join(f.name for f in fights)}")
+    out: dict = {"fights": [f.name for f in fights]}
+    pool = GearPool(profile, item_inventory_types(), item_sets())
+    worn = profile_text
+    if pool.candidates:
+        print(f"== What to equip: Top Gear on your {len(pool.candidates)} items")
+        res = run_topgear(profile_text, pool, fights, root / "equip", objective=args.objective,
+                          max_combos=args.max_combos)
+        out["equip"] = results.topgear(res)
+        best = res.best()
+        if best is not None and best.weighted(weights) > 0:
+            worn = profile_text.rstrip() + "\n" + best_set_simc(pool, best)  # the drops simmed on top of it
+            (root / "best_set.simc").write_text(best_set_simc(pool, best), encoding="utf-8")
+    else:
+        print("No items in bags or vault: export /simc with its bags to see what to equip.")
+    client = WCLClient()
+    encs = [find_encounter(client, b) for b in args.boss] if args.boss else raid_encounters(client)
+    if not args.boss:
+        zone = max(x.zone_id for x in encs)
+        encs = [x for x in encs if x.zone_id == zone]
+    best_profile = parse_simc_export(worn)
+    levels = [i.ilvl for i in best_profile.equipped.values() if i.ilvl]
+    ilvl = loot_ilvl(levels, args.difficulty or settings.get("difficulty"))
+    items = usable_loot([x.id for x in encs], profile.class_name, encounter_loot(), item_classes(), item_names(),
+                        profile.spec, _primary()) if ilvl else []
+    owned = {i.item_id: i.ilvl for i in best_profile.equipped.values() if i.item_id}
+    items = [it for it in items if (owned.get(it.item_id) or 0) < ilvl]
+    if items:
+        print(f"== What to farm: {len(items)} drops of {', '.join(x.name for x in encs)} at item level {ilvl}")
+        run_droptimizer(worn, best_profile, items, fights, root / "farm", ilvl, objective=args.objective)
+        out["farm"] = results.loot(items, weights, boss_ev(items, weights), ilvl, [x.name for x in encs])
+    results.write(root, "gear", out)
+    print(f"Runs: {root}")
+    return 0
+
+
+def cmd_topgear(args: argparse.Namespace) -> int:
+    from paf import simc
+    from paf.gamedata import item_inventory_types, item_sets
+    from paf.profile import parse_simc_export
+    from paf.topgear import GearPool, best_set_simc, format_result, run_topgear
+
+    profile_text, origin = _load_profile(args.profile)
+    profile = parse_simc_export(profile_text)
+    pool = GearPool(profile, item_inventory_types(), item_sets())
+    fights = _gear_fights(args)
+    if fights is None:
+        return 1
     n_cand = len(pool.candidates)
     tier = f", tier set {pool.tier_set}" if pool.tier_set else ""
     print(f"{profile.name} ({origin}): {n_cand} candidate items{tier}; fights: {', '.join(f.name for f in fights)}")
@@ -1538,6 +1610,9 @@ def cmd_prep(args: argparse.Namespace) -> int:
                                         alignment=d.alignment, validation=d.validation[1] if d.validation else None,
                                         extra_variants={slow.label: slow.fight} if slow else None)
         d.mrt = {p.objective: mrt_note(enc.name, p, fight, d.cd_names) for p in d.optimized}
+        for p in d.optimized:  # the opener's spells: their icons and Wowhead links (issue #39)
+            for _t, n, sid in [*p.opener, *p.default_opener]:
+                d.links.setdefault(n, f"spell={sid}")
         if d.defensives and d.defensives.moments:  # the defensive moments go in every note
             extra = defensives.mrt_lines(d.defensives)
             d.mrt = {o: n + "\n" + "\n".join(extra) for o, n in d.mrt.items()}
@@ -2792,6 +2867,8 @@ def build_parser() -> argparse.ArgumentParser:
     tg.add_argument("--preset", action="append", choices=["patchwerk", "cleave2", "aoe5"],
                     help="standard fight to add (repeatable; default patchwerk when no --boss)")
     tg.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    tg.add_argument("--targets", type=int, choices=[1, 2, 3, 5, 8], help="training dummy: how many targets")
+    tg.add_argument("--length", type=int, help="training dummy: the fight's length in seconds (default 300)")
     tg.add_argument("--objective", type=_objective, default=0.0,
                     help="total (default), boss (boss-only damage) or a boss weight like 0.7")
     tg.add_argument("--profile", help="simc profile (default: the one loaded with `paf profile`)")
@@ -2801,6 +2878,17 @@ def build_parser() -> argparse.ArgumentParser:
     tg.add_argument("--min-tier", type=int, help="minimum tier pieces (default: as many as equipped, up to 4)")
     tg.add_argument("--top", type=int, default=10)
     tg.set_defaults(func=cmd_topgear)
+
+    ge = sub.add_parser("gear", help="what to equip from your bags, then what to farm, on one fight")
+    ge.add_argument("--boss", action="append", help="sim on this boss's rebuilt fight (its prep); its drops only")
+    ge.add_argument("--preset", action="append", choices=["patchwerk", "cleave2", "aoe5"])
+    ge.add_argument("--targets", type=int, choices=[1, 2, 3, 5, 8], help="training dummy: how many targets")
+    ge.add_argument("--length", type=int, help="training dummy: the fight's length in seconds (default 300)")
+    ge.add_argument("--difficulty", choices=["lfr", "normal", "heroic", "mythic"])
+    ge.add_argument("--objective", type=_objective, default=0.0)
+    ge.add_argument("--profile", help="simc profile (default: your character's)")
+    ge.add_argument("--max-combos", type=int, default=1500)
+    ge.set_defaults(func=cmd_gear)
 
     ta = sub.add_parser("talents", help="sim the most common talent builds of the top players on your character")
     ta.add_argument("boss")

@@ -25,6 +25,8 @@ def read(run_dir: Path) -> dict | None:
 
 
 def fight_label(name: str) -> str:
+    if name.startswith("dummy "):  # a dummy the player set: "dummy 5 targets 3 min" (paf.cli._gear_fights)
+        return "a training dummy, " + name.removeprefix("dummy ")
     return {"patchwerk": "Training dummy", "cleave2": "2 targets", "aoe5": "5 targets"}.get(name, "On the boss")
 
 

@@ -207,3 +207,27 @@ def test_a_press_most_top_players_make_elsewhere_is_flagged_on_its_row(monkeypat
     assert fightview._tops_off(d, "Ancestral Swiftness", 123.0, [93.0, 123.0]) == ""
     d.tops_casts = {"shadow_blades": [193.0] * 64 + [200.0] * 30}
     assert fightview._tops_off(d, "Shadow Blades", 200.0) == ""  # a fair share press it then too
+
+
+def test_the_fight_tab_shows_the_opener_as_simc_plays_it(monkeypatch, tmp_path):
+    # issue #39 (a Frost Mage tester): the first 40 s of the plan, every cast in order
+    from paf import optimize
+
+    log = tmp_path / "boss-pull.log"
+    log.write_text("0.000 Player 'X' performs Action 'flask' (0) (100)\n"
+                   "0.000 Player 'X' performs Action 'shadow_blades' (121471) (100)\n"  # precombat
+                   "0.000 Player 'X_pet' schedules execute for Action 'bite' (17253)\n"  # a pet's
+                   "1.010 Player 'X' schedules execute for Action 'eviscerate' (196819)\n"
+                   "1.010 Player 'X' performs Action 'eviscerate' (196819) (40)\n"
+                   "1.200 Player 'X' performs Action 'shadow_strike' (1) (40)\n"  # a proc: not scheduled
+                   "1.500 Player 'X' schedules execute for Action 'eviscerate_overload' (2)\n"
+                   "41.000 Player 'X' schedules execute for Action 'eviscerate' (196819)\n", encoding="utf-8")
+    monkeypatch.setattr("paf.gamedata.spell_names", lambda locale="": {121471: "Shadow Blades", 196819: "Eviscerate"})
+    casts = optimize.opener(log)
+    assert casts == [(0.0, "Shadow Blades", 121471), (1.01, "Eviscerate", 196819)]  # no consumable, no swing, ≤40 s
+    d = sheet(monkeypatch)
+    d.optimized[0].opener = casts
+    d.lust = 0.0
+    html = fightview.opener_html(d)
+    assert "Bloodlust at the pull" in html and html.count("<li ") == 2
+    assert "<li title='Shadow Blades 0:00'>" in html and "<li title='Eviscerate 0:01'>" in html
