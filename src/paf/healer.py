@@ -930,7 +930,7 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
         f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(_shown(c.name).split(',')[0][:32])}</text>"
         + "".join(f"<rect x='{float(x((moved or {}).get((c.name, t), t))) - 4:.1f}' y='{H - B + 6 + 18 * i}' "
                   f"width='8' height='13' rx='2' "
-                  f"class='cp{'' if t in tied else ' off'}{' bk' if t in c.back else ''}'"
+                  f"class='cp{'' if t in tied else ' off'}{' bk' if t in c.back and not (c.every or c.why) else ''}'"  # a ◷ button: its pill says it
                   f"{_faint(c, t) if id(c) in faint else ''}><title>{e(_step_name(c.name))} {c.shown_at.get(t) or _mmss((moved or {}).get((c.name, t), t))}"
                   f"{'' if t in tied else _mark_reason(c, t, found, (moved or {}).get((c.name, t), t))}</title></rect>"
                   for t in sorted([*c.times, *c.alt, *[pt for pt in [_pull_t(c)] if pt is not None]])

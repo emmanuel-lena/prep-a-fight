@@ -869,7 +869,7 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
         also[p.swap_debuff] = ("measured on the top tanks: " + (
             f"they swap at about {peak} stacks, reached in about {secs:.0f} s" if peak >= 2 else
             f"they never take a second stack; the debuff lasts about {secs:.0f} s") + hit)
-    p.abilities = _role_journal(enc.id, diff_name, "tank", tl, also, tls.phases)
+    p.abilities = _role_journal(enc.id, diff_name, "tank", tl, also, tls.phases, hits=[m.t for m in found])
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     healer.add_icons(p)
@@ -918,7 +918,8 @@ def _primary() -> dict:
 
 
 def _role_journal(encounter_id: int, diff_name: str, role: str, tl, also: dict[str, str] | None = None,
-                  phases: list | None = None, shares: dict[str, float] | None = None) -> str:
+                  phases: list | None = None, shares: dict[str, float] | None = None,
+                  hits: list[float] | None = None) -> str:
     """The Encounter Journal's stages for a healer's or a tank's sheet: that role's abilities in full, the others'
     named (paf.bossguide), with the boss's cast times from the top kills."""
     from paf import bossguide
@@ -934,7 +935,7 @@ def _role_journal(encounter_id: int, diff_name: str, role: str, tl, also: dict[s
                                     icon_map=icons_for(bossguide.spell_refs(sections)), role=role,
                                     difficulty=diff_name, also=also,  # the fight tab's stage starts (heal round
                                     phases=[(n, t) for n, t, *_r in (phases or tl.phases)],  # 12: 1:58 vs 1:49)
-                                    shares=shares)
+                                    shares=shares, duration=tl.duration, hits=hits)  # each stage's cast strip
 
 
 def _prep_healer(args: argparse.Namespace, profile=None) -> int:
@@ -1014,7 +1015,8 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         if c.release is not None:
             c.stored = healer.stored_spells(con, enc.id, diff, c.name)
     h.abilities = _role_journal(enc.id, diff_name, "healer", tl, healer.moment_notes(found, staged=bool(clk)),
-                                tls.phases, dict(h.hitters))  # each ability its share of the raid's damage
+                                tls.phases, dict(h.hitters),  # each ability its share of the raid's damage
+                                [m.t for m in found])  # the big hits on the stages' cast strips
     h.named_by_damage = bool(by)
     h.raid_kills = healer.raid_kills(con, enc.id, diff, pool=True)
     h.hero = healer.hero_split(con, enc.id, diff, spec)

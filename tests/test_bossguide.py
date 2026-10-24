@@ -189,3 +189,25 @@ def test_many_repeated_abilities_are_named_with_icons_not_counted():
     a = abilities_html([one, two])
     second = a[a.index("Stage Two"):]
     assert "stay as they were" not in second and second.count("class='ab-chip'") == 5 and "As in Stage One: " in second
+
+
+def test_a_stage_draws_its_casts_on_a_strip():
+    # Restoration Shaman, Nek'zali (fresh heal review): "around 0:34, 1:10, 3:57" lines, no time picture
+    one = sec(1, "Stage One: Soulcoiler Initiation", "stage",
+              children=[sec(2, "Possession Barrage", "ability", spell=9)])
+    two = sec(3, "Stage Two: Uncoiling", "stage", children=[sec(4, "Possession Barrage", "ability", spell=9)])
+    html = abilities_html([one, two], timings={"Possession Barrage": [34.0, 70.0, 237.0]}, role="healer",
+                          phases=[("Stage One", 0.0), ("Stage Two", 178.0)], duration=280.0, hits=[35.0, 230.0])
+    first, second = html.split('<section class="stage">')[1:]
+    assert first.count("class='cs-ic'") == 2 and "title='Possession Barrage 0:34'" in first  # its stage's casts only
+    assert "title='a big hit 0:35'" in first and "0:35" not in second.split("cstrip")[1][:400]
+    assert second.count("class='cs-ic'") == 1 and "title='a big hit 3:50'" in second
+    assert "cstrip" not in abilities_html([one], timings={"Possession Barrage": [34.0]})  # no duration: no strip
+
+
+def test_a_fight_of_one_stage_draws_one_strip_on_top():
+    # Vashnik (fresh heal review): no stage in the journal, no strip
+    html = abilities_html([sec(1, "Toxic Vapor", "ability", spell=5)], timings={"Toxic Vapor": [30.0, 150.0]},
+                          role="healer", duration=280.0, hits=[40.0])
+    assert html.startswith('<section class="stage strip-only"><h3>Over the fight</h3><div class=\'cstrip\'')
+    assert html.count("class='cs-ic'") == 2 and "title='a big hit 0:40'" in html

@@ -38,3 +38,10 @@
 .ab-chip{display:inline-flex;align-items:center;gap:3px;margin:2px 8px 2px 0;font-style:normal;white-space:nowrap}
 .stage .also{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px}
 .sbm{display:inline-block;width:40px;height:5px;margin-right:5px;border-radius:3px;vertical-align:middle;background:color-mix(in srgb,var(--fg) 12%,transparent);overflow:hidden} .sbm>span{display:block;height:100%;background:var(--fg);opacity:.55}
+/* a stage's casts on its own time line: icons at their times, a dot at each big hit (fresh heal review) */
+.cstrip{position:relative;margin:6px 10px 14px 10px}
+.cstrip .cs-ic{position:absolute;transform:translateX(-50%);line-height:0}
+.cstrip .cs-ic img{width:20px;height:20px;border-radius:4px}
+.cstrip .cs-axis{position:absolute;left:0;right:0;height:2px;background:var(--line)}
+.cstrip .cs-hit{position:absolute;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--warn);transform:translateX(-50%)}
+.cstrip .cs-t{position:absolute;font-size:11px;color:var(--muted)} .cstrip .cs-t.end{transform:translateX(-100%)}

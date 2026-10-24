@@ -282,7 +282,8 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
                    mechanics: list | None = None, burst: dict[str, float] | None = None,
                    icon_map: dict[str, str] | None = None, role: str | None = None,
                    difficulty: str = "heroic", also: dict[str, str] | None = None,
-                   phases: list[tuple[str, float]] | None = None, shares: dict[str, float] | None = None) -> str:
+                   phases: list[tuple[str, float]] | None = None, shares: dict[str, float] | None = None,
+                   duration: float = 0.0, hits: list[float] | None = None) -> str:
     """Every stage and unit of the journal with its abilities; facts from the logs when known. phases: the logs'
     phase names and median starts, said in the stage headings they match ("Stage Two" for "Stage Two: Uncoiling")."""
     def start(title: str) -> str:
@@ -386,8 +387,56 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
             for where, names in repeated.items() if chips(names))
         notes += "".join(f"<p class='small muted also'>For {ROLE_OTHERS[r]}: {chips(names)}</p>"  # chips too (r. 45)
                          for r, names in others.items() if chips(names))
-        cards.append(f'<section class="stage">{title}{intro}{grouped(body)}{notes}</section>')
+        span = _span(top.title, phases, duration) if top.kind == "stage" and duration else None
+        strip = _cast_strip([top], span, ctx, hits) if span else ""
+        cards.append(f'<section class="stage">{title}{strip}{intro}{grouped(body)}{notes}</section>')
+    if duration and not any(s.kind == "stage" for s in sections):  # one stage: the whole fight's strip on top
+        whole = _cast_strip([s for s in sections if s.kind != "overview"], (0.0, duration), ctx, hits)
+        cards.insert(0, f'<section class="stage strip-only"><h3>Over the fight</h3>{whole}</section>' if whole else "")
     return "".join(cards)
+
+
+def _span(title: str, phases: list | None, duration: float) -> tuple[float, float] | None:
+    """A journal stage's start and end in the logs (the next phase's start, else the kill)."""
+    ph = sorted(phases or [], key=lambda p: p[1])
+    base = title.split(":")[0].strip().lower()
+    for i, (n, t) in enumerate(ph):
+        if n.split(":")[0].strip().lower() == base:
+            return t, (ph[i + 1][1] if i + 1 < len(ph) else duration)
+    return None
+
+
+def _cast_strip(tops: list[Section], span: tuple[float, float], ctx: dict, hits: list[float] | None) -> str:
+    """A stage's casts on its own time line (span: its start and end): each ability's icon at its times, a dot at
+    each big hit (fresh heal review: "around 0:34, 1:10, 3:57" lines, two clocks). Overlapping icons take a second
+    row."""
+    if span[1] <= span[0]:
+        return ""
+    a, b = span
+    marks = sorted({(t, s.title) for _d, s in walk(tops) if s.kind == "ability"
+                    for t in ctx["timings"].get(s.title.lower(), []) if a - 15 <= t < b})
+    if not marks:
+        return ""
+
+    def x(t: float) -> float:
+        return max(0.0, min(100.0, (t - a) / (b - a) * 100))
+    rows: list[float] = []  # each row's last icon position: a new icon closer than 4% takes the next row
+    icons_html = []
+    for t, n in marks:
+        r = next((i for i, last in enumerate(rows) if x(t) - last >= 4), len(rows))
+        if r < len(rows):
+            rows[r] = x(t)
+        else:
+            rows.append(x(t))
+        icons_html.append(f"<span class='cs-ic' style='left:{x(t):.1f}%;top:{r * 24}px' title='{e(n)} "
+                          f"{_mmss(t)}'>{icons.img(ctx['icons'].get(n, ''), 'small')}</span>")
+    dots = "".join(f"<span class='cs-hit' style='left:{x(t):.1f}%' title='a big hit {_mmss(t)}'></span>"
+                   for t in hits or [] if a <= t < b)
+    ends = (f"<span class='cs-t' style='left:0;top:{24 * len(rows) + 10}px'>{_mmss(a)}</span>"
+            f"<span class='cs-t end' style='left:100%;top:{24 * len(rows) + 10}px'>{_mmss(b)}</span>")
+    return (f"<div class='cstrip' style='height:{24 * len(rows) + 30}px' role='img' aria-label='the stage&#39;s "
+            f"casts over time'>{''.join(icons_html)}<div class='cs-axis' style='top:{24 * len(rows) + 4}px'>{dots}"
+            f"</div>{ends}</div>")
 
 
 CSS = theme.style("bossguide")

@@ -29,7 +29,7 @@
 .fv .seg a,.fv .seg button{font:600 13px var(--font-body);border:0;background:transparent;color:var(--muted);padding:7px 12px;cursor:pointer;text-decoration:none}
 .fv .seg [aria-current="page"],.fv .seg [aria-pressed="true"]{color:var(--fg);background:var(--surface);box-shadow:inset 0 -2px 0 var(--sel),0 0 0 1px var(--line)}
 .fv .seg button{font-family:var(--font-data);font-size:12.5px;padding:7px 10px}
-.fv .sheet-fv{display:grid;grid-template-columns:350px minmax(0,1fr);gap:44px;align-items:start;padding-top:20px}
+.fv .sheet-fv{display:grid;grid-template-columns:clamp(350px,29vw,420px) minmax(0,1fr);gap:44px;align-items:start;padding-top:20px}
 .fv .fside{position:sticky;top:max(14px,env(safe-area-inset-top,0px));display:grid;gap:14px;align-content:start;max-height:calc(100vh - 28px);overflow:auto}
 .fv .fbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow)}
 .fv .fbox h2{font:600 1.1rem/1.25 var(--font-reading);margin:0 0 10px}

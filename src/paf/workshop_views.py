@@ -302,19 +302,29 @@ def comp(d: dict) -> str:
         it, ✓ on it in your pull, ✗ hardly hit it in your pull."""
         sets = {k: {p["name"] for p in t.get(k) or []} for k in ("proposed", "pulled", "missed")}
         people = list({p["name"]: p for k in ("proposed", "pulled", "missed") for p in t.get(k) or []}.values())
-        if not people:
+        top = t["ranking"][0] if t.get("ranking") else None  # its best spec's players put on another target: said
+        away = {p["name"]: (p, o["name"]) for o in targets if o is not t for p in o.get("proposed") or []}
+        sent = [(away[n][0], away[n][1]) for n in (top or {}).get("players", [])
+                if n in away and n not in {p["name"] for p in people}]  # (fresh DPS review: Ixuu, 26k, no mark)
+        if not people and not sent:
             return ""
         chips = []
         for p in people:
             n = p["name"]
-            marks = ([("go", "&rarr;", "put them on it")] if n in sets["proposed"] and n not in sets["pulled"] else [])
+            marks = [("go", "&rarr;", "put them on it")] if n in sets["proposed"] else []  # the pick always shown,
+            # "→ ✓" when already there (fresh DPS review: the → count under the header's)
             marks += [("ok", "&#10003;", "on it in your pull")] if n in sets["pulled"] else []
             marks += [("warn", "&#10007;", "hardly hit it in your pull")] if n in sets["missed"] else []
             chips.append(f"<span class='who-chip st-{marks[0][0]}' title='{e(n)}: {', '.join(m[2] for m in marks)}'>"
                          f"{ic(p['spec'])}<b>{e(n)}</b>" + "".join(f"<i class='st {c}'>{g}</i>" for c, g, _w in marks)
                          + "</span>")
+        for p, other in sent:
+            chips.append(f"<span class='who-chip st-away' title='{e(p['name'])}: put on {e(other)}'>{ic(p['spec'])}"
+                         f"<b>{e(p['name'])}</b><i class='st away'>&#8599; {e(other)}</i></span>")
         said = [(c, g, w) for c, g, w in (("go", "&rarr;", "put them on it"), ("ok", "&#10003;", "on it in your pull"),
-                                          ("warn", "&#10007;", "hardly hit it")) if f"class='st {c}'" in "".join(chips)]
+                                          ("warn", "&#10007;", "hardly hit it"),
+                                          ("away", "&#8599;", "put on another target"))
+                if f"class='st {c}'" in "".join(chips)]
         key = " ".join(f"<span><i class='st {c}'>{g}</i> {w}</span>" for c, g, w in said)
         return f"<p class='lab roster-key'>{key}</p><div class='whos'>{''.join(chips)}</div>"
 

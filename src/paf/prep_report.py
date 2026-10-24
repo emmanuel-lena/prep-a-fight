@@ -793,7 +793,7 @@ def checklist_items(d: PrepData) -> list[tuple[str, str]]:
         item(f"Cooldowns ({_goal(want)} damage): use them as soon as they are ready; holding them for a moment of "
              f"the fight gains nothing measurable here")
     if getattr(d, "lust_spots", None):
-        item(f"{icons.img(d.icons.get('Bloodlust', '') or _sfallback(d, 'Bloodlust'), 'small')}{lust_line(d)}")
+        item(f"{icons.img(d.icons.get('Bloodlust', '') or _sfallback(d, 'Bloodlust'), 'small')}{lust_line(d, True)}")
     elif d.lust is not None:
         item("Bloodlust goes out at the pull" if d.lust < 15 else f"Bloodlust usually comes around {_mmss(d.lust)}")
     mine = [a for a in d.actions if a.kind in ("kill", "contact", "interrupt", "mechanic")
@@ -1120,7 +1120,7 @@ def in_time_order(note: str) -> str:
     return "\n".join(head + timed) + ("\n" if note.endswith("\n") else "")
 
 
-def lust_line(d: PrepData) -> str:
+def lust_line(d: PrepData, chips: bool = False) -> str:
     """Where the fight puts Bloodlust (the raid lead's pick, else the top raids' most used spot) and what the top
     raids' other spots would give you in the sim."""
     spots = d.lust_spots
@@ -1151,6 +1151,12 @@ def lust_line(d: PrepData) -> str:
                 + (": tell your raid lead." if not d.lust_pick else "."))
     elif gains:
         tail = " The top raids' other spots give you no more."
+    if chips:  # the checklist's form: its spot and who picked it as pills, the advice after (fresh DPS review)
+        spot = ("none" if sp.t is None else "at the pull" if sp.kind == "pull" else
+                f"{_mmss(sp.t)}, {sp.phrase.removeprefix('at ')}" if sp.kind == "phase" else _mmss(sp.t))
+        pick = "your raid lead&#39;s pick" if d.lust_pick else f"{sp.share:.0%} of the top raids"
+        return (f"<span class='act'><b>Bloodlust</b> <span class='pill'>{e(spot)}</span><span class='pill'>{pick}"
+                f"</span></span>{tail}")
     return f"{head} ({why}).{tail}"
 
 
@@ -1373,7 +1379,8 @@ def render(d: PrepData) -> str:
                     done = [x for x, _m in parsed]  # by identity: an Action is no set member (it crashed a prep)
                     rows = [a for a in rows if not any(a is x for x in done)]
                     blocks += (f"<h3>{e(title)}</h3><table class='kills fit'><thead><tr><th>Add</th>"
-                               "<th class='n'>a kill</th><th class='n' title='how long they live in the top kills'>"
+                               "<th class='n'>a kill</th><th class='n' title='how long they live in the top kills: the median of every add; "
+                               "the fight tab gives each wave its own'>"  # (a review: 18 s there, 19 s here)
                                "&#9201; killed in</th><th title='the share of the top players&#39; damage on them while "
                                "they are up'>your spec on them</th></tr></thead><tbody>" + "".join(
                                    f"<tr><td>{icons.img(d.icons.get(a.name, '') or _sfallback(d, a.name), 'small')}"

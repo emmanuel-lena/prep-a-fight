@@ -63,6 +63,8 @@ def test_the_page():
     page = workshop_views.render({"kind": "comp", **comp.to_dict("Boss", "this boss, kill of 1:40", rows())})
     assert "the most damage on" in page and "put them on it" in page and "hardly hit it" in page
     assert page.count("<b>Moon</b>") == 1 and "title='Moon: hardly hit it in your pull'" in page  # one roster
+    picked = {p["name"] for t in comp.to_dict("Boss", "x", rows())["targets"] for p in t["proposed"] or []}
+    assert all(f"title='{n}: put them on it" in page for n in picked)  # every pick keeps its →
 
 
 def test_the_spec_damage_of_the_tops_never_turns_into_a_spec_change():

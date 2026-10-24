@@ -144,3 +144,4 @@ table.night th.n{text-align:right}
 /* Who hits what: one roster, each player's state a mark (→ put on it, ✓ on it, ✗ hardly hit it) */
 .st{font-style:normal;font-weight:700;margin-left:2px} .st.go{color:var(--accent)} .st.ok{color:var(--pos)} .st.warn{color:var(--neg)}
 .who-chip.st-go{border-color:var(--accent)} .roster-key{display:flex;flex-wrap:wrap;gap:4px 14px}
+.st.away{color:var(--muted);font-weight:600} .who-chip.st-away{opacity:.75}

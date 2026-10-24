@@ -61,6 +61,8 @@ def test_the_sheet_says_where_bloodlust_goes_and_what_the_other_spots_give():
     assert line == ("<b>Bloodlust on pull</b> (52% of the top raids lust there). Lust at the start of Stage Two: "
                     "Uncoiling (40% of them) would give you <b class='pos'>+1.2% damage</b> (&plusmn;0.3%): tell your "
                     "raid lead.")
+    assert lust_line(d, True).startswith("<span class='act'><b>Bloodlust</b> <span class='pill'>at the pull</span>"
+                                         "<span class='pill'>52% of the top raids</span></span> Lust at the start")
     d.lust_pick, d.lust = s2.label, 262.0
     assert lust_line(d) == ("<b>Bloodlust at 4:22</b>, the start of Stage Two: Uncoiling (your raid lead's pick). "
                             "The top raids' other spots give you no more.")
