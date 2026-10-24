@@ -2313,6 +2313,7 @@ def _raid_tools(client, con, enc, diff: int, url: str) -> dict:
     code = report_code(url)
     boss = main_boss(con, enc.id, diff, enc.name)
     targets, _ = raidreview.references(con, enc.id, diff, boss)  # empty with a prep pack and no local corpus
+    rc = None
     if targets:
         try:
             rc = raid_from_report(client, url, enc.id, diff)
@@ -2337,6 +2338,9 @@ def _raid_tools(client, con, enc, diff: int, url: str) -> dict:
             print(f"  best pull: skipped ({str(ex)[:100]})")
     try:
         rows, icons = tracker.night(client, code, enc.id)
+        known = {n: sp for n, sp, _d in (rc.players if rc is not None else [])}  # the log's own icon names only
+        icons = {n: (known.get(n, ic) if "-" not in (ic or "") else ic) for n, ic in icons.items()}  # a class: its
+        # spec from the raid's comp, as who hits what shows it (DPS round 48: a Retribution Paladin's class icon)
         if rows:
             out["night"] = tracker.to_dict(code, rows, icons)
     except Exception as ex:  # noqa: BLE001
