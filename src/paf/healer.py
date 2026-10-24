@@ -888,8 +888,16 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
     extra = [c for c in presses or [] if others and c.times and c.spell_id != SWAP_LANE
              and all(c.name != r.name for r in rows)][:others]
     faint = {id(c) for c in extra}
-    rows = [*rows, *extra]
-    longest = max((len(_shown(c.name).split(',')[0]) for c in rows), default=0)  # a trinket's whole name (fresh
+    # a button played by two rhythms: a lane each, its share in its label (fresh heal review: Disc's Evangelism,
+    # "two rhythms, by their first press…" in words); every other button one lane
+    lanes: list[tuple[Cooldown, set | None, str]] = []
+    for c in [*rows, *extra]:
+        if len(c.rhythms) == 2:
+            lanes += [(c, set(ts), f" {'AB'[k]} {_pct(sp)}") for k, (sp, ts) in enumerate(c.rhythms)]
+        else:
+            lanes.append((c, None, ""))
+    rows = [c for c, _o, _t in lanes]
+    longest = max((len(_shown(c.name).split(',')[0]) + len(tag) for c, _o, tag in lanes), default=0)  # whole (fresh
     W, H, L, B = 760, 200 + 18 * len(rows), max(150, 6 * longest + 16) if rows else 46, 24 + 18 * len(rows)  # review)
     peak = max(curve, default=0) or 1
     span = max(len(curve) * STEP, 1)
@@ -927,18 +935,20 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
         + ("".join(f"<line x1='{x(t)}' x2='{x(t)}' y1='{H - B + 6 + 18 * i}' y2='{H - B + 18 + 18 * i}' class='sw'>"
                    f"<title>{e(c.name)} {_mmss(t)}</title></line>" for t in c.times if t <= span))
         if c.spell_id == SWAP_LANE else
-        f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(_shown(c.name).split(',')[0][:32])}</text>"
+        f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(_shown(c.name).split(',')[0][:32])}"
+        f"{e(tag)}</text>"
         + "".join(f"<rect x='{float(x((moved or {}).get((c.name, t), t))) - 4:.1f}' y='{H - B + 6 + 18 * i}' "
                   f"width='8' height='13' rx='2' "
                   f"class='cp{'' if t in tied else ' off'}{' bk' if t in c.back and not (c.every or c.why) else ''}'"  # a ◷ button: its pill says it
                   f"{_faint(c, t) if id(c) in faint else ''}><title>{e(_step_name(c.name))} {c.shown_at.get(t) or _mmss((moved or {}).get((c.name, t), t))}"
                   f"{'' if t in tied else _mark_reason(c, t, found, (moved or {}).get((c.name, t), t))}</title></rect>"
                   for t in sorted([*c.times, *c.alt, *[pt for pt in [_pull_t(c)] if pt is not None]])
-                  if t <= span  # in time order (round 84), the pull group the card shows too (round 99)
+                  if t <= span and (only is None or any(abs(t - o) <= 1 for o in only))  # its rhythm's only
+                  # in time order (round 84), the pull group the card shows too (round 99)
                   for tied in [{a for a in [*c.times, *c.alt] if (c.name, a) in answered} if answered is not None
                                else {a for a, n in [*zip(c.times, c.near, strict=False),
                                                     *zip(c.alt, c.alt_near or [""] * len(c.alt), strict=False)] if n}])
-        for i, c in enumerate(rows))
+        for i, (c, only, tag) in enumerate(lanes))
     return (f"<svg viewBox='0 0 {W} {H}' class='rd' role='img' aria-label='{e(label)}'>"
             f"<line class='ax' x1='{L}' x2='{W - 10}' y1='{H - B}' y2='{H - B}'/>{median}{lines}{ticks}"
             f"<polyline points='{pts}'/>{marks}{cds}</svg>")
@@ -1667,11 +1677,11 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
                   # (round 91: plain text after a chip read as that chip's continuation)
                   for k, v in (named or {}).items()
                   if k[0] == c.name and isinstance(k[1], tuple))
-        + ("<small class='alt'>two rhythms, by their first press: " + "; or ".join(
-            f"from {_mmss((moved or {}).get((c.name, ts[0]), ts[0]))}, then "
-            f"{_and([_mmss((moved or {}).get((c.name, t), t)) for t in ts[1:]])}" for _sp, ts in c.rhythms)
-           + "</small>"
-           if c.rhythms else "")
+        + ("<small class='alt'><span class='pill rhythm' title='two rhythms, by their first press: " + "; or ".join(
+            f"{_pct(sp)} from {_mmss((moved or {}).get((c.name, ts[0]), ts[0]))}, then "
+            f"{_and([_mmss((moved or {}).get((c.name, t), t)) for t in ts[1:]])}" for sp, ts in c.rhythms)
+           + "'>&#8649; 2 rhythms</span></small>"  # the chart's A and B lanes draw them (fresh
+           if c.rhythms else "")  # heal review: a sentence), the times on hover
         + (f"<small class='alt'><span class='pill rhythm' title='pressed every time it is back'><i class='g'>&#9719;</i> every "
            f"{c.every:.0f} s</span>"  # the rhythm a badge, as the others' (fresh heal review); its other presses (r. 109:
            + (f"; {_more(c, named)} more on that cadence" if c.times and _more(c, named) else "")  # Stasis "3 a
@@ -3184,9 +3194,9 @@ def render_sheet(h: HealerPrep) -> str:
                             f"{k:.1f} times a kill'>dispelled {k:.1f}&times; a kill</span>", stages, count=1)  # (r. 43)
         boss.append(f"<h2>Every ability{', phase by phase' if '<h3>' in stages else ''}</h2>"  # Vashnik: one phase
                     "<p class='small muted'><span class='pill' title='They shift with your raid&#39;s pace, and "
-                    "another spec&#39;s sheet can differ" + ("; the fight tab&#39;s, in stage time, can sit a few seconds "
-                                                             "off" if getattr(h, "staged", False) else "")
-                    + f"'>pull times &middot; {h.kills} kills, median {_mmss(h.duration)}</span></p>"  # a chip (r. 43)
+                    "another spec&#39;s sheet can differ"  # a staged fight's casts in stage time, as its hits (fresh
+                    + f"'>{'stage time' if getattr(h, 'staged', False) else 'pull times'} &middot; {h.kills} kills, "
+                    f"median {_mmss(h.duration)}</span></p>"  # heal review); a chip (r. 43)
                     f"<div class='stages'>{stages}</div>")
     # every spec the pool reads (paf.healroles.POOL_PLAYERS): the Disc Priest, 3 in a Holy Priest's kills, has 43
     # in the pool; its casts unread here are said so in its cells

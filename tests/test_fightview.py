@@ -200,6 +200,10 @@ def test_a_press_most_top_players_make_elsewhere_is_flagged_on_its_row(monkeypat
     d.tops_casts, d.tops_players = {"shadow_blades": [193.0] * 64 + [200.0] * 5}, 100
     assert fightview._tops_off(d, "Shadow Blades", 200.0) == "⚠ 64% of the top players at about 3:13"
     why = fightview._why(d, "Shadow Blades", 200.0, [2.0, 100.0, 200.0])  # 3:13 out of reach after 1:40: no
-    assert why.endswith("⚠ 64% of the top players at about 3:13, a cycle ahead")  # "press it earlier", said
+    assert why.endswith("⚠ 64% of the top players at about 3:13 (their cycle runs ~7 s ahead)")  # said
+    # Elemental, Nek'zali (fresh DPS review): the tops' 1:37 is the 1:33 press's, not the 2:03's
+    d.tops_casts = {"ancestral_swiftness": [97.0] * 74 + [125.0] * 10}
+    assert "⚠" not in fightview._why(d, "Ancestral Swiftness", 123.0, [2.0, 33.0, 64.0, 93.0, 123.0])
+    assert fightview._tops_off(d, "Ancestral Swiftness", 123.0, [93.0, 123.0]) == ""
     d.tops_casts = {"shadow_blades": [193.0] * 64 + [200.0] * 30}
     assert fightview._tops_off(d, "Shadow Blades", 200.0) == ""  # a fair share press it then too

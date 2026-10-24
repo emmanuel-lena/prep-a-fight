@@ -302,8 +302,8 @@ def items(d) -> list[tuple[float, Item]]:
         if it.kind in ("cd", "pot") and t >= 5 and not _ctx(t, out, it.kind):
             it.why = _why(d, it.name, t, order.get(it.name, []))
         elif it.kind in ("cd", "pot") and t >= 5:  # a press with its reason on the row: the top players' other
-            it.why = _tops_off(d, it.name, t)  # moment still said, as Dig deeper warns (fresh DPS review: Shadow
-            # Blades 3:20, the top players 3:13)
+            # moment still said, as Dig deeper warns (fresh DPS review: Shadow Blades 3:20, the top players 3:13)
+            it.why = _tops_off(d, it.name, t, order.get(it.name, []))
     hints = journal_hints(d, {_clean(it.name) for _t, it in out if it.side == "boss"})
     told: set[str] = set()
     for _t, it in sorted(out, key=lambda x: x[0]):  # said once, on the first event it names (the cause first)
@@ -349,8 +349,10 @@ def _why(d, name: str, t: float, presses: list[float]) -> str:
             # an earlier moment the cooldown cannot reach after the previous press: not "press it earlier" (a
             # review: "earlier, at 1:37" on a 2:03 row whose previous press is 1:33), but said when few press it
             # here: the top players run a cycle ahead (fresh DPS review: Shadow Blades 3:20, them 3:13)
-            if here < 0.25:
-                why += f"; ⚠ {there[0]:.0%} of the top players at about {_mmss(there[1])}, a cycle ahead"
+            if here < 0.25 and abs(there[1] - t) < abs(there[1] - prev[-1]):  # theirs, not the previous press's
+                # (fresh DPS review: Ancestral Swiftness 2:03 flagged for the 1:37 of its own 1:33 press)
+                why += (f"; ⚠ {there[0]:.0%} of the top players at about {_mmss(there[1])} (their cycle runs "
+                        f"~{t - there[1]:.0f} s ahead)")
             there = None
         if there is not None and here < 0.25:
             when = "wait until" if there[1] > t else "press it earlier, at"  # a deviation said as one (a review:
@@ -362,15 +364,17 @@ def _why(d, name: str, t: float, presses: list[float]) -> str:
     return why.lstrip(";, ")  # a later press with no rule said: its top players' part alone
 
 
-def _tops_off(d, name: str, t: float) -> str:
-    """Most top players press it at another moment close by, few at this one (prep_report.off_tops' rule)."""
+def _tops_off(d, name: str, t: float, presses: list[float] | None = None) -> str:
+    """Most top players press it at another moment close by, few at this one (prep_report.off_tops' rule); a moment
+    nearer another of your presses is that press's, not this one's."""
     from paf.prep_report import _key, tops_moment
 
     ts, n = d.tops_casts.get(_key(name)), d.tops_players
     if not ts or not n:
         return ""
     here, there = tops_moment(ts, n, t)
-    if there is None or here >= 0.25:
+    if there is None or here >= 0.25 or any(abs(there[1] - x) < abs(there[1] - t) for x in presses or []
+                                             if abs(x - t) > 1):
         return ""
     return f"⚠ {there[0]:.0%} of the top players at about {_mmss(there[1])}"
 
@@ -687,8 +691,9 @@ def _phase_html(name: str, start: float, end: float, pi: int, rows: str, its: li
     mine = [(t, x) for t, x in its if start - 0.5 <= t < end - 0.5 and x.side == "boss"]
     said = [x.text[0].lower() + x.text[1:] for _t, x in mine if x.kind == "immune"]
     said += [f"{x.text} at {_mmss(t)}" for t, x in mine if x.kind == "adds"]
-    said += [f"everyone moves from {_mmss(t)} to {_mmss(t + x.dur)}" for t, x in mine
-             if x.kind == "move" and x.dur >= MOVE_CUE]  # the stage's movement worth a word, with its times
+    said += [f"everyone moves from {_mmss(t)} to {_mmss(t + x.dur)}" if x.dur >= MOVE_CUE else
+             f"a {x.dur:.0f} s move at {_mmss(t)}" for t, x in mine  # every move the timeline draws, the short
+             if x.kind == "move"]  # ones in a word (fresh DPS review: 2 named, 4 drawn)
     said.sort(key=lambda s: [int(v) for v in re.findall(r"(\d+):(\d\d)", s)[:1][0]] if re.search(r"\d+:\d\d", s)
               else [0, 0])
     lust = [t for t, x in mine if x.kind == "lust"]

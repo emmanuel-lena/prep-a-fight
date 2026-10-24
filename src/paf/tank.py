@@ -778,7 +778,8 @@ def render_sheet(p: TankPrep) -> str:
     if p.abilities:  # every ability, the tanks' in full and the others' named
         boss.append(f"<h2>Every ability{', phase by phase' if '<h3>' in p.abilities else ''}</h2>"
                     "<p class='small muted'><span class='pill' title='They shift with your raid&#39;s pace, and "
-                    f"another spec&#39;s sheet can differ'>pull times &middot; {p.kills} kills, median "
+                    f"another spec&#39;s sheet can differ'>{'stage time' if getattr(p, 'staged', False) else 'pull times'}"
+                    f" &middot; {p.kills} kills, median "
                     f"{_mmss(p.duration)}</span></p>"  # the method a chip (round 43)
                     f"<div class='stages'>{p.abilities}</div>")
     have = next((x for x in p.presence if x.spec == p.spec), None)

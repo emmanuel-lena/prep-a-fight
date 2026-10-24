@@ -891,3 +891,15 @@ def test_the_chart_draws_the_other_cards_cooldowns_fainter_for_fewer_players():
     assert "style='opacity:1.00'" in svg and "style='opacity:0.78'" in svg
     assert healer.curve_svg([1.0] * 60, [], [], "x", [slt, ns], {"Spirit Link Totem"},
                             {("Spirit Link Totem", 73.0)}).count("class='cl'") == 1
+
+
+def test_a_button_of_two_rhythms_draws_a_lane_each():
+    # Discipline Priest, Vashnik (fresh heal review): Evangelism A 0:04 -> 1:42 -> 3:15, B 0:22 -> 1:49 -> 3:35
+    ts = [4.0, 22.0, 102.0, 109.0, 195.0, 215.0]
+    ev = healer.Cooldown("Evangelism", 1, 0.67, 3.0, ts, [""] * 6, support=[0.31, 0.36] * 3,
+                         rhythms=[(0.31, [4.0, 102.0, 195.0]), (0.36, [22.0, 109.0, 215.0])])
+    svg = healer.curve_svg([1.0] * 60, [], [], "x", [ev], set(), set(), others=4)
+    assert "Evangelism A 31%</text>" in svg and "Evangelism B 36%</text>" in svg
+    lanes = svg.split("class='cl'")[1:]
+    assert [lane.count("<rect") for lane in lanes] == [3, 3]
+    assert "Evangelism 0:22" not in lanes[0] and "Evangelism 0:22" in lanes[1]

@@ -1026,7 +1026,7 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     for c in h.cooldowns:
         if c.release is not None:
             c.stored = healer.stored_spells(con, enc.id, diff, c.name)
-    h.abilities = _role_journal(enc.id, diff_name, "healer", tl, healer.moment_notes(found, staged=bool(clk)),
+    h.abilities = _role_journal(enc.id, diff_name, "healer", tl, healer.moment_notes(found),
                                 tls.phases, dict(h.hitters),  # each ability its share of the raid's damage
                                 [m.t for m in found])  # the big hits on the stages' cast strips
     h.named_by_damage = bool(by)
