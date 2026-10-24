@@ -488,7 +488,7 @@ def render_sheet(p: TankPrep) -> str:
                        for n, u in p.mitigation) + "".join(
             f"<li><b>{ic(n)}{e(n)}</b><small><span class='use' title='pressed by {u:.0%} of the top players'>"  # the
             f"<span class='ubar'><span style='width:{u:.0%}'></span></span>{u:.0%}</span> &middot; {count(k)}/kill"
-            + (f" <span class='pill rhythm' title='pressed every time it is back'>&#9719; every {ev:.0f} s</span>"
+            + (f" <span class='pill rhythm' title='pressed every time it is back'><i class='g'>&#9719;</i> every {ev:.0f} s</span>"
                if ev else "") + "</small>"  # the cards' one form: a bar, N/kill, the rhythm a badge (fresh heal review)
             + ("<span class='when'>" + "".join(f"<span class='chip'>{_chip(moved_t.get((n, t), t), hit_of(n, t))}"
                                                f"{_share(x := tied.get((n, t), sp) if hit_of(n, t) else sp)}"

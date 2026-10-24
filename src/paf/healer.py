@@ -1339,9 +1339,10 @@ PULL = 12.0  # seconds: a press before this is the pull's opener, never a ramp f
 OR_NEAR = 20.0  # seconds: the farthest "or" time of a button pressed about every minute or on cooldown
 MINUTE = "about every minute"  # the reason a button pressed four times a kill or more is tied to no hit
 # a reason a press is tied to no hit, as its pill (the words on hover)
-RHYTHM = {MINUTE: "&#9719; ~1 min",  # a clock, never ⟲'s look-alike (fresh heal review: ↻ beside ⟲); "no hit" on hover
-          "a cast-while-moving button": "&#8674; on the move", "a movement button": "&#8674; movement",
-          "a trinket, placed by its rhythm": "&#9719; trinket rhythm", "a potion": "potion",
+RHYTHM = {MINUTE: "<i class='g'>&#9719;</i> ~1 min",  # a clock, never ⟲'s look-alike (fresh heal review); "no hit"
+          "a cast-while-moving button": "<i class='g'>&#8674;</i> on the move",  # on hover; the glyph its own span
+          "a movement button": "<i class='g'>&#8674;</i> movement",  # (a potion's "P" was enlarged as a glyph)
+          "a trinket, placed by its rhythm": "<i class='g'>&#9719;</i> trinket rhythm", "a potion": "potion",
           "cast on another player": "on another player"}
 
 
@@ -1532,7 +1533,9 @@ def brief(dl: str) -> str:
             return m.group(0)
         plain = html.unescape(re.sub(r"<[^>]+>", "", full)).replace("'", "&#39;")
         return f"<dt>{term}</dt><dd title='{plain}'>{word}</dd>"
-    return re.sub(r"<dt>(.*?)</dt><dd>(.*?)</dd>", short, dl)
+    out = re.sub(r"<dt>(.*?)</dt><dd>(.*?)</dd>", short, dl)
+    # a term and its meaning one unit, never split across lines (fresh heal review)
+    return re.sub(r"(<dt>.*?</dt><dd[^>]*>.*?</dd>)", r"<div class='lg'>\1</div>", out)
 
 
 # each legend term in a few words; its whole rule on the term's hover
@@ -1648,7 +1651,7 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
             f"{_and([_mmss((moved or {}).get((c.name, t), t)) for t in ts[1:]])}" for _sp, ts in c.rhythms)
            + "</small>"
            if c.rhythms else "")
-        + (f"<small class='alt'><span class='pill rhythm' title='pressed every time it is back'>&#9719; every "
+        + (f"<small class='alt'><span class='pill rhythm' title='pressed every time it is back'><i class='g'>&#9719;</i> every "
            f"{c.every:.0f} s</span>"  # the rhythm a badge, as the others' (fresh heal review); its other presses (r. 109:
            + (f"; {_more(c, named)} more on that cadence" if c.times and _more(c, named) else "")  # Stasis "3 a
            + "</small>" if c.every and not _held(c) else  # kill", two chips)

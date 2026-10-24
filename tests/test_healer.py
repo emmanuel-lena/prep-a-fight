@@ -474,7 +474,7 @@ def test_a_cadence_names_its_group_beside_a_held_habit():
     assert ("on cooldown from 0:04, about every 122 s; those pressing it at 0:35 instead press it again at varying "
             "times" in out)
     c.alt_near = [""]
-    assert "&#9719; every 122 s<" in healer.cooldowns_html([c])  # the rhythm badge
+    assert "&#9719;</i> every 122 s<" in healer.cooldowns_html([c])  # the rhythm badge
 
 
 def test_a_two_step_button_says_its_release_and_what_it_stores():
