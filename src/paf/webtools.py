@@ -248,7 +248,10 @@ def quota_html() -> str:
         line = quota_line()
         m = re.match(r"([\d,]+) / ([\d,]+)", line)  # thousands written "3,600" (app round 15: the bar read 31/3)
         n = [int(x.replace(",", "")) for x in m.groups()] if m else []
-        return (meter(n[0] / max(1, n[1])) if n else "") + e(line)  # a bar beside the numbers
+        short = line.replace(" points used this hour (reset in ", " pts &middot; resets in ").rstrip(")")  # room for
+        # four digits (fresh app review 7: 3 px from the edge at "10 / 3,600")
+        return (meter(n[0] / max(1, n[1])) if n else "") + (e(line) if short == line else
+                                                            e(short).replace("&amp;middot;", "&middot;"))
     except Exception as ex:  # noqa: BLE001 - shown as is
         return f"<span class='neg'>{e(str(ex)[:160])}</span>"
 
