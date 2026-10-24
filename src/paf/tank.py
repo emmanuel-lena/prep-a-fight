@@ -482,8 +482,9 @@ def render_sheet(p: TankPrep) -> str:
         def ic(n: str) -> str:  # its spell's icon (paf.healer.add_icons), none offline
             got = getattr(p, "name_icons", {}).get(n, "")
             return img(got, "small", "ics") if got else ""
-        return "".join(f"<li><b>{ic(n)}{e(n)}</b><span class='upbar' aria-hidden='true'><span style='width:"
-                       f"{u * 100:.0f}%'></span></span><b class='upn'>{u:.0%}</b><small>uptime</small></li>"
+        return "".join(f"<li><b>{ic(n)}{e(n)}</b><small><span class='use' title='up {u:.0%} of the kill'>"  # one bar
+                       f"<span class='ubar'><span style='width:{u * 100:.0f}%'></span></span>{u:.0%}</span> uptime"
+                       "</small></li>"  # style for the section (fresh heal review: two bars in one section)
                        for n, u in p.mitigation) + "".join(
             f"<li><b>{ic(n)}{e(n)}</b><small><span class='use' title='pressed by {u:.0%} of the top players'>"  # the
             f"<span class='ubar'><span style='width:{u:.0%}'></span></span>{u:.0%}</span> &middot; {count(k)}/kill"

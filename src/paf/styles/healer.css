@@ -82,3 +82,4 @@ table.others .under .ics{filter:grayscale(1);opacity:.55} /* a share under the b
 .hl2 .use{display:inline-flex;align-items:center;gap:5px} .hl2 .ubar{display:inline-block;width:46px;height:6px;border-radius:3px;background:color-mix(in srgb,var(--fg) 14%,transparent);overflow:hidden}
 .hl2 .ubar>span{display:block;height:100%;background:var(--fg);opacity:.55}
 .hl2 .top{margin-left:8px;font-weight:700;white-space:nowrap} .hl2 .top.take{color:var(--pos)} .hl2 .top.skip{color:var(--muted)}
+.pill.rhythm{font-size:12px} .pill.rhythm::first-letter{font-size:1.35em}

@@ -271,7 +271,7 @@ def test_back_from_cooldown_is_read_per_player():
 def test_the_talents_they_differ_on_most_when_none_splits_them():
     # Holy Paladin: no talent taken by 35-65% of them, so the change tab names the ones they differ on most
     page = healer.split_html([("Tower of Radiance", 0.22)], 100, "Holy Paladin", wide=True)
-    assert "differ on most</h2>" in page and "No talent splits them near half; these are the ones 15 to 85%" in page
+    assert "split on</h2>" in page and "No talent splits them near half; these are the ones 15 to 85%" in page
 
 
 def test_jobs_lead_says_either_only_when_your_spec_has_no_job():

@@ -1339,9 +1339,10 @@ PULL = 12.0  # seconds: a press before this is the pull's opener, never a ramp f
 OR_NEAR = 20.0  # seconds: the farthest "or" time of a button pressed about every minute or on cooldown
 MINUTE = "about every minute"  # the reason a button pressed four times a kill or more is tied to no hit
 # a reason a press is tied to no hit, as its pill (the words on hover)
-RHYTHM = {MINUTE: "&#9719; ~1 min, no hit",  # a clock, never ⟲'s look-alike (fresh heal review: ↻ beside ⟲) "a cast-while-moving button": "while moving, no hit",
-          "a movement button": "movement, no hit", "a trinket, placed by its rhythm": "trinket rhythm, no hit",
-          "a potion": "potion, no hit", "cast on another player": "on another player, no hit"}
+RHYTHM = {MINUTE: "&#9719; ~1 min",  # a clock, never ⟲'s look-alike (fresh heal review: ↻ beside ⟲); "no hit" on hover
+          "a cast-while-moving button": "&#8674; on the move", "a movement button": "&#8674; movement",
+          "a trinket, placed by its rhythm": "&#9719; trinket rhythm", "a potion": "potion",
+          "cast on another player": "on another player"}
 
 
 def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: str = "raid cooldown") -> str:
@@ -2172,8 +2173,8 @@ def talents_html(builds: list, players: int, who: str, hero: list | None = None)
                          + "><span><small>Hero tree</small> ", 1)  # choice
                 + "</ul>")  # rows' stacked bar (heal round 16: plain text), with no half tick (round 17)
     if builds and builds[0][0] < BUILD_SHARE * players:  # 3 of 100 is no build to show, empty row and all
-        return f"<h2>Talents the top {e(who)} play</h2>{line}" if line else ""  # the lead said there is no build
-    return (f"<h2>Talents the top {e(who)} play</h2>{line}<ul class='hl2'>"
+        return f"<h2>Talents the top players play</h2>{line}" if line else ""  # the lead said there is no build
+    return (f"<h2>Talents the top players play</h2>{line}<ul class='hl2'>"
             f"{builds_html(shown_builds(builds, players)) or '<li>No build yet.</li>'}</ul>")
 
 
@@ -2381,10 +2382,10 @@ def split_html(split: list, players: int, spec: str, wide: bool = False, icons: 
                marks: dict | None = None) -> str:
     """The talents the top players split on, with how often each is picked: what the builds above hide. wide: none
     or one is taken by 35 to 65% of them (Holy Paladin, Holy Priest), so the talents they differ on most, 15 to 85%."""
-    return ((f"<h2>The talents the top {e(spec)}s differ on most</h2><p>{(f'Only {e(near[0])} splits' if (near := [n for n, x in split if 0.35 <= x <= 0.65]) else 'No talent splits')} "
+    return ((f"<h2>The talents the top players split on</h2><p>{(f'Only {e(near[0])} splits' if (near := [n for n, x in split if 0.35 <= x <= 0.65]) else 'No talent splits')} "
              f"them near half; {'the others listed are' if near else 'these are'} the ones 15 to 85% of the "
              f"{players} players read take, closest to half first:</p>" if wide else
-             f"<h2>The talents the top {e(spec)}s split on</h2><p>The share of the {players} players read "
+             "<h2>The talents the top players split on</h2><p>The share of the {players} players read "
              "who take each, closest to half first:</p>") + "<ul class='hl2 split'>"
             + "".join((f"<li><b>{_pic(icons, n)}{e(n)}</b>{_bar(s)}<small>{s:.0%}</small></li>" if s >= 0 else
                        _pair(n, icons)).replace("</small></li>", f"{_mark_html(marks, n)}</small></li>", 1)  # inline,
