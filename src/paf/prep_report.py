@@ -599,7 +599,8 @@ def suggestions(d: PrepData) -> list[Suggestion]:
     if d.talents and d.talents.rows:
         best = best_build(d)
         g = best.per_fight.get(d.talents.fights[0], (0.0, None))[0] if best else 0.0
-        if best is not None and g > 2 * d.talents.error:
+        if best is not None and g > 2 * d.talents.error and not getattr(best, "swaps", None):  # the card above
+            # says it, with its gain and copy button: not twice (fresh DPS review: two +6.55% on one tab)
             both = set(best.add) & set(best.drop)  # same name on two nodes (e.g. a choice node): not a change
             add = [t for t in dict.fromkeys(best.add) if t not in both]
             drop = [t for t in dict.fromkeys(best.drop) if t not in both]
@@ -924,6 +925,9 @@ def places(g: float, gains: list[float]) -> int:
 def suggestions_html(d: PrepData) -> str:
     rows = []
     gains = [x.gain for x in suggestions(d) if x.gain is not None]
+    best = best_build(d) if d.talents else None  # the card's talent gain, left out of the list: still counted, so
+    if best is not None:  # the plan's figure reads as the card's (+6.65% beside +6.55%, never +6.7%)
+        gains.append(best.per_fight.get(d.talents.fights[0], (0.0, None))[0] or 0.0)
     for s in suggestions(d):
         label = {"major": "Major", "moderate": "Moderate", "minor": "Minor", "info": "Info",
                  "alt": "Alternative"}[s.severity]
