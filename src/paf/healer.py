@@ -1661,8 +1661,10 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
            f"<small class='alt'>on cooldown from {_mmss(c.times[0])}, about every {c.every:.0f} s; those pressing it "
            f"at {_and([_mmss((moved or {}).get((c.name, a), a)) for a in _held(c)])} instead press it again at varying "
            "times</small>" if c.every else
-           f"<small class='alt'>{_more(c, named)} more at varying times</small>" if c.times and _more(c, named) else
-           f"<small class='alt'>the other {_pct(_rest(c, named))} at varying times{_twice(c, named)}</small>"
+           f"<small class='alt'><span class='vary' title='{_more(c, named)} presses at varying times'>&mdash; "
+           f"{_more(c, named)} varying</span></small>" if c.times and _more(c, named) else  # one form (fresh review)
+           f"<small class='alt'><span class='vary' title='the other {_pct(_rest(c, named))} of its users press it at "
+           f"varying times'>&mdash; {_pct(_rest(c, named))} varying</span>{_twice(c, named)}</small>"
            if (c.times or any(k[0] == c.name and isinstance(k[1], tuple) for k in (named or {})))  # a card with
            and _rest(c, named) >= 0.15  # only a window line too (round 110: Spirit Link Totem's other 76% unsaid)
            else "")

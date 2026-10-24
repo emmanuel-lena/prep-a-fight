@@ -75,7 +75,7 @@ def test_every_cast_a_kill_is_said():
     players = [{"casts": {1: [4.0, 60.0 + 25 * i]}} for i in range(8)]  # the 2nd spread over three minutes
     tl = SimpleNamespace(abilities=[ab], duration=280.0, players=players)
     cd = healer.cooldowns(tl, [], {1: (180.0, 1)})[0]
-    assert cd.times == [4.0] and "+1 more at varying times" in healer.cooldowns_html([cd])
+    assert cd.times == [4.0] and "&mdash; +1 varying" in healer.cooldowns_html([cd])
 
 
 def test_no_moment_after_the_kill():
@@ -578,7 +578,7 @@ def test_a_once_a_kill_button_says_the_rest_of_its_presses():
     # Discipline Priest, Nek'zali (round 87): Ultimate Penitence pressed by 97%, chips at 27% and 20%
     c = healer.Cooldown("Ultimate Penitence", 1, 0.97, 1.0, [75.0], ["1:15 Soulcoil Rite"], alt=[36.0],
                         support=[0.27], alt_support=[0.2], alt_of=[75.0])
-    assert "the other 50% at varying times" in healer.cooldowns_html([c])
+    assert "&mdash; 50% varying" in healer.cooldowns_html([c])
 
 
 def test_the_rest_leaves_out_a_named_line_and_a_tied_chip_gives_its_pressers():
