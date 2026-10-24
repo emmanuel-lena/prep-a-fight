@@ -73,3 +73,15 @@ def test_a_spec_simmed_one_item_short_is_marked_and_said_once():
     out = briefing.spec_html(SimpleNamespace(specs=s))
     assert out.count("&dagger;") == 0 and out.count("Band of the Swarmcaller") == 1  # no dagger: the note says
     assert "Every gap is only roughly right: Subtlety and Assassination" in out  # yours short, every gap rough
+
+
+def test_the_lede_names_a_boss_unit_beside_the_add_waves():
+    """Fresh DPS review: "2 waves of adds" on a fight whose timeline draws 3 (the Echo of Jawae left out)."""
+    from paf.fight import AddWave, Fight
+
+    d = PrepData("Nek'zali", "heroic", "Elemental", "X", duration=255)
+    d.fight = Fight("x", 255, add_waves=[AddWave(52, 6, 18, "Restless Amani"), AddWave(73, 1, 75, "Echo of Jawae",
+                                                                                      scalable=False),
+                                         AddWave(167, 14, 18, "Restless Amani")])
+    d.waves = [(52, 6, 18, "Restless Amani"), (73, 1, 75, "Echo of Jawae"), (167, 14, 18, "Restless Amani")]
+    assert "with 2 waves of adds and Echo of Jawae" in briefing.lede_html(d)

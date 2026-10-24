@@ -499,8 +499,9 @@ def job_html(d) -> str:
 
     rules = {cd_name(d, k): r.name for k, r in (plan.choice.items() if plan else []) if r.name != "default"}  # the
     # names Your job shows (round 43: Ancestral Call, a racial, without its badge)
-    if d.lust is not None and d.lust < 5 and names:
-        rows.append(("Bloodlust", "<b>Bloodlust at the pull</b>: your opener goes inside it."))
+    in_lust = [n for n in names if n in rules and any(0 <= t <= 40 for t in order[n])]  # a held cooldown inside
+    if d.lust is not None and d.lust < 5 and in_lust:  # it, or no line (fresh DPS review: the big presses at 0:51)
+        rows.append(("Bloodlust", f"<b>Bloodlust at the pull</b>: {e(_and_names(in_lust))} inside it."))
     for n in sorted((n for n in names if n in order), key=lambda n: min(order[n])):  # in the order you first press them
         pre = [t for t in order[n] if t < 0.5 and (n in d.precast or "potion" in n.lower())]
         rest = [_mmss(t) for t in order[n] if t not in pre]

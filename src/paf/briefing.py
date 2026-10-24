@@ -34,7 +34,9 @@ def lede_html(d) -> str:
     parts = [f"A {_mmss(dur)} fight" if dur else "This fight"]
     if waves:  # the add waves; a boss unit played as a wave (an Echo) is not one of them
         n = len({round(w[0]) for w in waves})  # a wave is a moment: two types at one Imbibe are one (a review: 6)
-        parts.append(f"with {n} waves of adds" if n > 1 else "with one wave of adds")
+        bosses = sorted({w[3] for w in d.waves if w[1] and w not in waves})  # a boss unit said, not left out
+        parts.append((f"with {n} waves of adds" if n > 1 else "with one wave of adds")  # (fresh DPS review: "2 waves"
+                     + (f" and {' and '.join(e(re.sub(r' *[(].*', '', b)) for b in bosses)}" if bosses else ""))  # beside 3)
     lust = ""
     if d.lust is not None:
         lust = "with Bloodlust at the pull" if d.lust < 15 else f"with Bloodlust around {_mmss(d.lust)}"
