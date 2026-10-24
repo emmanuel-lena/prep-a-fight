@@ -51,7 +51,7 @@
 /* the journal in two columns on a wide screen (the owner, 2026-10-24: the right half was empty at 1440); a group
    of abilities, a heading and a strip never split across columns */
 @media (min-width:1200px){
-  .stages{max-width:1040px;column-count:2;column-gap:44px}  /* the page's content width (fresh heal review) */
+  .stages{max-width:1000px;column-count:2;column-gap:44px}  /* the page's content width (fresh heal review) */
   .stages .abg,.stages .cstrip,.stages .also{break-inside:avoid}
   .stages .stage>h3{break-after:avoid}
 }
