@@ -47,8 +47,8 @@ def test_the_page_carries_its_data_and_one_script(monkeypatch):
     assert any(s["k"] == "cd" and s["d"] == 16.0 for s in data["strips"])
     assert page.count("id='c-sync'") == 1 and "aria-keyshortcuts='Control+Shift+Space'" in page
     assert "Your job on this boss" in page and "<b>Kill the Amani</b>" in page
-    assert ("<b>Shadow Blades</b> at 0:52, 3:20 <span class='pill hold' title='keep for the next add wave if it comes "
-            "within 45 s, otherwise use it'>hold &le;45 s for adds</span>." in page)
+    assert ("<b>Shadow Blades</b> at 0:52, 3:20 <span class='pill hold' title='hold for the next add wave if within "
+            "45 s, else use it'>hold &le;45 s for adds</span>" in page)
     assert "<b>Potion</b> before the pull." in page
     blades = [a for a in data["acts"] if a["n"] == "Shadow Blades"]
     assert blades[0]["t"] == 52 and blades[0]["c"] == "on the 4 × Amani"  # called at its own time, not the row's
@@ -110,7 +110,7 @@ def test_a_press_no_boss_event_explains_says_why(monkeypatch):
     assert next(a for a in acts if a["t"] == 92)["w"] == why[92]
     d.optimized = [Plan("boss", {"shadow_blades": Rule("hold_adds_10", "", None)}, 0.0, 0.2)]  # a held rule: said once
     why = {t: it.why for t, it in fightview.items(d) if it.name == "Shadow Blades"}
-    assert why[92].startswith("keep for the next add wave if it comes within 10 s, otherwise use it")
+    assert why[92].startswith("hold for the next add wave if within 10 s, else use it")
     assert why[182] == "75% of the top players press it then"  # the rule not said again
 
 

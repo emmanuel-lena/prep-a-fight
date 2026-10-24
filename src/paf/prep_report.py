@@ -259,7 +259,7 @@ def rule_phrase(d: PrepData, rule: str) -> str:
     m = re.fullmatch(r"hold_(adds|vulnerable)_(\d+)", rule)
     if m:
         what = "the next add wave" if m.group(1) == "adds" else (vuln or "the damage amp")
-        return f"keep for {what} if it comes within {m.group(2)} s, otherwise use it"
+        return f"hold for {what} if within {m.group(2)} s, else use it"  # short, everywhere (DPS round 43)
     return {"default": "as SimC's default priority list", "on_cooldown": "the moment it is ready (the default list can wait some seconds)",
             "add_waves": f"only on add waves{f' ({waves})' if waves else ''}", "secondary_targets": f"only on {units or 'the secondary targets'}",
             "vulnerable_windows": f"only during {vuln or 'the damage amp'}", "lust_pi": "with Bloodlust",
@@ -869,8 +869,10 @@ def nsrt_block(note: str) -> str:
 def _pad_bar(text: str) -> str:
     """The raid's share of the top raids' damage on the adds as a bar, a mark at the weakest top raids' (DPS rounds
     36-42: "53% vs 84%" in words). '' when the line says no such pair."""
+    import html as _html
+
     m = re.search(r"(?:with you, your raid does|already does|,) (\d+)% (?:of the top raids' damage on them|with you)"
-                  r".*?the weakest top raids do (\d+)%", text)
+                  r".*?the weakest top raids do (\d+)%", _html.unescape(text))  # the line as shown: escaped (round 43)
     if not m:
         return ""
     you, low = int(m[1]), int(m[2])

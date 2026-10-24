@@ -19,7 +19,7 @@ def test_headline_speaks_the_players_language():
     d.optimized = [p]
     text = "\n".join(headline(d))
     assert "Boss damage: +10.3%" in text and "pad +6.8%" in text
-    assert "Ascendance, Vile Vial: keep for Venomous Heart if it comes within 60 s" in text
+    assert "Ascendance, Vile Vial: hold for Venomous Heart if within 60 s" in text
     assert "Stormkeeper: only on add waves" in text
     assert "trinket1" not in text and "secondary" not in text and "hold vulnerable" not in text
 
@@ -167,3 +167,5 @@ def test_the_pad_verdict_draws_its_bar():
     made = _pad_bar("pad them, you make the difference: your raid does 70% of the top raids' damage on them without "
                     "you, 90% with you (the weakest top raids do 84%)")
     assert "width:90%" in made and _pad_bar("Kill the adds.") == ""
+    assert "width:53%" in _pad_bar("with you, your raid does 53% of the top raids&#x27; damage on them (the weakest "
+                                   "top raids do 84%)")  # the card's details come escaped (round 43: never drawn)

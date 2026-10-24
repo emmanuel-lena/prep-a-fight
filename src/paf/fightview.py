@@ -493,7 +493,10 @@ def job_html(d) -> str:
             order.setdefault(it.name, []).append(0.0 if t < 0 else t)
     names = list(order)
     plan = simple._plan(d)
-    rules = {d.cd_names.get(k, k): r.name for k, r in (plan.choice.items() if plan else []) if r.name != "default"}
+    from paf.prep_report import cd_name
+
+    rules = {cd_name(d, k): r.name for k, r in (plan.choice.items() if plan else []) if r.name != "default"}  # the
+    # names Your job shows (round 43: Ancestral Call, a racial, without its badge)
     if d.lust is not None and d.lust < 5 and names:
         rows.append(("Bloodlust", "<b>Bloodlust at the pull</b>: your opener goes inside it."))
     for n in sorted((n for n in names if n in order), key=lambda n: min(order[n])):  # in the order you first press them
@@ -515,7 +518,8 @@ def job_html(d) -> str:
             same[0].append(n)  # Ascendance at 0:51, 2:52: the ninth line cut Ascendance off; a review)
             continue
         rows.append(([n], None, (when, why)))
-    rows = [((r[0][0], f"<b>{e(_and_names(r[0]))}</b> {e(r[2][0])}{r[2][1]}.", r[0]) if isinstance(r[0], list)
+    rows = [((r[0][0], f"<b>{e(_and_names(r[0]))}</b> {e(r[2][0])}{r[2][1]}"
+              + ("" if r[2][1].endswith("</span>") else "."), r[0]) if isinstance(r[0], list)  # no stop after a badge
              else (*r, None)) for r in rows]
     if not rows:
         return ""
