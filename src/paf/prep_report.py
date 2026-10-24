@@ -1366,7 +1366,7 @@ and the gear for that.</p></div>""")
         adds = any(c for _t, c, _l, _n in d.waves)  # with adds the metric matters; without, it is boss damage
         names = {"boss fight": "This fight (total damage)" if adds else "This fight (boss damage)",
                  "patchwerk": "Single target (reference)"}
-        head = "".join(f"<th class='n'>{e(names.get(f, f))}</th>" for f in tc.fights)
+        head = "".join(f"<th class='n'>{e(names.get(f, f))} &plusmn;{2 * tc.error:.1f}%</th>" for f in tc.fights)
         body = f"<tr><td>your talents</td>{''.join('<td class=n>ref</td>' for _ in tc.fights)}<td></td></tr>"
         first = tc.fights[0]
         for r in sorted(tc.rows, key=lambda r: -(r.per_fight.get(first, (0.0, None))[0] or 0.0)):
@@ -1401,7 +1401,7 @@ and the gear for that.</p></div>""")
                    f"<p><b>{e(best_g[1])} beats yours by {best_g[0]:+.1f}%</b> on this fight.</p>")
         tabs["gear"].append(f"""<h2>Talents of the top players, on your character</h2><div class="card scroll">
 {verdict}<table><tr><th title="Each top build simmed on your character; a gap under &plusmn;{2 * tc.error:.1f}% (SimC's error) is
-noise, and a build can lose on the dummy and win on this fight">Build &plusmn;{2 * tc.error:.1f}%</th>{head}
+noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
 <th>Changes vs your talents</th></tr>{body}</table></div>""")  # the method on the header (DPS rounds 36-40)
 
     # cooldown plans
@@ -1538,8 +1538,8 @@ than the coverage means they hold the cooldown.{burst_note}</p>
             "on the fight without personal assignments (tick yours in the app to see if they change your gear)"
         tabs["gear"].insert(0, f"""<h2>Best gear from your bags, for this fight</h2><div class="card scroll">
 {"<p class='small warn'>&#9888; Every set here loses more than 5%: a sim gone wrong, not a reading. Keep the gear you wear.</p>" if top < -5 else ""}
-<p class="small">Simmed {e(d.gear_plan or 'with the default priority list')}, {e(mine)}.</p>
-<table><tr><th>Swaps vs your equipped gear</th><th class="n">Gain &plusmn;{d.gear_error:.2f}%</th>{head}</tr>{body}</table>
+<table><tr><th title="Simmed {e(d.gear_plan or 'with the default priority list')}, {e(mine)}">Swaps vs your equipped gear
+</th><th class="n">Gain &plusmn;{d.gear_error:.2f}%</th>{head}</tr>{body}</table>
 {"<p class='tiny muted'>" + "; ".join(t for k, t in (("&asymp; best<", "&asymp; best: within the error of the best set"), ("keep yours<", "&asymp; keep yours: no set beats yours by twice the error")) if k in body) + ".</p>" if "near" in body else ""}</div>""")
 
     # loot

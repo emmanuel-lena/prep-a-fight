@@ -128,3 +128,4 @@ a.tal:hover{background:var(--surface-2)}
 .sw-one{display:inline-flex;align-items:center;gap:2px}
 .simple .cards .sw-strip.free{grid-column:1/-1;display:flex;flex-direction:row;flex-wrap:wrap;justify-content:flex-start;gap:4px 14px;text-align:left} /* one row across both columns */
 .simple .cards li.sw-list>.sw-strip:not(.free){display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));justify-items:start} /* the wrapped grid it says, not a centred column */
+.simple .cards li.sw-list{width:100%;box-sizing:border-box} .simple .cards li.sw-list>.sw-strip.free{max-width:none}
