@@ -655,10 +655,10 @@ def render_sheet(p: TankPrep) -> str:
         # a tank's share of the kill's swaps, at least half the shared moments (round 43: "about 4" beside 9 swaps)
         taunts = f"{max(p.taunts_per_kill, len(p.swaps) / 2):.1f}".removesuffix(".0")
         swaps = f"{2 * max(p.taunts_per_kill, len(p.swaps) / 2):.0f}"  # both tanks' taunts: the swaps listed below
-        swap_said = (f"The tanks swap about {swaps} times a kill after the pull, each top tank taunting about {taunts} "
-                     "times (swaps on adds count)"  # the stacks: said by the swap moments' line below
-                     + ("." if one else f", the first time at {_mmss(p.swaps[0])}"
-                        + (f" after {e(causes[0])}." if causes[0] else ".")))
+        first = "" if one else f"; the first at {_mmss(p.swaps[0])}" + (f" after {e(causes[0])}" if causes[0] else "")
+        swap_said = (f"<span class='pill' title='the tanks swap about {swaps} times a kill after the pull (swaps on adds "
+                     f"count){first}'>&#8644; {swaps}/kill</span> <span class='pill'>{taunts} taunts each</span>")  # badges,
+        # the sentence on hover (fresh heal review: 70 words)
     # the chart's lanes: the defensives and short ones, the lead's answer first (Spell Reflection had none)
     shorts = [Cooldown(n, 0, u, k, ts, ["" for _ in ts], support=sps) for n, u, k, ts, _ev, sps, *_r in p.short_defs if ts]
     lane = [Cooldown("Tank swaps", SWAP_LANE, 1.0, len(p.swaps), p.swaps, [""] * len(p.swaps))] if p.swaps else []
@@ -696,12 +696,15 @@ def render_sheet(p: TankPrep) -> str:
              *(["a tick: a tank swap" if window_named and not answered else "the swaps"] if lane else [])]
     marks = f"Marks: {('; ' if window_named and not answered else ' and ').join(marks)}. " if marks else ""
     fight = ([f"<p class='lead'>{' '.join(lead)}</p>"] if lead else []) + ([table] if table else []) + [
-        f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted'>Median damage per "
-        f"second on the ranked tank of each top kill, {p.damage_kills or 'the top'} kills (that tank alone: a swap "
-        f"moves it; fewer kills past the median one). "
-        + ("After a dashed line, stage time (below). " if getattr(p, "staged", False) else "")
-        + marks + "A dot: one of "
-        f"the tanks' three biggest moments, whatever casts it (another as high may be left out).</p><ul class='hl2'>"
+        f"<h2>What hits the top tanks, and when</h2><div class='card'>{svg}<p class='small muted chart-key'>"
+        # a key of glyphs, the method on hover, as the healers' (fresh heal review: a paragraph)
+        f"<span class='pill' title='Median damage per second on the ranked tank of each top kill (that tank alone: a "
+        f"swap moves it; fewer kills past the median one)'>{p.damage_kills or 'the top'} kills</span> "
+        + ("<span>&#9478; stage time after a dashed line</span> " if getattr(p, "staged", False) else "")
+        + (f"<span title='{e(marks)}'>&#9646; the table&#39;s answers</span> " if answered else "")
+        + ("<span>| a tank swap</span> " if lane else "")
+        + "<span title='one of the tanks&#39; three biggest moments, whatever casts it (another as high may be left "
+        "out)'>&#9679; a big moment</span></p><ul class='hl2'>"
         f"{'' if p.moments else '<li>No big moment: steady damage.</li>'}</ul></div>",
         f"<h2>Your defensives, where the top players press them</h2><ul class='hl2'>"
         f"{nouned(cooldowns_html(defs, answered, named, moved_t)) or '<li>No defensive most top tanks share: they spread them.</li>'}"
@@ -715,8 +718,9 @@ def render_sheet(p: TankPrep) -> str:
         + (f"<p class='small muted'>About {extra} more swaps a kill come at varying times.</p>"
            if swap and (extra := round(2 * p.taunts_per_kill) - len(p.swaps)) > 0 else "")
         # the rule said (round 87: a swap tied on Nek'zali, none on Vashnik's swap every 28 s, with no word why)
-        + ("<p class='small muted'>The table ties a swap to a hit only when swaps are rare enough not to land within "
-           "5 s of it by chance one time in three or more.</p>" if swap else "")
+        + ("<p class='small muted'><span class='pill' title='The table ties a swap to a hit only when swaps are rare "
+           "enough not to land within 5 s of it by chance one time in three or more.'>? when a swap is tied to a hit"
+           "</span></p>" if swap else "")  # the rule on hover (fresh heal review)
         + "".join(f"<p><b>Taunts stop working with {e(n)}:</b> {e(t)} <span class='muted'>(The Encounter Journal; "
                   + (f"never reached in the {k} top kills read" if not hit and k else
                      f"reached in {hit} of the {k} top kills read" if k else "not measured") + ".)</span></p>"
