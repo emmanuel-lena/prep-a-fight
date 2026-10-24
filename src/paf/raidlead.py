@@ -470,12 +470,15 @@ def page_body(difficulty: str) -> str:
             + "</td><td>" + " ".join(f"<span class='rl-best'>{_ic(b)}{e(pretty(b))}</span>" for b in t["best"])
             + "</td></tr>" for t in sh["targets"])
         everyone = sh["targets"] and all(t["whole_raid"] and not t["players"] for t in sh["targets"])
+        seconds = [t for t in sh["targets"] if t["second_boss"]]
         tg = ("<p class='rl-allrow'><span class='rl-everyone' title='the whole raid'>&#128101; all "  # nothing to
-              f"{len(in_raid)}</span> on " + ", ".join(  # assign: one line, not a table of "all" (fresh app review 6)
-                  e(t["name"]) + (" <span class='rl-side'>a second boss</span>" if t["second_boss"] else "")
-                  for t in sh["targets"]) + "</p>" if everyone else
+              f"{len(in_raid)}</span> on " + ", ".join(e(t["name"]) for t in sh["targets"])  # assign: one line
+              + (f" <span class='rl-side'>{'a second boss' if len(seconds) == 1 else f'{len(seconds)} second bosses'}"
+                 "</span>" if seconds else "") + "</p>" if everyone else
               f"<table class='rl-tg'><thead><tr><th>Target</th><th>Your raid</th><th>Best specs in the top raids</th>"
               f"</tr></thead><tbody>{tg}</tbody></table>") if tg else ""
+        alone = (f"<p class='rl-allrow'><span class='rl-everyone' title='the whole raid'>&#128101; all {len(in_raid)}"
+                 f"</span> on {e(x.name)}</p>")  # no add: the same badge as the others (round 40)
         bd = "".join(  # one line a player: who, which build, then each talent to take (+) or drop (-)
             f"<li class='rl-b'>{_ic(b['spec'])}<b>{e(b['name'])}</b><small>{e(pretty(b['spec']))}</small>"
             f"<span class='rl-side {'pad' if b['side'] == 'pad' else 'boss'}'>"
@@ -494,7 +497,7 @@ def page_body(difficulty: str) -> str:
         cards += (f"<article class='rl-boss' id='boss-{x.id}'><header><h3>{e(x.name)}</h3>"
                   f"{copy_button(text(sh, difficulty), 'Copy for Discord')}"
                   f"{copy_button(text(sh, difficulty, mrt=True), 'Copy MRT note')}</header>"
-                  f"<h4>Who hits what</h4>{tg or '<p>Everyone on the boss: no add to assign.</p>'}"
+                  f"<h4>Who hits what</h4>{tg or alone}"
                   + _talents_h4(sh, len(state["players"]) - len(bench), said) + (f"<ul>{bd}</ul>" if bd else "")
                   + lust_block(sh, difficulty) + "</article>")
     allbtn = (copy_button("\n\n".join(text(sh, difficulty) for sh in everything), "Copy every boss for Discord")

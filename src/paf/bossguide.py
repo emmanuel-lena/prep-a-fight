@@ -126,6 +126,12 @@ def modernize(html: str, difficulty: str = "heroic") -> str:
     return readable(h, difficulty)
 
 
+def _mentioned_in_summary(sections: list[Section], role: str) -> set[str]:
+    """Every ability the role's summary names, its subject or in passing ("…protected by Sanguineous Fortitude")."""
+    said = " ".join(role_bullets(sections, role)).lower()
+    return {s.title for _, s in walk(sections) if s.kind == "ability" and s.title and s.title.lower() in said}
+
+
 def _named_in_summary(sections: list[Section], role: str) -> set[str]:
     """The abilities the journal's summary for this role names ("Imbibe inflicts heavy damage…" for the healers)."""
     lines = [b.lower().lstrip() for b in role_bullets(sections, role)]  # the line's subject only, not a name in
@@ -222,7 +228,12 @@ def describe(spell_id: int, locale: str = "") -> str:
 def _ability(s: Section, depth: int, ctx: dict) -> str:
     raid = "raid damage" in ctx["also"].get(s.title, "")  # measured as a big raid hit: its tank tag says the raid
     dispel = ctx["role"] == "healer" and bool(DISPEL & set(s.flags))  # a healer's dispel keeps its words
-    summed = s.title in ctx["named"] and s.title not in ctx["also"] and not dispel  # its words: the summary's
+    m = ctx["mechanics"].get(s.title.lower())
+    can_be_you = m is not None and m.kind != "interrupt" and m.players_per_kill > 0  # it lands on players: you too
+    # named by the role's summary (its subject or in passing) and not kept for another reason: its words are the
+    # summary's, so a marker says where, never the words twice, never a bare name (rounds 37-40)
+    summed = (s.title in ctx["mentioned"] and s.title not in ctx["also"] and not dispel
+              and not (can_be_you and s.title not in ctx["named"]))
     tags = "".join(f'<span class="pill {"warn" if f in ("deadly", "interruptible") else ""}">{SHOWN_FLAGS[f]}'  # too
                    + (" &middot; raid too" if f == "tank" and raid else "") + "</span>"  # (round 112: Possession
                    for f in s.flags if f in SHOWN_FLAGS  # Barrage tagged "tank", three of the four raid hits)
@@ -231,7 +242,6 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
     times = ctx["timings"].get(s.title.lower())
     if times:
         facts.append(f"around {_when(times)}")
-    m = ctx["mechanics"].get(s.title.lower())
     if m:
         who = "interrupted" if m.kind == "interrupt" else f"{m.players_per_kill:.0f} players hit per kill"
         facts.append(who + (f", ~{m.cost:g} s of movement for you" if m.cost else ""))
@@ -241,14 +251,13 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
         facts.append(f"<b>burst window: the boss takes x{ctx['burst'][s.title.lower()]:g} damage</b>")
     # the journal's words only on what the journal flags for your role (or hits you too); the rest: its name, icon,
     # tags and times, the name a Wowhead link to read it (the owner, 2026-10-24: less prose)
-    can_be_you = m is not None and m.kind != "interrupt" and m.players_per_kill > 0  # it lands on players: you too
     told = (not ctx["role"] or ctx["role"] in s.flags or s.title in ctx["also"] or can_be_you
             or (ctx["role"] == "healer" and bool(DISPEL & set(s.flags))))  # a healer's dispels (review 36: Essence
     # Rend, the boss tab's headline, a bare name); what the role's summary names: a tag, its words being the
     # summary's (round 37: the same sentences in both columns)
-    if summed:  # never its words twice (round 38: Essence Rend and Sanguineous Fortitude in both columns); its
-        told = False  # numbers stay
-        tags += ('<span class="pill sum" title="its words: in what the journal tells your role, beside this list">'
+    if summed:  # its numbers stay
+        told = False
+        tags += ('<span class="pill sum" title="its words: in the journal&#39;s lines for your role, on this page">'
                  "&uarr; for you</span>")
     text = readable(s.text, ctx["difficulty"]).strip() if s.text and told else ""
     if not text and told:  # no journal text, or only another difficulty's sentence: the spell's own description
@@ -280,7 +289,8 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
            "mechanics": {m.name.lower(): m for m in (mechanics or [])},
            "burst": {k.lower(): v for k, v in (burst or {}).items()}, "icons": icon_map or {},
            "describe": describe, "difficulty": difficulty, "also": also or {}, "role": role,
-           "named": _named_in_summary(sections, role) if role else set()}
+           "named": _named_in_summary(sections, role) if role else set(),
+           "mentioned": _mentioned_in_summary(sections, role) if role else set()}
     def key(s: Section) -> tuple:
         return s.kind, s.title, readable(s.text), tuple(s.flags)
 
