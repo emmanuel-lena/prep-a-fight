@@ -307,7 +307,7 @@ def _talents_h4(sh: dict, total: int, said: int = -1) -> str:
     read (a review: on a boss with changes, who was not checked vanished)."""
     changing, unread_, other = len(sh["builds"]), sh.get("unread") or [], sh.get("no_split", 0)
     if other >= total:  # no spec has a pad/boss split on this boss: nothing to compare, said as such
-        return f"<h4>Talents <span class='rl-unread'>{NO_BUILD} on this boss</span></h4>"
+        return f"<h4 class='rl-h'>&#128214; Talents <span class='rl-unread'>{NO_BUILD} on this boss</span></h4>"
     ok = total - changing - len(unread_) - other
     parts = [f"<span class='rl-ok'>&#10003; {ok} on their build</span>"] if ok > 0 else []  # always counted
     if other and other != said:  # the roster says the tanks and healers once (fresh app review 4: nine times a page)
@@ -316,7 +316,7 @@ def _talents_h4(sh: dict, total: int, said: int = -1) -> str:
     if unread_:
         parts.append(f"<span class='rl-unread'>{len(unread_)} not read: {e(', '.join(unread_))}</span>")
     head = "Talents to change" if changing or unread_ else "Talents"  # nothing to change: the badge says it alone
-    return f"<h4>{head} {''.join(parts)}</h4>"
+    return f"<h4 class='rl-h'>&#128214; {head} {''.join(parts)}</h4>"
 
 
 NO_BUILD = "no pad/boss build"  # one phrase wherever nothing is compared (fresh app review 6)
@@ -442,8 +442,15 @@ def page_body(difficulty: str) -> str:
 
     in_raid = [s for n, s, _d in state["players"] if n not in bench]
     said = sum(1 for s in in_raid if not _damage_spec(s))  # no pad/boss build to compare: said here, not per boss
-    roster = (f"<section class='rl-roster'><h2>Your roster <small class='muted'>{len(in_raid)} players"
-              + (f" &middot; {said} tanks and healers, {NO_BUILD}" if said else "") + "</small></h2>"
+    from paf.raidneed import HEALERS
+
+    heal = sum(1 for s in in_raid if s in HEALERS or pretty(s) in HEALERS)
+    tanks = said - heal  # the roles as icons and counts, the rule on hover (fresh app review 7: a sentence)
+    roles = (f"<span class='rl-role' title='tanks: {NO_BUILD}'>&#128737; {tanks}</span>"
+             f"<span class='rl-role' title='healers: {NO_BUILD}'>&#10010; {heal}</span>"
+             f"<span class='rl-role' title='damage dealers'>&#9876; {len(in_raid) - said}</span>")
+    roster = (f"<section class='rl-roster'><h2>Your roster <small class='muted'>{len(in_raid)} players</small>"
+              f"<span class='rl-roles'>{roles}</span></h2>"
               f"<p class='small muted'>From {e(state.get('roster_from', ''))}{when} "
               f"&middot; <a href='https://www.warcraftlogs.com/reports/{e(state['report'])}' target='_blank' rel='noopener'>"
               f"the log &#8599;</a></p><div class='rl-chips'>{chips}</div>"
@@ -505,7 +512,7 @@ def page_body(difficulty: str) -> str:
         cards += (f"<article class='rl-boss' id='boss-{x.id}'><header><h3>{e(x.name)}</h3>"
                   f"{copy_button(text(sh, difficulty), 'Copy for Discord')}"
                   f"{copy_button(text(sh, difficulty, mrt=True), 'Copy MRT note')}</header>"
-                  f"<h4>Who hits what</h4>{tg or alone}"
+                  f"<h4 class='rl-h'>&#127919; Who hits what</h4>{tg or alone}"
                   + _talents_h4(sh, len(state["players"]) - len(bench), said) + (f"<ul>{bd}</ul>" if bd else "")
                   + lust_block(sh, difficulty) + "</article>")
     allbtn = (copy_button("\n\n".join(text(sh, difficulty) for sh in everything), "Copy every boss for Discord")

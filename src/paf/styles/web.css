@@ -474,3 +474,4 @@ section.adv textarea{max-width:920px} /* the content column, never to the window
 .mx-legend .pill.chk::before{display:none} .rl-num{font:700 17px var(--font-data);color:var(--fg);margin-right:3px}
 .rl-sb{grid-template-rows:auto 1fr auto} .rl-rows{display:grid;gap:2px;align-self:end}
 .set-status .meter{margin-right:8px}
+.rl-roles{display:inline-flex;gap:12px;margin-left:14px;font:600 15px var(--font-data);vertical-align:middle} .rl-role{white-space:nowrap}
