@@ -437,13 +437,13 @@ def raid_section(r: RaidInfo, gear: bool = True) -> str:
         name, _, spec = p.partition(" (")
         spec = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", spec.rstrip(")"))
         return f"<span class='chip' title='{e(spec)}'>{icons.spec_img(spec)}{e(name)}</span>"
-    groups = "".join(f"<li><b>{e(k)}</b> ({len(ps)}): {''.join(chip(p) for p in ps)}</li>"  # chips (DPS round 51)
+    groups = "".join(f"<li><b>{e(k)} ({len(ps)})</b><span>{''.join(chip(p) for p in ps)}</span></li>"  # label, chips
                      for k, ps in r.archetypes.items() if ps)
     rest, swapped = healers_left(r)
     if groups and rest > 0:  # every player of the log accounted for
-        groups += f"<li><b>healers</b> ({rest}): not counted for the adds</li>"
+        groups += f"<li><b>healers ({rest})</b><span>not counted for the adds</span></li>"
     if groups and swapped:
-        groups += f"<li><b>you</b> (1): in the log as {e(r.logged_as)}, swapped for the spec you prepare</li>"
+        groups += f"<li><b>you (1)</b><span>in the log as {e(r.logged_as)}, swapped for the spec you prepare</span></li>"
     what = "the cooldown plan and the gear on this sheet are" if gear else "the cooldown plan on this sheet is"
     verdict = (f"Stay on the boss: {what} the one{'s' if gear else ''} for boss damage." if r.objective == "boss"
                else f"Pad the adds: {what} the one{'s' if gear else ''} for total damage.")
@@ -467,7 +467,7 @@ def raid_section(r: RaidInfo, gear: bool = True) -> str:
 <div class="scroll"><table><tr><th>Adds</th><th class="n">Your raid without you</th><th class="n">With you</th>
 <th class="n">Top raids' weakest quarter</th><th>Verdict</th></tr>{rows}</table></div>
 <p class="small muted">Damage your raid puts on these adds, as a share of the top raids' (their median = 100%).</p>
-<p class="small">Your raid on this boss, by what each spec does with the adds:</p><ul class="small">{groups}</ul>{est}{build}
+<p class="small">Your raid on this boss, by what each spec does with the adds:</p><ul class="small grp">{groups}</ul>{est}{build}
 <h4 class="small">How it is computed</h4><p class="small muted">Measured: on this boss, each spec puts
 a share of its damage on these adds while they are up (from the ranked kills): well above the median of all players =
 AoE / funnel, well below = single target. Computed: your raid's damage on the adds = every player's DPS in your log x

@@ -347,7 +347,7 @@ def comp(d: dict) -> str:
     note = (f"DPS on the target of each spec&#39;s players in the top kills of this boss{both}. It compares specs, "
             "not your players&#39; skill, and does not know your strategy.")  # on hover (DPS rounds 46-51)
     return (f"{head}<div class='jobs wide'>{cards}</div><p class='ws-fine'><span class='pill' title='{note}'>"
-            "&#9432; how it is read</span></p>")
+            "? how it is read</span></p>")
 
 def _mmss(t: float | None) -> str:
     if t is None or t == float("inf"):
@@ -492,7 +492,7 @@ def night(d: dict) -> str:
             "of the wipe itself are left out. A red 0/1: no damage potion in that pull. A name in red died without a "
             "healthstone or a health potion first.")  # on hover (DPS rounds 46-51)
     return (f"{head}<h3>Over the night</h3>{table}{by_pull}<p class='ws-fine'><span class='pill' title='{note}'>"
-            "&#9432; how it is read</span></p>")
+            "? how it is read</span></p>")
 
 def pulldiff(d: dict) -> str:
     """Two pulls side by side: the highlights first, the boss health, then the player's detail."""
