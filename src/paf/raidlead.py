@@ -469,7 +469,12 @@ def page_body(difficulty: str) -> str:
                  if t["players"] else "<span class='muted'>nobody fits</span>"))
             + "</td><td>" + " ".join(f"<span class='rl-best'>{_ic(b)}{e(pretty(b))}</span>" for b in t["best"])
             + "</td></tr>" for t in sh["targets"])
-        tg = (f"<table class='rl-tg'><thead><tr><th>Target</th><th>Your raid</th><th>Best specs in the top raids</th>"
+        everyone = sh["targets"] and all(t["whole_raid"] and not t["players"] for t in sh["targets"])
+        tg = ("<p class='rl-allrow'><span class='rl-everyone' title='the whole raid'>&#128101; all "  # nothing to
+              f"{len(in_raid)}</span> on " + ", ".join(  # assign: one line, not a table of "all" (fresh app review 6)
+                  e(t["name"]) + (" <span class='rl-side'>a second boss</span>" if t["second_boss"] else "")
+                  for t in sh["targets"]) + "</p>" if everyone else
+              f"<table class='rl-tg'><thead><tr><th>Target</th><th>Your raid</th><th>Best specs in the top raids</th>"
               f"</tr></thead><tbody>{tg}</tbody></table>") if tg else ""
         bd = "".join(  # one line a player: who, which build, then each talent to take (+) or drop (-)
             f"<li class='rl-b'>{_ic(b['spec'])}<b>{e(b['name'])}</b><small>{e(pretty(b['spec']))}</small>"

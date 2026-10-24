@@ -470,3 +470,4 @@ section.adv textarea{max-width:920px} /* the content column, never to the window
 .fs-k::before{content:"";display:inline-block;width:12px;height:8px;border-radius:2px;margin-right:5px;vertical-align:0}
 .fs-k.add::before{background:color-mix(in srgb,var(--accent) 55%,transparent)} .fs-k.away::before{border:1px dashed var(--line);background:color-mix(in srgb,var(--muted) 14%,transparent)}
 .fs-k.move::before{background:var(--warn);opacity:.7} .fs-k.lust::before{background:var(--neg);width:8px;clip-path:polygon(0 0,100% 0,50% 100%)}
+.rl-allrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:4px 0 10px}

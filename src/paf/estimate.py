@@ -58,10 +58,9 @@ class Estimate:
     @property
     def badge(self) -> str:
         """The lead as a badge (fresh app review 5): "~2 min · prep pack", the quota's wait apart."""
-        what = {"pack_local": "prep pack", "pack_shared": "shared prep pack", "corpus": "kills on your computer",
-                "collect": f"downloads {self.kills} kills"}[self.source]
-        wait = f" · {round(self.wait)} min of quota" if self.wait >= 1 else ""
-        return f"~{max(1, round(self.minutes))} min to prepare · {what}{wait}"
+        what = "" if self.source != "collect" else f" · downloads {self.kills} kills"  # the source on hover; a
+        wait = f" · {round(self.wait)} min of quota" if self.wait >= 1 else ""  # download said (it takes the time)
+        return f"~{max(1, round(self.minutes))} min to prepare{what}{wait}"
 
 
 def sims_minutes() -> float:
