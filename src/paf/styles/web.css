@@ -479,5 +479,4 @@ table.status td:first-child{padding-right:18px;white-space:nowrap}
 .lr-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap} .lr-face{width:34px;height:34px;border-radius:50%;object-fit:cover}
 .lr-hp{display:inline-block;width:120px;height:8px;border-radius:4px;background:color-mix(in srgb,var(--fg) 12%,transparent);overflow:hidden}
 .lr-hp>i{display:block;height:100%;background:var(--neg);opacity:.75}
-table.status td:first-child{width:190px}
 .rl-tl{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0 4px;font-size:14px} .rl-tl>b{font:600 12px var(--font-display);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}

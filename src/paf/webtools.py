@@ -320,7 +320,8 @@ stays where it is">Get nightly</button></form></div></td></tr>
 <tr><td>{OK_DOT}prep-a-fight</td><td class="small"><div class="val"><span>version {e(__version__)}</span>
 <form method="post" action="/update/check"><button class="btn ghost">Check for updates</button></form></div></td></tr>
 <tr><td>{ok_wcl}Warcraft Logs</td><td class="small">{quota}</td></tr>
-<tr><td>{OK_DOT}Caches (sims, logs)</td><td class="small">{cache_meter}{size(cache_root()) / 1e6:,.0f} /
+<tr><td title="sims and Warcraft Logs answers">{OK_DOT}Caches</td><td class="small">{cache_meter}
+{size(cache_root()) / 1e6:,.0f} /
 {float(settings.get('cache_max_mb') or 0):,.0f} MB</td></tr>
 <tr><td>{OK_DOT if data_dir().is_dir() else ""}Data folder</td><td class="small">{path_html(str(data_dir()))}</td></tr>
 </table></div>
