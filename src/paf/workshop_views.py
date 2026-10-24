@@ -344,9 +344,10 @@ def comp(d: dict) -> str:
     if any(t["second_boss"] for t in targets):
         both += "; on both bosses for a second boss" if both else " (on both bosses for a second boss"
     both += ")" if both else ""
-    return (f"{head}<div class='jobs wide'>{cards}</div><p class='ws-fine'>DPS on the target of each spec's players in "
-            f"the top kills of this boss{both}. It compares specs, not your players' skill, and does not know your "
-            "strategy.</p>")
+    note = (f"DPS on the target of each spec&#39;s players in the top kills of this boss{both}. It compares specs, "
+            "not your players&#39; skill, and does not know your strategy.")  # on hover (DPS rounds 46-51)
+    return (f"{head}<div class='jobs wide'>{cards}</div><p class='ws-fine'><span class='pill' title='{note}'>"
+            "&#9432; how it is read</span></p>")
 
 def _mmss(t: float | None) -> str:
     if t is None or t == float("inf"):
@@ -485,12 +486,13 @@ def night(d: dict) -> str:
                       for t, n, b in dead[:12])
         detail += (f"<li><div class='j-head'><b>{e(r['boss'])}</b><small><span class='num'>{_mmss(r['duration'])}</span>"
                    f" &middot; {end}</small></div><div class='whos'>{who}</div></li>")
-    by_pull = (f"<details class='more' open><summary>Pull by pull ({len(pulls)})</summary><ul class='pulls'>{detail}</ul>"
-               "</details>") if len(pulls) > 1 else ""  # one pull: the table above says it all
-    return (f"{head}<h3>Over the night</h3>{table}{by_pull}<p class='ws-fine'>Read from the casts of the log: a damage "
-            "potion counts from 10 s before the pull (the pre-pot); the deaths of the wipe itself are left out. A red 0/1: no "
-            "damage potion in that pull. A name in red died without a "
-            "healthstone or a health potion first.</p>")
+    by_pull = (f"<h4 class='more'>Pull by pull ({len(pulls)})</h4><ul class='pulls'>{detail}</ul>"  # in sight, no fold
+               if len(pulls) > 1 else "")  # one pull: the table above says it all
+    note = ("Read from the casts of the log: a damage potion counts from 10 s before the pull (the pre-pot); the deaths "
+            "of the wipe itself are left out. A red 0/1: no damage potion in that pull. A name in red died without a "
+            "healthstone or a health potion first.")  # on hover (DPS rounds 46-51)
+    return (f"{head}<h3>Over the night</h3>{table}{by_pull}<p class='ws-fine'><span class='pill' title='{note}'>"
+            "&#9432; how it is read</span></p>")
 
 def pulldiff(d: dict) -> str:
     """Two pulls side by side: the highlights first, the boss health, then the player's detail."""

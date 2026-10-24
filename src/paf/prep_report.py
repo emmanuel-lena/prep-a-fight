@@ -433,7 +433,11 @@ def raid_section(r: RaidInfo, gear: bool = True) -> str:
         f"{_without_shares(e(re.sub(r'^(pad them|stay on the boss)[:,] *', '', raidneed.readable(v.reason))))}"
         "</td></tr>"  # its shares are the row's columns (DPS round 47: said twice)
         for v in r.verdicts)
-    groups = "".join(f"<li><b>{e(k)}</b> ({len(ps)}): {e(re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', ', '.join(ps)))}</li>"
+    def chip(p: str) -> str:  # "Poilodibz (Blood Death Knight)": the spec's icon, the name; the spec on hover
+        name, _, spec = p.partition(" (")
+        spec = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", spec.rstrip(")"))
+        return f"<span class='chip' title='{e(spec)}'>{icons.spec_img(spec)}{e(name)}</span>"
+    groups = "".join(f"<li><b>{e(k)}</b> ({len(ps)}): {''.join(chip(p) for p in ps)}</li>"  # chips (DPS round 51)
                      for k, ps in r.archetypes.items() if ps)
     rest, swapped = healers_left(r)
     if groups and rest > 0:  # every player of the log accounted for

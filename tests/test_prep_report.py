@@ -35,7 +35,7 @@ def test_raid_section_and_headline():
                       "boss", [], {AOE: ["Nizae (Balance Druid)"]}, "AoE / funnel")
     assert headline(d)[0].startswith("With your raid: stay on the boss.")
     page = render(d)
-    assert "Your raid and the adds" in page and "Nizae (Balance Druid)" in page and "you are not in that log" in page
+    assert "Your raid and the adds" in page and "title='Balance Druid'" in page and "you are not in that log" in page
 
 
 def test_render_prep_sheet_with_wowhead_links():
