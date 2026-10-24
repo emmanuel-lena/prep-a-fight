@@ -1568,7 +1568,9 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
     def tie(c: Cooldown, t: float, n: str) -> str:
         return n if answered is None or (c.name, t) in answered else ""
     return "".join(
-        f"<li><b>{_ic(c)}{e(_shown(c.name))}</b><small>pressed by {c.users:.0%} of the top players &middot; {count(c.per_kill)} a kill"
+        f"<li><b>{_ic(c)}{e(_shown(c.name))}</b><small><span class='use' title='pressed by {c.users:.0%} of the top "
+        f"players'><span class='ubar'><span style='width:{c.users:.0%}'></span></span>{c.users:.0%}</span> &middot; "
+        f"{count(c.per_kill)}/kill"  # a bar and two numbers (review 36: the same words on every row)
         + (f", {_pct(c.on_others)} of the presses on another player" if 0 <= c.on_others < 0.95 else
            ", all on another player" if c.on_others >= 0.95 else "") + "</small>"
         "<span class='when'>" + ("".join(f"<span class='chip'>{_chip((moved or {}).get((c.name, t), _named_at(c, t, named, sp)), tie(c, t, n))}"
