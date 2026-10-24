@@ -1513,7 +1513,24 @@ def legend_for(dl: str, page: str) -> str:
     out = re.sub(r"<dt>(.*?)</dt><dd>.*?</dd>", keep, dl)
     if "ramp" not in low:  # a clause no card uses goes too (a review: the ramp window on a sheet with none)
         out = out.replace("; a ramp: 8 to 30 s ahead", "")
-    return out
+
+    def short(m) -> str:  # a few words a term, its whole rule on hover (heal rounds 36-46: 30 to 40 words an entry)
+        term, full = m.group(1), m.group(2)
+        word = LEGEND_SHORT.get(re.sub(r"<[^>]+>|&[^;]+;", "", term).strip().lower())
+        if word is None:
+            return m.group(0)
+        plain = html.unescape(re.sub(r"<[^>]+>", "", full)).replace("'", "&#39;")
+        return f"<dt>{term}</dt><dd title='{plain}'>{word}</dd>"
+    return re.sub(r"<dt>(.*?)</dt><dd>(.*?)</dd>", short, out)
+
+
+# each legend term in a few words; its whole rule on the term's hover
+LEGEND_SHORT = {"n%": "of the top players read", "tied to a hit": "pressed in the hit's window by a quarter",
+                "tied to a moment": "pressed in the moment's window by a quarter",
+                "a time": "shared by a quarter of its users", "on cooldown": "pressed each time it is back",
+                "back from cooldown": "pressed as soon as it is back, not for the hit",
+                "or": "another time some press it instead",
+                "not kept": "in a hit's window, not its answer", "stage time": "after a dashed line: from the stage's start"}
 
 
 def _unnest(text: str) -> str:
