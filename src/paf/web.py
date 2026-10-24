@@ -585,8 +585,12 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
             f"href='/view/{e(i['key'])}' title='{e(i['difficulty'].capitalize())} &middot; "
             f"{time.strftime('%d %b %H:%M', time.localtime(i['mtime']))}"
             f"{'' if 'prep' in i['files'] else ' &middot; no sim yet'}'>"
-            f"{short_ago(i['mtime']) if 'prep' in i['files'] else 'no sim'}"  # a date reads as done (fresh review 4)
+            f"{_cell_word(i) if 'prep' in i['files'] else 'no sim'}"  # a date reads as done (fresh review 4)
             "</a>" for i in xs)  # no sim: the dashed outline, in the legend (never colour alone)
+
+    def _cell_word(i) -> str:  # today's: a check, its date on hover (fresh app review 6: "today" twenty times)
+        w = short_ago(i["mtime"])
+        return "&#10003;" if w == "today" else w
 
     def who(sp: str) -> str:
         cls = icons.class_key(sp)
