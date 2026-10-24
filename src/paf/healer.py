@@ -3011,8 +3011,9 @@ def render_sheet(h: HealerPrep) -> str:
     aura = h.dispelled[0][0] if h.dispelled else ""
     first = ([f"<p class='lead'>The top {e(h.spec)} of each kill removes {e(aura)} {h.dispelled[0][1]:.1f} times "
               f"a kill{when}." + (f" {e(h.dispel_text)}" if h.dispel_text else "") + fed + "</p>"  # the journal's
-              f"<p class='small muted'>A mean over {h.dispel_kills} of their kills, timed: a lighter read than the "
-              f"cooldowns' {h.kills}; the Dig deeper tab's rates a minute are medians over every kill.</p>"]  # method
+              f"<p class='small muted'><span class='pill' title='A mean over {h.dispel_kills} of their kills, timed: "
+              f"a lighter read than the cooldowns&#39; {h.kills}; the Dig deeper tab&#39;s rates a minute are medians "
+              f"over every kill'>{h.dispel_kills} kills, timed</span></p>"]  # the method a chip (round 43)
              # under the lead, not in it (round 78)
              if h.dispelled and h.dispelled[0][1] >= 1 else [journal_lead(h.journal, "healers")])
     boss = first + (
@@ -3041,13 +3042,14 @@ def render_sheet(h: HealerPrep) -> str:
         stages = h.abilities
         if h.dispelled and h.dispelled[0][1] >= 1:
             name, k = h.dispelled[0]
-            stages = stages.replace(f"<b>{e(name)}</b>", f"<b>{e(name)}</b> <small class=\"muted\">(the top "
-                                    f"{e(h.spec)}s dispel it {k:.1f} times a kill)</small>", 1)
+            stages = re.sub(rf"(<b>(?:<a [^>]*>)?{re.escape(e(name))}(?:</a>)?</b>)",  # its name a Wowhead link
+                            lambda m_: m_.group(1) + f" <span class='pill' title='the top {e(h.spec)}s dispel it "
+                            f"{k:.1f} times a kill'>dispelled {k:.1f}&times; a kill</span>", stages, count=1)  # (r. 43)
         boss.append(f"<h2>Every ability{', phase by phase' if '<h3>' in stages else ''}</h2>"  # Vashnik: one phase
-                    f"<p class='small muted'>Pull times in the {h.kills} top {e(h.spec)} kills (median "
-                    f"{_mmss(h.duration)}): they shift with your raid's pace, and another spec's sheet can differ"
-                    + ("; the fight tab's, in stage time, can sit a few seconds off" if getattr(h, "staged", False)
-                       else "") + ".</p>"
+                    "<p class='small muted'><span class='pill' title='They shift with your raid&#39;s pace, and "
+                    "another spec&#39;s sheet can differ" + ("; the fight tab&#39;s, in stage time, can sit a few seconds "
+                                                             "off" if getattr(h, "staged", False) else "")
+                    + f"'>pull times &middot; {h.kills} kills, median {_mmss(h.duration)}</span></p>"  # a chip (r. 43)
                     f"<div class='stages'>{stages}</div>")
     # every spec the pool reads (paf.healroles.POOL_PLAYERS): the Disc Priest, 3 in a Holy Priest's kills, has 43
     # in the pool; its casts unread here are said so in its cells

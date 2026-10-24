@@ -32,7 +32,6 @@ from paf.healer import (
     UNSIMMED,
     Cooldown,
     Moment,
-    _and,
     _mmss,
     _pct,
     moment_names,
@@ -727,7 +726,11 @@ def render_sheet(p: TankPrep) -> str:
               f"{trinkets_html(p.trinkets, getattr(p, 'item_icons', None)) or '<li>No gear yet.</li>'}</ul>",
               ]  # the lead says no sim weighs them
     top_share = max((s_ for _n, s_ in p.hitters), default=1.0) or 1.0
-    hit = "".join(f"<li><b>{e(n)}</b><span class='upbar' aria-hidden='true'><span style='width:"  # a bar each, the
+    from paf.icons import img as _img
+
+    names_ic = getattr(p, "name_icons", {}) or {}
+    hit = "".join(f"<li><b>{_img(names_ic.get(n, ''), 'small', 'ics')}{e(n)}</b><span class='upbar' "  # icons
+                  "aria-hidden='true'><span style='width:"  # a bar each, the
                   f"{s / top_share * 100:.0f}%'></span></span><small>{s:.0%}</small></li>"  # unit in the heading
                   for n, s in p.hitters)
     jr = "".join(f"<li>{e(plain(x))}</li>" for x in p.journal)
@@ -736,11 +739,7 @@ def render_sheet(p: TankPrep) -> str:
     # the boss tab says what hits them (the fight tab, when): measured, then the journal below
     # the three most, and any tied with the third at its shown share (round 92: Dripping Fangs 8% left out beside
     # Caustic Surge 8%, the mechanic the swaps follow)
-    top3 = [(n, s_) for i, (n, s_) in enumerate(p.hitters) if i < 3 or (len(p.hitters) > 2
-                                                                    and f"{s_:.0%}" == f"{p.hitters[2][1]:.0%}")]
-    top_hit = (f"<p class='lead'>What hits the top tanks the most: "
-               f"{_and([f'{e(n)} ({s:.0%})' for n, s in top3])} of their damage taken.</p>"
-               if p.hitters else journal_lead(p.journal, "tanks"))
+    top_hit = ("" if p.hitters else journal_lead(p.journal, "tanks"))  # the bars right below say it (round 43)
     boss = [top_hit, f"<h2>The abilities that hit the top tanks the most <small class='muted'>(% of the damage they "
                      f"take)</small></h2><ul class='hl2'>{hit or '<li>Not measured yet.</li>'}</ul>"]
     boss += [f"<p class='small muted'>Taunts stop working with {e(n)} (the Encounter Journal), never reached in the "
@@ -749,8 +748,9 @@ def render_sheet(p: TankPrep) -> str:
         boss.append(f"<h2>What the Encounter Journal asks tanks</h2><ul class='hl2'>{jr}</ul>")
     if p.abilities:  # every ability, the tanks' in full and the others' named
         boss.append(f"<h2>Every ability{', phase by phase' if '<h3>' in p.abilities else ''}</h2>"
-                    f"<p class='small muted'>Pull times in the {p.kills} top {e(p.spec)} kills (median "
-                    f"{_mmss(p.duration)}): they shift with your raid's pace, and another spec's sheet can differ.</p>"
+                    "<p class='small muted'><span class='pill' title='They shift with your raid&#39;s pace, and "
+                    f"another spec&#39;s sheet can differ'>pull times &middot; {p.kills} kills, median "
+                    f"{_mmss(p.duration)}</span></p>"  # the method a chip (round 43)
                     f"<div class='stages'>{p.abilities}</div>")
     have = next((x for x in p.presence if x.spec == p.spec), None)
     deeper = []

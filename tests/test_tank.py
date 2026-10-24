@@ -41,7 +41,7 @@ def test_tank_busters_hitters_and_swaps():
     assert "What hits you, and when" in page and "Crush" in page and "Tank swaps" in page
     assert "Shield Wall" in page and "Shield Block" in page and "Taunt at 3 stacks." in page
     sheet = tank.render_sheet(p)  # the four-tab sheet the app shows: its lead names the tanks' own danger
-    assert "What hits the top tanks the most: Melee" in sheet and "<b>0:30</b></td><td>Crush</td>" in sheet
+    assert "What hits the top tanks the most" not in sheet and "<b>0:30</b></td><td>Crush</td>" in sheet
     import re
     assert not re.search(r"round \d+", re.sub(r"<[^>]+>", " ", sheet))  # no review note in the page's text
 
