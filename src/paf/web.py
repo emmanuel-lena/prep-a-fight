@@ -301,6 +301,9 @@ class Jobs:
                 return
             job["status"] = "done" if code == 0 else f"failed (exit {code})"
             self._save(jid, job)
+            from paf import telemetry
+
+            telemetry.after_job(args, job["status"], log, job["started"])  # opt-in, in Settings
             if NOTIFY["on"] and args[:1] == ["prep"]:
                 _notify_done(args, job["status"])
 

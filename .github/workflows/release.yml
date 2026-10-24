@@ -17,6 +17,7 @@ jobs:
         shell: pwsh
         env:
           PAF_FEEDBACK_URL: ${{ secrets.PAF_FEEDBACK_URL }}
+          PAF_TELEMETRY_URL: ${{ secrets.PAF_TELEMETRY_URL }}
       - uses: actions/upload-artifact@v4
         with:
           name: installer

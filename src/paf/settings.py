@@ -33,6 +33,8 @@ SETTINGS: dict[str, Setting] = {
     "region": Setting("", "restrict rankings to a region (EU, US, KR, TW, CN); empty = all"),
     "language": Setting("auto", "language of the app and the prep sheets (auto = the language of Windows; en, fr...)"),
     "check_updates": Setting("on", "look for a new version of the app every 10 minutes", ("on", "off")),
+    "telemetry": Setting("off", "send an anonymous summary of each prep and tool run (step times, errors; no names) "
+                                "to help fix them", ("on", "off")),
     "share_packs": Setting("on", "share the prep packs you compute (fight data only, no names) so others skip the log "
                                   "collection", ("on", "off")),
     "refresh_after_reset": Setting("on", "after the weekly reset, prepare again by itself the bosses \"Prepare the "

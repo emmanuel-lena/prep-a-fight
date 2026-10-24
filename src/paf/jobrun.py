@@ -70,6 +70,9 @@ def run_job(args: list[str], result: Path | None = None, should_stop: Callable[[
                 return jid, "stopped"
     meta["status"] = "done" if proc.returncode == 0 else f"failed (exit {proc.returncode})"
     save()
+    from paf import telemetry
+
+    telemetry.after_job(args, meta["status"], folder / f"job-{jid}.log", meta["started"])  # opt-in, in Settings
     log(f"{' '.join(args[:2])}: {meta['status']}")
     return jid, "done" if proc.returncode == 0 else "failed"
 

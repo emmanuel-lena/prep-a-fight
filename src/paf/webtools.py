@@ -139,6 +139,8 @@ SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
         ("share_packs", "Share the prep packs you compute",
          "Fight data only, no names: the next player of your spec skips the log download."),
         ("check_updates", "Look for new versions", "Every 10 minutes, on GitHub."),
+        ("telemetry", "Send a summary of each run",
+         "Step times and errors only, no names: it tells us what is slow or broken on players' computers."),
     ]),
     ("Advanced", True, [
         ("corpus_size", "Kills read per boss", "The top kills a prep reads, then keeps reading in the background."),
@@ -151,7 +153,8 @@ SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
 ]
 
 
-SHOWN_HELP = {"share_packs": "Fight data only, no names."}  # what leaves the computer: always in sight
+SHOWN_HELP = {"share_packs": "Fight data only, no names.",  # what leaves the computer: always in sight
+             "telemetry": "Step times and errors only, no names."}
 PLACEHOLDER = {"guild_server": "as the game writes it: Kazzak, Twisting Nether"}
 
 

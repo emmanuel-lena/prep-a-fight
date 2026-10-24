@@ -37,6 +37,10 @@ Copy-Item (Join-Path $root "src\paf\assets\prep-a-fight.ico") $app
 if ($env:PAF_FEEDBACK_URL) {
     [IO.File]::WriteAllText((Join-Path $python "Lib\site-packages\paf\feedback_url.txt"), $env:PAF_FEEDBACK_URL)
 }
+# where the opt-in run summaries go (another Discord webhook, a CI secret too: paf.telemetry)
+if ($env:PAF_TELEMETRY_URL) {
+    [IO.File]::WriteAllText((Join-Path $python "Lib\site-packages\paf\telemetry_url.txt"), $env:PAF_TELEMETRY_URL)
+}
 
 $version = [regex]::Match((Get-Content (Join-Path $root "pyproject.toml") -Raw), '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
 & $iscc /Q "/DAppVersion=$version" (Join-Path $root "installer\prep-a-fight.iss")
