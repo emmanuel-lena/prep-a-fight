@@ -394,6 +394,17 @@ def taunt_immunity(sections, difficulty: str) -> list[tuple[str, str]]:
     return out
 
 
+def _cause_badge(common: str, stacks: dict) -> str:
+    """_cause as a badge: "8 stacks ≈ 29 s" or "after Dripping Fangs", the sentence on its hover."""
+    if not common:
+        return ""
+    peak, secs = stacks.get(common, (0, 0))
+    word = f"{peak} stacks &asymp; {secs:.0f} s" if peak >= 2 else f"after {e(common)}"
+    from html import unescape
+
+    return f"<span class='pill' title='{e(unescape(_cause(common, stacks)).strip(' ()'))}'>{word}</span>"
+
+
 def _cause(common: str, stacks: dict) -> str:
     """What most swaps follow, measured on the top tanks: the stacks of a stacking debuff, or a debuff they never
     let stack and how long it stays; else a timing."""
@@ -702,6 +713,8 @@ def render_sheet(p: TankPrep) -> str:
         f"swap moves it; fewer kills past the median one)'>{p.damage_kills or 'the top'} kills</span> "
         + ("<span>&#9478; stage time after a dashed line</span> " if getattr(p, "staged", False) else "")
         + (f"<span title='{e(marks)}'>&#9646; the table&#39;s answers</span> " if answered else "")
+        + ("<span>&#9647; another press, or one in a moment&#39;s window that is not its answer</span> "
+           if outline or window_named else "")  # its own chip, as the healers' (fresh heal review)
         + ("<span>| a tank swap</span> " if lane else "")
         + "<span title='one of the tanks&#39; three biggest moments, whatever casts it (another as high may be left "
         "out)'>&#9679; a big moment</span></p><ul class='hl2'>"
@@ -711,12 +724,12 @@ def render_sheet(p: TankPrep) -> str:
         f"{nouned(rare_html(p.rare, answered, named))}</ul>",  # the same rows as the others (heal round 10)
         f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"
         f"{nouned(mit_html(answered)) or '<li>Not measured yet.</li>'}</ul>",
-        f"<h2>Tank swaps</h2><p>{swap_said + ' ' if swap_said else ''}{'The swap moments most top raids share' if swap else 'No swap moment most top raids share.'}"
-        f"{_cause(common, p.stacks) if swap and one else ''}"
-        f"{':' if swap else ''}</p>" + (f"<ul class='hl2'><li><span class='when'>{swap}</span>"
-                                                          f"</li></ul>" if swap else "")
-        + (f"<p class='small muted'>About {extra} more swaps a kill come at varying times.</p>"
+        f"<h2>Tank swaps</h2><p>{swap_said + ' ' if swap_said else ''}"  # badges, the sentences on hover (fresh
+        + (_cause_badge(common, p.stacks) if swap and one else "")  # heal review: badges beside sentences)
+        + (f" <span class='pill' title='about {extra} more swaps a kill come at varying times'>+{extra} varying</span>"
            if swap and (extra := round(2 * p.taunts_per_kill) - len(p.swaps)) > 0 else "")
+        + ("" if swap else "No swap moment most top raids share.") + "</p>"
+        + (f"<ul class='hl2'><li><span class='when'>{swap}</span></li></ul>" if swap else "")
         # the rule said (round 87: a swap tied on Nek'zali, none on Vashnik's swap every 28 s, with no word why)
         + ("<p class='small muted'><span class='pill' title='The table ties a swap to a hit only when swaps are rare "
            "enough not to land within 5 s of it by chance one time in three or more.'>? when a swap is tied to a hit"
