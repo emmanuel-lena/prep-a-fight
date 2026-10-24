@@ -1689,7 +1689,8 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
            if c.rhythms else "")  # heal review: a sentence), the times on hover
         + (f"<small class='alt'><span class='pill rhythm' title='pressed every time it is back'><i class='g'>&#9719;</i> every "
            f"{c.every:.0f} s</span>"  # the rhythm a badge, as the others' (fresh heal review); its other presses (r. 109:
-           + (f"; {_more(c, named)} more on that cadence" if c.times and _more(c, named) else "")  # Stasis "3 a
+           + (f" <span class='vary' title='{_more(c, named)} more presses a kill on that cadence'>&mdash; "
+              f"{_more(c, named)} on cadence</span>" if c.times and _more(c, named) else "")  # Stasis "3 a
            + "</small>" if c.every and not _held(c) else  # kill", two chips)
            # a held habit kept (only one for a hit is): the cadence is the other group's (round 79: Avenging Wrath
            # "on cooldown" beside 26% holding it for 0:35, whose later presses vary)
@@ -1954,6 +1955,18 @@ def _store_bars(c: Cooldown, groups: list[float], by: dict, n: int) -> str:
                    f"<rect x='{x(a):.1f}' y='{y - 4}' width='{x(b) - x(a):.1f}' height='8' rx='3' class='sr' "
                    f"style='opacity:{max(0.3, min(1.0, share / 0.6)):.2f}'><title>released {_mmss(a)} to {_mmss(b)}, "
                    f"{_pct(share)} of the top players</title></rect>")
+    r = c.release  # the releases on a big hit, any store: a bar ending on its line, as long as they held it
+    for h in c.hits if r is not None else []:
+        hs, inside = hit_share(r, h, h), _counted(r, h, h)
+        if hs is None or hs < 0.1 or not inside or h > end:
+            continue
+        held = _gap_of(c, inside) or 0.0
+        y = 10 + 16 * len(rows)
+        rows.append((h, []))
+        out.append(f"<rect x='{x(h - held):.1f}' y='{y - 4}' width='{max(3.0, x(h) - x(h - held)):.1f}' height='8' "
+                   f"rx='3' class='sr any' style='opacity:{max(0.3, min(1.0, hs / 0.6)):.2f}'><title>any store "
+                   f"released on the {_mmss(h)} hit, {_pct(hs)}" + (f", held {held:.0f} s" if held else "")
+                   + "</title></rect>")
     hits = "".join(f"<line x1='{x(h):.1f}' x2='{x(h):.1f}' y1='2' y2='{16 * len(rows) + 4}' class='sh'>"
                    f"<title>the {_mmss(h)} hit</title></line>" for h in c.hits if h <= end)
     ticks = "".join(f"<text x='{x(m):.1f}' y='{16 * len(rows) + 16}' class='st' text-anchor='middle'>{_mmss(m)}</text>"
@@ -2018,8 +2031,8 @@ def _released(c: Cooldown) -> str:
                       + (f" &middot; held {gap:.0f} s" if (gap := _gap_of(c, inside)) else "") + "</span>")
     rest = [u for _s, u in other if u is not None]
     if chips and rest:
-        chips += (f"<small class='alt'>and about {len(rest) / n:.1f} more releases a kill, of stores made at other "
-                  "times</small>")  # releases, not players: a player may have several (round 88: "94% release")
+        chips += (f"<span class='vary' title='and about {len(rest) / n:.1f} more releases a kill, of stores made "
+                  f"at other times'>&mdash; +{len(rest) / n:.1f} other releases</span>")  # a dim pill (fresh heal review)  # releases, not players: a player may have several (round 88: "94% release")
     gap = "" if chips else f", a median {c.release_gap:.0f} s after its store" if c.release_gap else ""
     never = f"; {_pct(c.unreleased)} of the stores are never released" if c.unreleased >= 0.05 else ""
     out = (f"<span class='subrow'><small class='alt'>released:</small>{bars}{chips}</span>" if chips else  # each

@@ -512,6 +512,7 @@ def test_a_two_step_button_says_its_release_and_what_it_stores():
             "released)'>3:36 &middot; 50% &middot; from 3:20</span>") in out  # the any-store chip says the hit
     assert "released:</small><span class='stwrap'><svg class='stbars'" in out  # its bars
     assert "<title>a store at 3:20</title>" in out
+    assert "class='sr any'" in out and "released on the 3:35 hit, 50%, held 16 s</title>" in out  # its hit, drawn
     assert "and about 0.5 more releases a kill, of stores made at other times" in out  # the 1:40 stores
     assert "any store &rarr; 3:35 hit &middot; 50% &middot; held 16 s</span>" in out
     # a store never released before the next store is not paired with the next one's release (round 83)

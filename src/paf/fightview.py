@@ -425,7 +425,7 @@ def _ev(it: Item, row_t: float | None = None) -> str:
         why, _sep, flag = it.why.partition("⚠ ")  # the top players' other moment: an amber chip after the name, its
         if flag:  # sentence on hover (fresh DPS review: buried at the end of a grey line)
             at = re.search(r"at about (\d+:\d\d)", flag)
-            warn = (f" <span class='pill warn' title='{e(flag)}'>&#9888; tops &asymp;{at[1] if at else ''}</span>")
+            warn = (f" <span class='pill amb' title='{e(flag)}'>&#9888; tops &asymp;{at[1] if at else ''}</span>")
         if why.strip("; "):
             notes.append(why.strip("; "))
     small = f"<small>{', '.join(notes)}</small>" if notes else ""
