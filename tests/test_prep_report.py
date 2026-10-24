@@ -179,3 +179,17 @@ def test_the_pad_line_leaves_its_shares_to_the_bar():
     both = ("pad them, you make the difference: your raid does 70% of the top raids&#x27; damage on them without "
             "you, 90% with you (the weakest top raids do 84%).")
     assert _without_shares(both) == both  # the bar draws only the share with you
+
+
+def test_the_adds_to_kill_render_as_a_table():
+    """Fresh DPS review: the kill actions as a table; an Action is no set member (the first version crashed preps)."""
+    from paf.actions import Action
+
+    d = PrepData("Boss", "heroic", "Elemental", "Char", kills=10, duration=255)
+    d.guide_summary = "<div class='guide'><p>x</p></div>"
+    d.actions = [Action("kill", "Restless Amani", "Kill the Restless Amani (~21 per kill): the top raids kill them in "
+                        "~19 s; top Elemental players put 23% of their damage on them while they are up."),
+                 Action("kill", "Odd Add", "Kill the Odd Add whenever it comes.")]
+    page = render(d)
+    assert "<table class='kills fit'>" in page and "&times;21" in page and "19 s" in page and "width:23%" in page
+    assert "Kill the Odd Add whenever it comes." in page  # a line the table cannot read keeps its words

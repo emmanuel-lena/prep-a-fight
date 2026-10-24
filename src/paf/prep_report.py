@@ -1316,7 +1316,8 @@ def render(d: PrepData) -> str:
                 parsed = [(a, m) for a in rows if kind == "kill" and (m := KILL_TEXT.fullmatch(a.text))]
                 if parsed:  # the adds as a table: how many, how fast the top raids kill them, your share on them
                     # (fresh DPS review: bullet sentences)
-                    rows = [a for a in rows if a not in {x for x, _m in parsed}]
+                    done = [x for x, _m in parsed]  # by identity: an Action is no set member (it crashed a prep)
+                    rows = [a for a in rows if not any(a is x for x in done)]
                     blocks += (f"<h3>{e(title)}</h3><table class='kills fit'><thead><tr><th>Add</th>"
                                "<th class='n'>a kill</th><th class='n' title='how long they live in the top kills'>"
                                "&#9201; killed in</th><th title='the share of the top players&#39; damage on them while "
