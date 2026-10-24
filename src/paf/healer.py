@@ -1446,6 +1446,8 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
                if back > BACK_SHARE[0] else why)
     when = _about(inside) if inside else _mmss(t)  # the presses counted, not the moment's (round 53: "2:20" for a
     if ramp:                                          # window ending at 2:18, its presses at 2:14)
+        if named is not None and c.presses:  # its chip names this press at its time: the table says that time
+            when = _mmss(t)  # (rounds 36-44: "about 1:44 to 1:59" beside the chip's 1:49)
         return f" ({few}{_pct(sp)} ramp with {e(_shown(c.name))} ahead of it{of}, about {when}, {e(why)})"
     return f" ({few}{_pct(sp)} press {e(_shown(c.name))} in its window{of}, about {when}, {e(why)})"
 
