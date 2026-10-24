@@ -3116,6 +3116,8 @@ def render_sheet(h: HealerPrep) -> str:
 
         first = first + [
             "<h2>The abilities that hit the raid the most <small class='muted'>(% of the damage it takes)</small></h2>"
+            f"<p class='small muted'><span class='pill' title='the raid&#39;s damage taken by ability, summed over "
+            f"the kills read'>{h.raid_kills or 'the top'} kills</span></p>"  # its sample, as every block (r. 5)
             "<ul class='hl2'>" + "".join(
                 f"<li><b>{_img(boss_ic.get(n, ''), 'small', 'ics')}{e(n)}</b><span class='upbar' aria-hidden='true'>"
                 f"<span style='width:{sh / top_share * 100:.0f}%'></span></span><small>{sh:.0%}</small></li>"
