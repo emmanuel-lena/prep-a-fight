@@ -1314,6 +1314,12 @@ def render(d: PrepData) -> str:
                             ts = [_mmss(x) for x, c2, _l2, n2 in d.waves if c2 and n2 == n]
                             gates.append((n, f"Kill the {base} (at {', '.join(ts)})."))
                 parsed = [(a, m) for a in rows if kind == "kill" and (m := KILL_TEXT.fullmatch(a.text))]
+                # a boss unit to kill (an Echo of Jawae): a row of the table too, its count and life from the waves
+                # (fresh DPS review: a bullet under the table)
+                unit_waves = [(n, w) for n, _say in gates for w in d.waves if w[1] and w[3] == n][:4] if parsed else []
+                unit_rows = [f"<tr><td>{icons.img(_sfallback(d, n), 'small')}{e(re.sub(r' *[(].*', '', n))}</td>"
+                             f"<td class='n'>&times;{w[1]}</td><td class='n' title='alive this long in the top kills'>"
+                             f"{w[2]:.0f} s</td><td><span class='muted'>&mdash;</span></td></tr>" for n, w in unit_waves]
                 if parsed:  # the adds as a table: how many, how fast the top raids kill them, your share on them
                     # (fresh DPS review: bullet sentences)
                     done = [x for x, _m in parsed]  # by identity: an Action is no set member (it crashed a prep)
@@ -1326,8 +1332,11 @@ def render(d: PrepData) -> str:
                                    f"{e(m['name'])}</td><td class='n'>&times;{m['n'] or 1}</td><td class='n'>"
                                    f"{m['life']} s</td><td>" + (
                                        f"<span class='kbar'><span style='width:{m['share']}%'></span></span> "
-                                       f"{m['share']}%" if m['share'] else "") + "</td></tr>"
-                                   for a, m in parsed) + "</tbody></table>")
+                                       f"{m['share']}%" if m['share'] else "<span class='muted' title='not measured "
+                                       "for your spec: too short-lived or too rare in its kills'>&mdash;</span>")
+                                   + "</td></tr>" for a, m in parsed)
+                               + "".join(unit_rows) + "</tbody></table>")
+                    gates = [g for g in gates if g[0] not in {u for u, _w in unit_waves}]  # said in the table
                     title = ""  # the list below, if any, goes under the same heading
                 if rows or gates:
                     blocks += ((f"<h3>{e(title)}</h3>" if title else "") + "<ul>" + "".join(

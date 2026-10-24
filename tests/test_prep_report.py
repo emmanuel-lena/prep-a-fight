@@ -190,6 +190,8 @@ def test_the_adds_to_kill_render_as_a_table():
     d.actions = [Action("kill", "Restless Amani", "Kill the Restless Amani (~21 per kill): the top raids kill them in "
                         "~19 s; top Elemental players put 23% of their damage on them while they are up."),
                  Action("kill", "Odd Add", "Kill the Odd Add whenever it comes.")]
+    d.waves = [(52.0, 6, 18.0, "Restless Amani"), (73.0, 1, 75.0, "Echo of Jawae")]  # a unit no action names
     page = render(d)
+    assert "Echo of Jawae</td><td class='n'>&times;1</td>" in page and "Kill the Echo of Jawae" not in page
     assert "<table class='kills fit'>" in page and "&times;21" in page and "19 s" in page and "width:23%" in page
     assert "Kill the Odd Add whenever it comes." in page  # a line the table cannot read keeps its words
