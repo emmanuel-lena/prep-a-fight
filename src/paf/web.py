@@ -1218,7 +1218,15 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
         slug = characters.current_slug()
         last, said = lastraid.card(slug), lastraid.headline(slug)
         if said and "data-reading" not in last:  # read: one line beside the prep, the details on Reclear
-            last = (f"<section class='lr lr-row'><h2>Your last raid</h2><p class='lr-line'>{e(said)} "
+            import re
+
+            pct = re.search(r"got it to (\d+)%", said)  # the boss's face and its health left as a bar (fresh app
+            boss = next((x for x in encs if said.startswith(x.name)), None)  # review 7: a sentence)
+            face = (f"<img class='lr-face' src='/bossimg/{boss.id}.png' alt='' onerror=\"this.remove()\">"
+                    if boss else "")
+            bar = (f"<span class='lr-hp' title='boss health left at the end of your best pull'><i style='width:"
+                   f"{int(pct[1])}%'></i></span>" if pct else "")
+            last = (f"<section class='lr lr-row'><h2>Your last raid</h2><p class='lr-line'>{face}{e(said)} {bar}"
                     "<a href='/reclear'>Reclear &rarr;</a></p></section>")
         else:
             last = last + lastraid.CARD_JS if last else ""

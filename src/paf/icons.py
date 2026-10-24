@@ -99,7 +99,8 @@ def spec_img(spec: str, cls: str = "ics") -> str:
     key = class_key(spec)
     if not key:
         return ""
-    colour = CLASS_COLORS.get(key, "")
+    colour = "currentColor" if key == "priest" else CLASS_COLORS.get(key, "")  # white: the text's colour, seen
+    # on both themes (heal round 48: a white ring on the light theme)
     ring = f' style="box-shadow:0 0 0 1.5px {colour}"' if colour else ""
     return img(spec_icon(spec) or CLASS_ICON.format(cls=key), "small", cls, "").replace("<img ", f"<img{ring} ", 1)
 
