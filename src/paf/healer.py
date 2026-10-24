@@ -1002,10 +1002,12 @@ def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list
                     + "".join(f"<span class='tag'>{x}</span>" for x in (tags or {}).get(k, [])) + "</td>"
                     f"<td class='sz'><span class='track'><span class='bar' style='width:{max(8, round((m.ratio - 1) / max(0.01, top - 1) * 100))}%'></span></span>"
                     f"<b>{_x(m.ratio)}&times;</b></td><td class='ans'>{_tidy(ans)}</td></tr>")  # the legend's ⟲, as the chips
-    return ("<table class='hits'><thead><tr><th>When</th><th>What hits</th><th>Size &times;</th><th>What the top players press</th></tr></thead><tbody>" + "".join(rows)
-            + f"</tbody></table><p class='small muted hits-rule'>{rule + '. ' if rule else ''}"
-            + (f"None kept with no reason beside it: {same.strip()[1:-1]}. " if same else "") + "Size: &times; the usual "
-            f"{usual}; bars from 1&times; to the biggest hit.</p>")
+    size = f"<th title='&times; the usual {usual}; bars from 1&times; to the biggest hit'>&times; usual</th>"  # the
+    # scale on its header (review 36: a footnote line)
+    note = (rule + ". " if rule else "") + (f"None kept with no reason beside it: {same.strip()[1:-1]}." if same else "")
+    return ("<table class='hits'><thead><tr><th>When</th><th>What hits</th>" + size
+            + "<th>What the top players press</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
+            + (f"<p class='small muted hits-rule'>{note.strip()}</p>" if note.strip() else ""))
 
 
 def _stage_tag(t: float, phases: list | None) -> str:
@@ -2940,20 +2942,20 @@ def render_sheet(h: HealerPrep) -> str:
     rare_ext = [c for c in rare_kept if c not in items and _external(c.spell_id) == "protective"]
     rare_def = [c for c in rare_kept if c not in items and c not in rare_ext and is_defensive(c.spell_id, c.name)]
     fight = ([lead] if lead else []) + [
-        f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted'>Median raid "
-        f"damage per second, {h.raid_kills or 'the top'} kills (up to 40 a spec read: the same hits on every healer "
-        f"sheet; fewer kills past the median one). "
-        + ("After a dashed line, stage time (below). " if getattr(h, "staged", False) else "")
-        + ("Marks: the table's answers" + (" (an outline: another press, or one in a hit's window that is not "
-                                            "its answer)" if any(
+        f"<h2>The raid damage, and its big moments</h2><div class='card'>{svg}<p class='small muted chart-key'>"
+        # a key of glyphs, the method on hover (review 36: three lines of caption)
+        f"<span class='pill' title='Median raid damage per second; up to 40 kills a spec read: the same hits on every "
+        f"healer sheet; fewer kills past the median one'>{h.raid_kills or 'the top'} kills</span> "
+        + ("<span>&#9474; stage time after a dashed line</span> " if getattr(h, "staged", False) else "")
+        + ("<span>&#9646; the table's answers</span> " + ("<span>&#9647; another press, or one in a hit's window "
+                                                           "that is not its answer</span> " if any(
             (c.name, t) not in answered for c in drawn if c.name in lanes for t in [*c.times, *c.alt])
-            else "") + ". " if lead_names
-           else "No cooldown is kept for these hits; an outline: a press in a hit's window, not its answer. "
-           if lanes else "No cooldown is kept for these hits, so none is drawn. ")
-        + "A dot: a big hit, "
-        + ("named after what deals most of the damage there"
-           if h.named_by_damage else "named after the boss cast just before it (&quot;after X&quot;: 8 to 30 s "
-           "before, matched by timing)") + f".</p><ul class='hl2'>"
+            else "") if lead_names
+           else "<span>No cooldown is kept for these hits</span> <span>&#9647; a press in a hit's window</span> "
+           if lanes else "<span>No cooldown is kept for these hits, so none is drawn</span> ")
+        + "<span title='" + ("named after what deals most of the damage there" if h.named_by_damage else
+                             "named after the boss cast just before it (&quot;after X&quot;: 8 to 30 s before, "
+                             "matched by timing)") + "'>&#9679; a big hit</span></p><ul class='hl2'>"
         f"{'' if h.moments else '<li>No big moment: steady raid damage.</li>'}</ul></div>",
         f"<h2>Your long cooldowns, where the top {e(h.spec)}s press them</h2><ul class='hl2'>"
         f"{cooldowns_html(sorted((c for c in heals if _external(c.spell_id) != 'protective'), key=_rank(lead_names)), answered, named, moved) or '<li>Not enough top players in the corpus yet.</li>'}"
