@@ -2960,14 +2960,14 @@ def render_sheet(h: HealerPrep) -> str:
         f"{rare_html(rare, answered, named)}</ul>"]  # a cooldown the top players skip is information too
     exts = [c for c in heals if _external(c.spell_id) == "protective"]
     buffers = [c for c in heals if _external(c.spell_id) == "damage"]  # Power Infusion: a buff on a damage dealer
-    buff_note = (f" {_and([e(_shown(c.name)) for c in buffers])}, a buff cast on a damage dealer, is with your long "
-                 "cooldowns above." if buffers else "")  # round 34: "fewer than half cast one" read as PI's absence
+    # Power Infusion: said where it is, as a pill (round 34: "fewer than half cast one" read as PI's absence)
     if exts or rare_ext:  # cast on another player: their own group, apart from the raid cooldowns; one form at
         # any share (round 98: Time Dilation 50% a card, 48% a line; heal round 10: still two forms)
         fight.append(f"<h2>Your externals{f', where the top {e(h.spec)}s cast them' if any(c.times for c in exts) else ''}"
                      f"</h2><ul class='hl2'>"
                      f"{cooldowns_html(exts, answered, named)}{rare_html(rare_ext, answered, named)}</ul>"
-                     + (f"<p class='small muted'>{buff_note.strip()}</p>" if buff_note else ""))
+                     .replace("</h2>", "".join(f" <span class='pill'>{e(_shown(c.name))}: with your cooldowns above"
+                                               "</span>" for c in buffers) + "</h2>", 1))  # a pill (round 38)
     else:  # none, said (round 92: the Shaman's sheet had no line), as a badge on its heading (review 36: a sentence)
         fight.append("<h2>Your externals <span class='pill'>none here</span>"
                      + "".join(f" <span class='pill'>{e(_shown(c.name))}: with your cooldowns above</span>"

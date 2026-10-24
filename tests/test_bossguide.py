@@ -85,7 +85,9 @@ def test_a_unit_told_before_shows_only_what_changes():
     a = abilities_html([one, two])
     inter = a[a.index("Intermission"):]
     assert "As in Stage One; what changes:" in inter and "Ancient spirits" not in inter
-    assert NOW_DEADLY in inter and "A corpse lingers." not in inter
+    # under the unit's "As in Stage One", its rows say only what changed (round 38: three times in four lines)
+    assert 'now</span> <span class="pill warn">deadly</span>' in inter and NOW_DEADLY not in inter
+    assert "A corpse lingers." not in inter
     assert "Also, as in Stage One: Corpse Blight." in inter
 
 
@@ -149,7 +151,7 @@ def test_a_healers_dispels_are_told_what_their_summary_names_tagged():
     a = abilities_html([over, stage], role="healer")
     # the dispel told; what the healers' summary names: their tag, its words being the summary's (round 37)
     assert "A magic curse on a player." in a and ">magic<" in a and "Froth." not in a
-    assert "The boss drinks." not in a and "<b>Imbibe</b> <span class=\"pill\">healer</span>" in a
+    assert "The boss drinks." not in a and "&uarr; for you</span>" in a
 
 
 def test_a_mechanic_that_lands_on_players_is_told():

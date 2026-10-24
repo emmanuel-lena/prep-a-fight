@@ -241,8 +241,10 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
             or (ctx["role"] == "healer" and bool(DISPEL & set(s.flags))))  # a healer's dispels (review 36: Essence
     # Rend, the boss tab's headline, a bare name); what the role's summary names: a tag, its words being the
     # summary's (round 37: the same sentences in both columns)
-    if s.title in ctx["named"] and not told:
-        tags += f'<span class="pill">{SHOWN_FLAGS.get(ctx["role"], ctx["role"])}</span>'  # the role's own tag
+    if s.title in ctx["named"]:  # first: never its words, whatever else holds (round 38: Essence Rend and
+        told = s.title in ctx["also"]  # Sanguineous Fortitude said in both columns); its numbers stay
+        tags += '<span class="pill sum" title="its words: in For you, at the top">&uarr; for you</span>'  # its own
+        # marker, not the journal's role flag (round 38: "dps" with words on some rows, without on others)
 
     text = readable(s.text, ctx["difficulty"]).strip() if s.text and told else ""
     if not text and told:  # no journal text, or only another difficulty's sentence: the spell's own description
@@ -287,7 +289,7 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
     for top in sections:
         if top.kind == "overview":
             continue
-        rows, repeated, others, skip = [], {}, {}, None
+        rows, repeated, others, skip, under = [], {}, {}, None, None
         for depth, s in walk(top.children):
             if skip is not None and depth > skip:  # under an ability of another role: named with it
                 continue
@@ -310,24 +312,29 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
                 seen.setdefault(key(s), top.title)
                 prior = told_text.setdefault((s.kind, s.title, readable(s.text)), (top.title, set(s.flags)))
                 prior = prior if prior[0] != top.title else None
+            if under is not None and depth <= under:
+                under = None
+            quiet = under is not None  # under a unit already "as in" its stage: said once (round 38)
             if s.kind == "ability" and key(s) in seen and seen[key(s)] != top.title:  # told before: its name only,
                 pic = icons.img(ctx["icons"].get(s.title, ""), "small")           # for what is new under it
+                where = "" if quiet else f' <span class="muted small">as in {e(_short(seen[key(s)]))}</span>'
                 rows.append(f'<div class="ab" style="margin-left:{min(depth, 1) * 14}px"><div>{pic}<b>{e(s.title)}</b>'
-                            f' <span class="muted small">as in {e(_short(seen[key(s)]))}</span></div></div>')
+                            f"{where}</div></div>")
             elif s.kind == "ability" and prior:  # the same words as before, a new tag (Vessel of Awakening: deadly)
                 was = prior
                 new = [SHOWN_FLAGS[f] for f in s.flags if f in SHOWN_FLAGS and f not in was[1]]
                 pic = icons.img(ctx["icons"].get(s.title, ""), "small")
+                pills = " ".join(  # the pills every other ability gets (app round 11)
+                    f'<span class="pill {"warn" if x in ("deadly", "interrupt") else ""}">{e(x)}</span>' for x in new)
+                lead = "" if quiet else f"as in {e(_short(was[0]))}, "
+                what = f"{lead}now</span> {pills}" if new else f"{lead}changed</span>"
                 rows.append(f'<div class="ab" style="margin-left:{min(depth, 1) * 14}px"><div>{pic}<b>{e(s.title)}</b>'
-                            f' <span class="muted small">as in {e(_short(was[0]))}'
-                            + (", now</span> " + " ".join(  # the pills every other ability gets (app round 11)
-                                f'<span class="pill {"warn" if x in ("deadly", "interrupt") else ""}">{e(x)}</span>'
-                                for x in new) if new else ", changed</span>")
-                            + "</div></div>")
+                            f' <span class="muted small">{what}</div></div>')
             elif s.kind == "ability":
                 rows.append(_ability(s, depth, ctx))
             elif s.kind == "creature":  # a unit told before: its name, then only what changed under it
                 told = seen.get(key(s), top.title) != top.title
+                under = depth if told else None  # its rows need not say "as in" again
                 ts = None if told else ctx["timings"].get(s.title.lower())  # when it comes, at its first stage
                 at = f" <span class='muted small'>around {_when(ts)}</span>" if ts else ""  # only (app rounds 13-14:
                 # the adds had no time, then the intermission's repeat gave the Stage One spawns)

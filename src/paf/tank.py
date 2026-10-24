@@ -682,6 +682,7 @@ def render_sheet(p: TankPrep) -> str:
                     "the swaps", [*defs, *shorts, *lane], {"Tank swaps", *(n for n, _t in answered), *window_named},
                     answered,
                     moved_t)  # its marks at the lead's times (round 71)
+    svg = nouned(svg)  # its hovers in the cards' noun too (round 38: "the 2:55 hit" over a 1.45x moment)
     # the marks said are the ones drawn (heal round 10: "the table's answers" over a chart of swaps alone)
     outline = any((c.name, t) not in answered for c in [*defs, *shorts]
                   if c.name in {n for n, _t in answered} | window_named for t in c.times)
