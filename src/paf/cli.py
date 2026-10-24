@@ -872,6 +872,13 @@ def _prep_tank(args: argparse.Namespace, profile=None) -> int:
     out = data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     healer.add_icons(p)
+    try:  # the journal's icon for a name the journal has: one icon per ability per tab (round 45: Soul Transfer
+        from paf.icons import icons_for  # two icons, bars and list)
+
+        journal_ic = icons_for(bossguide.spell_refs(bossguide.load(enc.id, diff_name)))
+        p.name_icons.update({n: ic for n, ic in journal_ic.items() if n in dict(p.hitters) and n != "Melee"})
+    except Exception:  # noqa: BLE001 - offline: the spells' own icons
+        pass
     out.write_text(tank.render_sheet(p), encoding="utf-8")
     for m in found:
         print(f"  tank buster at {healer._mmss(m.t)} ({m.ratio:.1f}x): {m.boss_spell}")

@@ -175,7 +175,7 @@ def test_the_pad_line_leaves_its_shares_to_the_bar():
     from paf.prep_report import _without_shares
 
     assert _without_shares("Pad them: with you, your raid does 53% of the top raids&#x27; damage on them (the weakest "
-                           "top raids do 84%); it lacks cleave.") == "Pad them: it lacks cleave."
+                           "top raids do 84%); it lacks cleave.") == "Your raid lacks cleave."
     both = ("pad them, you make the difference: your raid does 70% of the top raids&#x27; damage on them without "
             "you, 90% with you (the weakest top raids do 84%).")
     assert _without_shares(both) == both  # the bar draws only the share with you

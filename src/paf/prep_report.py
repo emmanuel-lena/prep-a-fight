@@ -877,7 +877,9 @@ def _pad_bar(text: str) -> str:
         return ""
     you, low = int(m[1]), int(m[2])
     top = max(100, you, low)
-    return (f"<div class='padbar' title='your raid {you}%, the weakest top raids {low}% of the top raids&#39; damage'>"
+    end = "" if low / top > 0.8 else " ends"  # "100%" only where it does not touch the mark's label (round 45)
+    return (f"<div class='padbar{end}' title='your raid {you}%, the weakest top raids {low}% of the top raids&#39; "
+            "damage'>"
             f"<i style='width:{you / top * 100:.0f}%'></i><b style='left:{low / top * 100:.0f}%'></b>"
             f"<span>your raid {you}%</span><span class='lo' style='left:{low / top * 100:.0f}%'>{low}%</span></div>")
 
@@ -889,7 +891,8 @@ def _without_shares(text: str) -> str:
         return text
     out = re.sub(r"(?:(?:with|without) you, )?your raid (?:already )?does \d+%.*?\(the weakest top raids do \d+%\)(?:; )?", "",
                  text)
-    return re.sub(r":\s*$", ".", re.sub(r":\s+(?=[.;]|$)", "", out)).replace(": .", ".")
+    out = re.sub(r":\s*$", ".", re.sub(r":\s+(?=[.;]|$)", "", out)).replace(": .", ".")
+    return re.sub(r"^Pad them: it lacks", "Your raid lacks", out)  # the title says "pad" (round 45: said twice)
 
 
 def places(g: float, gains: list[float]) -> int:

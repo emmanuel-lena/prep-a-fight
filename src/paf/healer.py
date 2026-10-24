@@ -160,7 +160,7 @@ def add_icons(prep) -> None:
             prep.name_icons = icons_for({n: f"spell={i}" for n, i in ids.items()})
         except Exception:  # noqa: BLE001 - offline
             prep.name_icons = {}
-        prep.name_icons.setdefault("Melee", "ability_meleedamage")  # the boss's swings: no spell of its own
+        prep.name_icons["Melee"] = "ability_meleedamage"  # the boss's swings: a weapon (a "Melee" spell read a gear)
 
 
 def _ic(c: Cooldown | None) -> str:
@@ -1446,8 +1446,8 @@ def landed_in(m: Moment, cds: list[Cooldown], named: dict | None = None, word: s
                if back > BACK_SHARE[0] else why)
     when = _about(inside) if inside else _mmss(t)  # the presses counted, not the moment's (round 53: "2:20" for a
     if ramp:                                          # window ending at 2:18, its presses at 2:14)
-        if named is not None and c.presses:  # its chip names this press at its time: the table says that time
-            when = _mmss(t)  # (rounds 36-44: "about 1:44 to 1:59" beside the chip's 1:49)
+        if inside:  # its chip's time, the centre of its counted presses (_named_at), not their span (rounds 36-45:
+            when = _mmss(_center(inside))  # "about 1:44 to 1:59" beside the chip's 1:49)
         return f" ({few}{_pct(sp)} ramp with {e(_shown(c.name))} ahead of it{of}, about {when}, {e(why)})"
     return f" ({few}{_pct(sp)} press {e(_shown(c.name))} in its window{of}, about {when}, {e(why)})"
 

@@ -380,8 +380,8 @@ def abilities_html(sections: list[Section], *, timings: dict[str, list[float]] |
             + ("Also unchanged: " if unit_said and len(repeated) == 1 else f"As in {e(_short(where))}: ")  # its unit
             + chips(names) + "</p>"  # said the stage (round 39)
             for where, names in repeated.items() if chips(names))
-        notes += "".join(f"<p class='small muted also'>For {ROLE_OTHERS[r]}: {e(', '.join(dict.fromkeys(names)))}.</p>"
-                        for r, names in others.items())
+        notes += "".join(f"<p class='small muted also'>For {ROLE_OTHERS[r]}: {chips(names)}</p>"  # chips too (r. 45)
+                         for r, names in others.items() if chips(names))
         cards.append(f'<section class="stage">{title}{intro}{grouped(body)}{notes}</section>')
     return "".join(cards)
 
