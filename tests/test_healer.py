@@ -879,3 +879,15 @@ def test_twice_reads_the_shares_as_shown():
                         presses=[[130.0, 250.0]] * 10 + [[50.0]] * 19)
     assert c.support[0] + healer._rest(c) > c.users
     assert healer._twice(c) == ""
+
+
+def test_the_chart_draws_the_other_cards_cooldowns_fainter_for_fewer_players():
+    # Restoration Shaman, Nek'zali (fresh heal review): Nature's Swiftness and Spiritwalker's Grace had chips only
+    slt = healer.Cooldown("Spirit Link Totem", 1, 0.98, 2.0, [73.0], ["1:15"], support=[0.31])
+    ns = healer.Cooldown("Nature's Swiftness", 1, 1.0, 5.0, [7.0, 128.0], ["", ""], support=[0.91, 0.47])
+    svg = healer.curve_svg([1.0] * 60, [], [], "x", [slt, ns], {"Spirit Link Totem"}, {("Spirit Link Totem", 73.0)},
+                           others=4)
+    assert "Nature&#x27;s Swiftness" in svg or "Nature's Swiftness" in svg
+    assert "style='opacity:1.00'" in svg and "style='opacity:0.78'" in svg
+    assert healer.curve_svg([1.0] * 60, [], [], "x", [slt, ns], {"Spirit Link Totem"},
+                            {("Spirit Link Totem", 73.0)}).count("class='cl'") == 1

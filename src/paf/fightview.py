@@ -421,20 +421,24 @@ def _row(m: Moment, i: int, gap: float = 0.0) -> str:
             f"<div class='you'>{'<span class=vh>You: </span>' + you if you else ''}</div></div>")
 
 
-def _cadence(ts: list[float]) -> str:
-    """Press times as a player reads them: up to five listed; more, the run at one cadence then the rest listed
-    (DPS round 17: "every 31 s (8 times)" hid the press held to 2:47 for the wave)."""
-    shown = [_mmss(t) for t in ts]
+def _tc(t: float) -> str:
+    return f"<time class='tc'>{_mmss(t)}</time>"
+
+
+def _cadence_chips(ts: list[float]) -> str:
+    """Press times as a player reads them, as chips: up to five listed; more, the run at one cadence (one ⟲ badge)
+    then the rest listed (DPS round 17: "every 31 s (8 times)" hid the press held to 2:47 for the wave; fresh DPS
+    review: as sentences)."""
     if len(ts) <= 5:
-        return ", ".join(shown)
+        return "".join(_tc(t) for t in ts)
     gaps = [b - a for a, b in zip(ts, ts[1:], strict=False)]
     step = sorted(gaps)[len(gaps) // 2]
-    run = next((i for i, g in enumerate(gaps) if abs(g - step) > 3), len(gaps))  # the first gap off the cadence
-    if run < 3:  # no steady start: every time
-        return ", ".join(shown)
-    rest = shown[run + 1:]
-    return (f"{shown[0]}, then about every {step:.0f} s to {shown[run]}"
-            + (f"; then {', '.join(rest)}" if rest else ""))
+    run = next((i for i, g in enumerate(gaps) if abs(g - step) > 3), len(gaps))
+    if run < 3:
+        return "".join(_tc(t) for t in ts)
+    return (_tc(ts[0]) + f"<span class='pill' title='about every {step:.0f} s from {_mmss(ts[0])} to "
+            f"{_mmss(ts[run])}'>&#10227; {step:.0f} s &rarr; {_mmss(ts[run])}</span>"
+            + "".join(_tc(t) for t in ts[run + 1:]))
 
 
 # a cooldown plan's rule as Your job's badge (its sentence on the badge's hover)
@@ -448,8 +452,8 @@ def job_html(d) -> str:
 
     def at(name: str) -> str:  # the waves of that unit, as the fight tab places them
         ts = [t for t, c, _l, n in d.waves if c and _clean(n) == name]
-        return f" at {', '.join(_mmss(t) for t in ts)}" if ts else ""
-    rows = [(a.name, f"<b>{e(a.text.split(':')[0].split(' (')[0])}</b>{at(a.name)}.") for a in d.actions
+        return " " + "".join(_tc(t) for t in ts) if ts else ""  # chips, as the cooldowns' (fresh DPS review)
+    rows = [(a.name, f"<b>{e(a.text.split(':')[0].split(' (')[0])}</b>{at(a.name)}") for a in d.actions
             if a.kind in ("kill", "contact") or (a.kind == "interrupt" and a.text.startswith("Interrupt"))][:2]
     kills = [a for a in d.actions if a.kind == "kill"][:2]
     if len(kills) == 2 and at(kills[0].name) and at(kills[0].name) == at(kills[1].name):  # one wave, two units:
@@ -457,7 +461,7 @@ def job_html(d) -> str:
         kills.sort(key=lambda a: next((i for i, w in enumerate(d.waves) if _clean(w[3]) == a.name), 99))
         both = "Kill " + " and ".join(e(a.name) for a in kills)  # the timeline's words and order (DPS round 12)
         rows = [r for r in rows if r[0] not in {a.name for a in kills}]
-        rows.insert(0, (kills[0].name, f"<b>{both}</b>{at(kills[0].name)}."))  # every line ends alike
+        rows.insert(0, (kills[0].name, f"<b>{both}</b>{at(kills[0].name)}"))  # every line ends alike
     hints = {it.name: it.hint for _t, it in items(d) if it.hint}
     said = {_clean(a.name) for a in d.actions}
     skip = {a.name for a in d.actions if a.kind == "ignore"}
@@ -467,42 +471,46 @@ def job_html(d) -> str:
             said.add(name)
             why = next((h for k, h in hints.items() if name.lower() in h.lower()), "")
             many = any(c2 > 1 for _t2, c2, _l2, n2 in d.waves if _clean(n2) == name) and not name.endswith("s")
-            rows.append((n, f"<b>Kill the {e(name)}{'s' if many else ''}</b>{at(name)}."))  # the why: on the rows
+            rows.append((n, f"<b>Kill the {e(name)}{'s' if many else ''}</b>{at(name)}"))  # the why: on the rows
             hints = {k: h for k, h in hints.items() if h != why}
     imm = d.fight.invulnerable if d.fight is not None else []
     for w in imm[:1]:
         adds = [_clean(x[3]) for x in d.waves if w.start - 2 <= x[0] <= w.start + w.duration and x[1]]
-        what = f": your damage goes on the {e(adds[0])}" if adds else ""
         shown = [int(x.start + x.duration) - int(x.start) for x in imm]  # from the times shown, so "1:41 to 2:40"
         lo, hi = min(shown), max(shown)  # reads 59 s (DPS round 13: "(58 s)")
 
         long = _span(lo) if lo == hi else f"{_span(lo)} to {_span(hi)} each"  # every time (the Sentinels: three)
         if len(imm) == 1:
-            when = f"from {_mmss(w.start)} to {_mmss(w.start + w.duration)}"
+            when = f"{_tc(w.start)}&rarr;{_tc(w.start + w.duration)}"
         else:
-            when = f"at {', '.join(_mmss(x.start) for x in imm)}"
-        rows.append((IMMUNE_ICON, f"<b>Boss immune</b> {when} ({long}){what}."))
+            when = "".join(_tc(x.start) for x in imm)
+        rows.append((IMMUNE_ICON, f"<b>Boss immune</b> {when}<span class='pill'>{long}</span>"
+                                  + (f"<span class='pill' title='your damage goes on the {e(adds[0])}'>&rarr; the "
+                                     f"{e(adds[0])}</span>" if adds else "")))
+        # chips (fresh DPS review: "Boss immune from 1:41 to 2:40 (59 s): your damage goes on the …")
     if len(rows) < 2:  # the journal's lines for damage dealers about this fight's events (Sszorak: Dig In)
         done = {r[0] for r in rows}
         for _t, it in items(d):
             if it.hint and it.hint in hints.values() and it.name not in done and len(rows) < 3:
                 done.add(it.name)
-                times = [_mmss(max(0.0, x)) for x, y in items(d) if y.side == "boss" and y.name == it.name]
-                rows.append((it.name, f"<b>{e(_clean(it.name))}</b> at {', '.join(times[:5])} "  # its words on the
+                times = [max(0.0, x) for x, y in items(d) if y.side == "boss" and y.name == it.name]
+                rows.append((it.name, f"<b>{e(_clean(it.name))}</b> {''.join(_tc(x) for x in times[:5])}"  # its words
                                       f"<span class='src' title='Journal: {e(it.hint)}'>&#128214;</span>"))  # book's
                 # hover: a description of the mechanic, not an order (fresh DPS review: the most-read card)
     defs = _defensives(d)
     if defs:
         s, why = defs[0][1], defs[0][2]
         at = ", ".join(_mmss(t) for t, x, _w in defs if x == s)  # every time the fight tab calls it
-        rows.append((s, f"<b>{e(s)}</b> at {at}{' for ' + e(why.removesuffix(chr(39) + 's damage')) if why else ''}, "
-                        "the top players' defensive."))
+        rows.append((s, f"<b>{e(s)}</b> {''.join(_tc(t) for t, x, _w in defs if x == s)}<span class='pill' "
+                        f"title='the top players&#39; defensive'>&#128737; "
+                        f"{'for ' + e(why.removesuffix(chr(39) + 's damage')) if why else 'defensive'}</span>"))
     wins = d.movement.windows if d.movement else []
     for t, it in items(d):  # a mobility spell the fight tab calls for a move: said, with who presses it
         if it.side == "you" and it.kind == "move":
             share = next((sh for w in wins if abs(w.start - t) <= 1.5 for n, sh in w.spells if n == it.name), None)
-            who = f": {share:.0%} of the top players press it there" if share else ""
-            rows.append((it.name, f"<b>{e(it.name)}</b> for the move at {_mmss(t)}{who}."))
+            who = f" &middot; {share:.0%} of the tops" if share else ""
+            rows.append((it.name, f"<b>{e(it.name)}</b> {_tc(t)}<span class='pill' title='for the move; the share of "
+                                  f"the top players pressing it there'>&#8596; move{who}</span>"))
     names, _order, _held = simple._pressed(d)
     order: dict[str, list[float]] = {}  # the times the fight view calls (a burst moved onto its adds included)
     for t, it in items(d):
@@ -516,17 +524,16 @@ def job_html(d) -> str:
     # names Your job shows (round 43: Ancestral Call, a racial, without its badge)
     in_lust = [n for n in names if n in rules and any(0 <= t <= 40 for t in order[n])]  # a held cooldown inside
     if d.lust is not None and d.lust < 5 and in_lust:  # it, or no line (fresh DPS review: the big presses at 0:51)
-        rows.append(("Bloodlust", f"<b>Bloodlust at the pull</b>: {e(_and_names(in_lust))} inside it."))
+        rows.append(("Bloodlust", f"<b>Bloodlust</b> <span class='pill'>at the pull</span><span class='pill'>"
+                                  f"{e(_and_names(in_lust))} inside</span>"))
     for n in sorted((n for n in names if n in order), key=lambda n: min(order[n])):  # in the order you first press them
         pre = [t for t in order[n] if t < 0.5 and (n in d.precast or "potion" in n.lower())]
         rest = [_mmss(t) for t in order[n] if t not in pre]
-        when = _cadence([t for t in order[n] if t not in pre])  # a long list: its cadence, never cut (DPS 16-17)
-        if pre:
-            when = "before the pull" + (f", then {when}" if rest else "")
-        elif rest:
-            when = f"at {when}"
+        when = _cadence_chips([t for t in order[n] if t not in pre])  # a long list: its cadence, never cut
+        if pre:  # (DPS 16-17); chips, not a sentence (fresh DPS review)
+            when = "<span class='pill' title='before the pull'>pre-pull</span>" + (when if rest else "")
         if all(t < 5 for t in order[n]) and "potion" not in n.lower():  # a short cooldown: the opener, then rotation
-            when += ", then with your rotation"
+            when += "<span class='pill' title='then with your rotation'>then rotation</span>"
         hold = re.fullmatch(r"hold_(adds|vulnerable)_(\d+)", rules.get(n, ""))
         badge = (f"hold &le;{hold[2]} s for {'adds' if hold[1] == 'adds' else 'the damage amp'}" if hold else
                  RULE_BADGE.get(rules.get(n, "")))  # every rule a badge, its words on hover (fresh DPS review)
@@ -537,8 +544,7 @@ def job_html(d) -> str:
             same[0].append(n)  # Ascendance at 0:51, 2:52: the ninth line cut Ascendance off; a review)
             continue
         rows.append(([n], None, (when, why)))
-    rows = [((r[0][0], f"<b>{e(_and_names(r[0]))}</b> {e(r[2][0])}{r[2][1]}"
-              + ("" if r[2][1].endswith("</span>") else "."), r[0]) if isinstance(r[0], list)  # no stop after a badge
+    rows = [((r[0][0], f"<b>{e(_and_names(r[0]))}</b> {r[2][0]}{r[2][1]}", r[0]) if isinstance(r[0], list)  # chips
              else (*r, None)) for r in rows]
     if not rows:
         return ""

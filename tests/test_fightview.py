@@ -47,9 +47,9 @@ def test_the_page_carries_its_data_and_one_script(monkeypatch):
     assert any(s["k"] == "cd" and s["d"] == 16.0 for s in data["strips"])
     assert page.count("id='c-sync'") == 1 and "aria-keyshortcuts='Control+Shift+Space'" in page
     assert "Your job on this boss" in page and "<b>Kill the Amani</b>" in page
-    assert ("<b>Shadow Blades</b> at 0:52, 3:20 <span class='pill hold' title='hold for the next add wave if within "
-            "45 s, else use it'>hold &le;45 s for adds</span>" in page)
-    assert "<b>Potion</b> before the pull." in page
+    assert ("<b>Shadow Blades</b> <time class='tc'>0:52</time><time class='tc'>3:20</time> <span class='pill hold' "
+            "title='hold for the next add wave if within 45 s, else use it'>hold &le;45 s for adds</span>" in page)
+    assert "<b>Potion</b> <span class='pill' title='before the pull'>pre-pull</span>" in page  # chips, not sentences
     blades = [a for a in data["acts"] if a["n"] == "Shadow Blades"]
     assert blades[0]["t"] == 52 and blades[0]["c"] == "on the 4 × Amani"  # called at its own time, not the row's
     assert [a["k"] for a in data["anchors"]] == ["pull", "cast", "adds", "phase", "cast"]  # what a press can confirm
@@ -129,12 +129,13 @@ def test_a_boss_row_says_what_the_journal_tells_damage_dealers(monkeypatch):
     assert ("class='hint' title='Journal: Dig In increases Sszorak&#x27;s damage taken during Howling Maelstrom.'>"
             "&#128214; journal") in page  # the timeline row: its words on hover, Your job says them
     job = fightview.job_html(d)  # Your job names it with when, its words on the book's hover
-    assert "<b>Dig In</b> at 1:51, 4:09" in job and "title='Journal: Dig In increases" in job
+    assert "<b>Dig In</b> <time class='tc'>1:51</time><time class='tc'>4:09</time>" in job
+    assert "title='Journal: Dig In increases" in job
     d.waves = [(24.0, 5, 30.0, "Bubblefin Shorerunner")]
     d.role_bullets = ["[Alluring Bubble] attracts a large group of Bubblefin Shorerunners to rush toward the bubble."]
     assert next(it for _t, it in fightview.items(d) if it.kind == "adds").hint.startswith("Alluring Bubble attracts")
     job = fightview.job_html(d)  # no action names the murlocs: Your job says to kill them, with the journal's why
-    assert "<b>Kill the Bubblefin Shorerunners</b> at 0:24.</span>" in job  # the why stays on the fight rows
+    assert "<b>Kill the Bubblefin Shorerunners</b> <time class='tc'>0:24</time></span>" in job  # the why: fight rows
 
 
 def test_two_adds_of_one_wave_are_one_kill_row(monkeypatch):
@@ -146,14 +147,15 @@ def test_two_adds_of_one_wave_are_one_kill_row(monkeypatch):
     you = [it.text for t, it in fightview.items(d) if t == 24.0 and it.side == "you"]
     assert you == ["Kill Burning Venom and Shrouded Venom"]
     job = fightview.job_html(d)
-    assert "Kill Burning Venom and Shrouded Venom at 0:24" in re.sub("<[^>]+>", "", job)
+    assert "<b>Kill Burning Venom and Shrouded Venom</b> <time class='tc'>0:24</time>" in job
 
 
 def test_a_long_press_list_reads_as_its_cadence_then_its_exceptions():
     # Elemental, Nek'zali (DPS rounds 16-17): "every 31 s (8 times)" hid the press held for the 2:47 wave
-    assert fightview._cadence([0, 31.4, 62.9, 93.7, 123.7, 168.0, 204.9, 235.2]) == (
-        "0:00, then about every 31 s to 2:03; then 2:48, 3:24, 3:55")
-    assert fightview._cadence([10.0, 60.0, 90.0]) == "0:10, 1:00, 1:30"
+    chips = fightview._cadence_chips([0, 31.4, 62.9, 93.7, 123.7, 168.0, 204.9, 235.2])  # Your job's form
+    assert re.sub("<[^>]+>", " ", chips).split() == ["0:00", "&#10227;", "31", "s", "&rarr;", "2:03", "2:48", "3:24",
+                                                     "3:55"]
+    assert re.sub("<[^>]+>", " ", fightview._cadence_chips([10.0, 60.0, 90.0])).split() == ["0:10", "1:00", "1:30"]
 
 
 def test_a_boss_cast_is_a_reason_for_a_defensive_only():

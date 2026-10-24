@@ -1009,6 +1009,39 @@ def _tools_html() -> str:
                               "mechanics"), target="_top"))
 
 
+# the other actions' sentences (paf.actions), read back into chips (fresh DPS review: sentence bullets)
+ACTION_CHIPS = [
+    (re.compile(r"(?P<name>.+?): (?P<n>\d+) players? per kill, an assignment(?:, ~(?P<mv>[\d.]+) s of movement when "
+                r"it is you)?\. If it is yours, tick it in the app \(the boss's prep page\)\."),
+     lambda m: [f"&#128101; {m['n']} a kill"] + ([f"&harr; ~{m['mv']} s moving"] if m["mv"] else [])
+     + ["yours? tick it on the boss page"]),
+    (re.compile(r"(?P<name>.+?): hits ~(?P<n>\d+) players per kill; .+? take it in (?P<p>\d+)% of the kills: "
+                r"(?P<v>expect it|it can be you)\."),
+     lambda m: [f"&#128101; ~{m['n']} a kill", f"{m['p']}% of the kills &middot; "
+                + ("expect it" if m["v"] == "expect it" else "you?")]),
+    (re.compile(r"(?P<name>.+?): the top raids do not kill it with damage \(it stays ~(?P<min>\d+) min\); do not "
+                r"spend your damage on it unless your raid's strategy says so\."),
+     lambda m: [f"&#9719; stays ~{m['min']} min", "leave it"]),
+    (re.compile(r"Interrupt (?P<name>.+?): .+? kick it in (?P<p>\d+)% of the kills \(~(?P<k>\d+) kicks per kill\), "
+                r"far more than one player in twenty would: it is part of your job\."),
+     lambda m: [f"{m['p']}% of the kills", f"~{m['k']} kicks a kill", "your job"]),
+    (re.compile(r"(?P<name>.+?) is interrupted ~(?P<k>\d+) times per kill, mostly by other classes \(.+?: "
+                r"(?P<p>\d+)% of the kills\); kick it if your raid asks\."),
+     lambda m: [f"~{m['k']} kicks a kill", f"you: {m['p']}% of the kills", "if your raid asks"]),
+]
+
+
+def action_row(d, a) -> str:
+    """One action as its icon, its name and chips, its sentence on hover; a sentence no pattern reads stays as is."""
+    pic = icons.img(d.icons.get(a.name, "") or _sfallback(d, a.name), "small")
+    for pat, chips in ACTION_CHIPS:
+        m = pat.fullmatch(a.text)
+        if m:
+            return (f"<li class='act' title='{e(a.text)}'>{pic}<b>{e(m['name'])}</b> "
+                    + "".join(f"<span class='pill'>{c}</span>" for c in chips(m)) + "</li>")
+    return f"<li>{pic}{e(a.text)}</li>"
+
+
 def gate_kills(d: PrepData) -> list[tuple[str, str]]:
     """(unit, sentence) of each add whose death ends the boss's immunity: the target that gates the fight."""
     out = []
@@ -1346,7 +1379,7 @@ def render(d: PrepData) -> str:
                 if rows or gates:
                     blocks += ((f"<h3>{e(title)}</h3>" if title else "") + "<ul>" + "".join(
                         f"<li>{icons.img(_sfallback(d, n), 'small')}{e(t)}</li>" for n, t in gates) + "".join(
-                        f"<li>{icons.img(d.icons.get(a.name, '') or _sfallback(d, a.name), 'small')}{e(a.text)}</li>" for a in rows) + "</ul>")
+                        action_row(d, a) for a in rows) + "</ul>")
             tabs["boss"].insert(0, "<h2>What the top players do, from their logs</h2><div class='card guide'>"
                                 f"{blocks}</div>")
         tabs["boss"].append(defensives_html(d))
@@ -1429,23 +1462,27 @@ on the home page of the app (its latest public log is used), or paste one of you
 then tells you whether the others cover the adds (stay on the boss) or you should pad them, and picks the cooldown plan
 and the gear for that.</p></div>""")
 
-    # sim of the fight
+    # sim of the fight: number tiles, each sentence on hover (fresh DPS review: a paragraph of figures)
     if d.sim_dps and d.patchwerk_dps:
-        boss = ""
+        def kpi(label: str, value: str, sub: str, why: str = "") -> str:
+            return (f"<div class='tile kpi'{f' title={chr(39)}{e(why)}{chr(39)}' if why else ''}><div class='l'>"
+                    f"{e(label)}</div><div class='v'>{value}</div><div class='s'>{e(sub)}</div></div>")
+        played = "the plan the sheet plays" if getattr(d, "aim_plan", False) else "SimC's default list"
+        tiles = [kpi("Rebuilt fight", f"{d.sim_dps:,.0f}", f"DPS · {(d.sim_dps / d.patchwerk_dps - 1):+.0%} vs a "
+                     f"Patchwerk ({d.patchwerk_dps:,.0f})", f"Your character on the fight rebuilt from the logs, vs a "
+                     f"Patchwerk of the same length; with its talents and {played}")]
         if d.sim_boss_dps:
-            boss = (f", {d.sim_boss_dps:,.0f} of it on the boss ({d.sim_boss_dps / d.sim_dps:.0%}: your character's own "
-                    f"share in this sim, with its talents and "
-                    f"{'the plan the sheet plays' if getattr(d, 'aim_plan', False) else 'SimC' + chr(39) + 's default list'})")
-        cal = ""
+            tiles.append(kpi("On the boss", f"{d.sim_boss_dps / d.sim_dps:.0%}", f"{d.sim_boss_dps:,.0f} DPS",
+                             f"Your character's own share on the boss in this sim, with its talents and {played}"))
         if d.boss_share_real is not None and d.waves:
-            cal = (f" The top players put {d.boss_share_real:.0%} of their damage on the boss in their logs: the rebuilt "
-                   f"fight is tuned toward that by counting each add wave at {d.add_scale:g} of its size (SimC hits every "
-                   f"add in range, real players do not)." if (d.add_scale or 1) < 1 else
-                   f" The top players put {d.boss_share_real:.0%} of their damage on the boss in their logs; the rebuilt "
-                   f"fight keeps every add wave at its full size (the add counts come from the logs).")
-        tabs["fight"].append(f"""<h2>Your character on this fight</h2><div class="card">
-<p>{d.sim_dps:,.0f} DPS on the rebuilt fight{boss}, vs {d.patchwerk_dps:,.0f} on a Patchwerk of the same length
-({(d.sim_dps / d.patchwerk_dps - 1):+.0%}).{cal}</p></div>""")
+            tiles.append(kpi("Top players on the boss", f"{d.boss_share_real:.0%}",
+                             f"in their logs · add waves ×{d.add_scale:g}" if (d.add_scale or 1) < 1
+                             else "in their logs · add waves at full size",
+                             "The rebuilt fight is tuned toward that share by counting each add wave at "
+                             f"{d.add_scale:g} of its size (SimC hits every add in range, real players do not)"
+                             if (d.add_scale or 1) < 1 else
+                             "The rebuilt fight keeps every add wave at its full size (the add counts come from the logs)"))
+        tabs["fight"].append(f"<h2>Your character on this fight</h2><div class='kpis'>{''.join(tiles)}</div>")
 
     # talents
     if d.talents:

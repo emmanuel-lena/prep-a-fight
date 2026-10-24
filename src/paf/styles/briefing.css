@@ -108,3 +108,6 @@ details.more>summary{font:italic 400 17px var(--font-reading);color:var(--muted)
 .spt.go{border-color:color-mix(in srgb,var(--pos) 55%,var(--line))} .spt.go .spt-v{color:var(--pos)}
 .spt.same .spt-v,.spt.low .spt-v{color:var(--muted)}
 .checks .t>img:first-child{margin-right:8px;vertical-align:-3px} /* a mechanic's icon, kept off its words */
+/* a plan's rules as badges in "What matters for you", as in the change card */
+.moves .rbs{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px} .moves .rb{display:inline-flex;align-items:center;gap:5px}
+.moves .rb img{width:20px;height:20px}

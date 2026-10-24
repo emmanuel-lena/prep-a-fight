@@ -458,7 +458,8 @@ def night(d: dict) -> str:
     said = (f"{deaths} {'death' if deaths == 1 else 'deaths'}{' before the wipes' if wipes else ''}" if deaths
             else "no death")
     head = _verdict("warn" if bare else "ok", f"{len(pulls)} {'pull' if len(pulls) == 1 else 'pulls'}, {said}",
-                    f"<span>Died without a healthstone or a health potion first:</span> <span class='num'>{bare}</span>")
+                    f"<span>Died without a healthstone or a health potion first:</span> <span class='num'>{bare}</span>"
+                    if bare else "")  # none: the title says it all (fresh DPS review: a restating line)
     rows = ""
     clean = [n for n, v in summary.items() if not (v["deaths"] or v["bare"] or v["healthstone"] or v["health"])
              and v["pulls_damage_potion"] >= len(pulls)]  # a row of zeros says nothing: one line for them (DPS

@@ -195,3 +195,25 @@ def test_the_adds_to_kill_render_as_a_table():
     assert "Echo of Jawae</td><td class='n'>&times;1</td>" in page and "Kill the Echo of Jawae" not in page
     assert "<table class='kills fit'>" in page and "&times;21" in page and "19 s" in page and "width:23%" in page
     assert "Kill the Odd Add whenever it comes." in page  # a line the table cannot read keeps its words
+
+
+def test_actions_read_as_chips_with_their_sentence_on_hover():
+    # Nek'zali, Elemental (fresh DPS review): the assignment, the mechanic and the unit left alive were sentences
+    from paf.actions import Action
+    from paf.prep_report import action_row
+
+    d = PrepData("Nek'zali", "heroic", "Elemental", "Char")
+    well = action_row(d, Action("assignment", "Soulcoil Well", "Soulcoil Well: 4 players per kill, an assignment, "
+                                "~4 s of movement when it is you. If it is yours, tick it in the app (the boss's prep "
+                                "page)."))
+    assert "<b>Soulcoil Well</b>" in well and "&#128101; 4 a kill" in well and "~4 s moving" in well
+    assert "title='Soulcoil Well: 4 players" in well
+    rend = action_row(d, Action("mechanic", "Essence Rend", "Essence Rend: hits ~11 players per kill; top Elemental "
+                                "players take it in 52% of the kills: it can be you."))
+    assert "52% of the kills &middot; you?" in rend
+    jawae = action_row(d, Action("ignore", "Summoner Jawae", "Summoner Jawae: the top raids do not kill it with "
+                                 "damage (it stays ~3 min); do not spend your damage on it unless your raid's strategy "
+                                 "says so."))
+    assert "stays ~3 min" in jawae and "leave it" in jawae
+    odd = action_row(d, Action("contact", "X", "X: handled by contact."))
+    assert "X: handled by contact." in odd and "title=" not in odd

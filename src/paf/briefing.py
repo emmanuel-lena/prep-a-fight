@@ -66,7 +66,7 @@ def lede_html(d) -> str:
 
 def _moves(d) -> list[tuple[float, str, str, str]]:
     """(gain, the sentence, its detail, a button) of each change worth saying, biggest first."""
-    from paf.prep_report import _goal, best_build, cd_name, copy_button, linkify, rule_phrase, wanted
+    from paf.prep_report import _goal, best_build, copy_button, linkify, wanted
 
     out = []
     best = best_build(d)
@@ -101,10 +101,12 @@ def _moves(d) -> list[tuple[float, str, str, str]]:
         out.append((0.0, "Play SimC's default priority list: the plan's small gain turns into a loss on a slower "
                          "kill.", "", ""))
     elif plan is not None:
-        rules = [(cd_name(d, k), rule_phrase(d, r.name)) for k, r in plan.choice.items() if r.name != "default"]
-        say = "; ".join(f"{n}: {r}" for n, r in rules) + ("" if getattr(plan, "robust", True) else
-                                                          ". Not robust: the gain can vanish on a harder fight.")
-        out.append((plan.gain, f"Play your cooldowns for {e(_goal(plan.objective))} damage.", e(say),
+        from paf.simple import _rule_badges
+
+        say = _rule_badges(d, plan) + ("" if getattr(plan, "robust", True) else  # Your job's badges, each rule on
+                                       " <span class='pill warn' title='the gain can vanish on a harder fight'>not "
+                                       "robust</span>")  # hover (fresh DPS review: a semicolon list)
+        out.append((plan.gain, f"Play your cooldowns for {e(_goal(plan.objective))} damage.", say,
                     copy_button(d.mrt[plan.objective], "Copy the MRT note") if d.mrt.get(plan.objective) else ""))
     elif plans:
         role = {"total": " for padding the adds", "boss": " for boss damage"}.get(wanted(d) or "", "")

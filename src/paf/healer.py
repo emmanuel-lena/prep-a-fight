@@ -872,8 +872,10 @@ SWAP_LANE = -1  # a Cooldown with this spell id is the tank swaps' lane: ticks, 
 
 def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, float]], label: str,
               presses: list | None = None, named: set[str] | None = None, answered: set | None = None,
-              moved: dict | None = None) -> str:
-    """A damage-taken curve (per STEP), its big moments as dots, the phases as dashed lines; under it, one row per
+              moved: dict | None = None, others: int = 0) -> str:
+    """others: lanes for the rest of the cards' cooldowns, an outline each press, fainter for fewer of the top
+    players (fresh heal review: the chip lists read on one time axis).
+    A damage-taken curve (per STEP), its big moments as dots, the phases as dashed lines; under it, one row per
     cooldown (Cooldown) with a mark where the top players usually press it: the hit and the button on one time axis."""
     # a lane for a cooldown with a moment 40% of the top players share: a spread one (Divine Steed) has none
     named = named or set()  # the cooldowns the lead names for a hit: their lane first, whatever their share; then
@@ -883,7 +885,12 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
                   key=lambda c: c.name not in named)[:PRESS_ROWS]
     if answered is not None:  # the lead's answers only: the chart draws what the page says, a full mark each
         rows = [c for c in presses or [] if c.name in named][:PRESS_ROWS]
-    W, H, L, B = 760, 200 + 18 * len(rows), 150 if rows else 46, 24 + 18 * len(rows)
+    extra = [c for c in presses or [] if others and c.times and c.spell_id != SWAP_LANE
+             and all(c.name != r.name for r in rows)][:others]
+    faint = {id(c) for c in extra}
+    rows = [*rows, *extra]
+    longest = max((len(_shown(c.name).split(',')[0]) for c in rows), default=0)  # a trinket's whole name (fresh
+    W, H, L, B = 760, 200 + 18 * len(rows), max(150, 6 * longest + 16) if rows else 46, 24 + 18 * len(rows)  # review)
     peak = max(curve, default=0) or 1
     span = max(len(curve) * STEP, 1)
 
@@ -916,14 +923,14 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
               f"<text x='{L - 4}' y='{float(y(med)) + 9:.1f}' class='mdl' text-anchor='end'>{_per_s(med)}</text>"
               ) if med else ""
     cds = "".join(
-        f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(_shown(c.name).split(',')[0][:22])}</text>"
+        f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(_shown(c.name).split(',')[0][:32])}</text>"
         + ("".join(f"<line x1='{x(t)}' x2='{x(t)}' y1='{H - B + 6 + 18 * i}' y2='{H - B + 18 + 18 * i}' class='sw'>"
                    f"<title>{e(c.name)} {_mmss(t)}</title></line>" for t in c.times if t <= span))
         if c.spell_id == SWAP_LANE else
-        f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(_shown(c.name).split(',')[0][:22])}</text>"
+        f"<text x='{L - 8}' y='{H - B + 16 + 18 * i}' class='cl' text-anchor='end'>{e(_shown(c.name).split(',')[0][:32])}</text>"
         + "".join(f"<rect x='{float(x((moved or {}).get((c.name, t), t))) - 4:.1f}' y='{H - B + 6 + 18 * i}' "
                   f"width='8' height='13' rx='2' "
-                  f"class='cp{'' if t in tied else ' off'}'><title>{e(_step_name(c.name))} {c.shown_at.get(t) or _mmss((moved or {}).get((c.name, t), t))}"
+                  f"class='cp{'' if t in tied else ' off'}'{_faint(c, t) if id(c) in faint else ''}><title>{e(_step_name(c.name))} {c.shown_at.get(t) or _mmss((moved or {}).get((c.name, t), t))}"
                   f"{'' if t in tied else _mark_reason(c, t, found, (moved or {}).get((c.name, t), t))}</title></rect>"
                   for t in sorted([*c.times, *c.alt, *[pt for pt in [_pull_t(c)] if pt is not None]])
                   if t <= span  # in time order (round 84), the pull group the card shows too (round 99)
@@ -934,6 +941,14 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
     return (f"<svg viewBox='0 0 {W} {H}' class='rd' role='img' aria-label='{e(label)}'>"
             f"<line class='ax' x1='{L}' x2='{W - 10}' y1='{H - B}' y2='{H - B}'/>{median}{lines}{ticks}"
             f"<polyline points='{pts}'/>{marks}{cds}</svg>")
+
+
+def _faint(c: Cooldown, t: float) -> str:
+    """An extra lane's mark: as opaque as the share of the top players pressing it then (a quarter at least, to be
+    seen)."""
+    pairs = [*zip(c.times, c.support or [], strict=False), *zip(c.alt, c.alt_support or [], strict=False)]
+    sp = next((v for a, v in pairs if a == t), c.users)
+    return f" style='opacity:{max(0.25, min(1.0, sp / 0.6)):.2f}'"  # 60% and more: full
 
 
 def _per_s(v: float) -> str:
@@ -3034,8 +3049,10 @@ def render_sheet(h: HealerPrep) -> str:
     lanes = set(lead_names) | {k[0] for k in named if k[0] != KEPT} | {c.name for c in drawn if _shown(c.name) in lanes_extra}
     # gets its lane and its outline there (heal confirm round 2: Convoke 60% in the 1:15 window, no mark)
     named[(KEPT, "answers")] = frozenset(_shown(n) for n in lead_names)  # what "not kept" may be said of
+    extra = any(c.times and c.name not in lanes for c in [*drawn, *items])  # the other lanes (curve_svg's others)
     svg = curve_svg(h.curve, h.moments, h.phases, "Raid damage taken over the fight, and the top players' healing "
-                    "cooldowns", drawn, lanes, answered, moved)
+                    "cooldowns", [*drawn, *(c for c in items if c not in drawn)], lanes, answered, moved,
+                    others=5)  # the trinkets after the cards' cooldowns (fresh heal review)
     rare_kept = [c for c in h.rare if c not in utility]
     rare = [c for c in rare_kept if c not in items and not is_defensive(c.spell_id, c.name)
             and _external(c.spell_id) != "protective"]  # the others go to their own section
@@ -3047,12 +3064,14 @@ def render_sheet(h: HealerPrep) -> str:
         f"<span class='pill' title='Median raid damage per second; up to 40 kills a spec read: the same hits on every "
         f"healer sheet; fewer kills past the median one'>{h.raid_kills or 'the top'} kills</span> "
         + ("<span>&#9478; stage time after a dashed line</span> " if getattr(h, "staged", False) else "")
-        + ("<span>&#9646; the table's answers</span> " + ("<span>&#9647; another press, or one in a hit's window "
-                                                           "that is not its answer</span> " if any(
+        + ("<span>&#9646; the table's answers</span> " + ("<span title='or one in a hit&#39;s window that is not "
+                                                           "its answer; fainter: fewer of the top players press it "
+                                                           "then'>&#9647; another press</span> " if extra or any(
             (c.name, t) not in answered for c in drawn if c.name in lanes for t in [*c.times, *c.alt])
             else "") if lead_names
-           else "<span>No cooldown is kept for these hits</span> <span>&#9647; a press in a hit's window</span> "
-           if lanes else "<span>No cooldown is kept for these hits, so none is drawn</span> ")
+           else "<span>No cooldown is kept for these hits</span> <span title='fainter: fewer of the top players "
+           "press it then'>&#9647; a press</span> "
+           if lanes or extra else "<span>No cooldown is kept for these hits, so none is drawn</span> ")
         + "<span title='" + ("named after what deals most of the damage there" if h.named_by_damage else
                              "named after the boss cast just before it (&quot;after X&quot;: 8 to 30 s before, "
                              "matched by timing)") + "'>&#9679; a big hit</span></p><ul class='hl2'>"

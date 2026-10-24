@@ -491,3 +491,7 @@ dialog.ss::backdrop{background:var(--bg)}
 .fv .keys .src{color:var(--muted)} .fv .stl.short .ph-name h2{font-size:17px}
 /* two cooldowns pressed together on one line: their icons stacked in the icon column */
 .fv .keys li .ics2{display:flex;flex-direction:column;gap:3px}
+/* Your job: times as chips, rules and facts as pills, on the label's line (fresh DPS review: sentences) */
+.fv .keys li>span{display:flex;flex-wrap:wrap;align-items:center;gap:5px 6px} .fv .keys li>span>b{margin-right:2px}
+.fv .keys .tc{font:600 12.5px/1 var(--font-display);padding:4px 7px;border-radius:6px;border:1px solid var(--line);
+  background:var(--surface);font-variant-numeric:tabular-nums}

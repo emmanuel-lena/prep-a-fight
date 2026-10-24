@@ -370,11 +370,13 @@ CAST_GAP = 0.03  # casting this much less than the top players is worth saying
 MOVE_GAP = 0.08  # moving this much more than them in a phase is worth saying
 
 
-def _bars(label: str, you: float, tops: float | None, good_high: bool, who: str = "Top players") -> str:
+def _bars(label: str, you: float, tops: float | None, good_high: bool, who: str = "Top players", ok: str = "") -> str:
+    """ok: a ✓ by the label, the sentence on hover (fresh DPS review: "You keep casting…" under the bars)."""
     worse = tops is not None and ((tops - you) if good_high else (you - tops)) >= (CAST_GAP if good_high else MOVE_GAP)
     top = (f"<div class='bar tops'><span style='width:{tops * 100:.0f}%'></span><em>{e(who)} {tops:.0%}</em></div>"
            if tops is not None else "")
-    return (f"<div class='cmp'><b>{e(label)}</b><div class='bar you{' worse' if worse else ''}'>"
+    tick = f" <span class='ok-tick' title='{e(ok)}'>&#10003;</span>" if ok else ""
+    return (f"<div class='cmp'><b>{e(label)}{tick}</b><div class='bar you{' worse' if worse else ''}'>"
             f"<span style='width:{you * 100:.0f}%'></span><em>You {you:.0%}</em></div>{top}</div>")
 
 
@@ -391,16 +393,15 @@ def review_card(d) -> str:
                  and (worst.tops_active or 0) - worst.active >= CAST_GAP else "")
         says.append(f"You cast {(r.tops_active - r.active) * dur:.0f} s less than the top players over the fight{where}: "
                     f"always have a spell going, even while moving (instant spells).")
-    elif r.tops_active is not None:
-        says.append("You keep casting like the top players do.")
+    cast_ok = "You keep casting like the top players do." if r.tops_active is not None and not says else ""
     moving = [p for p in r.phases if p.tops_moving is not None and p.moving - p.tops_moving >= MOVE_GAP]
     if moving:
         p = max(moving, key=lambda p: p.moving - p.tops_moving)
         span = f"in {p.name} ({p.moving:.0%} of the phase" if len(r.phases) > 1 else f"({p.moving:.0%} of the fight"
         says.append(f"You move more than them {span}, top players {p.tops_moving:.0%}): "
                     f"outside the strategy's moments, stand still.")
-    elif r.tops_moving is not None:
-        says.append("You move about as much as the top players.")  # within MOVE_GAP: 46% vs 44% (review 36)
+    move_ok = ("You move about as much as the top players." if r.tops_moving is not None and not moving
+               else "")  # within MOVE_GAP: 46% vs 44% (review 36)
     gaps = "".join(f"<time>{_mmss(a)} &middot; {b:.0f} s</time>" for a, b in r.gaps)
     longest = "Your longest pause" if len(r.gaps) == 1 else "Your longest pauses"
     pauses = (f"<p class='what pauses'>{longest} without casting:</p><div class='times'>{gaps}</div>"
@@ -409,8 +410,8 @@ def review_card(d) -> str:
     who = f"Top {d.spec}" if logged else "Top players"  # whose bars these are, when your pull is another spec
     return (f"<article class='card s-review'><h2>Your last pull</h2><p class='what'>{e(r.fight)}, from your raid's "
             f"log." + (f" <span class='pill'>as {e(logged)}</span>" if logged else "") + "</p>"
-            f"<div class='cmps'>{_bars('Casting', r.active, r.tops_active, True, who)}"
-            f"{_bars('Moving', r.moving, r.tops_moving, False, who)}</div>"
+            f"<div class='cmps'>{_bars('Casting', r.active, r.tops_active, True, who, cast_ok)}"
+            f"{_bars('Moving', r.moving, r.tops_moving, False, who, move_ok)}</div>"
             + (f"<p class='small muted'>Your pull as {e(logged)} beside the top {e(d.spec)} players: another spec, a "
                "rough comparison.</p>" if logged else "")  # said, never read as like for like (fresh DPS review)
             + "".join(f"<p class='say'>{e(s)}</p>" for s in says) + pauses + "</article>")

@@ -26,7 +26,8 @@ def test_card_says_what_differs():
     assert "4:22 &middot; 7 s" in card and "bar you worse" in card
     d.review = review.Review("kill of 6:40", 0.87, 0.87, 0.5, 0.52, [], [])
     card = simple.review_card(d)
-    assert "You keep casting like the top players do." in card and "You move about as much" in card
+    assert "title='You keep casting like the top players do.'>&#10003;" in card  # a tick, said on hover
+    assert "title='You move about as much as the top players.'>&#10003;" in card and "class='say'" not in card
     d.review = None
     assert simple.review_card(d) == ""
 
