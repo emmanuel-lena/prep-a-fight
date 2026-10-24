@@ -1351,11 +1351,11 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
         raid_ic = icons.img("inv_misc_groupneedmore", "medium", "goal-ic")
         goal_html = ('<section class="ob-step" data-step="goal"><h2><span class="vh">Step 1 of 4: </span>Your goal on this boss</h2>'
                      '<div class="goals">' + f"""<label class="goal"><input type="radio" name="goal" value="boss"><span><b>{boss_ic}Boss damage</b>
-<small>everyone on the boss: cooldowns and gear for it</small></span></label>
+<small>cooldowns and gear for the boss</small></span></label>
 <label class="goal"><input type="radio" name="goal" value="total"><span><b>{pad_ic}Pad the adds</b>
-<small>your job is the adds: cooldowns and gear for total damage</small></span></label>
+<small>for total damage</small></span></label>
 <label class="goal"><input type="radio" name="goal" value="auto" checked><span><b>{raid_ic}Let my raid decide</b>
-<small>reads your raid's log: if the others cover the adds, you stay on the boss</small></span></label>
+<small>from your raid's log</small></span></label>
 """ + f'</div><div class="ob-actions">{nxt}</div></section>')
     est_badge = (f"<p class='est-badge' title='{e(est.lead)}'>&#9201; {e(est.badge)}</p>" if est else "")
     body = f"""<div class="boss-cols"><div class="boss-main"><h1>{e(enc.name)} {diff_pill(difficulty)}</h1>

@@ -371,7 +371,8 @@ def _cmp_table(rows: list[dict], report: str = "") -> str:
         return f"<th title='no death in the pull'>{word}{t}</th>"
     # the comparison's own pulls: its best and worst without a death (paf.pulldiff), not the night's best pull
     return ("<table class='lr-cmp fit'><thead><tr><th></th>"
-            + head("Best clean pull", 0) + head("Weakest clean pull", 1) + "<th>Gap</th></tr>"  # not the night's best
+            + head("Best pull &middot; 0 deaths", 0) + head("Weakest &middot; 0 deaths", 1) + "<th>Gap</th></tr>"  # no
+            # death said, not left to a hover (fresh app review 7: read against the night's 58%)
             "</thead><tbody>"
             + "".join(f"<tr class='{e(r.get('kind', ''))}'><td>{e(r['cmp'][0])}</td>"  # bars: fresh app review 5
                       f"<td><b>{_bar(r['cmp'][1], r['cmp'][1:3])}</b></td><td>{_bar(r['cmp'][2], r['cmp'][1:3])}</td><td class='gap'>{e(_signed_word(_delta(r['cmp'][1], r['cmp'][2]), r.get('kind')))}"
