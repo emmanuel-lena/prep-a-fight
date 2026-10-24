@@ -5,6 +5,8 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 
 ## Unreleased
 
+## 0.8.26 (2026-10-25)
+
 - The Gear tool tries every crafted piece your spec can wear in every slot, each in every Thalassian Missive (the
   stat pair read from the game data), and your own crafted pieces remade with each other missive: the item says
   which missive to craft ("craft, Crit/Mastery", "recraft, Haste/Versatility").
