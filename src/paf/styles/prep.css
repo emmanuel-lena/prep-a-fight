@@ -121,3 +121,4 @@ ul.grp .plain{display:block;padding-top:9px} /* a text row on its label's line, 
 .kbar{display:inline-block;width:70px;height:6px;border-radius:3px;background:color-mix(in srgb,var(--fg) 12%,transparent);vertical-align:middle;overflow:hidden} .kbar>span{display:block;height:100%;background:var(--fg);opacity:.55} table.kills td{padding:4px 14px 4px 0}
 /* an action of the boss tab: its icon, name and chips on one line, its sentence on hover */
 .act{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px} .act b{margin-right:4px}
+tr.noise>td{opacity:.5} tr.noise:hover>td{opacity:1} /* a talent build within the sims' noise of yours: dimmed, not folded */

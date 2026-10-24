@@ -22,7 +22,11 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 - More to see on the sheets: the healer chart draws a lane for each of your long cooldowns and trinkets, fainter
   where fewer top players press it; Your job on the DPS fight tab reads as time chips and badges (pre-pull, ⟲ a
   cadence, 🛡 a defensive, the boss immune); the boss tab's assignments and mechanics as chips (players hit, your
-  odds, movement), each sentence on hover; Dig deeper's numbers as tiles.
+  odds, movement), each sentence on hover; Dig deeper's numbers as tiles. The healer and tank charts now draw
+  every press (fainter where fewer top players press it, two rhythms as two lanes, Stasis's stores and releases),
+  so the cooldown cards keep only what the chart cannot say (a press tied to a hit, "or", varying); each journal
+  stage draws the boss's casts on a strip; the journal reads in two columns on a wide screen; talent builds
+  within the sims' noise of yours are dimmed.
 - Talents to take or drop no longer ask you to change a button the sim's rotation never presses (Purge, Tremor
   Totem, Blind, Tranquilizing Shot): they are set apart, in grey, as your choice, on the sheet and on the raid lead
   page.

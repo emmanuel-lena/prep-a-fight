@@ -1535,7 +1535,10 @@ and the gear for that.</p></div>""")
             if choice and len(add) + len(drop) <= OTHER_BUILD:
                 diff = ("" if diff.endswith("from yours</span>") and not (add or drop) else diff + "<br>") + (
                     "<span class='muted'>your choice: " + ", ".join(choice) + "</span>")  # each name escaped above
-            body += (f"<tr><td>{e(r.build.label)}<br><span class='small muted'>{r.build.count} players, median rank "
+            noise = all(abs(r.per_fight.get(f, (0.0, None))[0] or 0.0) <= 2 * tc.error for f in tc.fights)
+            tr = "<tr class='noise' title='within the sims&#39; noise of yours'>" if noise else "<tr>"  # dimmed, never
+            # folded: what differs per build stays readable (the owner, 2026-10-24)
+            body += (f"{tr}<td>{e(r.build.label)}<br><span class='small muted'>{r.build.count} players, median rank "
                      f"{r.build.median_rank:.0f}</span></td>{cells}<td class='small'>{diff}</td></tr>")
         best_g = max((((r.per_fight.get(first, (0.0, None))[0] or 0.0), r.build.label) for r in tc.rows),
                      default=(0.0, ""))

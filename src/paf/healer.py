@@ -66,6 +66,19 @@ class Moment:
     dtps: float  # raid damage taken per second there
     ratio: float  # times the median
     boss_spell: str = ""
+    unsure: str = ""  # why its name is uncertain (named by damage, no cast of it close before): said on hover
+
+
+def mark_unsure(found: list[Moment], casts: dict[str, list[float]]) -> None:
+    """A hit named by its damage with no cast of that ability in the 25 s before (on the hit's clock): its name
+    marked uncertain (the owner, 2026-10-24: Nek'zali's 4:15 "Possession Barrage", casts at 0:34, 1:10, 3:49)."""
+    for m in found:
+        for n in moment_names(m):
+            ts = casts.get(n)
+            if ts and not any(m.t - 25 <= t <= m.t + 2 for t in ts):
+                m.unsure = (f"named after the damage taken there; no {n} cast is shared within 25 s before it "
+                            f"(its casts: about {', '.join(_mmss(t) for t in ts)}): maybe a cast fewer kills share")
+                break
 
 
 @dataclass
@@ -914,6 +927,7 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
     marks = guides + "".join(f"<circle cx='{x(m.t)}' cy='{y(m.dtps)}' r='4' class='mk'><title>{_mmss(m.t)}"
                     + (f" &middot; {e(m.boss_spell)}" if m.boss_spell else "")  # the table's name as the table
                     # says it (review 36: "mostly" on every hover, never in the table)
+                    + (" ?" if getattr(m, "unsure", "") else "")  # its name not backed by a cast (the table's ?)
                     + f" &middot; {_x(m.ratio)}&times; the usual damage"  # each dot its hover (round 114)
                     + (f" &middot; {_stage_tag(m.t, phases)}" if _stage_tag(m.t, phases) else "") + "</title></circle>"
                     f"<text x='{float(x(m.t)) + 6:.1f}' y='{float(y(m.dtps)) - 8:.1f}' class='ml'>{_mmss(m.t)}</text>"
@@ -1032,6 +1046,7 @@ def hits_table(moments: list, shown: list, pairs: list, bare: dict, phases: list
         tag = _stage_tag(m.t, phases)
         rows.append(f"<tr><td class='t'><b>{k}</b>" + (f"<small>{e(tag)}</small>" if tag else "") + "</td>"
                     f"<td>{e(m.boss_spell) if m.boss_spell else '<span class=muted>raid damage</span>'}"
+                    + (f" <span class='pill unsure' title='{e(m.unsure)}'>?</span>" if m.unsure else "")
                     + "".join(f"<span class='tag'>{x}</span>" for x in (tags or {}).get(k, [])) + "</td>"
                     f"<td class='sz'><span class='track'><span class='bar' style='width:{max(8, round((m.ratio - 1) / max(0.01, top - 1) * 100))}%'></span></span>"
                     f"<b>{_x(m.ratio)}&times;</b></td><td class='ans'>{_tidy(ans)}</td></tr>")  # the legend's ⟲, as the chips
@@ -1625,6 +1640,33 @@ def _tidy(html: str) -> str:
     html = re.sub(r" &middot; not kept(?= ?(?:&middot;|,) back from cooldown)", "", html)  # ⟲ says it (heal c. 15)
     html = re.sub(r" ?(?:&middot;|,) back from cooldown for about half", " &middot; &#10226;&nbsp;about half", html)
     return re.sub(r" ?(?:&middot;|,) back from cooldown", "&nbsp;&middot;&nbsp;&#10226;", html)  # never alone on a line
+
+
+PLAIN_CHIP = re.compile(r"\d+:\d\d &middot; \d+%(?: \(\d+ kills going\))?")
+
+
+def chart_names(svg: str) -> set[str]:
+    """The cooldowns a chart draws a lane for (its labels, a rhythm's A/B tag left out)."""
+    return {re.sub(r" [AB]$", "", html.unescape(n)) for n in re.findall(r"class='cl'[^>]*>([^<]+)<", svg)}
+
+
+def fold_plain(rows: str, drawn: set[str]) -> str:
+    """A row whose button the chart draws: its plain chips (a time and a share, tied to nothing) folded into one dim
+    pill, their times and shares on its hover, the chart's marks saying them (the owner, 2026-10-24: the chip lists
+    down to their exceptions: hit ties, "or", varying, ⟲)."""
+    def one(m: re.Match) -> str:
+        li = m.group(0)
+        name = re.search(r"<b>(?:<[^>]+>)*([^<]+)</b>", li)
+        if not name or not any(html.unescape(name[1]).startswith(n) for n in drawn):
+            return li
+        plain = [c for c in re.findall(r"<span class='chip'>([^<]*)</span>", li) if PLAIN_CHIP.fullmatch(c)]
+        if not plain:
+            return li
+        for c in plain:
+            li = li.replace(f"<span class='chip'>{c}</span>", "", 1)
+        pill = (f"<span class='vary' title='{'; '.join(plain)}'>&#9647; {len(plain)} on the chart</span>")
+        return li.replace("<span class='when'>", "<span class='when'>" + pill, 1)
+    return re.sub(r"<li>.*?</li>", one, rows, flags=re.S)
 
 
 def cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dict | None = None,
@@ -3144,7 +3186,7 @@ def render_sheet(h: HealerPrep) -> str:
                              "matched by timing)") + "'>&#9679; a big hit</span></p><ul class='hl2'>"
         f"{'' if h.moments else '<li>No big moment: steady raid damage.</li>'}</ul></div>",
         f"<h2>Your long cooldowns, where the top players press them</h2><ul class='hl2'>"
-        f"{cooldowns_html(sorted((c for c in heals if _external(c.spell_id) != 'protective'), key=_rank(lead_names)), answered, named, moved) or '<li>Not enough top players in the corpus yet.</li>'}"
+        f"{fold_plain(cooldowns_html(sorted((c for c in heals if _external(c.spell_id) != 'protective'), key=_rank(lead_names)), answered, named, moved), chart_names(svg)) or '<li>Not enough top players in the corpus yet.</li>'}"
         f"{rare_html(rare, answered, named)}</ul>"]  # a cooldown the top players skip is information too
     exts = [c for c in heals if _external(c.spell_id) == "protective"]
     buffers = [c for c in heals if _external(c.spell_id) == "damage"]  # Power Infusion: a buff on a damage dealer
@@ -3153,7 +3195,7 @@ def render_sheet(h: HealerPrep) -> str:
         # any share (round 98: Time Dilation 50% a card, 48% a line; heal round 10: still two forms)
         fight.append(f"<h2>Your externals{', where the top players cast them' if any(c.times for c in exts) else ''}"
                      f"</h2><ul class='hl2'>"
-                     f"{cooldowns_html(exts, answered, named)}{rare_html(rare_ext, answered, named)}</ul>"
+                     f"{fold_plain(cooldowns_html(exts, answered, named), chart_names(svg))}{rare_html(rare_ext, answered, named)}</ul>"
                      .replace("</h2>", "".join(f" <span class='pill'>{e(_shown(c.name))}: with your cooldowns above"
                                                "</span>" for c in buffers) + "</h2>", 1))  # a pill (round 38)
     elif buffers:  # none: no section (fresh heal review: an empty heading); a buff on a dealer said where it is
@@ -3164,7 +3206,7 @@ def render_sheet(h: HealerPrep) -> str:
         fight.append(f"<h2>Your defensives</h2><ul class='hl2'>{cooldowns_html(defs, answered, named)}"
                      f"{rare_html(rare_def, answered, named)}</ul>")
     if items:
-        fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{cooldowns_html(items, answered)}</ul>")
+        fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{fold_plain(cooldowns_html(items, answered), chart_names(svg))}</ul>")
     potions = h.potions or [c for c in h.cooldowns if _item(c.spell_id) and c not in items]  # as the tank's
     if potions:
         fight.append(f"<h2>Consumables</h2><ul class='hl2'>{cooldowns_html(potions, set())}</ul>")

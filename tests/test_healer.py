@@ -906,3 +906,25 @@ def test_a_button_of_two_rhythms_draws_a_lane_each():
     lanes = svg.split("class='cl'")[1:]
     assert [lane.count("<rect") for lane in lanes] == [3, 3]
     assert "Evangelism 0:22" not in lanes[0] and "Evangelism 0:22" in lanes[1]
+
+
+def test_a_drawn_buttons_plain_chips_fold_into_one_pill():
+    # the owner (2026-10-24): with every press on the chart, the chips keep their exceptions only
+    rows = ("<li><b><img>Nature&#x27;s Swiftness</b><small>x</small><span class='when'><span class='chip'>0:07 "
+            "&middot; 91%</span><span class='chip'>1:13 &middot; 2 s before the 1:15 hit &middot; 88%</span>"
+            "<span class='chip'>4:20 &middot; 35% (93 kills going)</span></span></li>"
+            "<li><b>Ascendance</b><span class='when'><span class='chip'>0:35 &middot; 37%</span></span></li>")
+    out = healer.fold_plain(rows, {"Nature's Swiftness"})
+    assert ("<span class='when'><span class='vary' title='0:07 &middot; 91%; 4:20 &middot; 35% (93 kills going)'>"
+            "&#9647; 2 on the chart</span><span class='chip'>1:13 &middot; 2 s before") in out  # its tie kept
+    assert "<span class='chip'>0:35 &middot; 37%</span>" in out  # not drawn: its chips stay
+    assert healer.chart_names("<text class='cl' x='1'>Evangelism A</text>") == {"Evangelism"}
+
+
+def test_a_hit_named_without_a_cast_close_before_is_marked_unsure():
+    # Nek'zali (the owner, 2026-10-24): the 4:15 hit "Possession Barrage", its casts at 0:34, 1:10, 3:49
+    a, b = healer.Moment(230.0, 1.0, 2.0, "Possession Barrage"), healer.Moment(255.0, 1.0, 2.0, "Possession Barrage")
+    healer.mark_unsure([a, b], {"Possession Barrage": [34.0, 70.0, 229.0]})
+    assert not a.unsure and "no Possession Barrage cast is shared within 25 s before it" in b.unsure
+    out = healer.hits_table([b], [b], [], {}, None, {}, "")
+    assert "<span class='pill unsure' title='named after the damage taken there" in out

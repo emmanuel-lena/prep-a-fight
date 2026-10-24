@@ -100,3 +100,4 @@ p > .vary{display:inline-block;padding:1px 7px;border-radius:999px;border:1px da
 .hl2 .stwrap{flex-basis:100%;display:block} .hl2 .stbars{width:100%;max-width:640px;height:auto;display:block}
 .stbars .so{fill:var(--fg)} .stbars .sl{stroke:var(--muted);stroke-width:1;stroke-dasharray:2 2}
 .stbars .sr{fill:var(--accent)} .stbars .sh{stroke:var(--warn);stroke-width:1;opacity:.6} .stbars .st{fill:var(--muted);font-size:10px}
+.pill.unsure{padding:0 6px;cursor:help;border:1px dashed var(--line);background:transparent;color:var(--muted)} /* a hit's name not backed by a cast */

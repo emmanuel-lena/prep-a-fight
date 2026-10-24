@@ -1003,6 +1003,11 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
     by = healer.raid_by_ability(con, enc.id, diff, tl.duration, pool=True, clock=clk)
     if by:  # measured: what hits the raid there
         healer.name_by_damage(found, by)
+        pull = sorted(t for _n, t, *_r in tl.phases)  # the casts on the hits' clock (stage time when staged)
+        stage = sorted(t for _n, t, *_r in tls.phases)
+        same = len(pull) != len(stage) or pull == stage
+        healer.mark_unsure(found, {n: [t if same else stage_time(t, pull, stage) for t in ts if t <= tl.duration]
+                                   for n, ts in tl.boss_casts})
     for m in found:
         if not by and m.boss_spell in tank_only:
             m.boss_spell += ", aimed at the tank"

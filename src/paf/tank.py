@@ -34,6 +34,8 @@ from paf.healer import (
     Moment,
     _mmss,
     _pct,
+    chart_names,
+    fold_plain,
     moment_names,
 )
 from paf.theme import diff_pill
@@ -728,7 +730,7 @@ def render_sheet(p: TankPrep) -> str:
         "out)'>&#9679; a big moment</span></p><ul class='hl2'>"
         f"{'' if p.moments else '<li>No big moment: steady damage.</li>'}</ul></div>",
         f"<h2>Your defensives, where the top players press them</h2><ul class='hl2'>"
-        f"{nouned(cooldowns_html(defs, answered, named, moved_t)) or '<li>No defensive most top tanks share: they spread them.</li>'}"
+        f"{nouned(fold_plain(cooldowns_html(defs, answered, named, moved_t), chart_names(svg))) or '<li>No defensive most top tanks share: they spread them.</li>'}"
         f"{nouned(rare_html(p.rare, answered, named))}</ul>",  # the same rows as the others (heal round 10)
         f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"
         f"{nouned(mit_html(answered)) or '<li>Not measured yet.</li>'}</ul>",
@@ -808,11 +810,11 @@ def render_sheet(p: TankPrep) -> str:
     used = [c for c in rest if _item(c.spell_id)]  # potions: the deeper tab
     damage = [c for c in rest if c not in used]  # Avatar, Shield Charge: pressed by all of them, the fight tab
     if damage:
-        fight.append(f"<h2>Your damage cooldowns</h2><ul class='hl2'>{cooldowns_html(damage, set())}</ul>")
+        fight.append(f"<h2>Your damage cooldowns</h2><ul class='hl2'>{fold_plain(cooldowns_html(damage, set()), chart_names(svg))}</ul>")
     if items:
-        fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{cooldowns_html(items, set())}</ul>")
+        fight.append(f"<h2>On-use trinkets</h2><ul class='hl2'>{fold_plain(cooldowns_html(items, set()), chart_names(svg))}</ul>")
     if used:  # the healers' sheets have theirs on the fight tab too
-        fight.append(f"<h2>Consumables</h2><ul class='hl2'>{cooldowns_html(used, set())}</ul>")
+        fight.append(f"<h2>Consumables</h2><ul class='hl2'>{fold_plain(cooldowns_html(used, set()), chart_names(svg))}</ul>")
     if p.presence:
         if have and have.share >= 0.99:  # the corpus is this spec's kills
             line = ""  # the lead says who plays beside them (heal round 18: said twice)
