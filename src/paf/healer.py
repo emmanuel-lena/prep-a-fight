@@ -3051,7 +3051,8 @@ def render_sheet(h: HealerPrep) -> str:
         stages = h.abilities
         if h.dispelled and h.dispelled[0][1] >= 1:
             name, k = h.dispelled[0]
-            stages = re.sub(rf"(<b>(?:<a [^>]*>)?{re.escape(e(name))}(?:</a>)?</b>)",  # its name a Wowhead link
+            stages = re.sub(rf"(<b>(?:<a [^>]*>)?{re.escape(e(name))}(?:</a>)?</b>(?: ?<span class=\"pill[^>]*>[^<]*"
+                            r"</span>)*)",  # its name a Wowhead link, after the journal's tags (round 45: tag first)
                             lambda m_: m_.group(1) + f" <span class='pill' title='the top {e(h.spec)}s dispel it "
                             f"{k:.1f} times a kill'>dispelled {k:.1f}&times; a kill</span>", stages, count=1)  # (r. 43)
         boss.append(f"<h2>Every ability{', phase by phase' if '<h3>' in stages else ''}</h2>"  # Vashnik: one phase
