@@ -1348,7 +1348,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
                 r = d.review
                 print(f"  your {r.fight}: casting {r.active:.0%} of the time (top players {r.tops_active or 0:.0%}), "
                       f"moving {r.moving:.0%} (top players {r.tops_moving or 0:.0%})")
-            d.raid_tools = _raid_tools(client, con, enc, diff, raid_url)
+            d.raid_tools = _raid_tools(client, con, enc, diff, raid_url,
+                                       (profile.name or "", f"{spec} {settings.get('class') or ''}".strip()))
         except (ValueError, OSError, KeyError, TypeError) as ex:
             print(f"  could not read your raid's log: {ex}")
             d.notes.append(f"Your raid's log could not be read ({ex}).")
@@ -2306,7 +2307,7 @@ def _plan_raid(enc, diff_name: str) -> str:
         return ""
 
 
-def _raid_tools(client, con, enc, diff: int, url: str) -> dict:
+def _raid_tools(client, con, enc, diff: int, url: str, me: tuple[str, str] = ("", "")) -> dict:
     """For the "Your raid" tab of the prep: who hits what (paf.comp), the best pull if the boss is not dead in that
     log (paf.wipe), this boss's pulls of the night (paf.tracker). Each one on its own: a failure only skips it."""
     import statistics as st
@@ -2318,10 +2319,14 @@ def _raid_tools(client, con, enc, diff: int, url: str) -> dict:
     code = report_code(url)
     boss = main_boss(con, enc.id, diff, enc.name)
     targets, _ = raidreview.references(con, enc.id, diff, boss)  # empty with a prep pack and no local corpus
-    rc = None
+    rc, logged = None, {}
     if targets:
         try:
             rc = raid_from_report(client, url, enc.id, diff)
+            logged = {n: sp for n, sp, _d in rc.players}  # as played: the night's chips show the log's spec
+            if me[0] and me[1]:  # your character as the spec you prepare, as the raid verdict counts it (fresh DPS
+                rc.players = [(n, me[1] if n.lower() == me[0].lower() else sp, dps)  # review: you listed as your
+                              for n, sp, dps in rc.players]  # rogue on the Elemental's sheet)
             if rc.same_boss:
                 refs = comp.references(con, enc.id, diff, targets)
                 out["comp"] = comp.to_dict(boss, rc.fight, comp.assign(rc, refs))
@@ -2343,7 +2348,7 @@ def _raid_tools(client, con, enc, diff: int, url: str) -> dict:
             print(f"  best pull: skipped ({str(ex)[:100]})")
     try:
         rows, icons = tracker.night(client, code, enc.id)
-        known = {n: sp for n, sp, _d in (rc.players if rc is not None else [])}  # the log's own icon names only
+        known = logged if rc is not None else {}  # the log's specs, as played (your rogue stays a rogue there)
         icons = {n: (known.get(n, ic) if "-" not in (ic or "") else ic) for n, ic in icons.items()}  # a class: its
         # spec from the raid's comp, as who hits what shows it (DPS round 48: a Retribution Paladin's class icon)
         if rows:
