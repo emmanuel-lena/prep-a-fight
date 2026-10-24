@@ -743,6 +743,22 @@ def specgear(d: dict) -> str:
             f"your spec.</p>")
 
 
+def enchant_table(d: dict) -> str:
+    """Each enchant and gem the top players wear, its gain on your set; the ones to change first (picked: beyond the
+    sims' noise), the share of the top players who wear it on hover."""
+    rows = sorted(d["rows"], key=lambda r: (not r.get("pick"), r["kind"] != "enchant", r["slot"], -(r["gain"] or 0)))
+    def gain(g: float) -> str:
+        return "worn" if g == 0 else f"{g:+.2f}%"  # 0: what you already wear there
+    body = "".join(
+        f"<tr><td>{'<b>&#10003; change</b>' if r.get('pick') else ''}</td>"
+        f"<td>{e(r['slot'].replace('_', ' ') or 'every socket')}</td>"
+        f"<td title='worn by {r['share']:.0%} of the top players'>{e(r['name'])}</td><td class='n'>{gain(r['gain'])}"
+        "</td></tr>" for r in rows)
+    return (f"<div class='scroll'><table class='night'><tr><th></th><th>Slot</th><th>What the top players wear</th>"
+            f"<th class='n' title='on your set, the sims&#39; error about ±{d.get('error', 0):.2f}%'>Gain</th></tr>"
+            f"{body}</table></div>")
+
+
 def gear(d: dict) -> str:
     """What to equip (Top Gear), then what to farm (the drops on top of that set), on the fight picked."""
     from paf.results import fight_label
@@ -753,6 +769,8 @@ def gear(d: dict) -> str:
     out = f"<p class='ws-lead'>Simmed on {e(fights)}.</p>" if fights else ""
     if d.get("equip"):
         out += "<h2>Equip</h2>" + topgear(d["equip"])
+    if (d.get("enchants") or {}).get("rows"):
+        out += "<h2>Enchants and gems</h2>" + enchant_table(d["enchants"])
     if d.get("farm"):
         out += "<h2>Farm</h2>" + loot(d["farm"])
     return out or _verdict("ok", "Nothing to change", "<span>No item of your bags or of this loot beats what you "

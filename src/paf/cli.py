@@ -452,6 +452,26 @@ def cmd_gear(args: argparse.Namespace) -> int:
     if not args.boss:
         zone = max(x.zone_id for x in encs)
         encs = [x for x in encs if x.zone_id == zone]
+    from paf import enchants
+    from paf.profile import wcl_class_spec
+
+    cs = wcl_class_spec(profile)
+    if cs and encs:  # enchants and gems: what the top players of your spec wear, simmed on your set
+        diff_name = args.difficulty or settings.get("difficulty")
+        try:
+            rows = enchants.tops_rows(client, encs[0].id, settings.DIFFICULTIES.get(diff_name, 4), *cs)
+            choices, unique = enchants.candidates(rows), enchants.unique_gems(rows)
+            if choices:
+                print(f"== Enchants and gems: {len(choices)} the top {cs[1]} players wear")
+                enchants.names(choices)
+                err = enchants.run(worn, fights, root / "enchants", choices, unique, objective=args.objective)
+                picks = enchants.best(choices, err)
+                out["enchants"] = {"error": err, "rows": [
+                    {"kind": c.kind, "slot": c.slot, "name": c.name, "id": c.item, "share": c.share, "gain": c.gain,
+                     "pick": c in picks} for c in choices if c.gain is not None]}
+                worn = enchants.apply(worn, picks, unique)  # the farm simmed on that set
+        except Exception as ex:  # noqa: BLE001 - the set and the farm still stand
+            print(f"  enchants and gems skipped: {str(ex)[:120]}")
     best_profile = parse_simc_export(worn)
     levels = [i.ilvl for i in best_profile.equipped.values() if i.ilvl]
     ilvl = loot_ilvl(levels, args.difficulty or settings.get("difficulty"))
