@@ -603,7 +603,7 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
             + (" <span class='pill diff mx nosim'>no sim yet</span>" if any("prep" not in i["files"] for i in items)
                else "") + (" <span class='pill diff mx chk'>&#10003; today</span>"
                            if any(short_ago(i["mtime"]) == "today" for i in items) else "")
-            + " <span class='pill diff mx old'>to redo</span></p>")  # only the marks present
+            + " <span class='pill diff mx old'>&#8635; to redo</span></p>")  # only the marks present
 
 
 TABS = (("prep", "Prep sheet"), ("timeline", "Top players' timelines"))
@@ -1174,8 +1174,9 @@ def raid_board(encs, class_name: str, spec: str) -> str:
             else:
                 href, state, word = f"/boss?boss={x.id}&amp;difficulty={diff}", "no", "prepare"
             if diff == settings.get("difficulty"):  # said under the portrait, without pointing at it
-                said = {"no": "no sim yet" if item else "not prepared", "ok": "ready",
-                        "old": "to redo"}.get(state, word)  # a sheet without a sim (timelines) is no "not prepared"
+                said = {"no": "no sim yet" if item else "not prepared", "ok": "&#10003; ready",
+                        "old": "&#8635; to redo"}.get(state, word)  # the table's marks too (round 43); a sheet without
+                # a sim (timelines) is no "not prepared"
                 here = f"<small class='rb-st {state}'>{said}</small>"
                 ring = f" st-{state}" + (" st-nosim" if state == "no" and item else "")  # the face's ring says it
             states += (f"<a class='rb-d {state}' href='{href}'><span class='rb-frame {shape}'><span class='rb-in'>"
