@@ -1513,14 +1513,19 @@ def legend_for(dl: str, page: str) -> str:
     if "ramp" not in low:  # a clause no card uses goes too (a review: the ramp window on a sheet with none)
         out = out.replace("; a ramp: 8 to 30 s ahead", "")
 
-    def short(m) -> str:  # a few words a term, its whole rule on hover (heal rounds 36-46: 30 to 40 words an entry)
+    return brief(out)
+
+
+def brief(dl: str) -> str:
+    """Each term of a legend in a few words, its whole rule on hover (heal rounds 36-48: 30 to 40 words an entry)."""
+    def short(m) -> str:
         term, full = m.group(1), m.group(2)
         word = LEGEND_SHORT.get(re.sub(r"<[^>]+>|&[^;]+;", "", term).strip().lower())
         if word is None:
             return m.group(0)
         plain = html.unescape(re.sub(r"<[^>]+>", "", full)).replace("'", "&#39;")
         return f"<dt>{term}</dt><dd title='{plain}'>{word}</dd>"
-    return re.sub(r"<dt>(.*?)</dt><dd>(.*?)</dd>", short, out)
+    return re.sub(r"<dt>(.*?)</dt><dd>(.*?)</dd>", short, dl)
 
 
 # each legend term in a few words; its whole rule on the term's hover
@@ -1529,7 +1534,13 @@ LEGEND_SHORT = {"n%": "of the top players read", "tied to a hit": "pressed in th
                 "a time": "shared by a quarter of its users", "on cooldown": "pressed each time it is back",
                 "back from cooldown": "pressed as soon as it is back, not for the hit",
                 "or": "another time some press it instead",
-                "not kept": "in a hit's window, not its answer", "stage time": "after a dashed line: from the stage's start"}
+                "not kept": "in a hit's window, not its answer", "stage time": "after a dashed line: from the stage's start",
+                "read on": "the table's kills, every player", "a button": "pressed in the hit's window by a quarter",
+                "faded": "under a quarter: the most pressed", "none held": "back from cooldown: no answer",
+                "none shared": "no button reaches a tenth", "few players": "under 100 healers: a few's habit",
+                "a row": "the spec's median player", "a job": "a fifth more, beyond chance",
+                "a spike": "5 s at 1.5&times; the median damage", "the shares": "from different kills: no sum",
+                "externals, buffs": "a mean, cast on others", "dispels": "the boss tab: its top player"}
 
 
 def _unnest(text: str) -> str:
@@ -2504,7 +2515,7 @@ def roles_more(roles: list, mine: str = "", found: list | None = None, staged: b
     left = list(dict.fromkeys(n for r in roles if r.spec != mine for n, *_x in getattr(r, "cd_names", [])
                               if n.endswith(STORE)))
     head = "".join(f"<th>{_mmss(h)} hit</th>" for h in hits)
-    return ("<h2>The other healers' cooldowns on the big hits</h2>"
+    return brief("<h2>The other healers' cooldowns on the big hits</h2>"  # its legend in a few words (round 48)
             f"<table class='others'><thead><tr><th>Healer</th>{head}</tr></thead><tbody>{out}</tbody></table>"
             "<dl class='legend'><dt>Read on</dt><dd>the table's kills"
             + (" whose stage starts are read (presses in stage time, as the curve)" if staged else "")
@@ -2595,7 +2606,7 @@ def nums_note(roles: list, own: str = "") -> str:
              ("The shares", "from different kills: they do not add up."),
              ("Externals, buffs", "a mean over every player of the spec, cast on others only."),
              ("Dispels", "the boss tab counts the top player only.")]
-    return "<dl class='legend'>" + "".join(f"<dt>{k}</dt><dd>{v}</dd>" for k, v in plain) + "</dl>"
+    return brief("<dl class='legend'>" + "".join(f"<dt>{k}</dt><dd>{v}</dd>" for k, v in plain) + "</dl>")
 
 
 def _plain(text: str) -> str:

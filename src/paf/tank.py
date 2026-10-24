@@ -794,13 +794,15 @@ def render_sheet(p: TankPrep) -> str:
                       + comps_table(p.comps, p.kills).replace("Healers", "Tanks"))
         deaths = any(x.deaths_with is not None for x in p.presence)
         # every sample of the sheet, once, as the healers' sheets (round 38: no map on the tank's)
-        deeper.append(f"<p class='small muted'>Where the numbers come from: your cooldowns' timings and the boss's "
-                      f"times: the {p.kills} top {e(p.spec)} kills (every cast read); the tanks' damage: "
-                      f"{p.damage_kills or 'up to 40'} of them; the tanks beside them and the compositions: the same "
-                      f"{p.kills}, deaths read on fewer.</p>")
-        deeper.append("<p class='small muted'>" + ("" if deaths else "The deaths of each composition are not read yet. ")
-                      + "A spec's longer kills or extra deaths are a reading, not a verdict: the raids that bring it "
-                      "differ in other ways too, and a few kills move a mean of deaths.</p>")
+        # every sample once, as chips with their words on hover, as the healers' "Read on" (heal rounds 36-48)
+        deeper.append(
+            "<p class='small muted chips'>Read on "
+            f"<span class='pill' title='your cooldowns&#39; timings and the boss&#39;s times, every cast read'>{p.kills} "
+            f"top kills</span> <span class='pill' title='the tanks&#39; damage'>{p.damage_kills or 40} for the damage"
+            f"</span> <span class='pill' title='the tanks beside them and the compositions; deaths read on fewer"
+            + ("" if deaths else ", not read yet") + "'>the same for the tanks beside them</span> "
+            "<span class='pill' title='the raids that bring a spec differ in other ways too, and a few kills move a "
+            "mean of deaths'>a reading, not a verdict</span></p>")
     from paf.healer import legend_for
 
     # the legend under every card it explains, its used terms only (as the healers'; a review: mid-page)
