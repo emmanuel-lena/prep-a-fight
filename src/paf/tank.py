@@ -485,9 +485,10 @@ def render_sheet(p: TankPrep) -> str:
         return "".join(f"<li><b>{ic(n)}{e(n)}</b><span class='upbar' aria-hidden='true'><span style='width:"
                        f"{u * 100:.0f}%'></span></span><b class='upn'>{u:.0%}</b><small>uptime</small></li>"
                        for n, u in p.mitigation) + "".join(
-            f"<li><b>{ic(n)}{e(n)}</b><small>pressed by {u:.0%} of the top players &middot; {count(k)} a kill"  # the
-            # cards' one form (heal round 16)
-            + (f" &middot; on cooldown, about every {ev:.0f} s" if ev else "") + "</small>"
+            f"<li><b>{ic(n)}{e(n)}</b><small><span class='use' title='pressed by {u:.0%} of the top players'>"  # the
+            f"<span class='ubar'><span style='width:{u:.0%}'></span></span>{u:.0%}</span> &middot; {count(k)}/kill"
+            + (f" <span class='pill rhythm' title='pressed every time it is back'>&#9719; every {ev:.0f} s</span>"
+               if ev else "") + "</small>"  # the cards' one form: a bar, N/kill, the rhythm a badge (fresh heal review)
             + ("<span class='when'>" + "".join(f"<span class='chip'>{_chip(moved_t.get((n, t), t), hit_of(n, t))}"
                                                f"{_share(x := tied.get((n, t), sp) if hit_of(n, t) else sp)}"
                                                f"{_of_pressers(x, u)}{why(n, t)}</span>"  # no hit named: none (heal round 17: "not on a big hit" twice)

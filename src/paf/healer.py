@@ -1339,7 +1339,7 @@ PULL = 12.0  # seconds: a press before this is the pull's opener, never a ramp f
 OR_NEAR = 20.0  # seconds: the farthest "or" time of a button pressed about every minute or on cooldown
 MINUTE = "about every minute"  # the reason a button pressed four times a kill or more is tied to no hit
 # a reason a press is tied to no hit, as its pill (the words on hover)
-RHYTHM = {MINUTE: "&#8635; ~1 min, no hit", "a cast-while-moving button": "while moving, no hit",
+RHYTHM = {MINUTE: "&#9719; ~1 min, no hit",  # a clock, never ⟲'s look-alike (fresh heal review: ↻ beside ⟲) "a cast-while-moving button": "while moving, no hit",
           "a movement button": "movement, no hit", "a trinket, placed by its rhythm": "trinket rhythm, no hit",
           "a potion": "potion, no hit", "cast on another player": "on another player, no hit"}
 
@@ -1647,7 +1647,8 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
             f"{_and([_mmss((moved or {}).get((c.name, t), t)) for t in ts[1:]])}" for _sp, ts in c.rhythms)
            + "</small>"
            if c.rhythms else "")
-        + (f"<small class='alt'>on cooldown, about every {c.every:.0f} s"  # its other presses said too (round 109:
+        + (f"<small class='alt'><span class='pill rhythm' title='pressed every time it is back'>&#9719; every "
+           f"{c.every:.0f} s</span>"  # the rhythm a badge, as the others' (fresh heal review); its other presses (r. 109:
            + (f"; {_more(c, named)} more on that cadence" if c.times and _more(c, named) else "")  # Stasis "3 a
            + "</small>" if c.every and not _held(c) else  # kill", two chips)
            # a held habit kept (only one for a hit is): the cadence is the other group's (round 79: Avenging Wrath
