@@ -206,7 +206,8 @@ def test_actions_read_as_chips_with_their_sentence_on_hover():
     well = action_row(d, Action("assignment", "Soulcoil Well", "Soulcoil Well: 4 players per kill, an assignment, "
                                 "~4 s of movement when it is you. If it is yours, tick it in the app (the boss's prep "
                                 "page)."))
-    assert "<b>Soulcoil Well</b>" in well and "&#128101; 4 a kill" in well and "~4 s moving" in well
+    assert "<span class='act'" in well and "<b>Soulcoil Well</b>" in well
+    assert "&#128101; 4 a kill" in well and "~4 s moving" in well
     assert "title='Soulcoil Well: 4 players" in well
     rend = action_row(d, Action("mechanic", "Essence Rend", "Essence Rend: hits ~11 players per kill; top Elemental "
                                 "players take it in 52% of the kills: it can be you."))

@@ -1166,7 +1166,10 @@ def _twice(c: Cooldown, named: dict | None = None) -> str:
     if not c.presses or not c.n_all:
         return ""
     lines = [v[0] for k, v in (named or {}).items() if k[0] == c.name and isinstance(k[1], tuple)]
-    shown = [*(c.support or []), *(c.alt_support or []), *lines, _rest(c, named)]
+    chips = [_tied_share(c, t, n, sp) for t, n, sp in zip(c.times, c.near or [""] * len(c.times), c.support or [],
+                                                           strict=False)]  # the figures the chips show (fresh heal
+    # review: Zephyr's 10% a hit window's share, 12% raw: 10 + 19 under its 30% yet the caveat)
+    shown = [*chips, *(c.alt_support or []), *lines, _rest(c, named)]
     if sum(int(100 * x + 0.5) for x in shown) <= int(100 * c.users + 0.5):  # the shares as shown: rounding is no overlap
         return ""  # (fresh heal review: Zephyr 10 + 19 under its 30%, the caveat explained nothing)
     two = c.twice if c.twice >= 0 else sum(1 for ts in c.presses if len(ts) >= 2) / c.n_all  # every cast (r. 111)

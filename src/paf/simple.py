@@ -409,11 +409,12 @@ def review_card(d) -> str:
     logged = getattr(getattr(d, "raid", None), "logged_as", "")  # played as another spec: said (DPS round 10)
     who = f"Top {d.spec}" if logged else "Top players"  # whose bars these are, when your pull is another spec
     return (f"<article class='card s-review'><h2>Your last pull</h2><p class='what'>{e(r.fight)}, from your raid's "
-            f"log." + (f" <span class='pill'>as {e(logged)}</span>" if logged else "") + "</p>"
+            f"log." + (f" <span class='pill' title='Your pull as {e(logged)} beside the top {e(d.spec)} players: "
+                       f"another spec, a rough comparison'>as {e(logged)} &middot; &asymp; other spec</span>"
+                       if logged else "") + "</p>"
             f"<div class='cmps'>{_bars('Casting', r.active, r.tops_active, True, who, cast_ok)}"
             f"{_bars('Moving', r.moving, r.tops_moving, False, who, move_ok)}</div>"
-            + (f"<p class='small muted'>Your pull as {e(logged)} beside the top {e(d.spec)} players: another spec, a "
-               "rough comparison.</p>" if logged else "")  # said, never read as like for like (fresh DPS review)
+            # its pill says it is no like for like, the sentence on hover (fresh DPS review: a line under the bars)
             + "".join(f"<p class='say'>{e(s)}</p>" for s in says) + pauses + "</article>")
 
 

@@ -801,7 +801,7 @@ def checklist_items(d: PrepData) -> list[tuple[str, str]]:
     for n, t in gate_kills(d):  # the add that ends the immunity, first
         item(f"{icons.img(_sfallback(d, n), 'small')}{e(t)}")
     for a in mine[:6]:
-        item(f"{icons.img(d.icons.get(a.name, '') or _sfallback(d, a.name), 'small')}{e(a.text)}")
+        item(action_inner(d, a))
     if not mine:
         for b in d.role_bullets[:4]:
             item(e(b))
@@ -1031,15 +1031,25 @@ ACTION_CHIPS = [
 ]
 
 
-def action_row(d, a) -> str:
-    """One action as its icon, its name and chips, its sentence on hover; a sentence no pattern reads stays as is."""
+ACTION_CHIPS.insert(0, (KILL_TEXT, lambda m: [f"&times;{m['n'] or 1} a kill", f"&#9201; ~{m['life']} s"]
+                       + ([f"your spec {m['share']}%"] if m["share"] else [])))
+
+
+def action_inner(d, a) -> str:
+    """An action as its icon, its name and chips, its sentence on hover; a sentence no pattern reads stays as is
+    (the boss tab and the checklist: one form, fresh DPS review)."""
     pic = icons.img(d.icons.get(a.name, "") or _sfallback(d, a.name), "small")
     for pat, chips in ACTION_CHIPS:
         m = pat.fullmatch(a.text)
         if m:
-            return (f"<li class='act' title='{e(a.text)}'>{pic}<b>{e(m['name'])}</b> "
-                    + "".join(f"<span class='pill'>{c}</span>" for c in chips(m)) + "</li>")
-    return f"<li>{pic}{e(a.text)}</li>"
+            verb = "Kill the " if pat is KILL_TEXT else ""  # a line to tick: what to do (a table says it in its head)
+            return (f"<span class='act' title='{e(a.text)}'>{pic}<b>{verb}{e(m['name'])}</b> "
+                    + "".join(f"<span class='pill'>{c}</span>" for c in chips(m)) + "</span>")
+    return f"{pic}{e(a.text)}"
+
+
+def action_row(d, a) -> str:
+    return f"<li>{action_inner(d, a)}</li>"
 
 
 def gate_kills(d: PrepData) -> list[tuple[str, str]]:

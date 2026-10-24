@@ -692,9 +692,13 @@ def render_sheet(p: TankPrep) -> str:
                             if t not in c.windowed:
                                 c.windowed.append(t)
     svg = curve_svg(p.curve, p.moments, p.phases, "Damage the top tanks take over the fight, their defensives and "
-                    "the swaps", [*defs, *shorts, *lane], {"Tank swaps", *(n for n, _t in answered), *window_named},
+                    "the swaps", [*lane, *defs, *shorts, *others], {"Tank swaps", *(n for n, _t in answered),
+                                                                    *window_named},
                     answered,
-                    moved_t)  # its marks at the lead's times (round 71)
+                    moved_t, others=5)  # its marks at the lead's times (round 71); the other cards' cooldowns and
+    # the worn trinkets as the healers' faint lanes (fresh heal review: the tank chart without them)
+    faint = any(c.times for c in [*defs, *shorts, *others]
+                if c.name not in {"Tank swaps", *(n for n, _t in answered), *window_named})  # curve_svg's others
     svg = nouned(svg)  # its hovers in the cards' noun too (round 38: "the 2:55 hit" over a 1.45x moment)
     if any(m.ratio < 1.5 for m in p.moments):  # a moment named so: "tied to no moment" (round 39: both words)
         svg = svg.replace("tied to no hit", "tied to no moment").replace("the big hits", "the big moments")
@@ -714,8 +718,9 @@ def render_sheet(p: TankPrep) -> str:
         + ("<span>&#9478; stage time after a dashed line</span> " if getattr(p, "staged", False) else "")
         + ("<span title='the presses the table gives as each moment&#39;s answer'>&#9646; the table&#39;s answers</span> "
            if answered else "")  # the outline has its own chip (fresh heal review)
-        + ("<span>&#9647; another press, or one in a moment&#39;s window that is not its answer</span> "
-           if outline or window_named else "")  # its own chip, as the healers' (fresh heal review)
+        + ("<span title='or one in a moment&#39;s window that is not its answer; fainter: fewer of the top players "
+           "press it then'>&#9647; another press</span> "
+           if outline or window_named or faint else "")  # its own chip, as the healers' (fresh heal review)
         + ("<span>| a tank swap</span> " if lane else "")
         + "<span title='one of the tanks&#39; three biggest moments, whatever casts it (another as high may be left "
         "out)'>&#9679; a big moment</span></p><ul class='hl2'>"
