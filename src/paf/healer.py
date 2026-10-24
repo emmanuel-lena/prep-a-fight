@@ -1941,6 +1941,8 @@ def _why_not(c: Cooldown, t: float, found: list | None = None, shown: float | No
         b = None if c.why == MINUTE else _back_in(c, t, hit_t)  # "back from cooldown" alone; the chip's own
         back = ("" if b is None or b <= BACK_SHARE[0] else ", back from cooldown"  # reading of it, its words)
                 + (" for about half" if b <= BACK_SHARE[1] else ""))
+        if c.every:  # its card's word, as the table says it (rounds 36-38: "on cooldown" there, "back for half" here)
+            back = ", on cooldown"
         said = c.shown_at.get(t, "") if re.fullmatch(r"\d+:\d\d", c.shown_at.get(t, "")) else ""
         gap = _secs(_mmss(hit_t)) - _secs(said or _mmss(t if shown is None else shown))  # from the time the
         # mark's title shows, as its chip counts it (heal confirm round 9: 21 s on the chip, 22 on hover)

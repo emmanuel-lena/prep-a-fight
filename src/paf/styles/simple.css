@@ -126,4 +126,4 @@ a.tal:hover{background:var(--surface-2)}
 .sw-strip .sw-lab{grid-column:1/-1}
 .sw-strip.free .sw-lab{color:var(--muted)} .sw-strip.free .tal{opacity:.65} .sw-strip.free .sw-sign{color:var(--muted);font-weight:700;margin-left:4px}
 .sw-one{display:inline-flex;align-items:center;gap:2px}
-.sw-strip.free{justify-content:flex-start;text-align:left}
+.simple .cards .sw-strip.free{grid-column:1/-1;display:flex;flex-wrap:wrap;justify-content:flex-start;gap:4px 14px;text-align:left} /* one row across both columns */

@@ -220,7 +220,7 @@ def items(d) -> list[tuple[float, Item]]:
         tank = roles.get(name) == ["tank"] and name not in hits_you
         if tank and len(times) >= 4:  # the tank's, often: one dim row, its rhythm said (round 38: 7 grey rows)
             gap = (times[-1] - times[0]) / (len(times) - 1)
-            add(times[0], Item("boss", "tank", name, f"{name} (tank, {len(times)} times, every ~{gap:.0f} s)",
+            add(times[0], Item("boss", "tank", name, f"{name} (tank · {len(times)}× · ~{gap:.0f} s)",
                                _icon(d, name)))
             times = []
         for t in times:
@@ -348,8 +348,9 @@ def moments(d) -> list[Moment]:
     """Events close in time share a row; a phase start always opens its own."""
     out: list[Moment] = []
     for t, it in items(d):
-        if (not out or t - out[-1].t > ROW_GAP or (it.kind == "phase" and t - out[-1].t > 0.5)
-                or (t < 0) != (out[-1].t < 0)):
+        if (not out or t - out[-1].t > ROW_GAP or (it.kind in ("phase", "kill") and t - out[-1].t > 0.5)
+                or (it.side == "you" and it.kind == "cd" and t - out[-1].t >= 3)  # a press on its own time's row
+                or (t < 0) != (out[-1].t < 0)):  # (round 39: the kill and Shadow Blades 1:40 on a 3:57 / 1:34 pill)
             out.append(Moment(t))
         out[-1].items.append(it)
     return out

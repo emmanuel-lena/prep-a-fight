@@ -160,3 +160,15 @@ def test_a_boss_cast_is_a_reason_for_a_defensive_only():
     its = [(198.0, cast)]
     assert fightview._ctx(200.0, its, "cd") == ""
     assert fightview._ctx(200.0, its, "def") == "on Malignant Catalyst"
+
+
+def test_the_kill_and_a_press_a_few_seconds_on_open_their_own_rows(monkeypatch):
+    """Round 39: the kill at 4:01 on the 3:57 Malignant Catalyst row, Shadow Blades 1:40 on the 1:34 row."""
+    from paf import fightview
+
+    its = [(94.0, fightview.Item("boss", "cast", "Exploding Infection", "Exploding Infection")),
+           (100.0, fightview.Item("you", "cd", "Shadow Blades", "Shadow Blades")),
+           (237.0, fightview.Item("boss", "cast", "Malignant Catalyst", "Malignant Catalyst")),
+           (241.0, fightview.Item("boss", "kill", "The kill", "The kill, around 4:01"))]
+    monkeypatch.setattr(fightview, "items", lambda d: its)
+    assert [m.t for m in fightview.moments(None)] == [94.0, 100.0, 237.0, 241.0]

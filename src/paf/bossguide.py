@@ -128,8 +128,10 @@ def modernize(html: str, difficulty: str = "heroic") -> str:
 
 def _named_in_summary(sections: list[Section], role: str) -> set[str]:
     """The abilities the journal's summary for this role names ("Imbibe inflicts heavy damage…" for the healers)."""
-    said = " ".join(role_bullets(sections, role)).lower()
-    return {s.title for _, s in walk(sections) if s.kind == "ability" and s.title and s.title.lower() in said}
+    lines = [b.lower().lstrip() for b in role_bullets(sections, role)]  # the line's subject only, not a name in
+    # passing (round 39: "…if too many souls enter the Soulcoil Well" marked the Well)
+    return {s.title for _, s in walk(sections) if s.kind == "ability" and s.title
+            and any(x.startswith(s.title.lower()) for x in lines)}
 
 
 def _short(stage: str) -> str:
@@ -219,9 +221,12 @@ def describe(spell_id: int, locale: str = "") -> str:
 
 def _ability(s: Section, depth: int, ctx: dict) -> str:
     raid = "raid damage" in ctx["also"].get(s.title, "")  # measured as a big raid hit: its tank tag says the raid
+    dispel = ctx["role"] == "healer" and bool(DISPEL & set(s.flags))  # a healer's dispel keeps its words
+    summed = s.title in ctx["named"] and s.title not in ctx["also"] and not dispel  # its words: the summary's
     tags = "".join(f'<span class="pill {"warn" if f in ("deadly", "interruptible") else ""}">{SHOWN_FLAGS[f]}'  # too
                    + (" &middot; raid too" if f == "tank" and raid else "") + "</span>"  # (round 112: Possession
-                   for f in s.flags if f in SHOWN_FLAGS)  # Barrage tagged "tank", three of the four raid hits)
+                   for f in s.flags if f in SHOWN_FLAGS  # Barrage tagged "tank", three of the four raid hits)
+                   and not (summed and f == ctx["role"]))  # one marker, not the role's flag too (round 39)
     facts = []
     times = ctx["timings"].get(s.title.lower())
     if times:
@@ -241,11 +246,10 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
             or (ctx["role"] == "healer" and bool(DISPEL & set(s.flags))))  # a healer's dispels (review 36: Essence
     # Rend, the boss tab's headline, a bare name); what the role's summary names: a tag, its words being the
     # summary's (round 37: the same sentences in both columns)
-    if s.title in ctx["named"]:  # first: never its words, whatever else holds (round 38: Essence Rend and
-        told = s.title in ctx["also"]  # Sanguineous Fortitude said in both columns); its numbers stay
-        tags += '<span class="pill sum" title="its words: in For you, at the top">&uarr; for you</span>'  # its own
-        # marker, not the journal's role flag (round 38: "dps" with words on some rows, without on others)
-
+    if summed:  # never its words twice (round 38: Essence Rend and Sanguineous Fortitude in both columns); its
+        told = False  # numbers stay
+        tags += ('<span class="pill sum" title="its words: in what the journal tells your role, beside this list">'
+                 "&uarr; for you</span>")
     text = readable(s.text, ctx["difficulty"]).strip() if s.text and told else ""
     if not text and told:  # no journal text, or only another difficulty's sentence: the spell's own description
         text = readable(ctx["describe"](s.spell_id), ctx["difficulty"])
