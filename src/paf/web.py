@@ -1545,6 +1545,8 @@ def boss_line(enc, difficulty: str) -> str:
 def fight_strip(enc, difficulty: str) -> str:
     """The rebuilt fight as one strip (fresh app review 5): the adds as bars with their count, the boss away hatched,
     the moves as ticks, Bloodlust on the axis, a mark a minute. The boss line is its label."""
+    import re
+
     from paf.corpus.template import template_path
     from paf.fight import Fight
     from paf.plan import mmss
@@ -1574,18 +1576,21 @@ def fight_strip(enc, difficulty: str) -> str:
     ends: list[float] = []  # a lane's last end: waves that overlap go one under the other
     for a in sorted(f.add_waves, key=lambda a: a.time):  # a wave: a bar as long as it lives, its count
         a0, a1 = x(a.time), x(a.time + a.lifetime)
+        tag = (re.sub(r"\s*\([^)]*\)", "", a.name or "").strip()[:3] + " ") if a.name else ""  # whose wave (fresh
+        # review 7: "×1" read on hover only)
         lane = next((i for i, end in enumerate(ends) if end + 30 < a0), None)
         if lane is None and len(ends) < 2:  # two lanes at most: a third overlap goes where the bars end first
             ends.append(0.0)
             lane = len(ends) - 1
         elif lane is None:
             lane = min(range(2), key=lambda i: ends[i])
-        ends[lane] = max(ends[lane], a1 + 28, a0 + 30)  # room for a count written beside its bar
+        ends[lane] = max(ends[lane], a1 + 28 + 6 * len(tag), a0 + 30)  # room for a label written beside its bar
         y = 24 + lane * 19
-        inside = a1 - a0 >= 30  # its true length; a short wave's count beside it (fresh app review 6: 5 s drawn 12)
+        inside = a1 - a0 >= 30 + 6 * len(tag)  # its true length; a short wave's label beside it (round 6)
         out.append(f"<rect class='fs-add' x='{a0:.1f}' y='{y}' width='{max(3.0, a1 - a0):.1f}' height='16' rx='3'>"
                    f"<title>{e(a.name or 'adds')} at {mmss(a.time)}: {a.count}, ~{a.lifetime:.0f} s</title></rect>"
-                   f"<text class='fs-n' x='{(a0 + 5) if inside else (a1 + 3):.1f}' y='{y + 12}'>&#215;{a.count}</text>")
+                   f"<text class='fs-n' x='{(a0 + 5) if inside else (a1 + 3):.1f}' y='{y + 12}'>{e(tag)}&#215;{a.count}"
+                   "</text>")
     for mv in f.movement:  # a move: a tick just over the axis
         out.append(f"<rect class='fs-move' x='{x(mv.start):.1f}' y='{axis - 7}' "
                    f"width='{max(2.0, x(mv.start + mv.duration) - x(mv.start)):.1f}' height='6'/>")
