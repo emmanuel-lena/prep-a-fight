@@ -125,8 +125,8 @@ def test_a_boss_row_says_what_the_journal_tells_damage_dealers(monkeypatch):
     assert [it.hint for it in dig] == ["Dig In increases Sszorak's damage taken during Howling Maelstrom.", ""]
     assert not next(it for _t, it in fightview.items(d) if it.name == "Ravage").hint  # not a damage dealer's line
     page = fightview.html(d)
-    assert ("class='hint' title='Dig In increases Sszorak&#x27;s damage taken during Howling Maelstrom.'>"
-            "Journal: Dig In") in page
+    assert ("class='hint' title='Journal: Dig In increases Sszorak&#x27;s damage taken during Howling Maelstrom.'>"
+            "&#128214; journal") in page  # the timeline row: its words on hover, Your job says them
     assert "<b>Dig In</b> at 1:51, 4:09: Dig In increases" in fightview.job_html(d)  # Your job says it, with when
     d.waves = [(24.0, 5, 30.0, "Bubblefin Shorerunner")]
     d.role_bullets = ["[Alluring Bubble] attracts a large group of Bubblefin Shorerunners to rush toward the bubble."]

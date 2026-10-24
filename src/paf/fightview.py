@@ -389,7 +389,7 @@ def _ev(it: Item, row_t: float | None = None) -> str:
         notes.append(it.why)
     small = f"<small>{', '.join(notes)}</small>" if notes else ""
     if it.hint:
-        small += f"<small class='hint' title='{e(it.hint)}'>Journal: {e(it.hint)}</small>"
+        small += f"<small class='hint' title='Journal: {e(it.hint)}'>&#128214; journal</small>"  # its words on hover
     return (f"<div class='ev ek-{it.kind}'>{_ic(it.icon)}<div class='x'><span class='main'>{text}</span>{small}"
             "</div></div>")
 
@@ -473,7 +473,7 @@ def job_html(d) -> str:
                 done.add(it.name)
                 times = [_mmss(max(0.0, x)) for x, y in items(d) if y.side == "boss" and y.name == it.name]
                 rows.append((it.name, f"<b>{e(_clean(it.name))}</b> at {', '.join(times[:5])}: {e(it.hint)} "
-                                      "<span class='src'>(Journal)</span>"))
+                                      "<span class='src'>(Journal)</span>"))  # the job itself: its words stay here
     defs = _defensives(d)
     if defs:
         s, why = defs[0][1], defs[0][2]

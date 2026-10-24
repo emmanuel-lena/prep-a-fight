@@ -548,11 +548,16 @@ def _stall(d, p) -> str:
     held = [d.cd_names.get(k, k) for k, r in p.choice.items() if r.name != "default"]
     boss = p.totals.get("boss") if p.objective != "boss" else p.gain
     if held and boss is not None and boss < -15:
-        return ("The boss loss is mostly a sim artifact: SimC's default rotation ties other spells to "  # no number:
-                # the card's line gives it, against the plan played (DPS confirm round 7: "21%" from another base)
-                f"{held[0]}, so they stop while it is held and pile up for the moment it is pressed. The real cost is "
-                f"lower and the gain likely overstated too: read this plan as a direction, not a number.")
+        return ("Sim artifact: a direction, not a number.")  # the why on its hover (stall_why); no number: the
+        # card's line gives it (DPS confirm round 7; round 42: two lines)
     return ""
+
+
+def stall_why(d, p) -> str:
+    """The reason _stall gives its short line, for its hover."""
+    held = [d.cd_names.get(k, k) for k, r in p.choice.items() if r.name != "default"]
+    return (f"SimC's default rotation ties other spells to {held[0]}, so they stop while it is held and pile up for "
+            "the moment it is pressed: the real boss loss is lower and the gain likely overstated too.") if held else ""
 
 
 def _severity(gain: float | None) -> str:
@@ -643,7 +648,7 @@ def suggestions(d: PrepData) -> list[Suggestion]:
                          )  # the addons named in the buttons' own tooltips (review 36)
         stall = _stall(d, p)
         if stall:
-            lines.append(f"<div class='why'>&#9888; {e(stall)}</div>")
+            lines.append(f"<div class='why' title='{e(stall_why(d, p))}'>&#9888; {e(stall)}</div>")
         fell = want is not None and p.objective == want and _fallen(p)
         flags = [f for f in p.flags if not (fell and f.startswith("not robust"))]  # its pill says it (confirm 9)
         if flags:  # shown, not folded; a sign under the shown precision says nothing
@@ -1456,7 +1461,7 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
             elif p.gain > 2 * p.error:  # said, never left out in silence
                 checks += "<p class='small'>Not checked on pessimistic variants of the fight.</p>"
             if _stall(d, p):
-                checks += f"<p class='small warn'>&#9888; {e(_stall(d, p))}</p>"
+                checks += f"<p class='small warn' title='{e(stall_why(d, p))}'>&#9888; {e(_stall(d, p))}</p>"
             if off := off_tops(d, p):
                 checks += ("<p class='small warn'>&#9888; Not when the top players press it: " + e(" ".join(off))
                            + "</p>")
