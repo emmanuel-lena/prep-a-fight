@@ -249,6 +249,7 @@ class HealerPrep:
     casts: dict = field(default_factory=dict)  # boss ability -> its casts in the typical kill (timing evidence)
     split: list = field(default_factory=list)  # (talent, share picked) the top players split on (contested)
     split_marks: dict = field(default_factory=dict)  # the most played build's side of each split row (top_marks)
+    hitters: list = field(default_factory=list)  # (ability, share of the raid's damage taken), most first
     split_players: int = 0
     split_wide: bool = False  # no talent 35-65%: the split is the talents they differ on most (15-85%)
     potions: list = field(default_factory=list)  # potions a quarter of them or more drink (Cooldown)
@@ -3107,6 +3108,18 @@ def render_sheet(h: HealerPrep) -> str:
               f"over every kill'>{h.dispel_kills} kills, timed</span></p>"]  # the method a chip (round 43)
              # under the lead, not in it (round 78)
              if h.dispelled and h.dispelled[0][1] >= 1 else [journal_lead(h.journal, "healers")])
+    hitters = getattr(h, "hitters", None) or []  # what hits the raid the most, as the tank's bars (fresh heal
+    if hitters:  # review: the tab had no number but dispels)
+        top_share = hitters[0][1] or 1
+        boss_ic = getattr(h, "name_icons", {}) or {}
+        from paf.icons import img as _img
+
+        first = first + [
+            "<h2>The abilities that hit the raid the most <small class='muted'>(% of the damage it takes)</small></h2>"
+            "<ul class='hl2'>" + "".join(
+                f"<li><b>{_img(boss_ic.get(n, ''), 'small', 'ics')}{e(n)}</b><span class='upbar' aria-hidden='true'>"
+                f"<span style='width:{sh / top_share * 100:.0f}%'></span></span><small>{sh:.0%}</small></li>"
+                for n, sh in hitters) + "</ul>"]
     boss = first + (
         [f"<h2>What the Encounter Journal asks healers</h2><ul class='hl2'>{jr}</ul>"] if jr else [])
     if h.dispelled and (len(h.dispelled) > 1 or h.dispelled[0][1] < 1):  # the others than the lead's job, measured

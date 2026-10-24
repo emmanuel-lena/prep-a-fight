@@ -1003,6 +1003,11 @@ def _prep_healer(args: argparse.Namespace, profile=None) -> int:
         healer.trinkets(con, enc.id, diff), bossguide.role_bullets(bossguide.load(enc.id, diff_name), "healer"),
         [(n, t) for n, t, _ in tls.phases], class_name=cls, character=getattr(profile, "name", "") or "")
     h.staged = bool(clk)
+    if by:  # the raid's damage taken by ability over the kills read: the boss tab's bars (fresh heal review)
+        totals = {n: sum(v) for n, v in by.items()}
+        whole = sum(totals.values()) or 1.0
+        h.hitters = [(n, t / whole) for n, t in sorted(totals.items(), key=lambda x: (-x[1], x[0]))
+                     if t / whole >= 0.03][:8]
     healer.two_step(tls, h.cooldowns, found)  # Stasis: its release and what it stores
     for c in h.cooldowns:
         if c.release is not None:
