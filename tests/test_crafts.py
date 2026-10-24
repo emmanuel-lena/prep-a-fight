@@ -10,14 +10,21 @@ def row(**slots):
     return {"amount": 1, "gear": gear}
 
 
-def test_the_crafted_candidates_are_the_top_players_with_their_stats_and_level():
-    # the Gear tool (the owner, 2026-10-24): crafts as Raidbots sims them, from what the best players crafted
-    cloak = {"id": 900, "bonusIDs": [1, 2], "itemLevel": 285}
-    rows = [row(s14=cloak, s10={"id": 901, "bonusIDs": [3], "itemLevel": 285})] * 8 + [row(s14={"id": 77})] * 2
-    got = crafts.candidates(rows, frozenset({900, 901}))
-    assert ("back", ",id=900,bonus_id=1/2,ilevel=285", 900, 285) in got
-    assert ("finger1", ",id=901,bonus_id=3,ilevel=285", 901, 285) in got and len(got) == 2  # a drop is no craft
+def test_every_crafted_piece_is_tried_in_every_missive(monkeypatch):
+    # the Gear tool (the owner, 2026-10-24: "sim each missive"): the top players' crafted pieces, their missive (a
+    # bonus ID the logs carry: 8791 Crit/Mastery) taken out and each missive pair tried instead
+    monkeypatch.setattr(crafts, "missive_stats", lambda: {8790: (32, 36), 8791: (32, 49)})
+    assert crafts.stats_of(("12214", "8791")) == (32, 49) and crafts.stats_of((1, 2)) is None
+    assert crafts.pairs() == [(32, 36), (32, 49)]
+    cloak = {"id": 900, "bonusIDs": ["1", "8791"], "itemLevel": 285}
+    other = {"id": 900, "bonusIDs": ["1", "8790"], "itemLevel": 285}  # the same cloak, another missive: one piece
+    rows = [row(s14=cloak)] * 6 + [row(s14=other)] * 2 + [row(s14={"id": 77})] * 2
+    got = crafts.candidates(rows, frozenset({900}))
+    assert got == [("back", ",id=900,bonus_id=1,ilevel=285,crafted_stats=32/36", 900, 285, (32, 36)),
+                   ("back", ",id=900,bonus_id=1,ilevel=285,crafted_stats=32/49", 900, 285, (32, 49))]
     assert crafts.candidates(rows, frozenset()) == []  # offline: none
+    mine = "back=,id=900,bonus_id=1/8790,crafted_stats=32/36"
+    assert crafts.recrafts(mine, frozenset({900})) == [("back=,id=900,bonus_id=1,crafted_stats=32/49", (32, 49))]
 
 
 EXPORT = """rogue="T"

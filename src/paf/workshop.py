@@ -33,7 +33,7 @@ GROUPS = (("gear", "Your gear and talents"), ("cds", "Your cooldowns and rotatio
 
 TOOLS: tuple[Tool, ...] = (
     Tool("gear", "What to equip, what to farm", "Your /simc on one fight: your best set, then the drops worth farming.",
-         "inv_misc_bag_10", "gear", "15-60", ("boss~", "targets", "length", "difficulty", "goal", "simc"),
+         "inv_misc_bag_10", "gear", "15-60", ("boss~", "targets", "length", "difficulty", "goal", "depth", "simc"),
          "Your best set from your bags and vault, then every usable drop of the boss (or the raid) ranked by its "
          "gain on top of it.", needs_prep=False),  # a local Raidbots (the owner, 2026-10-24)
     Tool("topgear", "Best gear from your bags", "Your bags' best set for this boss.",
@@ -78,7 +78,7 @@ TOOLS: tuple[Tool, ...] = (
          "Each assignable mechanic with its timings and the damage it costs.", needs_prep=False),  # reads the kills
 )
 BY_CMD = {t.cmd: t for t in TOOLS}
-CURATED_FIELDS = {"boss", "difficulty", "objective", "raid", "fight", "targets", "length", "simc"}  # set by the curated form, not under "options"
+CURATED_FIELDS = {"boss", "difficulty", "objective", "raid", "fight", "targets", "length", "simc", "depth"}  # set by the curated form, not under "options"
 
 
 def _icon(name: str, cls: str = "") -> str:
@@ -203,6 +203,11 @@ def _field(kind: str, encounters: list) -> str:
     if kind == "length":
         return _segs("length", "Fight length (dummy)", [("180", "3 min", ""), ("300", "5 min", ""),
                                                          ("420", "7 min", "")], "300")
+    if kind == "depth":  # the owner, 2026-10-24: "an hour if need be" for the best of the best
+        return _segs("depth", "How deep", [("quick", "Quick", "the usual: about 15 min"),
+                                           ("thorough", "Thorough", "more items kept, the best sets checked at a fine "
+                                                                    "error, then every swap tried: up to an hour")],
+                     "thorough")
     if kind == "simc":
         return ("<label class='ws-f'><span>Another character</span><textarea name='simc' rows='4' placeholder='Paste "
                 "a /simc export here to sim it instead of your character'></textarea></label>")
@@ -265,6 +270,8 @@ def args(cmd: str, form: dict[str, list[str]]) -> list[str] | None:
         out += ["--targets", one("targets")]
     if not boss and one("length") and one("length") != "300":
         out += ["--length", one("length")]
+    if one("depth") == "thorough" and cmd == "gear":
+        out.append("--thorough")
     if one("simc"):  # a pasted export: saved apart, never over your character's profile
         from paf.config import data_dir
 

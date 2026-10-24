@@ -274,8 +274,12 @@ def run_topgear(profile_text: str, pool: GearPool, fights: list[FightProfile], r
                 pass1_error: float = 0.3, pass2_error: float = 0.15, keep: dict[str, int] | None = None,
                 prune_below: float = -0.5, min_tier: int | None = None, max_combos: int = 1500,
                 objective: float = 0.0, log: Callable[[str], None] = print,
-                crafted: frozenset[int] = frozenset()) -> TopGearResult:
-    keep = keep or {"armor": 2, "finger": 3, "trinket": 3, "weapon": 3}
+                crafted: frozenset[int] = frozenset(), thorough: bool = False) -> TopGearResult:
+    """thorough (the Gear tool, "an hour if need be": the owner, 2026-10-24): more items kept per slot, the best sets
+    simmed again at a fine error so their order is no noise, then a local search from the best one: every item of every
+    slot swapped in alone, again until no swap gains (it catches what pass 1's pruning missed)."""
+    keep = keep or ({"armor": 4, "finger": 5, "trinket": 5, "weapon": 5} if thorough else
+                    {"armor": 2, "finger": 3, "trinket": 3, "weapon": 3})
     weights = {f.name: f.weight for f in fights}
     swaps = pool.single_swaps()
     log(f"Pass 1: {len(swaps)} single swaps x {len(fights)} fight(s)")
@@ -317,20 +321,73 @@ def run_topgear(profile_text: str, pool: GearPool, fights: list[FightProfile], r
         combos = build_combos(pool, kept, min_tier=min_tier, max_combos=max_combos, crafted=crafted)
     log("  kept: " + "; ".join(f"{f}: {len(g)}" for f, g in kept.items() if g))
     log(f"Pass 2: {len(combos)} combinations x {len(fights)} fight(s)")
-    for fp in fights:
-        sets = {c.name: [line for o in c.options.values() for line in o.lines()] for c in combos}
-        if not sets:
-            break
-        res = simc.run_sets(profile_text, fp.lines, sets, run_dir / f"pass2-{fp.name}", log=log,
-                            target_error=pass2_error)
-        by_name = {p.name: p for p in res.profilesets}
-        for c in combos:
-            ps = by_name.get(c.name)
-            if ps:
-                c.scores[fp.name] = score_of(res, ps, objective)
-                c.errors[fp.name] = ps.dps.error / res.baseline["dps"].mean * 100 if res.baseline["dps"].mean else 0
-        log(f"  {fp.name}: {res.elapsed:.0f}s")
+
+    def score(cs: list[Combo], error: float, tag: str) -> None:  # each combo against what you wear, on each fight
+        for fp in fights:
+            sets = {c.name: [line for o in c.options.values() for line in o.lines()] for c in cs}
+            if not sets:
+                return
+            res = simc.run_sets(profile_text, fp.lines, sets, run_dir / f"{tag}-{fp.name}", log=log,
+                                target_error=error)
+            by_name = {p.name: p for p in res.profilesets}
+            base = res.baseline["dps"].mean
+            for c in cs:
+                ps = by_name.get(c.name)
+                if ps:
+                    c.scores[fp.name] = score_of(res, ps, objective)
+                    c.errors[fp.name] = ps.dps.error / base * 100 if base else 0
+            log(f"  {fp.name}: {res.elapsed:.0f}s")
+    score(combos, pass2_error, "pass2")
+    if thorough and combos:
+        top = sorted(combos, key=lambda c: -c.weighted(weights))[:25]
+        log(f"Pass 3: the best {len(top)} sets again, at a fine error")
+        score(top, 0.05, "pass3")
+        combos.append(refine(pool, max(top, key=lambda c: c.weighted(weights)), score, weights, min_tier, crafted,
+                             log))
     return TopGearResult(fights, combos, run_dir)
+
+
+def valid(pool: GearPool, gears: list[Gear], need_tier: int, max_crafted: int, crafted: frozenset[int],
+          max_vault: int = 1) -> bool:
+    """A set the game allows and the player asked for: one vault item, the tier pieces kept, two crafted pieces."""
+    return (sum(g.source == "vault" for g in gears) <= max_vault and sum(pool.is_tier(g) for g in gears) >= need_tier
+            and (not crafted or sum((g.item_id or 0) in crafted for g in gears) <= max_crafted))
+
+
+def refine(pool: GearPool, start: Combo, score, weights: dict[str, float], min_tier: int | None,
+           crafted: frozenset[int], log: Callable[[str], None] = print, rounds: int = 4) -> Combo:
+    """Pass 4: from the best set, every option of every slot (every candidate, not only the kept ones) swapped in
+    alone; the best swap beyond the noise taken, again, until none gains. The set it ends on, scored against what you
+    wear."""
+    fams = pool.families()
+    equipped = {f: pool.equipped_option(f) for f in fams}
+    need_tier = min(sum(pool.is_tier(g) for g in pool.equipped.values()), 4) if min_tier is None else min_tier
+    max_crafted = max(2, sum((g.item_id or 0) in crafted for g in pool.equipped.values()))
+    by_fam: dict[str, list[Gear]] = {}
+    for slot, g in pool.candidates:
+        by_fam.setdefault(family(slot), []).append(g)
+    current = Combo("refined", dict(start.options), dict(start.scores), dict(start.errors))
+    for k in range(rounds):
+        full = {f: current.options.get(f, equipped[f]) for f in fams}
+        tries = [current]
+        for f in fams:
+            for opt in pool.options_for(f, list(dict.fromkeys(by_fam.get(f, [])))):
+                if opt == full[f]:
+                    continue
+                cand = {**full, f: opt}
+                if not valid(pool, [g for o in cand.values() for g in o.gears()], need_tier, max_crafted, crafted):
+                    continue
+                diff = {x: o for x, o in cand.items() if o != equipped[x]}
+                if diff:
+                    tries.append(Combo(f"r{k}x{len(tries)}", diff))
+        log(f"Pass 4, round {k + 1}: {len(tries) - 1} swaps from the best set")
+        score(tries, 0.1, f"pass4-{k + 1}")
+        best = max(tries, key=lambda c: c.weighted(weights))
+        noise = 2 * max([*best.errors.values(), *current.errors.values(), 0.0])
+        if best is current or best.weighted(weights) <= current.weighted(weights) + noise:
+            break
+        current = Combo("refined", dict(best.options), dict(best.scores), dict(best.errors))
+    return current
 
 
 def format_result(r: TopGearResult, pool: GearPool, top: int = 10) -> str:

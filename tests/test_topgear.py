@@ -117,3 +117,22 @@ def test_a_dual_wielder_keeps_its_off_hand_weapon():
     p = GearPool(parse_simc_export(rogue), {5001: 13, 5002: 13, 5003: 13, 5004: 13}, SETS)  # every one a 1H weapon
     opts = p.options_for("weapon", [])
     assert all(dict(o.slots)["off_hand"] is not None for o in opts)  # the equipped dagger stays in the off hand
+
+
+def test_the_local_search_finds_a_swap_the_pruning_missed():
+    # the Gear tool's thorough mode (the owner, 2026-10-24): from the best set, every item swapped in alone
+    from paf.topgear import Combo, refine
+
+    pool = GearPool(parse_simc_export(EXPORT), {}, {})
+    gain = {2001: 0.4, 3003: 1.0}  # the helm the pruning kept, the ring it dropped
+
+    def score(cs, error, tag):
+        for c in cs:
+            ids = {g.item_id for o in c.options.values() for g in o.gears()}
+            c.scores["f"] = sum(v for i, v in gain.items() if i in ids)
+            c.errors["f"] = 0.05
+    helm = next(g for s, g in pool.candidates if g.item_id == 2001)
+    start = Combo("c1", {"head": pool.options_for("head", [helm])[1]}, {"f": 0.4}, {"f": 0.05})
+    out = refine(pool, start, score, {"f": 1.0}, 0, frozenset(), log=lambda m: None)
+    ids = {g.item_id for o in out.options.values() for g in o.gears()}
+    assert {2001, 3003} <= ids and out.scores["f"] == 1.4

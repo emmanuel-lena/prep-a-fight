@@ -5,6 +5,12 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 
 ## Unreleased
 
+- The Gear tool tries every crafted piece your spec can wear in every slot, each in every Thalassian Missive (the
+  stat pair read from the game data), and your own crafted pieces remade with each other missive: the item says
+  which missive to craft ("craft, Crit/Mastery", "recraft, Haste/Versatility").
+- The Gear tool's "Thorough" depth: more items kept per slot, up to 20,000 sets, the best ones simmed again at a fine
+  error, then every swap tried from the best set until none gains (up to an hour on a desktop).
+
 ## 0.8.25 (2026-10-24)
 
 - The fight tab shows the opener: every cast of the first 40 seconds in order, as SimulationCraft plays your plan,

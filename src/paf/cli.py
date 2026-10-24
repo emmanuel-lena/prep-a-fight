@@ -454,24 +454,37 @@ def cmd_gear(args: argparse.Namespace) -> int:
     pool = GearPool(profile, item_inventory_types(), item_sets())
     crafted = crafts.crafted_ids()
     names = item_names()
-    from collections import Counter
-
-    stats = Counter(m[1] for m in (re.search(r"crafted_stats=([\d/]+)", it.line) for it in profile.equipped.values())
-                    if m).most_common(1)  # the logs give no crafted stats: your own crafts' pair, said on the label
-    own_stats = stats[0][0] if stats else ""
-    for n, (slot, value, item, ilvl) in enumerate(crafts.candidates(rows, crafted)):
-        if not any(g.item_id == item and (g.ilvl or 0) >= (ilvl or 0)  # yours at that level already: no recraft
-                   for g in [*pool.equipped.values(), *(g for _s, g in pool.candidates)]):
-            value += f",crafted_stats={own_stats}" if own_stats else ""
+    def said(pair: tuple) -> str:  # "Crit/Mastery": the missive on the item's label
+        return "/".join(crafts.STAT_NAMES.get(x, str(x)) for x in pair)
+    for n, (slot, value, item, ilvl, pair) in enumerate(crafts.candidates(rows, crafted)):
+        if not any(g.item_id == item and (g.ilvl or 0) >= (ilvl or 0)  # yours at that level: its recrafts below
+                   for g in pool.equipped.values()):
             pool.candidates.append((slot, Gear(f"cr{n}", _with_enchant(value, profile.equipped.get(slot)),
                                                (names.get(item) or ("",))[0], ilvl or None,
-                                               "craft, your crafts' stats" if own_stats else "craft", item)))
+                                               "craft" + (f", {said(pair)}" if pair else ""), item)))
+    level = max([int(it.get("itemLevel") or 0) for r in rows for it in r.get("gear") or [] if it.get("id") in crafted]
+                + [it.ilvl or 0 for it in profile.equipped.values() if (it.item_id or 0) in crafted])
+    tried = {g.item_id for _s, g in pool.candidates} | {it.item_id for it in profile.equipped.values()}
+    for slot, item, name in crafts.craftable(profile.class_name, profile.spec, crafted) if level else []:
+        if item in tried:  # the top players' version or yours: already there, with its missives
+            continue
+        base = f",id={item},ilevel={level}"  # every other piece a profession makes, at the top craft level
+        for k, pair in enumerate(crafts.pairs() if not slot.startswith("trinket") else [()]):  # a trinket: no
+            pool.candidates.append((slot, Gear(f"ca{item}{k}", _with_enchant(  # missive
+                crafts.with_stats(base, pair) if pair else base, profile.equipped.get(slot)), name, level,
+                "craft" + (f", {said(pair)}" if pair else ""), item)))
+    for slot, it in profile.equipped.items():  # your crafted pieces remade with each other missive
+        for k, (value, pair) in enumerate(crafts.recrafts(it.line, crafted)):
+            pool.candidates.append((slot, Gear(f"rc{slot}{k}", value, it.name, it.ilvl, f"recraft, {said(pair)}",
+                                               it.item_id)))
     worn = profile_text
     if pool.candidates:
         print(f"== What to equip: Top Gear on your {len(pool.candidates)} items (crafts the top players wear "
               f"included)")
+        thorough = getattr(args, "thorough", False)
         res = run_topgear(profile_text, pool, fights, root / "equip", objective=args.objective,
-                          max_combos=args.max_combos, crafted=crafted)
+                          max_combos=max(args.max_combos, 20000) if thorough and args.max_combos == 1500 else
+                          args.max_combos, crafted=crafted, thorough=thorough)
         out["equip"] = results.topgear(res)
         best = res.best()
         if best is not None and best.weighted(weights) > 0:
@@ -2929,6 +2942,9 @@ def build_parser() -> argparse.ArgumentParser:
     ge.add_argument("--objective", type=_objective, default=0.0)
     ge.add_argument("--profile", help="simc profile (default: your character's)")
     ge.add_argument("--max-combos", type=int, default=1500)
+    ge.add_argument("--thorough", action="store_true",
+                    help="more items kept, 20000 sets, the best ones at a fine error, then a local search (up to an "
+                         "hour on a desktop)")
     ge.set_defaults(func=cmd_gear)
 
     ta = sub.add_parser("talents", help="sim the most common talent builds of the top players on your character")
