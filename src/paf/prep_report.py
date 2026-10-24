@@ -910,6 +910,12 @@ def _without_shares(text: str) -> str:
     return re.sub(r"^Pad them: it lacks", "Your raid lacks", out)  # the title says "pad" (round 45: said twice)
 
 
+# an add to kill as paf.actions says it: its name, how many a kill, how fast, the spec's share on it
+KILL_TEXT = re.compile(r"Kill the (?P<name>.+?) \((?:~(?P<n>\d+) per kill|once per kill)\): the top raids kill them "
+                       r"in ~(?P<life>\d+) s(?:; top .+? players put (?P<share>\d+)% of their damage on them while "
+                       r"they are up)?\.")
+
+
 def places(g: float, gains: list[float]) -> int:
     """Decimals for a gain: two when another gain rounds alike at one (never one figure copied: DPS rounds 13, 38)."""
     return 2 if any(f"{g:.1f}" == f"{x:.1f}" and abs(g - x) >= 0.005 for x in gains) else 1
@@ -1303,8 +1309,23 @@ def render(d: PrepData) -> str:
                             named.add(base)
                             ts = [_mmss(x) for x, c2, _l2, n2 in d.waves if c2 and n2 == n]
                             gates.append((n, f"Kill the {base} (at {', '.join(ts)})."))
+                parsed = [(a, m) for a in rows if kind == "kill" and (m := KILL_TEXT.fullmatch(a.text))]
+                if parsed:  # the adds as a table: how many, how fast the top raids kill them, your share on them
+                    # (fresh DPS review: bullet sentences)
+                    rows = [a for a in rows if a not in {x for x, _m in parsed}]
+                    blocks += (f"<h3>{e(title)}</h3><table class='kills fit'><thead><tr><th>Add</th>"
+                               "<th class='n'>a kill</th><th class='n' title='how long they live in the top kills'>"
+                               "&#9201; killed in</th><th title='the share of the top players&#39; damage on them while "
+                               "they are up'>your spec on them</th></tr></thead><tbody>" + "".join(
+                                   f"<tr><td>{icons.img(d.icons.get(a.name, '') or _sfallback(d, a.name), 'small')}"
+                                   f"{e(m['name'])}</td><td class='n'>&times;{m['n'] or 1}</td><td class='n'>"
+                                   f"{m['life']} s</td><td>" + (
+                                       f"<span class='kbar'><span style='width:{m['share']}%'></span></span> "
+                                       f"{m['share']}%" if m['share'] else "") + "</td></tr>"
+                                   for a, m in parsed) + "</tbody></table>")
+                    title = ""  # the list below, if any, goes under the same heading
                 if rows or gates:
-                    blocks += (f"<h3>{e(title)}</h3><ul>" + "".join(
+                    blocks += ((f"<h3>{e(title)}</h3>" if title else "") + "<ul>" + "".join(
                         f"<li>{icons.img(_sfallback(d, n), 'small')}{e(t)}</li>" for n, t in gates) + "".join(
                         f"<li>{icons.img(d.icons.get(a.name, '') or _sfallback(d, a.name), 'small')}{e(a.text)}</li>" for a in rows) + "</ul>")
             tabs["boss"].insert(0, "<h2>What the top players do, from their logs</h2><div class='card guide'>"

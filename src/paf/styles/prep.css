@@ -118,3 +118,4 @@ ul.grp{list-style:none;padding:0} ul.grp>li{display:grid;grid-template-columns:1
 ul.grp>li>b{grid-row:span 1} ul.grp .chip{margin:0 6px 4px 0}
 ul.grp>li>b{padding-top:9px} /* centred on the first chip row: a chip is 38 px, the label 21 (measured) */
 ul.grp .plain{display:block;padding-top:9px} /* a text row on its label's line, as the chip rows */
+.kbar{display:inline-block;width:70px;height:6px;border-radius:3px;background:color-mix(in srgb,var(--fg) 12%,transparent);vertical-align:middle;overflow:hidden} .kbar>span{display:block;height:100%;background:var(--fg);opacity:.55} table.kills td{padding:4px 14px 4px 0}
