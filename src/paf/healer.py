@@ -3047,7 +3047,7 @@ def render_sheet(h: HealerPrep) -> str:
                              "named after the boss cast just before it (&quot;after X&quot;: 8 to 30 s before, "
                              "matched by timing)") + "'>&#9679; a big hit</span></p><ul class='hl2'>"
         f"{'' if h.moments else '<li>No big moment: steady raid damage.</li>'}</ul></div>",
-        f"<h2>Your long cooldowns, where the top {e(h.spec)}s press them</h2><ul class='hl2'>"
+        f"<h2>Your long cooldowns, where the top players press them</h2><ul class='hl2'>"
         f"{cooldowns_html(sorted((c for c in heals if _external(c.spell_id) != 'protective'), key=_rank(lead_names)), answered, named, moved) or '<li>Not enough top players in the corpus yet.</li>'}"
         f"{rare_html(rare, answered, named)}</ul>"]  # a cooldown the top players skip is information too
     exts = [c for c in heals if _external(c.spell_id) == "protective"]
@@ -3055,7 +3055,7 @@ def render_sheet(h: HealerPrep) -> str:
     # Power Infusion: said where it is, as a pill (round 34: "fewer than half cast one" read as PI's absence)
     if exts or rare_ext:  # cast on another player: their own group, apart from the raid cooldowns; one form at
         # any share (round 98: Time Dilation 50% a card, 48% a line; heal round 10: still two forms)
-        fight.append(f"<h2>Your externals{f', where the top {e(h.spec)}s cast them' if any(c.times for c in exts) else ''}"
+        fight.append(f"<h2>Your externals{', where the top players cast them' if any(c.times for c in exts) else ''}"
                      f"</h2><ul class='hl2'>"
                      f"{cooldowns_html(exts, answered, named)}{rare_html(rare_ext, answered, named)}</ul>"
                      .replace("</h2>", "".join(f" <span class='pill'>{e(_shown(c.name))}: with your cooldowns above"
@@ -3083,7 +3083,7 @@ def render_sheet(h: HealerPrep) -> str:
         change.append(split_html(h.split, h.split_players, h.spec, h.split_wide, getattr(h, "talent_icons", None),
                                  getattr(h, "split_marks", None)))
     trk = trinkets_html(h.trinkets, getattr(h, "item_icons", None)) or "<li>No gear yet.</li>"
-    change.append(f"<h2>Trinkets the top {e(h.spec)}s equip</h2><ul class='hl2 bars'>{trk}</ul>"
+    change.append(f"<h2>Trinkets the top players equip</h2><ul class='hl2 bars'>{trk}</ul>"
                   f"<p class='small muted'>"
                   f"To weigh a talent or an item for your character, use <a href=\"{QE_LIVE}\" target=\"_blank\" "
                   f"rel=\"noopener\">QE Live</a>.</p>")
@@ -3108,7 +3108,7 @@ def render_sheet(h: HealerPrep) -> str:
     if h.dispelled and (len(h.dispelled) > 1 or h.dispelled[0][1] < 1):  # the others than the lead's job, measured
         inside = set(re.findall(r'<b>([^<]+)</b>', h.abilities))  # the abilities the journal lists below
         said = h.dispelled[0][1] >= 1  # the lead's note says how it is counted (heal round 11: said twice)
-        boss.append(f"<h2>{'What else' if said else 'What'} the top {e(h.spec)}s dispel here</h2><p class='dispels'>"
+        boss.append(f"<h2>{'What else' if said else 'What'} the top players dispel here</h2><p class='dispels'>"
                     + "".join(f"<span class='chip'><b>{e(n)}</b> &middot; {k:.1f} a kill"
                               + ("" if n in inside else " &middot; <small>not in the Encounter Journal</small>")
                               + "</span>" for n, k in (h.dispelled[1:] if said else h.dispelled)) + "</p>"  # the
@@ -3174,7 +3174,7 @@ def render_sheet(h: HealerPrep) -> str:
             line = f"{_pct(have.share)} of the top kills bring a {e(h.spec)} ({have.per_kill:.1f} a kill when they do)."
         else:
             line = f"Few top raids bring a {e(h.spec)} on this boss."
-        deeper_first.append(f"<h2>Healers in the top {e(h.spec)}s' kills</h2><p>{line} In the {n_kills} top kills read for "
+        deeper_first.append(f"<h2>Healers in the top players' kills</h2><p>{line} In the {n_kills} top kills read for "
                       f"their healing"  # the casts' 100 said under "Where the numbers come from" (round 77)
                       + (f" (median {_mmss(h.own_median)}" if h.own_median else "")
                       + (f", {'slower' if h.own_median > h.duration else 'faster'} than the {h.kills} top kills' "

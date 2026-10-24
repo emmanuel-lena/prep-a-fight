@@ -702,7 +702,7 @@ def render_sheet(p: TankPrep) -> str:
         + marks + "A dot: one of "
         f"the tanks' three biggest moments, whatever casts it (another as high may be left out).</p><ul class='hl2'>"
         f"{'' if p.moments else '<li>No big moment: steady damage.</li>'}</ul></div>",
-        f"<h2>Your defensives, where the top {e(p.spec)}s press them</h2><ul class='hl2'>"
+        f"<h2>Your defensives, where the top players press them</h2><ul class='hl2'>"
         f"{nouned(cooldowns_html(defs, answered, named, moved_t)) or '<li>No defensive most top tanks share: they spread them.</li>'}"
         f"{nouned(rare_html(p.rare, answered, named))}</ul>",  # the same rows as the others (heal round 10)
         f"<h2>Active mitigation and short defensives the top tanks use</h2><ul class='hl2'>"
@@ -725,7 +725,7 @@ def render_sheet(p: TankPrep) -> str:
               split_html(p.split, p.split_players, p.spec, p.split_wide, getattr(p, "talent_icons", None),
                          getattr(p, "split_marks", None))
               if p.split else "",
-              f"<h2>Trinkets the top {e(p.spec)}s equip</h2><ul class='hl2 bars'>"
+              f"<h2>Trinkets the top players equip</h2><ul class='hl2 bars'>"
               f"{trinkets_html(p.trinkets, getattr(p, 'item_icons', None)) or '<li>No gear yet.</li>'}</ul>",
               ]  # the lead says no sim weighs them
     top_share = max((s_ for _n, s_ in p.hitters), default=1.0) or 1.0
