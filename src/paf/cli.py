@@ -434,12 +434,44 @@ def cmd_gear(args: argparse.Namespace) -> int:
     root = simc.new_run_dir(label="gear")
     print(f"{profile.name} ({origin}); fights: {', '.join(f.name for f in fights)}")
     out: dict = {"fights": [f.name for f in fights]}
+    from paf import crafts, enchants
+    from paf.profile import wcl_class_spec
+    from paf.topgear import Gear, _with_enchant
+
+    client = WCLClient()
+    encs = [find_encounter(client, b) for b in args.boss] if args.boss else raid_encounters(client)
+    if not args.boss:
+        zone = max(x.zone_id for x in encs)
+        encs = [x for x in encs if x.zone_id == zone]
+    cs = wcl_class_spec(profile)
+    rows: list[dict] = []
+    if cs and encs:  # the top players of your spec: their crafted pieces, enchants and gems are the candidates
+        try:
+            rows = enchants.tops_rows(client, encs[0].id, settings.DIFFICULTIES.get(
+                args.difficulty or settings.get("difficulty"), 4), *cs)
+        except Exception as ex:  # noqa: BLE001 - your own items still make a set
+            print(f"  the top players' gear could not be read: {str(ex)[:120]}")
     pool = GearPool(profile, item_inventory_types(), item_sets())
+    crafted = crafts.crafted_ids()
+    names = item_names()
+    from collections import Counter
+
+    stats = Counter(m[1] for m in (re.search(r"crafted_stats=([\d/]+)", it.line) for it in profile.equipped.values())
+                    if m).most_common(1)  # the logs give no crafted stats: your own crafts' pair, said on the label
+    own_stats = stats[0][0] if stats else ""
+    for n, (slot, value, item, ilvl) in enumerate(crafts.candidates(rows, crafted)):
+        if not any(g.item_id == item and (g.ilvl or 0) >= (ilvl or 0)  # yours at that level already: no recraft
+                   for g in [*pool.equipped.values(), *(g for _s, g in pool.candidates)]):
+            value += f",crafted_stats={own_stats}" if own_stats else ""
+            pool.candidates.append((slot, Gear(f"cr{n}", _with_enchant(value, profile.equipped.get(slot)),
+                                               (names.get(item) or ("",))[0], ilvl or None,
+                                               "craft, your crafts' stats" if own_stats else "craft", item)))
     worn = profile_text
     if pool.candidates:
-        print(f"== What to equip: Top Gear on your {len(pool.candidates)} items")
+        print(f"== What to equip: Top Gear on your {len(pool.candidates)} items (crafts the top players wear "
+              f"included)")
         res = run_topgear(profile_text, pool, fights, root / "equip", objective=args.objective,
-                          max_combos=args.max_combos)
+                          max_combos=args.max_combos, crafted=crafted)
         out["equip"] = results.topgear(res)
         best = res.best()
         if best is not None and best.weighted(weights) > 0:
@@ -447,19 +479,8 @@ def cmd_gear(args: argparse.Namespace) -> int:
             (root / "best_set.simc").write_text(best_set_simc(pool, best), encoding="utf-8")
     else:
         print("No items in bags or vault: export /simc with its bags to see what to equip.")
-    client = WCLClient()
-    encs = [find_encounter(client, b) for b in args.boss] if args.boss else raid_encounters(client)
-    if not args.boss:
-        zone = max(x.zone_id for x in encs)
-        encs = [x for x in encs if x.zone_id == zone]
-    from paf import enchants
-    from paf.profile import wcl_class_spec
-
-    cs = wcl_class_spec(profile)
-    if cs and encs:  # enchants and gems: what the top players of your spec wear, simmed on your set
-        diff_name = args.difficulty or settings.get("difficulty")
+    if rows:  # enchants and gems: what the top players of your spec wear, simmed on your set
         try:
-            rows = enchants.tops_rows(client, encs[0].id, settings.DIFFICULTIES.get(diff_name, 4), *cs)
             choices, unique = enchants.candidates(rows), enchants.unique_gems(rows)
             if choices:
                 print(f"== Enchants and gems: {len(choices)} the top {cs[1]} players wear")

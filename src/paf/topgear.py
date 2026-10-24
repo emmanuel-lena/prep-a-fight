@@ -216,12 +216,15 @@ def select_kept(pool: GearPool, pass1: dict[str, dict[str, float]], weights: dic
 
 
 def build_combos(pool: GearPool, kept: dict[str, list[Gear]], min_tier: int | None = None,
-                 max_vault: int = 1, max_combos: int = 1500) -> list[Combo]:
+                 max_vault: int = 1, max_combos: int = 1500, crafted: frozenset[int] = frozenset()) -> list[Combo]:
+    """crafted: the items professions make; a set holds two embellished pieces at most, so two crafted items at most
+    (or as many as you wear now: a set of yours is never ruled out)."""
     fams = pool.families()
     per_fam = {f: pool.options_for(f, kept.get(f, [])) for f in fams}
     equipped = {f: pool.equipped_option(f) for f in fams}
     eq_tier = sum(pool.is_tier(g) for g in pool.equipped.values())
     need_tier = min(eq_tier, 4) if min_tier is None else min_tier
+    max_crafted = max(2, sum((g.item_id or 0) in crafted for g in pool.equipped.values()))
     total = 1
     for opts in per_fam.values():
         total *= len(opts)
@@ -233,6 +236,8 @@ def build_combos(pool: GearPool, kept: dict[str, list[Gear]], min_tier: int | No
         if sum(g.source == "vault" for g in gears) > max_vault:
             continue
         if sum(pool.is_tier(g) for g in gears) < need_tier:
+            continue
+        if crafted and sum((g.item_id or 0) in crafted for g in gears) > max_crafted:
             continue
         diff = {o.fam: o for o in choice if o != equipped[o.fam]}
         if not diff:
@@ -268,7 +273,8 @@ def score_of(res: simc.SimResult, ps: simc.ProfilesetResult, objective: float) -
 def run_topgear(profile_text: str, pool: GearPool, fights: list[FightProfile], run_dir: Path, *,
                 pass1_error: float = 0.3, pass2_error: float = 0.15, keep: dict[str, int] | None = None,
                 prune_below: float = -0.5, min_tier: int | None = None, max_combos: int = 1500,
-                objective: float = 0.0, log: Callable[[str], None] = print) -> TopGearResult:
+                objective: float = 0.0, log: Callable[[str], None] = print,
+                crafted: frozenset[int] = frozenset()) -> TopGearResult:
     keep = keep or {"armor": 2, "finger": 3, "trinket": 3, "weapon": 3}
     weights = {f.name: f.weight for f in fights}
     swaps = pool.single_swaps()
@@ -306,9 +312,9 @@ def run_topgear(profile_text: str, pool: GearPool, fights: list[FightProfile], r
 
     while raw_count() > max_combos * 20 and shrink():
         pass
-    combos = build_combos(pool, kept, min_tier=min_tier, max_combos=max_combos)
+    combos = build_combos(pool, kept, min_tier=min_tier, max_combos=max_combos, crafted=crafted)
     while len(combos) > max_combos and shrink():
-        combos = build_combos(pool, kept, min_tier=min_tier, max_combos=max_combos)
+        combos = build_combos(pool, kept, min_tier=min_tier, max_combos=max_combos, crafted=crafted)
     log("  kept: " + "; ".join(f"{f}: {len(g)}" for f, g in kept.items() if g))
     log(f"Pass 2: {len(combos)} combinations x {len(fights)} fight(s)")
     for fp in fights:
