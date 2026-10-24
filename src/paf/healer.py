@@ -396,7 +396,8 @@ def moment_notes(found: list[Moment], staged: bool = False) -> dict[str, str]:
     for m in found:
         for n in moment_names(m):
             at.setdefault(n, []).append(m.t)
-    clock = " (measured, in stage time as the fight tab)" if staged else " (measured)"  # the boss tab's own times
+    clock = " (stage time)" if staged else ""  # the boss tab's own times; the pull times beside it (round 49: the
+    # clock note twice a tab)
     return {n: "big raid damage at " + _and([_mmss(t) for t in ts]) + clock for n, ts in at.items()}  # are pull time
     # (round 101: "around 0:34, 1:10, 3:55 · big raid damage at 0:35, 3:50 and 4:15" on two clocks, unsaid)
 
@@ -2135,8 +2136,7 @@ def talents_html(builds: list, players: int, who: str, hero: list | None = None)
     """The hero tree the top players pick (the first choice), then their builds played by enough of them."""
     line = ""
     if hero:
-        line = (f"<p><b>Hero tree:</b> {e(hero[0][0])} (all {players} players read).</p>" if len(hero) == 1 else
-                "<ul class='hl2 split'>" + _pair(" / ".join(f"{t} {round(sh * 100)}%" for t, sh in hero[:2]))  # the
+        line = ("<ul class='hl2 split'>"  # one tree too: its bar, as the sheets with two (heal round 49: text) + _pair(" / ".join(f"{t} {round(sh * 100)}%" for t, sh in hero[:2]))  # the
                 .replace("<li class='pair'><span>", "<li class='pair hero'><span><small>Hero tree</small> ", 1)  # choice
                 + "</ul>")  # rows' stacked bar (heal round 16: plain text), with no half tick (round 17)
     if builds and builds[0][0] < BUILD_SHARE * players:  # 3 of 100 is no build to show, empty row and all
