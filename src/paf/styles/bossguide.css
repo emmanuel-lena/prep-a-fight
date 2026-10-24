@@ -33,3 +33,5 @@
 .abg:has(>.unit){border-left:0;padding-left:0;margin-left:0}
 .unit{font:600 15px/1.3 var(--font-reading);text-transform:none;letter-spacing:0;color:var(--fg);padding:12px 0 2px}
 .ab>.small.muted{font-size:13px;font-variant-numeric:tabular-nums}
+.ab:not(:has(>div+div)){padding:3px 0;border-top:0} /* a name alone: a tight line, not a full row's space */
+.stage:not(:has(h3)):not(:has(.ab-d)):not(:has(.ab>div+div)){margin-bottom:4px} .stage:not(:has(h3)):not(:has(.ab-d)):not(:has(.ab>div+div))>.abg{margin-bottom:0} /* an ability alone, its name only: one tight line */
