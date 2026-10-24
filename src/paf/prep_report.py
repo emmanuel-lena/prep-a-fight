@@ -1598,8 +1598,9 @@ than the coverage means they hold the cooldown.{burst_note}</p>
                        f"<td class='n'>{_pct(v, err=d.loot_error)}</td></tr>" for i, s, v, real in d.loot[:12])
         tabs["gear"].append(f"""<h2>What this boss drops, for you</h2><div class="card scroll">
 {'<p class="notice small">Nothing this boss drops is an upgrade for you at item level ' + str(d.loot_ilvl) + ': every value below is a loss vs what you already have.</p>' if all((real if real is not None else v) <= 0 for _, _, v, real in d.loot) else ''}
-<table><tr><th>Item</th><th>Slot</th><th class="n" title="The item inserted in your best Top Gear sets, the rest of your
-gear rearranged around it: its real value">In your best sets</th><th class="n" title="The classic droptimizer value, on your
+<table><tr><th>Item</th><th>Slot</th><th class="n" title="vs your best set without it: the item inserted in your best
+Top Gear sets, the rest rearranged around it (its real value; below a single swap when your best set already beats what you
+wear)">In your best sets</th><th class="n" title="vs the gear you wear: the classic droptimizer value, one swap on your
 equipped set">Single swap</th></tr>{body}</table>
 <p class="small muted">At item level {d.loot_ilvl}{_track_top(d)}; statistical error about &plusmn;{d.loot_error:.2f}%.</p></div>""")
 
