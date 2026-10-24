@@ -137,3 +137,15 @@ def test_a_plan_not_played_keeps_its_own_notes_on_its_card():
     d.mrt = {"total": "prep-a-fight: Vashnik, cooldowns for total damage (pad) (+0.6%)\n{time:1:48} Potion"}
     page = render(d)
     assert "{time:1:48} Potion" in page and "{time:0:02} Potion" not in page.split("not played")[1]
+
+
+def test_a_mechanics_times_find_its_name_in_a_wowhead_link():
+    """Round 37: the boss tab's 'around' times of the mechanics were lost once the names became Wowhead links."""
+    from types import SimpleNamespace
+
+    from paf.prep_report import mech_around
+
+    html = ('<div class="ab"><div><b><a class="wh" href="x">Essence Rend</a></b> </div>'
+            "<div class='small muted'>11 players hit per kill</div></div>")
+    d = SimpleNamespace(boss_casts=[], mech_times={"Essence Rend": [20.0, 60.0]})
+    assert "around 0:20, 1:00" in mech_around(html, d)

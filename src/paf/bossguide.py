@@ -236,7 +236,8 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
         facts.append(f"<b>burst window: the boss takes x{ctx['burst'][s.title.lower()]:g} damage</b>")
     # the journal's words only on what the journal flags for your role (or hits you too); the rest: its name, icon,
     # tags and times, the name a Wowhead link to read it (the owner, 2026-10-24: less prose)
-    told = (not ctx["role"] or ctx["role"] in s.flags or s.title in ctx["also"]
+    can_be_you = m is not None and m.kind != "interrupt" and m.players_per_kill > 0  # it lands on players: you too
+    told = (not ctx["role"] or ctx["role"] in s.flags or s.title in ctx["also"] or can_be_you
             or (ctx["role"] == "healer" and bool(DISPEL & set(s.flags))))  # a healer's dispels (review 36: Essence
     # Rend, the boss tab's headline, a bare name); what the role's summary names: a tag, its words being the
     # summary's (round 37: the same sentences in both columns)

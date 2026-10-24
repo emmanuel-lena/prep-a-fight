@@ -2186,7 +2186,12 @@ def _boss_guide(d, con, enc, diff: int, diff_name: str, spec: str, tl, fight, pk
     d.role_bullets = bossguide.role_bullets(sections, "damage")
     d.ability_roles = bossguide.ability_roles(sections)
     if pk is not None:
-        d.actions = pk.actions
+        from dataclasses import replace as _with
+
+        # a pack's words as the prep writes them now (round 37: a week-old pack kept "Tick it on the boss page")
+        d.actions = [_with(a, text=a.text.replace(" Tick it on the boss page if it is yours.",
+                                                  " If it is yours, tick it in the app (the boss's prep page)."))
+                     for a in pk.actions]
     else:
         _corpus_actions(d, con, enc, diff, spec, sections, mechs)
     d.guide_abilities = bossguide.abilities_html(sections, timings=dict(tl.boss_casts), mechanics=mechs,

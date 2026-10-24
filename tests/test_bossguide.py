@@ -150,3 +150,14 @@ def test_a_healers_dispels_are_told_what_their_summary_names_tagged():
     # the dispel told; what the healers' summary names: their tag, its words being the summary's (round 37)
     assert "A magic curse on a player." in a and ">magic<" in a and "Froth." not in a
     assert "The boss drinks." not in a and "<b>Imbibe</b> <span class=\"pill\">healer</span>" in a
+
+
+def test_a_mechanic_that_lands_on_players_is_told():
+    """Round 37: Exploding Infection (9 players a kill) lost its words with decision 1; it can be you."""
+    class Mech:
+        name, kind, players_per_kill, cost = "Exploding Infection", "debuff", 9.0, 0.0
+    stage = sec(4, "Stage One", "stage", children=[
+        sec(5, "Exploding Infection", "ability", "Erupts on nearby players.", ["magic"]),
+        sec(6, "Plague Froth", "ability", "Froth.")])
+    a = abilities_html([stage], role="damage", mechanics=[Mech()])
+    assert "Erupts on nearby players." in a and "Froth." not in a

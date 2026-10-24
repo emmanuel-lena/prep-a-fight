@@ -332,8 +332,8 @@ def comp(d: dict) -> str:
         if t["proposed"]:
             block += f"<p class='lab go'>Put them on it</p><div class='whos'>{names(t['proposed'])}</div>"
         if t["pulled"]:
-            block += (f"<details class='more' open><summary>On it in your pull ({len(t['pulled'])})</summary>"
-                      f"<div class='whos'>{names(t['pulled'])}</div></details>")
+            block += (f"<p class='lab'>On it in your pull ({len(t['pulled'])})</p>"  # a heading, not a fold
+                      f"<div class='whos'>{names(t['pulled'])}</div>")
         if t["missed"]:
             both = {p["name"] for p in t["missed"]} & {p["name"] for p in t["proposed"] or []}
             block += (f"<p class='lab warn'>Hardly hit it in your pull{' (some of those put on it above)' if both else ''}"

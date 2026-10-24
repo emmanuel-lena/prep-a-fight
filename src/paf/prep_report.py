@@ -960,7 +960,7 @@ def mech_around(html: str, d: PrepData) -> str:
         if name in casts or not ts:
             continue
         times = ", ".join(_mmss(t) for t in ts)
-        html = re.sub(rf"(<b>{re.escape(e(name))}</b>[^<]*(?:<span[^>]*>[^<]*</span>[^<]*)*</div>)(?!<div class='small muted'>around)",
+        html = re.sub(rf"(<b>(?:<a [^>]*>)?{re.escape(e(name))}(?:</a>)?</b>[^<]*(?:<span[^>]*>[^<]*</span>[^<]*)*</div>)(?!<div class='small muted'>around)",
                       lambda m, times=times: m.group(1) + f"<div class='small muted'>around {times}</div>", html)
     return html
 
@@ -1371,7 +1371,8 @@ and the gear for that.</p></div>""")
             add = [t for t in dict.fromkeys(r.add) if t not in both]
             drop = [t for t in dict.fromkeys(r.drop) if t not in both]
             free = utility(add + drop, d.class_name, d.spec) if add or drop else set()  # buttons the rotation never
-            choice = [t for t in add + drop if t in free]  # presses: apart, grey, the player's (the owner, 2026-10-24)
+            choice = [f"+ {e(t)}" for t in add if t in free] + [f"&minus; {e(t)}" for t in drop if t in free]  # presses:
+            # apart, grey, the player's, each with its sign (the owner, 2026-10-24; round 37)
             add, drop = [t for t in add if t not in free], [t for t in drop if t not in free]
             diff = "<span class='muted'>only ranks or a choice node differ from yours</span>"
             if len(add) + len(drop) > OTHER_BUILD:  # another build altogether: one badge, not 40 names (the owner,
@@ -1382,7 +1383,7 @@ and the gear for that.</p></div>""")
                         f"<span class='minus'>&minus;</span> <span class='muted'>{e(', '.join(drop) or '-')}</span>")
             if choice and len(add) + len(drop) <= OTHER_BUILD:
                 diff = ("" if diff.endswith("from yours</span>") and not (add or drop) else diff + "<br>") + (
-                    f"<span class='muted'>your choice: {e(', '.join(choice))}</span>")
+                    "<span class='muted'>your choice: " + ", ".join(choice) + "</span>")  # each name escaped above
             body += (f"<tr><td>{e(r.build.label)}<br><span class='small muted'>{r.build.count} players, median rank "
                      f"{r.build.median_rank:.0f}</span></td>{cells}<td class='small'>{diff}</td></tr>")
         best_g = max((((r.per_fight.get(first, (0.0, None))[0] or 0.0), r.build.label) for r in tc.rows),

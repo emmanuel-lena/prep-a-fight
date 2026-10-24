@@ -135,7 +135,8 @@ def swaps_html(d, swaps: list) -> str:
         return (f"<div class='sw-strip {cls}'><span class='sw-lab'>{word}</span>"
                 + "".join(_talent(d, t) for t in ts) + "</div>") if ts else ""
     choice = ("<div class='sw-strip free'><span class='sw-lab'>Your choice</span>"
-              + "".join(f"<span class='sw-sign'>{sign}</span>{_talent(d, t)}" for sign, t in mine) + "</div>"
+              + "".join(f"<span class='sw-one'><span class='sw-sign'>{sign}</span>{_talent(d, t)}</span>"
+                        for sign, t in mine) + "</div>"  # a sign and its talent on one chip (round 37: a column)
               if mine else "")
     return f"<li class='sw-list'>{strip('+ Take', 'take', take)}{strip('&minus; Drop', 'drop', drop)}{choice}</li>"
 
