@@ -102,7 +102,7 @@ def test_the_strip_says_what_each_boss_asks():
     x = SimpleNamespace(id=7, name="Vashnik")
     sh = {"targets": [{"players": ["A", "B"]}, {"players": []}], "builds": [{}, {}, {}]}
     cell = raidlead._strip_cell(x, sh)
-    assert "href='#boss-7'" in cell and "2 on adds" in cell and "3 players to change talents" in cell
+    assert "href='#boss-7'" in cell and "2</b> on adds" in cell and "3</b> to change talents" in cell
     assert "nothing to change" in raidlead._strip_cell(x, {"targets": [], "builds": []})
     assert "no kills read" in raidlead._strip_cell(x, None)
     # no spec with a pad/boss build on this boss (Coiled Altar): nothing compared, never "nothing to change"

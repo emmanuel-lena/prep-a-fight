@@ -233,7 +233,8 @@ def _ability(s: Section, depth: int, ctx: dict) -> str:
     # named by the role's summary (its subject or in passing) and not kept for another reason: its words are the
     # summary's, so a marker says where, never the words twice, never a bare name (rounds 37-40)
     summed = (s.title in ctx["mentioned"] and s.title not in ctx["also"] and not dispel
-              and not (can_be_you and s.title not in ctx["named"]))
+              and (s.title in ctx["named"] or not (can_be_you or ctx["role"] in s.flags)))  # in passing, its own
+    # words say what the line does not (round 41: Toxic Vapor's stacking damage, a healer's)
     tags = "".join(f'<span class="pill {"warn" if f in ("deadly", "interruptible") else ""}">{SHOWN_FLAGS[f]}'  # too
                    + (" &middot; raid too" if f == "tank" and raid else "") + "</span>"  # (round 112: Possession
                    for f in s.flags if f in SHOWN_FLAGS  # Barrage tagged "tank", three of the four raid hits)

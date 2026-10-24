@@ -175,5 +175,5 @@ def test_an_ability_the_summary_names_in_passing_is_marked_not_told_twice():
         sec(5, "Sanguineous Fortitude", "ability", "Fortified as it emerges.", ["damage"]),
         sec(6, "Malignant Burst", "ability", "Bursts on all players.", ["deadly"])])
     a = abilities_html([over, stage], role="damage")
-    assert "Fortified" not in a and "Bursts on all" not in a and a.count("&uarr; for you") == 2
-    assert ">dps<" not in a  # one marker, not the role's flag too
+    # flagged for the role and named in passing: its own words say more than the line (round 41: Toxic Vapor)
+    assert "Fortified" in a and ">dps<" in a and "Bursts on all" not in a and a.count("&uarr; for you") == 1

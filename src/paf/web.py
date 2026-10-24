@@ -601,7 +601,7 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
             f"<tbody>{rows}</tbody></table></div><p class='mx-legend'>"
             + " ".join(diff_pill(k) for k in ("normal", "heroic", "mythic") if any(i["difficulty"] == k for i in items))
             + (" <span class='pill diff mx nosim'>no sim yet</span>" if any("prep" not in i["files"] for i in items)
-               else "") + (" <span class='pill diff mx'>&#10003; today</span>"
+               else "") + (" <span class='pill diff mx chk'>&#10003; today</span>"
                            if any(short_ago(i["mtime"]) == "today" for i in items) else "")
             + " <span class='pill diff mx old'>to redo</span></p>")  # only the marks present
 

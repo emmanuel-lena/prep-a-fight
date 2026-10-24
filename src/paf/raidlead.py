@@ -315,7 +315,8 @@ def _talents_h4(sh: dict, total: int, said: int = -1) -> str:
                      "healers</span>")  # short, nine times a page (fresh app review: the page grew)
     if unread_:
         parts.append(f"<span class='rl-unread'>{len(unread_)} not read: {e(', '.join(unread_))}</span>")
-    return f"<h4>Talents to change {''.join(parts)}</h4>"
+    head = "Talents to change" if changing or unread_ else "Talents"  # nothing to change: the badge says it alone
+    return f"<h4>{head} {''.join(parts)}</h4>"
 
 
 NO_BUILD = "no pad/boss build"  # one phrase wherever nothing is compared (fresh app review 6)
@@ -332,8 +333,8 @@ def _strip_cell(x, sh, total: int = 0, difficulty: str = "heroic") -> str:
         adds = sum(len(t["players"]) for t in sh["targets"])
         n = len(sh["builds"])  # players, not talents (fresh app review 6: "4 talent changes" for 2 players' 6)
         nobuild = bool(total) and sh.get("no_split", 0) >= total  # nothing compared: said as the card says it
-        say = (f"<span class='rl-sv'>{adds} on adds</span>" if adds else "") + (
-            f"<span class='rl-sv'>{n} {'player' if n == 1 else 'players'} to change talents</span>" if n else "") + (
+        say = (f"<span class='rl-sv'><b class='rl-num'>{adds}</b> on adds</span>" if adds else "") + (  # the numbers
+            f"<span class='rl-sv'><b class='rl-num'>{n}</b> to change talents</span>" if n else "") + (  # big
             f"<span class='rl-sv none'>{NO_BUILD}</span>" if nobuild else "") or (
             "<span class='rl-sv ok'>&#10003; nothing to change</span>")
     img = (f"<img src='/bossimg/{x.id}.png' alt='' loading='eager' onerror=\"this.remove()\">")
