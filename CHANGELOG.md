@@ -11,10 +11,9 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
   main stat), against you as you are; the top players' set at 334 stays on the tile's hover as the ceiling. (#35)
 - New "Gear" tool, in the side bar: paste a /simc (or use your character), pick a fight (a training dummy with 1 to 8
   targets and 3, 5 or 7 minutes, or a boss you prepared: its real fight), and it tells you what to equip from your
-  bags and vault (and the crafted pieces the top players of your spec wear, with your crafts' stats), the enchants
-  and gems they wear simmed on that set, then which drops of
-  that boss (or the whole raid) to farm, ranked by their gain on top of it. Top Gear gets the same dummy options
-  and the paste box.
+  bags and vault (with the crafted pieces the top players of your spec wear, at your crafts' stats), which of the
+  enchants and gems they wear to change, then which drops of that boss (or the whole raid) to farm, ranked by their
+  gain on top of that set. Top Gear gets the same dummy options and the paste box.
 - When Warcraft Logs is down, a prep no longer waits out every retry on each kill (it once took 55 min for one
   step): it stops that step with one line and reads the rest on a later prep. (#36)
 - When the hour's Warcraft Logs quota runs out, the optional steps (who handles each mechanic, the raids' Bloodlust)
