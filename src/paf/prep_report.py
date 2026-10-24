@@ -829,8 +829,11 @@ def defensives_html(d: PrepData) -> str:
                     f"<span class='muted small'>{s:.0%}</span>" for n, sid, s in m.spells)
         + f"</td><td>{link(m.boss_ability, f'spell={m.boss_spell_id}') + cast_note(m) if m.boss_ability else untied(m)}"
         + "</td></tr>" for m in df.moments)
-    table = (f"<div class='scroll'><table><tr><th>When</th><th>Top players</th><th>Defensive</th><th>The boss "
-             f"ability it answers</th></tr>{rows}</table></div>") if df.moments else (
+    method = (f"When the top players of your spec press one ({df.kills} kills); the fight tab calls the moments where "
+              f"{fightview_support():.0%} or more of them press one")
+    answers = "cast within about 10 s, or long before for damage that lands later"
+    table = (f"<div class='scroll'><table><tr><th>When</th><th title='{e(method)}'>Top players</th><th>Defensive</th>"
+             f"<th title='{answers}'>The boss ability it answers</th></tr>{rows}</table></div>") if df.moments else (
         "<p class='small'>The top players do not press their defensives at one shared moment on this boss: use them "
         "when you take damage.</p>")
     usage = "".join(f"<span class='chip{' rare' if per < 0.2 else ''}'>{icons.img(d.icons.get(n, ''), 'small')}"
@@ -840,10 +843,7 @@ def defensives_html(d: PrepData) -> str:
             + (f"<div class='small chips'><span class='muted'>Used{'' if df.moments else f', {df.kills} ranked kills'}:"
                f"</span><span>{usage}</span></div>" if usage
                else "")  # the label its own column, the chips wrapping beside it (DPS confirm round 14)
-            + (f"<p class='small muted'>When the top players of your spec press one ({df.kills} kills) and the boss "
-               "ability it answers (cast within about 10 s, or long before for damage that lands later); the fight tab "
-               f"calls the moments where {fightview_support():.0%} or more of them press one.</p>" if df.moments else
-               "") + "</div>")  # no table: no columns told, the source in the chips' label (DPS confirm round 15)
+            + "</div>")  # the table's method on its header (DPS rounds 36-40: three lines under it)  # no table: no columns told, the source in the chips' label (DPS confirm round 15)
 
 
 def _track_top(d) -> str:
@@ -1400,9 +1400,9 @@ and the gear for that.</p></div>""")
                    if best_g[0] <= 2 * tc.error else
                    f"<p><b>{e(best_g[1])} beats yours by {best_g[0]:+.1f}%</b> on this fight.</p>")
         tabs["gear"].append(f"""<h2>Talents of the top players, on your character</h2><div class="card scroll">
-{verdict}<p class="small muted">Each top build simmed on your character at &plusmn;{2 * tc.error:.1f}% (SimC's error, as
-its target_error): a gap under that is noise. A build can lose on the dummy and win on this fight.</p>
-<table><tr><th>Build</th>{head}<th>Changes vs your talents</th></tr>{body}</table></div>""")
+{verdict}<table><tr><th title="Each top build simmed on your character; a gap under &plusmn;{2 * tc.error:.1f}% (SimC's error) is
+noise, and a build can lose on the dummy and win on this fight">Build &plusmn;{2 * tc.error:.1f}%</th>{head}
+<th>Changes vs your talents</th></tr>{body}</table></div>""")  # the method on the header (DPS rounds 36-40)
 
     # cooldown plans
     if d.plans:
@@ -1549,9 +1549,9 @@ than the coverage means they hold the cooldown.{burst_note}</p>
                        f"<td class='n'>{_pct(v, err=d.loot_error)}</td></tr>" for i, s, v, real in d.loot[:12])
         tabs["gear"].append(f"""<h2>What this boss drops, for you</h2><div class="card scroll">
 {'<p class="notice small">Nothing this boss drops is an upgrade for you at item level ' + str(d.loot_ilvl) + ': every value below is a loss vs what you already have.</p>' if all((real if real is not None else v) <= 0 for _, _, v, real in d.loot) else ''}
-<p class="small muted">"In your best sets": the item inserted in your best Top Gear sets, the rest of your gear
-rearranged around it (its real value). "Single swap": the classic droptimizer value, on your equipped set.</p>
-<table><tr><th>Item</th><th>Slot</th><th class="n">In your best sets</th><th class="n">Single swap</th></tr>{body}</table>
+<table><tr><th>Item</th><th>Slot</th><th class="n" title="The item inserted in your best Top Gear sets, the rest of your
+gear rearranged around it: its real value">In your best sets</th><th class="n" title="The classic droptimizer value, on your
+equipped set">Single swap</th></tr>{body}</table>
 <p class="small muted">At item level {d.loot_ilvl}{_track_top(d)}; statistical error about &plusmn;{d.loot_error:.2f}%.</p></div>""")
 
     notes = [re.sub(r"^SimC puts (\d+%) of your damage on the boss vs (\d+%) in the top players' logs, even with more "
