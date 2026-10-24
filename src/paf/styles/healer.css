@@ -96,3 +96,7 @@ p > .vary{display:inline-block;padding:1px 7px;border-radius:999px;border:1px da
 .rd .cp.bk{stroke-dasharray:2.5 1.5} /* pressed as soon as it is back (the chips' ⟲): a dashed outline */
 /* the outline key: its opacity scale shown (fewer top players, fainter), as the lanes draw it */
 .chart-key i.o1,.chart-key i.o2{font-style:normal;font-size:1.25em} .chart-key i.o1{opacity:.3} .chart-key i.o2{opacity:.6}
+/* a two-step button's stores and releases on one time line (Stasis): dot, line, bar */
+.hl2 .stwrap{flex-basis:100%;display:block} .hl2 .stbars{width:100%;max-width:640px;height:auto;display:block}
+.stbars .so{fill:var(--fg)} .stbars .sl{stroke:var(--muted);stroke-width:1;stroke-dasharray:2 2}
+.stbars .sr{fill:var(--accent)} .stbars .sh{stroke:var(--warn);stroke-width:1;opacity:.6} .stbars .st{fill:var(--muted);font-size:10px}

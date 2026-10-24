@@ -541,8 +541,9 @@ def off_tops(d, p) -> list[str]:
         if here >= 0.25 or there is None:  # a fair share of them press it then too, or no other moment
             continue
         seen[key] = seen.get(key, 0) + 1
+        ahead = f" (their cycle runs ~{t - there[1]:.0f} s ahead)" if there[1] < t else ""  # the fight tab's words
         out.append(f"{cd_name(d, key)}: the plan presses it at {_mmss(t)}, {there[0]:.0%} of the top "
-                   f"players at about {_mmss(there[1])}.")
+                   f"players at about {_mmss(there[1])}{ahead}.")  # (fresh DPS review: one reason on both tabs)
     return out
 
 

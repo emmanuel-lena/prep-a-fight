@@ -893,7 +893,8 @@ def curve_svg(curve: list[float], found: list[Moment], phases: list[tuple[str, f
     lanes: list[tuple[Cooldown, set | None, str]] = []
     for c in [*rows, *extra]:
         if len(c.rhythms) == 2:
-            lanes += [(c, set(ts), f" {'AB'[k]} {_pct(sp)}") for k, (sp, ts) in enumerate(c.rhythms)]
+            lanes += [(c, set(ts), f" {'AB'[k]}") for k, (_sp, ts) in enumerate(c.rhythms)]  # the shares in the
+            # card's pill: a rhythm's share (first press) is not its first chip's (fresh heal review: B 30% vs 36%)
         else:
             lanes.append((c, None, ""))
     rows = [c for c, _o, _t in lanes]
@@ -1677,9 +1678,13 @@ def _cooldowns_html(cds: list[Cooldown], answered: set | None = None, named: dic
                   # (round 91: plain text after a chip read as that chip's continuation)
                   for k, v in (named or {}).items()
                   if k[0] == c.name and isinstance(k[1], tuple))
-        + ("<small class='alt'><span class='pill rhythm' title='two rhythms, by their first press: " + "; or ".join(
-            f"{_pct(sp)} from {_mmss((moved or {}).get((c.name, ts[0]), ts[0]))}, then "
-            f"{_and([_mmss((moved or {}).get((c.name, t), t)) for t in ts[1:]])}" for sp, ts in c.rhythms)
+        + ("<small class='alt'><span class='pill rhythm' title='two rhythms, by their first press (the chart&#39;s "
+           "A and B): " + "; or ".join(
+            f"{'AB'[k]}, {_pct(sp)} of the top players start with it at "
+            f"{_mmss((moved or {}).get((c.name, ts[0]), ts[0]))}, then "
+            f"{_and([_mmss((moved or {}).get((c.name, t), t)) for t in ts[1:]])}" for k, (sp, ts) in enumerate(c.rhythms))
+           + (f"; {_pct(c.users - sum(sp for sp, _ts in c.rhythms))} of them follow neither"
+              if c.users - sum(sp for sp, _ts in c.rhythms) >= 0.05 else "")
            + "'>&#8649; 2 rhythms</span></small>"  # the chart's A and B lanes draw them (fresh
            if c.rhythms else "")  # heal review: a sentence), the times on hover
         + (f"<small class='alt'><span class='pill rhythm' title='pressed every time it is back'><i class='g'>&#9719;</i> every "
@@ -1925,6 +1930,38 @@ def _gap_of(c: Cooldown, inside: list[float]) -> float:
     return st.median(gaps) if gaps else 0.0
 
 
+def _store_bars(c: Cooldown, groups: list[float], by: dict, n: int) -> str:
+    """Each store and its releases on one time line: a dot at the store, a bar over the middle half of its
+    releases, as opaque as their share, a line between (fresh heal review: Stasis's chip run, the densest text)."""
+    rows = [(g, [u for _s, u in by[g] if u is not None]) for g in groups]
+    rows = [(g, us) for g, us in rows if us]
+    if not rows:
+        return ""
+    end = max([*(u for _g, us in rows for u in us), *c.hits, *(c.lasts or [])], default=60.0)
+    end = min(end, st.median(c.lasts)) if c.lasts else end
+    W, L = 600, 8
+
+    def x(t: float) -> float:
+        return L + max(0.0, min(1.0, t / max(end, 1))) * (W - 2 * L)
+    out = []
+    for i, (g, us) in enumerate(rows):
+        y = 10 + 16 * i
+        q = st.quantiles(us, n=4) if len(us) >= 4 else [min(us), st.median(us), max(us)]
+        a, b = q[0], max(q[2], q[0] + 2)
+        share = len(us) / n
+        out.append(f"<line x1='{x(g):.1f}' x2='{x(a):.1f}' y1='{y}' y2='{y}' class='sl'/>"
+                   f"<circle cx='{x(g):.1f}' cy='{y}' r='4' class='so'><title>a store at {_mmss(g)}</title></circle>"
+                   f"<rect x='{x(a):.1f}' y='{y - 4}' width='{x(b) - x(a):.1f}' height='8' rx='3' class='sr' "
+                   f"style='opacity:{max(0.3, min(1.0, share / 0.6)):.2f}'><title>released {_mmss(a)} to {_mmss(b)}, "
+                   f"{_pct(share)} of the top players</title></rect>")
+    hits = "".join(f"<line x1='{x(h):.1f}' x2='{x(h):.1f}' y1='2' y2='{16 * len(rows) + 4}' class='sh'>"
+                   f"<title>the {_mmss(h)} hit</title></line>" for h in c.hits if h <= end)
+    ticks = "".join(f"<text x='{x(m):.1f}' y='{16 * len(rows) + 16}' class='st' text-anchor='middle'>{_mmss(m)}</text>"
+                    for m in range(60, int(end), 60))
+    return (f"<span class='stwrap'><svg class='stbars' viewBox='0 0 {W} {16 * len(rows) + 20}' role='img' "
+            f"aria-label='each store and its releases over the fight'>{hits}{''.join(out)}{ticks}</svg></span>")
+
+
 def _released(c: Cooldown) -> str:
     """A two-step button's release and what it holds, on its card (Stasis: the store's chips above)."""
     r = c.release
@@ -1964,11 +2001,12 @@ def _released(c: Cooldown) -> str:
                    # (round 108: "52% … 16% release it later" read as 68% of a 70% store)
                    f" &middot; in the window of the {_mmss(h)} hit: {_pct(inwin(h) / reach(r, h))}"
                    f"{_reach_note(r, h)}")
-        return (f"<span class='chip'>{_about(us)} &middot; {_pct(len(us) / n)} &middot; from the "
-                f"{_mmss(g)} store, each a median {gap:.0f} s after its own"
-                + (f" ({_pct(never)} of those stores never released)" if never >= 0.05 else " (nearly all released)")
-                + win + "</span>")
+        how = (f"from the {_mmss(g)} store, each a median {gap:.0f} s after its own"
+               + (f" ({_pct(never)} of those stores never released)" if never >= 0.05 else " (nearly all released)"))
+        return (f"<span class='chip' title='{how}'>{_about(us)} &middot; {_pct(len(us) / n)} &middot; from "
+                f"{_mmss(g)}" + win + "</span>")  # its how on hover: the bars below draw it (fresh heal review)
     chips = "".join(chip(g, by[g]) for g in groups)
+    bars = _store_bars(c, groups, by, n)
     # each hit the lead answers with the release: its count of any store, as the lead says it (round 97: the lead's
     # 51% and 13 s found nowhere on the card, its chips 40% and 15 s from one store)
     for h in c.hits:
@@ -1984,7 +2022,7 @@ def _released(c: Cooldown) -> str:
                   "times</small>")  # releases, not players: a player may have several (round 88: "94% release")
     gap = "" if chips else f", a median {c.release_gap:.0f} s after its store" if c.release_gap else ""
     never = f"; {_pct(c.unreleased)} of the stores are never released" if c.unreleased >= 0.05 else ""
-    out = (f"<span class='subrow'><small class='alt'>released:</small>{chips}</span>" if chips else  # each
+    out = (f"<span class='subrow'><small class='alt'>released:</small>{bars}{chips}</span>" if chips else  # each
            # chip says its stores' share never released
            f"<small class='alt'>released{gap} at varying times{never}</small>")  # as chips, as the store's (r. 83)
     if c.stored:

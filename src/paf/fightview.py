@@ -420,12 +420,18 @@ def _ev(it: Item, row_t: float | None = None) -> str:
                                       and f"from {_mmss(it.t)}" not in it.text) else []
     if it.dur and it.kind not in ("move", "immune") and not it.said_dur:
         notes.append(f"lasts {it.dur:.0f} s")
+    warn = ""
     if it.why:
-        notes.append(it.why)
+        why, _sep, flag = it.why.partition("⚠ ")  # the top players' other moment: an amber chip after the name, its
+        if flag:  # sentence on hover (fresh DPS review: buried at the end of a grey line)
+            at = re.search(r"at about (\d+:\d\d)", flag)
+            warn = (f" <span class='pill warn' title='{e(flag)}'>&#9888; tops &asymp;{at[1] if at else ''}</span>")
+        if why.strip("; "):
+            notes.append(why.strip("; "))
     small = f"<small>{', '.join(notes)}</small>" if notes else ""
     if it.hint:
         small += f"<small class='hint' title='Journal: {e(it.hint)}'>&#128214; journal</small>"  # its words on hover
-    return (f"<div class='ev ek-{it.kind}'>{_ic(it.icon)}<div class='x'><span class='main'>{text}</span>{small}"
+    return (f"<div class='ev ek-{it.kind}'>{_ic(it.icon)}<div class='x'><span class='main'>{text}{warn}</span>{small}"
             "</div></div>")
 
 
@@ -691,9 +697,8 @@ def _phase_html(name: str, start: float, end: float, pi: int, rows: str, its: li
     mine = [(t, x) for t, x in its if start - 0.5 <= t < end - 0.5 and x.side == "boss"]
     said = [x.text[0].lower() + x.text[1:] for _t, x in mine if x.kind == "immune"]
     said += [f"{x.text} at {_mmss(t)}" for t, x in mine if x.kind == "adds"]
-    said += [f"everyone moves from {_mmss(t)} to {_mmss(t + x.dur)}" if x.dur >= MOVE_CUE else
-             f"a {x.dur:.0f} s move at {_mmss(t)}" for t, x in mine  # every move the timeline draws, the short
-             if x.kind == "move"]  # ones in a word (fresh DPS review: 2 named, 4 drawn)
+    said += [f"everyone moves from {_mmss(t)} to {_mmss(t + x.dur)}" for t, x in mine  # every move the timeline
+             if x.kind == "move"]  # draws, one form (fresh DPS review: 2 named, 4 drawn; then two phrasings)
     said.sort(key=lambda s: [int(v) for v in re.findall(r"(\d+):(\d\d)", s)[:1][0]] if re.search(r"\d+:\d\d", s)
               else [0, 0])
     lust = [t for t, x in mine if x.kind == "lust"]

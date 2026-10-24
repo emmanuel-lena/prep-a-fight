@@ -508,8 +508,10 @@ def test_a_two_step_button_says_its_release_and_what_it_stores():
                                                                    ("Hover", 0.25, 0.0)]
     c.stored = healer.stored_spells(con, 9, 4, "Stasis (Store)")
     out = healer.cooldowns_html([c])
-    assert ("released:</small><span class='chip'>3:36 &middot; 50% &middot; from the 3:20 store, "
-            "each a median 16 s after its own (nearly all released)</span>") in out  # the any-store chip says the hit
+    assert ("<span class='chip' title='from the 3:20 store, each a median 16 s after its own (nearly all "
+            "released)'>3:36 &middot; 50% &middot; from 3:20</span>") in out  # the any-store chip says the hit
+    assert "released:</small><span class='stwrap'><svg class='stbars'" in out  # its bars
+    assert "<title>a store at 3:20</title>" in out
     assert "and about 0.5 more releases a kill, of stores made at other times" in out  # the 1:40 stores
     assert "any store &rarr; 3:35 hit &middot; 50% &middot; held 16 s</span>" in out
     # a store never released before the next store is not paired with the next one's release (round 83)
@@ -899,7 +901,7 @@ def test_a_button_of_two_rhythms_draws_a_lane_each():
     ev = healer.Cooldown("Evangelism", 1, 0.67, 3.0, ts, [""] * 6, support=[0.31, 0.36] * 3,
                          rhythms=[(0.31, [4.0, 102.0, 195.0]), (0.36, [22.0, 109.0, 215.0])])
     svg = healer.curve_svg([1.0] * 60, [], [], "x", [ev], set(), set(), others=4)
-    assert "Evangelism A 31%</text>" in svg and "Evangelism B 36%</text>" in svg
+    assert "Evangelism A</text>" in svg and "Evangelism B</text>" in svg
     lanes = svg.split("class='cl'")[1:]
     assert [lane.count("<rect") for lane in lanes] == [3, 3]
     assert "Evangelism 0:22" not in lanes[0] and "Evangelism 0:22" in lanes[1]
