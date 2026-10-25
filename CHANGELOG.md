@@ -7,6 +7,8 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 
 - The opener lists your presses only: a Frost Mage's Frozen Orb and Flurry bolts (which SimC schedules like casts)
   no longer show as dozens of orbs on a one-minute cooldown. (#40)
+- The opener is a timeline now, at the top of the fight tab: what you cast before the pull, your cooldowns on their
+  own lane, your rotation under them, each icon at its time on a 40-second axis, Bloodlust as a band.
 ## 0.8.27 (2026-10-25)
 
 - Settings, "Send a summary of each run" (off unless you turn it on): at the end of each prep or tool run, the app

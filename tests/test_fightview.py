@@ -224,13 +224,16 @@ def test_the_fight_tab_shows_the_opener_as_simc_plays_it(monkeypatch, tmp_path):
                    "41.000 Player 'X' schedules execute for Action 'eviscerate' (196819)\n", encoding="utf-8")
     monkeypatch.setattr("paf.gamedata.spell_names", lambda locale="": {121471: "Shadow Blades", 196819: "Eviscerate"})
     casts = optimize.opener(log)
-    assert casts == [(0.0, "Shadow Blades", 121471), (1.01, "Eviscerate", 196819)]  # no consumable, no swing, ≤40 s
+    assert casts == [(-1.0, "Shadow Blades", 121471), (1.01, "Eviscerate", 196819)]  # precombat -1, no swing
     d = sheet(monkeypatch)
     d.optimized[0].opener = casts
     d.lust = 0.0
-    html = fightview.opener_html(d)
-    assert "Bloodlust at the pull" in html and html.count("<li ") == 2
-    assert "<li title='Shadow Blades 0:00'>" in html and "<li title='Eviscerate 0:01'>" in html
+    html = fightview.opener_html(d)  # a strip: the cooldowns' lane, the rotation's, Bloodlust a band
+    assert html.count("class='op-ic'") == 1 and "title='Bloodlust from 0:00'" in html
+    assert "<span class='op-l'>Pre-pull</span>" in html and "title='Shadow Blades before the pull'" in html
+    _cds, rot = html.split("<span class='op-l'>Rotation</span>")
+    assert "title='Eviscerate 0:01'" in rot
+    assert "style='left:2.53%;top:0px' title='Eviscerate 0:01'" in rot  # at its time on a 40 s axis
 
 
 def test_the_opener_keeps_only_what_the_action_list_presses(tmp_path):

@@ -449,7 +449,7 @@ def opener(log: Path, upto: float = OPENER_SPAN, actions: set[str] | None = None
         name = "Potion" if action == "potion" else names.get(sid) or action.replace("_", " ").capitalize()
         if name.endswith(" Overload"):  # an overload the list schedules under another action's name: no press
             continue
-        out.append((t, name, sid))
+        out.append((-1.0 if precombat else t, name, sid))  # -1: before the pull (the strip's own lane)
     return out
 
 

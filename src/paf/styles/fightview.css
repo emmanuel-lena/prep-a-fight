@@ -497,7 +497,17 @@ dialog.ss::backdrop{background:var(--bg)}
   background:var(--surface);font-variant-numeric:tabular-nums}
 .fv .boss .ev small.hint{margin-left:0} /* the time and 📖 together on one line, right-aligned (fresh DPS review) */
 .fv .pill.amb{background:transparent;color:var(--warn);border:1px solid currentColor} /* advice, not a loss: amber (fresh DPS review) */
-/* the opener: every cast of the first 40 s in order, an icon each, its time under it (issue #39) */
-.fv .opener .op{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(38px,1fr));gap:6px 4px}
-.fv .opener .op li{display:grid;justify-items:center;gap:2px;cursor:help}
-.fv .opener .op small{font:600 10.5px/1 var(--font-display);color:var(--muted);font-variant-numeric:tabular-nums}
+/* the opener as a strip, as the boss tab's (issue #39; the owner: "nice timelines elsewhere"): a lane for the
+   cooldowns, one for the rotation, each icon at its time; Bloodlust a band, a tick each 5 s */
+.fv .opstrip{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 18px 10px;margin:0 0 18px;box-shadow:var(--shadow)}
+.fv .opstrip h2{font:600 1.1rem/1.25 var(--font-reading);margin:0 0 10px}
+.fv .op-grid{display:grid;grid-template-columns:84px minmax(0,1fr);gap:6px 10px;align-items:start}
+.fv .op-l{font:600 11px/1 var(--font-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-top:9px}
+.fv .op-track{position:relative;border-left:1px solid var(--line);background:repeating-linear-gradient(90deg,transparent 0 calc(12.5% - 1px),color-mix(in srgb,var(--line) 60%,transparent) calc(12.5% - 1px) 12.5%)}
+.fv .op-ic{position:absolute;transform:translateX(-50%);line-height:0;cursor:help}
+.fv .op-ic .ic{width:26px;height:26px}
+.fv .op-lust{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--warn) 14%,transparent);border-top:2px solid color-mix(in srgb,var(--warn) 60%,transparent)}
+.fv .op-axis{position:relative;height:16px}
+.fv .op-tk{position:absolute;transform:translateX(-50%);font:600 10.5px/1 var(--font-display);color:var(--muted);font-variant-numeric:tabular-nums}
+.fv .op-tk:first-child{transform:none} .fv .op-tk:last-child{transform:translateX(-100%)}
+.fv .op-pre{display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 4px} .fv .op-pre .ic{width:26px;height:26px} .fv .op-pre span{line-height:0;cursor:help}

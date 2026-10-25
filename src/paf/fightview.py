@@ -749,12 +749,13 @@ def _side(d) -> str:
             "<div class='meter'><i id='c-meter'></i></div></div>"
             f"{_btn('c-sync', '', 'Control+Shift+Space', hidden=True)}"
             f"<div class='foot'>{_btn('ss-open', 'Second screen', cls='btn ghost')}{copy}</div></section>"
-            f"{job_html(d)}{opener_html(d)}</aside>")  # no pointer to the Dig deeper tab: it is right there (review 36)
+            f"{job_html(d)}</aside>")  # no pointer to the Dig deeper tab: it is right there (review 36)
 
 
 def opener_html(d) -> str:
-    """The first 40 s of the plan the fight tab plays, every cast in order as SimC plays it: an icon each, its time
-    under it, its name on hover; Bloodlust at the pull said (issue #39)."""
+    """The first 40 s of the plan the fight tab plays as a strip, as the boss tab's (issue #39; the owner, 2026-10-25:
+    "horrible, when we have nice timelines elsewhere"): a time axis, the cooldowns on a lane of their own, the
+    rotation's presses under them, each icon at its time with its name and time on hover, Bloodlust as a band."""
     plan = simple._plan(d)
     if plan is None:
         return ""
@@ -762,12 +763,46 @@ def opener_html(d) -> str:
     if not casts:
         return ""
     from paf.optimize import OPENER_SPAN
+    from paf.prep_report import cd_name
 
-    lust = " <span class='pill'>Bloodlust at the pull</span>" if d.lust is not None and d.lust < 5 else ""
-    cells = "".join(f"<li title='{e(n)} {_mmss(t)}'>{_ic(_icon(d, n))}<small>{_mmss(t)}</small></li>"
-                    for t, n, _sid in casts)
-    return (f"<section class='fbox opener'><h2>Opener <span class='muted small'>the first {OPENER_SPAN:.0f} s, as "
-            f"SimC plays it</span>{lust}</h2><ol class='op'>{cells}</ol></section>")
+    span = OPENER_SPAN
+    big = {cd_name(d, k) for o in d.optimized for k in o.choice} | {  # the plans' cooldowns (the default list
+        n for _t, n, _s in casts if "potion" in n.lower()} | {  # played has none of its own: a Rogue's Shadow Blades)
+        n for k, n in d.cd_names.items() if k.startswith("use_item")}  # the plan's cooldowns, the potion, the items
+    pre = [n for t, n, _s in casts if t < 0]  # cast before the pull: a lane of its own, in order
+    casts = [c for c in casts if c[0] >= 0]
+
+    def x(t: float) -> float:
+        return max(0.0, min(100.0, t / span * 100))
+
+    def lane(items: list[tuple[float, str]]) -> tuple[str, int]:  # icons at their times, a close one a row lower
+        rows: list[float] = []
+        out = []
+        for t, n in items:
+            r = next((i for i, last in enumerate(rows) if x(t) - last >= 2.8), len(rows))
+            if r < len(rows):
+                rows[r] = x(t)
+            else:
+                rows.append(x(t))
+            out.append(f"<span class='op-ic' style='left:{x(t):.2f}%;top:{r * 30}px' title='{e(n)} {_mmss(t)}'>"
+                       f"{_ic(_icon(d, n))}</span>")
+        return "".join(out), max(1, len(rows))
+    cds, n_cd = lane([(t, n) for t, n, _s in casts if n in big])
+    rot, n_rot = lane([(t, n) for t, n, _s in casts if n not in big])
+    lust = ""
+    if d.lust is not None and d.lust < span:
+        a = max(0.0, d.lust)
+        lust = (f"<span class='op-lust' style='left:{x(a):.2f}%;width:{x(min(span, a + 40)) - x(a):.2f}%' "
+                f"title='Bloodlust from {_mmss(a)}'></span>")
+    ticks = "".join(f"<span class='op-tk' style='left:{x(t):.2f}%'>{_mmss(t)}</span>"
+                    for t in range(0, int(span) + 1, 5))
+    pre_lane = ("<span class='op-l'>Pre-pull</span><div class='op-pre'>" + "".join(
+        f"<span title='{e(n)} before the pull'>{_ic(_icon(d, n))}</span>" for n in pre) + "</div>") if pre else ""
+    return (f"<section class='opstrip' aria-label='The opener'><h2>Opener <span class='muted small'>the first "
+            f"{span:.0f} s, as SimC plays it</span></h2><div class='op-grid'>{pre_lane}"
+            f"<span class='op-l'>Cooldowns</span><div class='op-track' style='height:{n_cd * 30}px'>{lust}{cds}</div>"
+            f"<span class='op-l'>Rotation</span><div class='op-track' style='height:{n_rot * 30}px'>{lust}{rot}</div>"
+            f"<span></span><div class='op-axis'>{ticks}</div></div></section>")
 
 
 def _second_screen(d) -> str:
@@ -817,7 +852,8 @@ def html(d) -> str:
     payload = json.dumps(data(d, ms, dur)).replace("</", "<\\/")
     return (f"<div class='fv'><a class='skip' href='#tl'>Skip to the fight</a>{kill_switch(d)}"
             f"<div class='sheet-fv'>{_side(d)}"
-            f"<section class='ftl' id='tl' tabindex='-1' aria-label='The fight'>{legend(its)}{''.join(sections)}"
+            f"<section class='ftl' id='tl' tabindex='-1' aria-label='The fight'>{opener_html(d)}{legend(its)}"
+            f"{''.join(sections)}"
             f"<div class='tl-end'></div></section></div>{_second_screen(d)}"
             "<p class='vh' id='sr' aria-live='polite' aria-atomic='false'></p>"
             f"<script>var FV={payload};</script><script>{JS}</script></div>")
