@@ -5,9 +5,12 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 
 ## Unreleased
 
+## 0.8.27 (2026-10-25)
+
 - Settings, "Send a summary of each run" (off unless you turn it on): at the end of each prep or tool run, the app
   sends the maintainers how long each step took and the error if it failed, with your computer's CPU and memory; no
   character, guild, log or file name. It tells us what is slow or broken on players' computers.
+
 ## 0.8.26 (2026-10-25)
 
 - The Gear tool tries every crafted piece your spec can wear in every slot, each in every Thalassian Missive (the
