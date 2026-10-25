@@ -409,7 +409,12 @@ NOT_CASTS = {"auto_attack", "auto_shot", "flask", "food", "augmentation", "snaps
              "variable", "wait", "pool_resource", "use_items", "run_action_list", "call_action_list"}
 
 
-def opener(log: Path, upto: float = OPENER_SPAN) -> list[tuple[float, str, int]]:
+def apl_actions(apl) -> set[str]:
+    """The action names an action list presses (its lists' entries: "frozen_orb,if=..." -> frozen_orb)."""
+    return {b.lstrip("/").split(",")[0] for lines in apl.values() for b in lines if b.strip()}
+
+
+def opener(log: Path, upto: float = OPENER_SPAN, actions: set[str] | None = None) -> list[tuple[float, str, int]]:
     """The casts of one simulated pull's first `upto` seconds, in order: (time, spell name, spell id), from a
     play_by_play log (issue #39: the 40 s opener as SimC plays it). Your character's only (no pet), the precombat
     ones, then what the action list schedules: a proc or an overload is no press."""
@@ -437,6 +442,8 @@ def opener(log: Path, upto: float = OPENER_SPAN) -> list[tuple[float, str, int]]
         precombat = how == "performs" and not scheduled  # before the first press the list schedules
         if not (precombat or how == "schedules execute for") or action in NOT_CASTS or "overload" in action:
             continue
+        if actions and action not in actions and not (action.startswith("use_item") and "use_item" in actions):
+            continue  # not in the list: no press (issue #40: Frozen Orb's bolts, scheduled like casts, "1 min cd")
         if not sid and action != "potion":
             continue
         name = "Potion" if action == "potion" else names.get(sid) or action.replace("_", " ").capitalize()
@@ -696,12 +703,13 @@ def optimize_all(profile_text: str, fight: Fight, run_dir: Path, *, objectives: 
     confirm(profile_text, apl, plans, fight, run_dir)
     sensitivity(profile_text, apl, plans, fight, run_dir, extra=extra_variants)
     default_pull = play_by_play(profile_text, apl, Plan("default", {}, 0, 0), fight, run_dir, cds)
-    default_open = opener(run_dir / "default-pull.log")
+    pressed = apl_actions(apl)
+    default_open = opener(run_dir / "default-pull.log", actions=pressed)
     if alignment:
         alignment = adjust_alignment(alignment, default_pull, fight)
     for p in plans:
         p.flags = sanity_flags(p, alignment or [], validation)
         p.timeline = play_by_play(profile_text, apl, p, fight, run_dir, cds)
-        p.opener = opener(run_dir / f"{p.objective}-pull.log")
+        p.opener = opener(run_dir / f"{p.objective}-pull.log", actions=pressed)
         p.default_timeline, p.default_opener = default_pull, default_open
     return plans, cds

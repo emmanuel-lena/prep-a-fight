@@ -231,3 +231,22 @@ def test_the_fight_tab_shows_the_opener_as_simc_plays_it(monkeypatch, tmp_path):
     html = fightview.opener_html(d)
     assert "Bloodlust at the pull" in html and html.count("<li ") == 2
     assert "<li title='Shadow Blades 0:00'>" in html and "<li title='Eviscerate 0:01'>" in html
+
+
+def test_the_opener_keeps_only_what_the_action_list_presses(tmp_path):
+    # issue #40 (a Frost Mage): Frozen Orb's and Flurry's bolts, scheduled like casts (75 frozen_orb_bolt for 3 orbs
+    # in a SimC pull), read as dozens of orbs on a cooldown that does not allow it
+    from collections import OrderedDict
+
+    from paf import optimize
+
+    log = tmp_path / "boss-pull.log"
+    log.write_text("".join(f"{t:.3f} Player 'M' schedules execute for Action '{a}' ({sid})\n"
+                           for t, a, sid in [(1.0, "frostbolt", 116), (3.3, "frozen_orb", 84714),
+                                             (3.8, "frozen_orb_bolt", 84721), (4.3, "frozen_orb_bolt", 84721),
+                                             (4.6, "flurry_bolt", 228354),
+                                             (4.8, "use_item_treacherous_transmitter", 446209)]), encoding="utf-8")
+    apl = OrderedDict({"": ["frostbolt", "frozen_orb,if=x", "use_item,name=treacherous_transmitter"]})
+    assert optimize.apl_actions(apl) == {"frostbolt", "frozen_orb", "use_item"}
+    got = [sid for _t, _a, sid in optimize.opener(log, actions=optimize.apl_actions(apl))]
+    assert got == [116, 84714, 446209]

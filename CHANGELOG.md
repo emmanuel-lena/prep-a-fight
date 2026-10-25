@@ -5,6 +5,8 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 
 ## Unreleased
 
+- The opener lists your presses only: a Frost Mage's Frozen Orb and Flurry bolts (which SimC schedules like casts)
+  no longer show as dozens of orbs on a one-minute cooldown. (#40)
 ## 0.8.27 (2026-10-25)
 
 - Settings, "Send a summary of each run" (off unless you turn it on): at the end of each prep or tool run, the app
