@@ -228,12 +228,12 @@ def test_the_fight_tab_shows_the_opener_as_simc_plays_it(monkeypatch, tmp_path):
     d = sheet(monkeypatch)
     d.optimized[0].opener = casts
     d.lust = 0.0
-    html = fightview.opener_html(d)  # a strip: the cooldowns' lane, the rotation's, Bloodlust a band
-    assert html.count("class='op-ic'") == 1 and "title='Bloodlust from 0:00'" in html
-    assert "<span class='op-l'>Pre-pull</span>" in html and "title='Shadow Blades before the pull'" in html
-    _cds, rot = html.split("<span class='op-l'>Rotation</span>")
-    assert "title='Eviscerate 0:01'" in rot
-    assert "style='left:2.53%;top:0px' title='Eviscerate 0:01'" in rot  # at its time on a 40 s axis
+    monkeypatch.setattr("paf.gamedata.spell_cooldowns", lambda: {121471: (90.0, 1)})
+    html = fightview.opener_html(d)  # a numbered sequence, as a guide writes it; the big cooldowns framed
+    assert "Opener <span class='pill'>in Bloodlust</span>" in html
+    assert "<li class='big' title='Shadow Blades · pre-pull'>" in html  # 90 s in the game data: framed
+    assert "<li class='' title='Eviscerate · 0:01'>" in html and "<small>1</small>" in html
+    assert html.endswith("<li class='then'>then your rotation</li></ol></section>")
 
 
 def test_the_opener_keeps_only_what_the_action_list_presses(tmp_path):
@@ -253,3 +253,14 @@ def test_the_opener_keeps_only_what_the_action_list_presses(tmp_path):
     assert optimize.apl_actions(apl) == {"frostbolt", "frozen_orb", "use_item"}
     got = [sid for _t, _a, sid in optimize.opener(log, actions=optimize.apl_actions(apl))]
     assert got == [116, 84714, 446209]
+
+
+def test_a_stage_reads_as_a_strip_not_a_sentence(monkeypatch):
+    # the owner (2026-10-26, Twin Fangs mythic): "everyone moves from 0:11 to 0:22; …" fifteen times in one block
+    its = [(0.0, fightview.Item("boss", "lust", "Bloodlust", "Bloodlust", "", 40.0)),
+           (11.0, fightview.Item("boss", "move", "Movement", "Movement, 11 s", "", 11.0)),
+           (35.0, fightview.Item("boss", "adds", "Spawn of Vexhul", "3 × Spawn of Vexhul", "ab_icon", 20.0))]
+    html = fightview._phase_html("Stage One", 0.0, 370.0, 0, "", its)
+    assert "everyone moves from" not in html and "class='ps'" in html
+    assert "title='everyone moves 0:11 to 0:22'" in html and "title='3 × Spawn of Vexhul at 0:35'" in html
+    assert "title='Bloodlust at 0:00'" in html and ">1:00</span>" in html and "<b>3</b></span>" in html

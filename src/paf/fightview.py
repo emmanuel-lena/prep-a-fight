@@ -705,13 +705,43 @@ def _phase_html(name: str, start: float, end: float, pi: int, rows: str, its: li
     if lust:
         said.insert(0, "Bloodlust " + ("at the pull" if lust[0] < 5 else f"at {_mmss(lust[0])}"))
     short = bool(mine) and all(x.kind in ("immune", "phase") for _t, x in mine)  # an immunity alone: its row says it
-    adv = f"<p class='ph-adv'>{e(cap('; '.join(said)))}.</p>" if said and not short else ""  # in time order
+    adv = _stage_strip(mine, start, end) if said and not short else ""  # a picture, each event's words on hover (the
+    # owner, 2026-10-26: "a block that hurts the eyes": every move, wave and lust of the stage in one sentence)
     span = _span(int(end) - int(start))  # from the clock times shown (DPS round 13: "1:41" lasting "1 min 42 s")
     m = re.fullmatch(r"(.*) \((\d+ of \d+)\)", name)
     title = f"{e(m[1])} <span class='rep'>({m[2]})</span>" if m else e(name)
     return (f"<section class='stl{' short' if short else ''}' aria-labelledby='ph{pi}-h'><div class='ph-band' "
             f"id='ph{pi}'><div class='ph-name'><h2 id='ph{pi}-h'>{title}</h2><span>{lasts}lasts about {span}.</span>"
             f"</div>{adv}<div class='ph-lanes' aria-hidden='true'>{lanes}</div></div>{rows}</section>")
+
+
+def _stage_strip(mine: list, start: float, end: float) -> str:
+    """A stage at a glance: its moves as bars, its add waves and boss units as icons, the boss's immunity and
+    Bloodlust as bands, a tick each minute; each one's words on hover."""
+    span = max(1.0, end - start)
+
+    def x(t: float) -> float:
+        return max(0.0, min(100.0, (t - start) / span * 100))
+    out = []
+    for t, it in mine:
+        if it.kind == "move":
+            out.append(f"<span class='ps-mv' style='left:{x(t):.2f}%;width:{max(0.6, x(t + it.dur) - x(t)):.2f}%' "
+                       f"title='everyone moves {_mmss(t)} to {_mmss(t + it.dur)}'></span>")
+        elif it.kind == "immune":
+            out.append(f"<span class='ps-im' style='left:{x(t):.2f}%;width:{x(t + it.dur) - x(t):.2f}%' "
+                       f"title='{e(it.text)}'></span>")
+        elif it.kind == "lust":
+            out.append(f"<span class='ps-lust' style='left:{x(t):.2f}%;width:{x(t + 40) - x(t):.2f}%' "
+                       f"title='Bloodlust at {_mmss(t)}'></span>")
+    def count(text: str) -> str:  # "3 × Spawn of Vexhul": its count on the icon, a boss unit alone none
+        m = re.match(r"(\d+)\s*×", text.replace("\u00a0", " "))
+        return f"<b>{m[1]}</b>" if m and m[1] != "1" else ""
+    icons_ = "".join(f"<span class='ps-ic' style='left:{x(t):.2f}%' title='{e(it.text)} at {_mmss(t)}'>{_ic(it.icon)}"
+                     f"{count(it.text)}</span>" for t, it in mine if it.kind == "adds")
+    ticks = "".join(f"<span class='ps-tk' style='left:{x(m):.2f}%'>{_mmss(m)}</span>"
+                    for m in range(60 * (int(start) // 60 + 1), int(end), 60) if x(m) < 96)
+    return (f"<div class='ps' role='img' aria-label='the stage: its moves, adds and Bloodlust'><div class='ps-row'>"
+            f"{''.join(out)}{icons_}</div><div class='ps-axis'>{ticks}</div></div>")
 
 
 def cap(s: str) -> str:
@@ -752,57 +782,45 @@ def _side(d) -> str:
             f"{job_html(d)}</aside>")  # no pointer to the Dig deeper tab: it is right there (review 36)
 
 
+BIG_CD = 45.0  # a cooldown of this many seconds at least is a big one in the opener (game data, base values)
+
+
 def opener_html(d) -> str:
-    """The first 40 s of the plan the fight tab plays as a strip, as the boss tab's (issue #39; the owner, 2026-10-25:
-    "horrible, when we have nice timelines elsewhere"): a time axis, the cooldowns on a lane of their own, the
-    rotation's presses under them, each icon at its time with its name and time on hover, Bloodlust as a band."""
+    """The opener as a guide writes it (issue #39; the owner, 2026-10-26: "hard to read", a strip of 40 s of rotation
+    and Shuriken Storm among the cooldowns): what you cast before the pull, then your presses in order, numbered,
+    up to your last big cooldown (a press of BIG_CD s or more, from the game data, the potion, an item), those framed;
+    then "your rotation". Each press's time under it, its name on hover."""
     plan = simple._plan(d)
     if plan is None:
         return ""
     casts = getattr(plan, "default_opener" if simple.plays_default(d) else "opener", None) or []
     if not casts:
         return ""
-    from paf.optimize import OPENER_SPAN
-    from paf.prep_report import cd_name
+    try:
+        from paf.gamedata import spell_cooldowns
 
-    span = OPENER_SPAN
-    big = {cd_name(d, k) for o in d.optimized for k in o.choice} | {  # the plans' cooldowns (the default list
-        n for _t, n, _s in casts if "potion" in n.lower()} | {  # played has none of its own: a Rogue's Shadow Blades)
-        n for k, n in d.cd_names.items() if k.startswith("use_item")}  # the plan's cooldowns, the potion, the items
-    pre = [n for t, n, _s in casts if t < 0]  # cast before the pull: a lane of its own, in order
-    casts = [c for c in casts if c[0] >= 0]
+        cds = spell_cooldowns()
+    except Exception:  # noqa: BLE001 - offline: the potion and the items only
+        cds = {}
+    items = {n for k, n in d.cd_names.items() if k.startswith("use_item")}
 
-    def x(t: float) -> float:
-        return max(0.0, min(100.0, t / span * 100))
+    def big(n: str, sid: int) -> bool:
+        return "potion" in n.lower() or n in items or (cds.get(sid) or (0.0,))[0] >= BIG_CD
+    pre = [(n, sid) for t, n, sid in casts if t < 0]
+    seq = [(t, n, sid) for t, n, sid in casts if t >= 0]
+    last = max((k for k, (_t, n, sid) in enumerate(seq) if big(n, sid)), default=-1)
+    shown = seq[:max(last + 2, 6)][:18]  # to the last big cooldown and one press after, a short opener at least
 
-    def lane(items: list[tuple[float, str]]) -> tuple[str, int]:  # icons at their times, a close one a row lower
-        rows: list[float] = []
-        out = []
-        for t, n in items:
-            r = next((i for i, last in enumerate(rows) if x(t) - last >= 2.8), len(rows))
-            if r < len(rows):
-                rows[r] = x(t)
-            else:
-                rows.append(x(t))
-            out.append(f"<span class='op-ic' style='left:{x(t):.2f}%;top:{r * 30}px' title='{e(n)} {_mmss(t)}'>"
-                       f"{_ic(_icon(d, n))}</span>")
-        return "".join(out), max(1, len(rows))
-    cds, n_cd = lane([(t, n) for t, n, _s in casts if n in big])
-    rot, n_rot = lane([(t, n) for t, n, _s in casts if n not in big])
-    lust = ""
-    if d.lust is not None and d.lust < span:
-        a = max(0.0, d.lust)
-        lust = (f"<span class='op-lust' style='left:{x(a):.2f}%;width:{x(min(span, a + 40)) - x(a):.2f}%' "
-                f"title='Bloodlust from {_mmss(a)}'></span>")
-    ticks = "".join(f"<span class='op-tk' style='left:{x(t):.2f}%'>{_mmss(t)}</span>"
-                    for t in range(0, int(span) + 1, 5))
-    pre_lane = ("<span class='op-l'>Pre-pull</span><div class='op-pre'>" + "".join(
-        f"<span title='{e(n)} before the pull'>{_ic(_icon(d, n))}</span>" for n in pre) + "</div>") if pre else ""
-    return (f"<section class='opstrip' aria-label='The opener'><h2>Opener <span class='muted small'>the first "
-            f"{span:.0f} s, as SimC plays it</span></h2><div class='op-grid'>{pre_lane}"
-            f"<span class='op-l'>Cooldowns</span><div class='op-track' style='height:{n_cd * 30}px'>{lust}{cds}</div>"
-            f"<span class='op-l'>Rotation</span><div class='op-track' style='height:{n_rot * 30}px'>{lust}{rot}</div>"
-            f"<span></span><div class='op-axis'>{ticks}</div></div></section>")
+    def cell(k: int, t: float | None, n: str, sid: int) -> str:
+        when = "pre-pull" if t is None else _mmss(t)
+        return (f"<li class='{'big' if big(n, sid) else ''}' title='{e(n)} · {when}'>{_ic(_icon(d, n))}"
+                f"<small>{'' if k < 0 else k}</small><em>{when}</em></li>")
+    lust = (" <span class='pill'>in Bloodlust</span>" if d.lust is not None and d.lust < 5 else "")
+    return (f"<section class='opseq' aria-label='The opener'><h2>Opener{lust} <span class='muted small'>as SimC plays "
+            f"it; framed: your big cooldowns</span></h2><ol>"
+            + "".join(cell(-1, None, n, sid) for n, sid in pre)
+            + "".join(cell(k + 1, t, n, sid) for k, (t, n, sid) in enumerate(shown))
+            + "<li class='then'>then your rotation</li></ol></section>")
 
 
 def _second_screen(d) -> str:

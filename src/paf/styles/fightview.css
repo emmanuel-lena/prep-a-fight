@@ -497,17 +497,24 @@ dialog.ss::backdrop{background:var(--bg)}
   background:var(--surface);font-variant-numeric:tabular-nums}
 .fv .boss .ev small.hint{margin-left:0} /* the time and 📖 together on one line, right-aligned (fresh DPS review) */
 .fv .pill.amb{background:transparent;color:var(--warn);border:1px solid currentColor} /* advice, not a loss: amber (fresh DPS review) */
-/* the opener as a strip, as the boss tab's (issue #39; the owner: "nice timelines elsewhere"): a lane for the
-   cooldowns, one for the rotation, each icon at its time; Bloodlust a band, a tick each 5 s */
-.fv .opstrip{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 18px 10px;margin:0 0 18px;box-shadow:var(--shadow)}
-.fv .opstrip h2{font:600 1.1rem/1.25 var(--font-reading);margin:0 0 10px}
-.fv .op-grid{display:grid;grid-template-columns:84px minmax(0,1fr);gap:6px 10px;align-items:start}
-.fv .op-l{font:600 11px/1 var(--font-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-top:9px}
-.fv .op-track{position:relative;border-left:1px solid var(--line);background:repeating-linear-gradient(90deg,transparent 0 calc(12.5% - 1px),color-mix(in srgb,var(--line) 60%,transparent) calc(12.5% - 1px) 12.5%)}
-.fv .op-ic{position:absolute;transform:translateX(-50%);line-height:0;cursor:help}
-.fv .op-ic .ic{width:26px;height:26px}
-.fv .op-lust{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--warn) 14%,transparent);border-top:2px solid color-mix(in srgb,var(--warn) 60%,transparent)}
-.fv .op-axis{position:relative;height:16px}
-.fv .op-tk{position:absolute;transform:translateX(-50%);font:600 10.5px/1 var(--font-display);color:var(--muted);font-variant-numeric:tabular-nums}
-.fv .op-tk:first-child{transform:none} .fv .op-tk:last-child{transform:translateX(-100%)}
-.fv .op-pre{display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 4px} .fv .op-pre .ic{width:26px;height:26px} .fv .op-pre span{line-height:0;cursor:help}
+/* the opener as a guide writes it (issue #39): a numbered sequence, the big cooldowns framed, each press's time */
+.fv .opseq{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 18px 12px;margin:0 0 18px;box-shadow:var(--shadow)}
+.fv .opseq h2{font:600 1.1rem/1.25 var(--font-reading);margin:0 0 10px;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px}
+.fv .opseq ol{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:12px 6px;align-items:flex-start}
+.fv .opseq li{position:relative;display:grid;justify-items:center;gap:3px;cursor:help;padding-right:12px}
+.fv .opseq li:not(:last-child)::after{content:"\203A";position:absolute;right:-1px;top:7px;color:var(--muted);font-size:16px}
+.fv .opseq li .ic{width:34px;height:34px}
+.fv .opseq li.big .ic{box-shadow:0 0 0 2px var(--accent),0 0 0 3px #000}
+.fv .opseq li small{position:absolute;top:-6px;left:-6px;font:700 10px/1 var(--font-display);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:2px 4px}
+.fv .opseq li small:empty{display:none}
+.fv .opseq li em{font:600 10.5px/1 var(--font-display);font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums}
+.fv .opseq li.then{align-self:center;font:600 12px/1 var(--font-display);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;cursor:default;padding-right:0}
+/* a stage at a glance (the owner, 2026-10-26: no sentence of every move): moves as bars, adds as icons, bands */
+.fv .ps{margin:8px 0 4px;max-width:720px}
+.fv .ps-row{position:relative;height:30px;border-bottom:1px solid var(--line)}
+.fv .ps-mv{position:absolute;bottom:0;height:8px;border-radius:3px;background:color-mix(in srgb,var(--muted) 45%,transparent);cursor:help}
+.fv .ps-im{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--line) 90%,transparent) 0 3px,transparent 3px 7px);cursor:help}
+.fv .ps-lust{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--warn) 14%,transparent);border-top:2px solid color-mix(in srgb,var(--warn) 60%,transparent);cursor:help}
+.fv .ps-ic{position:absolute;top:0;transform:translateX(-50%);line-height:0;cursor:help} .fv .ps-ic .ic{width:20px;height:20px}
+.fv .ps-axis{position:relative;height:14px} .fv .ps-tk{position:absolute;transform:translateX(-50%);font:600 10px/1.4 var(--font-display);color:var(--muted)}
+.fv .ps-ic b{position:absolute;right:-6px;bottom:-4px;font:700 9.5px/1 var(--font-display);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:1px 3px;line-height:1}

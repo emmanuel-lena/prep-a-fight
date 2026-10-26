@@ -5,6 +5,11 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 
 ## Unreleased
 
+- The opener reads as a guide writes it: what you cast before the pull, then your presses in order, numbered, to
+  your last big cooldown (framed: a long cooldown from the game data, your potion, your items; no more Shuriken
+  Storm among them), then "your rotation".
+- Each stage of the fight tab is a small strip instead of a sentence: the moves as bars, the add waves (their count
+  on the icon) and boss units at their time, Bloodlust and the boss's immunity as bands, each one's words on hover.
 ## 0.8.28 (2026-10-25)
 
 - The opener lists your presses only: a Frost Mage's Frozen Orb and Flurry bolts (which SimC schedules like casts)
