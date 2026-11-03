@@ -66,3 +66,12 @@ def test_performance_measures_are_attached_without_personal_data(tmp_path, monke
     assert "Zapper" not in perf and "abcDEF123" not in perf  # only step lines: no name, no report
     _, body = feedback.report("slow", "", "", perf)
     assert "--- performance ---" in body
+
+
+def test_report_keeps_a_download_s_last_progress_line():
+    log = "Downloading simc\n" + "".join(f"\r  {i / 115:6.1%}  {i} / 115 MiB" for i in range(1, 116)) + "\nExtract"
+    split = "Downloading simc\n" + "\n".join(f"  {i / 115:6.1%}  {i} / 115 MiB" for i in range(1, 116)) + "\nDone"
+    _, body = feedback.report("x", "", log)
+    assert body.count("MiB") == 1 and "115 / 115 MiB" in body and "Extract" in body
+    _, body = feedback.report("x", "", split)
+    assert body.count("MiB") == 1 and "Done" in body

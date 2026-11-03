@@ -153,9 +153,25 @@ def performance(log: str = "") -> str:
     return "\n".join(lines)
 
 
+PROGRESS = re.compile(r"^\s*\d+(\.\d+)?%\s+\d+ / \d+ MiB$")
+
+
+def overwritten(log: str) -> str:
+    """The log as the console last showed it: a line rewritten with \\r is its last text, and a download's progress
+    only its last line (a report from 0.8.28 held 230 lines of "x% n / 115 MiB" in its log's end)."""
+    out: list[str] = []
+    for raw in log.replace("\r\n", "\n").split("\n"):
+        line = raw.rstrip("\r").rpartition("\r")[2]
+        if PROGRESS.match(line) and out and PROGRESS.match(out[-1]):
+            out[-1] = line
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
 def report(message: str, what: str, log: str, perf: str = "") -> tuple[str, str]:
     """(title, body) of the feedback, scrubbed, log cut to its end; perf: performance() to attach."""
-    log = scrub(log)[-MAX_LOG:]
+    log = scrub(overwritten(log))[-MAX_LOG:]
     title = (message.strip().splitlines() or ["Feedback"])[0][:80]
     body = f"{message.strip()}\n\n{system_line()}\n" + (f"Command: paf {scrub(what)}\n" if what else "")
     if perf:

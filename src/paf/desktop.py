@@ -79,7 +79,10 @@ def _serve_in_process(window) -> bool:
                                                               reason or "OK", lines)
                 deferral.Complete()
 
-            form.Invoke(Action(reply))
+            try:
+                form.Invoke(Action(reply))
+            except Exception:  # noqa: BLE001 - the window closed meanwhile (InvalidOperationException): nobody to answer
+                pass
 
         threading.Thread(target=work, daemon=True).start()
 
