@@ -18,7 +18,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from paf import simc
+from paf import pulllog, simc
 from paf.cdplan import action_name, apl_lines, dump_apl, parse_apl, split_if
 from paf.fight import Fight
 from paf.simc_install import find_simc
@@ -214,6 +214,8 @@ class Plan:
     default_opener: list[tuple[float, str, int]] = field(default_factory=list)  # the default list's, as above
     default_timeline: list[tuple[float, str]] = field(default_factory=list)  # the default list's pull, played
     # instead when the plan is not robust (paf.simple._plan)
+    notes: object = None  # paf.pulllog.Notes of this plan's pull (issue #41), then the default list's
+    default_notes: object = None
 
     @property
     def robust(self) -> bool:
@@ -705,11 +707,13 @@ def optimize_all(profile_text: str, fight: Fight, run_dir: Path, *, objectives: 
     default_pull = play_by_play(profile_text, apl, Plan("default", {}, 0, 0), fight, run_dir, cds)
     pressed = apl_actions(apl)
     default_open = opener(run_dir / "default-pull.log", actions=pressed)
+    default_notes = pulllog.notes(run_dir / "default-pull.log", pressed, NOT_CASTS, OPENER_SPAN)
     if alignment:
         alignment = adjust_alignment(alignment, default_pull, fight)
     for p in plans:
         p.flags = sanity_flags(p, alignment or [], validation)
         p.timeline = play_by_play(profile_text, apl, p, fight, run_dir, cds)
         p.opener = opener(run_dir / f"{p.objective}-pull.log", actions=pressed)
-        p.default_timeline, p.default_opener = default_pull, default_open
+        p.notes = pulllog.notes(run_dir / f"{p.objective}-pull.log", pressed, NOT_CASTS, OPENER_SPAN)
+        p.default_timeline, p.default_opener, p.default_notes = default_pull, default_open, default_notes
     return plans, cds

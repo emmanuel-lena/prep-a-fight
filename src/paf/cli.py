@@ -1667,6 +1667,9 @@ def cmd_prep(args: argparse.Namespace) -> int:
         for p in d.optimized:  # the opener's spells: their icons and Wowhead links (issue #39)
             for _t, n, sid in [*p.opener, *p.default_opener]:
                 d.links.setdefault(n, f"spell={sid}")
+            for notes in (p.notes, p.default_notes):  # what is up at a press, the burst split (issue #41)
+                for sid, n in (notes.names if notes else {}).items():
+                    d.links.setdefault(n, f"spell={sid}")
         if d.defensives and d.defensives.moments:  # the defensive moments go in every note
             extra = defensives.mrt_lines(d.defensives)
             d.mrt = {o: n + "\n" + "\n".join(extra) for o, n in d.mrt.items()}

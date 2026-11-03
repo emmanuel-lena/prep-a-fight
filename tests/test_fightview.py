@@ -264,3 +264,26 @@ def test_a_stage_reads_as_a_strip_not_a_sentence(monkeypatch):
     assert "everyone moves from" not in html and "class='ps'" in html
     assert "title='everyone moves 0:11 to 0:22'" in html and "title='3 × Spawn of Vexhul at 0:35'" in html
     assert "title='Bloodlust at 0:00'" in html and ">1:00</span>" in html and "<b>3</b></span>" in html
+
+
+def test_the_opener_says_the_shards_at_a_spender_what_is_up_and_the_burst_split(monkeypatch, tmp_path):
+    # issue #41 (a Demonology tester): "how many shards at the Tyrant, must the dogs be out, what in the burst?"
+    from paf import pulllog
+
+    notes = pulllog.Notes("shards", {
+        (4.794, 265187): pulllog.Press(4.794, "summon_demonic_tyrant", 265187, res=5, up=[104316]),
+        (5.58, 105174): pulllog.Press(5.58, "hand_of_guldan", 105174, res=3, spends=True),
+        (6.0, 686): pulllog.Press(6.0, "shadow_bolt", 686, res=1)},
+        pulllog.Split(0.4, [(105174, "hand_of_guldan", 0.38)], [(264178, "demonbolt", 0.28)]),
+        {104316: "Call Dreadstalkers", 105174: "Hand of Gul'dan", 264178: "Demonbolt"})
+    d = sheet(monkeypatch)
+    d.optimized[0].opener = [(4.794, "Summon Demonic Tyrant", 265187), (5.58, "Hand of Gul'dan", 105174),
+                             (6.0, "Shadow Bolt", 686)]
+    d.optimized[0].notes = notes
+    monkeypatch.setattr("paf.gamedata.spell_cooldowns", lambda: {265187: (60.0, 1)})
+    html = fightview.opener_html(d)
+    assert "title='Summon Demonic Tyrant · 0:04 · 5 shards · with Call Dreadstalkers'" in html
+    assert "<b class='res'>5</b><span class='up'>" in html
+    assert "title='Hand of Gul&#x27;dan · 0:05 · 3 shards'" in html  # a spender: its shards
+    assert "title='Shadow Bolt · 0:06'" in html  # a builder: none
+    assert "In your cooldowns" in html and "38%" in html and "Between them" in html and "28%" in html

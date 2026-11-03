@@ -518,3 +518,15 @@ dialog.ss::backdrop{background:var(--bg)}
 .fv .ps-ic{position:absolute;top:0;transform:translateX(-50%);line-height:0;cursor:help} .fv .ps-ic .ic{width:20px;height:20px}
 .fv .ps-axis{position:relative;height:14px} .fv .ps-tk{position:absolute;transform:translateX(-50%);font:600 10px/1.4 var(--font-display);color:var(--muted)}
 .fv .ps-ic b{position:absolute;right:-6px;bottom:-4px;font:700 9.5px/1 var(--font-display);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:1px 3px;line-height:1}
+/* what a guide adds to the opener (issue #41): the resource on the icon, what of yours is up, the burst split */
+.fv .opseq li b.res{position:absolute;top:21px;right:14px;font:700 11px/1 var(--font-display);color:#fff;text-shadow:0 0 2px #000,0 0 2px #000;font-variant-numeric:tabular-nums}
+.fv .opseq li .up{display:flex;gap:1px}
+.fv .opseq li .ic.up{width:14px;height:14px;border-radius:3px}
+.fv .opseq .bs{display:grid;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.fv .opseq .bs-row{display:flex;align-items:center;gap:10px}
+.fv .opseq .bs-h{flex:0 0 136px;font:600 11px/1.2 var(--font-display);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.fv .opseq .bs ul{list-style:none;margin:0;padding:0;display:flex;gap:10px}
+.fv .opseq .bs li{display:flex;align-items:center;gap:4px;cursor:help}
+.fv .opseq .bs li .ic{width:24px;height:24px}
+.fv .opseq .bs li em{font:600 11px/1 var(--font-display);font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums}
+.fv .opseq .bs li::after{content:none}

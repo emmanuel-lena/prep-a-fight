@@ -19,6 +19,7 @@ from html import escape as e
 from importlib.resources import files
 
 from paf import icons, simple, theme
+from paf.pulllog import BIG_CD
 
 ROW_GAP = 6.0  # seconds: events this close share one row of the timeline
 PRE = -2.0  # where "before the pull" sits
@@ -782,20 +783,21 @@ def _side(d) -> str:
             f"{job_html(d)}</aside>")  # no pointer to the Dig deeper tab: it is right there (review 36)
 
 
-BIG_CD = 45.0  # a cooldown of this many seconds at least is a big one in the opener (game data, base values)
-
-
 def opener_html(d) -> str:
     """The opener as a guide writes it (issue #39; the owner, 2026-10-26: "hard to read", a strip of 40 s of rotation
     and Shuriken Storm among the cooldowns): what you cast before the pull, then your presses in order, numbered,
     up to your last big cooldown (a press of BIG_CD s or more, from the game data, the potion, an item), those framed;
-    then "your rotation". Each press's time under it, its name on hover."""
+    then "your rotation". Each press's time under it, its name on hover. What a guide adds (issue #41, "how many
+    shards at the Tyrant, must the dogs be out?"): the resource you hold on a spender's or a big cooldown's icon,
+    the icons of what of yours is up under a big cooldown; and what the list presses in your cooldowns and between."""
     plan = simple._plan(d)
     if plan is None:
         return ""
-    casts = getattr(plan, "default_opener" if simple.plays_default(d) else "opener", None) or []
+    default = simple.plays_default(d)
+    casts = getattr(plan, "default_opener" if default else "opener", None) or []
     if not casts:
         return ""
+    notes = getattr(plan, "default_notes" if default else "notes", None)
     try:
         from paf.gamedata import spell_cooldowns
 
@@ -810,17 +812,43 @@ def opener_html(d) -> str:
     seq = [(t, n, sid) for t, n, sid in casts if t >= 0]
     last = max((k for k, (_t, n, sid) in enumerate(seq) if big(n, sid)), default=-1)
     shown = seq[:max(last + 2, 6)][:18]  # to the last big cooldown and one press after, a short opener at least
+    res = notes.resource if notes else ""
 
     def cell(k: int, t: float | None, n: str, sid: int) -> str:
         when = "pre-pull" if t is None else _mmss(t)
-        return (f"<li class='{'big' if big(n, sid) else ''}' title='{e(n)} · {when}'>{_ic(_icon(d, n))}"
-                f"<small>{'' if k < 0 else k}</small><em>{when}</em></li>")
+        hover, extra = [n, when], ""
+        st = notes.at.get((round(t, 3), sid)) if notes and t is not None else None
+        if st and st.res is not None and (st.spends or (big(n, sid) and st.res)):
+            hover.append(f"{st.res} {res}")
+            extra += f"<b class='res'>{st.res}</b>"
+        if st and big(n, sid) and st.up:
+            up = [notes.names.get(x, "") for x in st.up][:4]
+            hover.append("with " + ", ".join(x for x in up if x))
+            extra += "<span class='up'>" + "".join(_ic(_icon(d, x), "ic up") for x in up) + "</span>"
+        return (f"<li class='{'big' if big(n, sid) else ''}' title='{e(' · '.join(hover))}'>{_ic(_icon(d, n))}"
+                f"<small>{'' if k < 0 else k}</small><em>{when}</em>{extra}</li>")
     lust = (" <span class='pill'>in Bloodlust</span>" if d.lust is not None and d.lust < 5 else "")
-    return (f"<section class='opseq' aria-label='The opener'><h2>Opener{lust} <span class='muted small'>as SimC plays "
-            f"it; framed: your big cooldowns</span></h2><ol>"
+    key = (f"; the number on an icon: your {res} as you press it" if res else "")
+    return (f"<section class='opseq' aria-label='The opener'><h2 title='Framed: your big cooldowns, under them what of "
+            f"yours is up{e(key)}'>Opener{lust} <span class='muted small'>as SimC plays it</span></h2><ol>"
             + "".join(cell(-1, None, n, sid) for n, sid in pre)
             + "".join(cell(k + 1, t, n, sid) for k, (t, n, sid) in enumerate(shown))
-            + "<li class='then'>then your rotation</li></ol></section>")
+            + "<li class='then'>then your rotation</li></ol>" + _burst_html(d, notes) + "</section>")
+
+
+def _burst_html(d, notes) -> str:
+    """Two rows: what the list presses more in your big cooldowns, and more between them (issue #41: "what do I do
+    in the burst phases and without them?"), each spell's share of the presses there."""
+    sp = notes.split if notes else None
+    if not sp or not (sp.inside or sp.outside):
+        return ""
+
+    def row(label: str, hint: str, side) -> str:
+        cells = "".join(f"<li title='{e(notes.names.get(sid, ''))} · {c:.0%} of your presses {hint}'>"
+                        f"{_ic(_icon(d, notes.names.get(sid, '')))}<em>{c:.0%}</em></li>" for sid, _a, c in side)
+        return f"<div class='bs-row'><span class='bs-h'>{label}</span><ul>{cells}</ul></div>" if cells else ""
+    return ("<div class='bs'>" + row("In your cooldowns", "in them", sp.inside)
+            + row("Between them", "between them", sp.outside) + "</div>")
 
 
 def _second_screen(d) -> str:

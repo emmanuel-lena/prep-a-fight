@@ -10,6 +10,11 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
   Storm among them), then "your rotation".
 - Each stage of the fight tab is a small strip instead of a sentence: the moves as bars, the add waves (their count
   on the icon) and boss units at their time, Bloodlust and the boss's immunity as bands, each one's words on hover.
+- The opener says what a guide adds: the shards (combo points, holy power...) you hold on a spender's or a big
+  cooldown's icon, what of yours is up under a big cooldown (the Tyrant: your Imp Lord and Dreadstalkers), and what
+  the sim presses more inside your cooldowns and between them (#41).
+- A bug report's log no longer fills up with the download's progress lines.
+
 ## 0.8.28 (2026-10-25)
 
 - The opener lists your presses only: a Frost Mage's Frozen Orb and Flurry bolts (which SimC schedules like casts)
