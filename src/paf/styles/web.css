@@ -480,3 +480,10 @@ table.status td:first-child{padding-right:18px;white-space:nowrap}
 .lr-hp{display:inline-block;width:120px;height:8px;border-radius:4px;background:color-mix(in srgb,var(--fg) 12%,transparent);overflow:hidden}
 .lr-hp>i{display:block;height:100%;background:var(--neg);opacity:.75}
 .rl-tl{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0 4px;font-size:14px} .rl-tl>b{font:600 12px var(--font-display);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+/* the roster changed by hand (issue #42): an added player dashed, a spec set by hand in the accent; the two forms */
+.rl-p.add button{border:1px dashed var(--muted);background:transparent}
+.rl-p.chg button small{color:var(--accent)}
+.rl-edit{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+.rl-edit form{display:flex;gap:6px;align-items:center;margin:0}
+.rl-edit input,.rl-edit select{font-size:13.5px;padding:6px 10px}
+.rl-edit input[name=name]{width:150px} .rl-edit input[name=log]{width:230px}

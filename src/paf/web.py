@@ -2272,12 +2272,22 @@ class Handler(BaseHTTPRequestHandler):
                 from paf import raidlead
 
                 diff = (form.get("difficulty") or [settings.get("difficulty")])[0]
-                raidlead.start(diff if diff in settings.DIFFICULTIES else "heroic")
+                raidlead.read_log(diff if diff in settings.DIFFICULTIES else "heroic", (form.get("log") or [""])[0])
                 self._redirect("/raidlead")
             elif self.path == "/raidlead/bench":
                 from paf import raidlead
 
                 raidlead.toggle_bench((form.get("name") or [""])[0])
+                self._redirect("/raidlead")
+            elif self.path in ("/raidlead/player", "/raidlead/remove"):
+                from paf import raidlead
+
+                name = (form.get("name") or [""])[0]
+                if self.path.endswith("remove"):
+                    raidlead.remove_player(name)
+                elif raidlead.set_player(name, (form.get("spec") or [""])[0]):  # a new spec: its talent rankings
+                    st = raidlead.load()
+                    raidlead.start(st.get("difficulty") or "heroic", st.get("report"))
                 self._redirect("/raidlead")
             elif self.path == "/raidlead/lust":
                 from paf import raidlead

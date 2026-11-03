@@ -145,7 +145,10 @@ def run(log=print) -> int:
         con = db.connect()
         from paf.raidreview import _damage_spec
 
-        specs = sorted({s for _n, s, _d in rc.players if _damage_spec(s)})  # healers and tanks: no build advice
+        state = load()  # with the hand edits made meanwhile (issue #42)
+        state["added"] = [[n, s] for n, s in state.get("added") or [] if n not in {p[0] for p in rc.players}]
+        save(state)
+        specs = sorted({s for _n, s, _d in roster(state) if _damage_spec(s)})  # healers and tanks: no build advice
         splits = state.get("splits") or {}
         for x in encs:
             if not _has_corpus(con, x.id, diff):
@@ -178,9 +181,9 @@ def builds(state: dict, enc_id: int, diff: int, roles: dict[str, str], names: di
     from paf.talents import utility
 
     out = []
-    for name, spec, _dps in state.get("players") or []:
+    for name, spec, _dps in roster(state):
         split = (state.get("splits") or {}).get(f"{enc_id}|{diff}|{spec}") or {}
-        taken = set(state.get("talents", {}).get(name) or [])
+        taken = set(_talents(state, name))
         if not split or not taken:
             continue
         side = roles.get(name, "boss")
@@ -204,13 +207,18 @@ def builds(state: dict, enc_id: int, diff: int, roles: dict[str, str], names: di
     return out
 
 
+def _talents(state: dict, name: str) -> list[int]:
+    """A player's talents from the log; none known once the raid lead changed their spec (the log's are another's)."""
+    return [] if name in (state.get("specs") or {}) else state.get("talents", {}).get(name) or []
+
+
 def unread(state: dict, enc_id: int, diff: int) -> list[str]:
     """The players builds() could not check (no talents read, or no build split for their spec): "nobody to
     change" never covers them (a review: Veoxic on an add, unread, under a green "nobody")."""
     out = []
-    for name, spec, _dps in state.get("players") or []:
+    for name, spec, _dps in roster(state):
         split = (state.get("splits") or {}).get(f"{enc_id}|{diff}|{spec}") or {}
-        if name not in set(state.get("bench") or []) and split and not state.get("talents", {}).get(name):
+        if name not in set(state.get("bench") or []) and split and not _talents(state, name):
             out.append(name)  # a spec with no pad/boss split (a tank, a healer) has nothing to read: not "unread"
     return out
 
@@ -218,7 +226,7 @@ def unread(state: dict, enc_id: int, diff: int) -> list[str]:
 def no_split(state: dict, enc_id: int, diff: int) -> int:
     """The players whose spec has no pad/boss build on this boss (the tanks and healers): said once, apart."""
     bench = set(state.get("bench") or [])
-    return sum(1 for name, spec, _d in state.get("players") or [] if name not in bench
+    return sum(1 for name, spec, _d in roster(state) if name not in bench
                and not (state.get("splits") or {}).get(f"{enc_id}|{diff}|{spec}"))
 
 
@@ -242,7 +250,7 @@ def sheet(state: dict, enc, diff: int) -> dict | None:
     if not _has_corpus(con, enc.id, diff):
         return None
     bench = set(state.get("bench") or [])
-    players = [(n, s, d) for n, s, d in state.get("players") or [] if n not in bench]
+    players = [(n, s, d) for n, s, d in roster(state) if n not in bench]
     rc = RaidComp(state.get("report", ""), state.get("roster_from", ""), players, {}, 0.0, False)
     refs = _references(con, enc.id, diff, main_boss(con, enc.id, diff, enc.name))
     rows = comp.assign(rc, refs)
@@ -431,16 +439,25 @@ def page_body(difficulty: str) -> str:
                        f"value='{e(difficulty)}'><button class='btn go'>Read my raid's roster</button></form></section>"
                        + _tools())
     bench = set(state.get("bench") or [])
-    chips = "".join(
-        f"<form method='post' action='/raidlead/bench' class='rl-p{' off' if n in bench else ''}'>"
-        f"<input type='hidden' name='name' value='{e(n)}'><button type='submit' title='"
-        f"{'Back in the raid' if n in bench else 'Bench'}'>{_ic(s)}<b>{e(n)}</b><small>{e(pretty(s))}</small></button></form>"
-        for n, s, _d in sorted(state["players"], key=lambda p: p[1]))
+    edited, added = set(state.get("specs") or {}), {n for n, _s in state.get("added") or []}
+    players = roster(state)
+
+    def chip(n: str, s: str) -> str:
+        if n in added:  # by hand: a click takes them out of the roster
+            act, tip, cls = "remove", "Remove (added by hand)", " add"
+        else:
+            act, tip = "bench", "Back in the raid" if n in bench else "Bench"
+            cls = (" off" if n in bench else "") + (" chg" if n in edited else "")
+        tip += " (spec set by hand)" if n in edited else ""
+        return (f"<form method='post' action='/raidlead/{act}' class='rl-p{cls}'><input type='hidden' name='name' "
+                f"value='{e(n)}'><button type='submit' title='{tip}'>{_ic(s)}<b>{e(n)}</b><small>{e(pretty(s))}"
+                f"</small></button></form>")
+    chips = "".join(chip(n, s) for n, s, _d in sorted(players, key=lambda p: p[1]))
     day = state.get("report_day")
     when = time.strftime(" (%a %d %b)", time.localtime(day / 1000)) if day else ""
     from paf.raidreview import _damage_spec
 
-    in_raid = [s for n, s, _d in state["players"] if n not in bench]
+    in_raid = [s for n, s, _d in players if n not in bench]
     said = sum(1 for s in in_raid if not _damage_spec(s))  # no pad/boss build to compare: said here, not per boss
     from paf.raidneed import HEALERS
 
@@ -449,14 +466,26 @@ def page_body(difficulty: str) -> str:
     roles = (f"<span class='rl-role' title='tanks: {NO_BUILD}'>&#128737; {tanks}</span>"
              f"<span class='rl-role' title='healers: {NO_BUILD}'>&#10010; {heal}</span>"
              f"<span class='rl-role' title='damage dealers'>&#9876; {len(in_raid) - said}</span>")
-    roster = (f"<section class='rl-roster'><h2>Your roster <small class='muted'>{len(in_raid)} players</small>"
-              f"<span class='rl-roles'>{roles}</span></h2>"
-              f"<p class='small muted'>From {e(state.get('roster_from', ''))}{when} "
-              f"&middot; <a href='https://www.warcraftlogs.com/reports/{e(state['report'])}' target='_blank' rel='noopener'>"
-              f"the log &#8599;</a></p><div class='rl-chips'>{chips}</div>"
-              f"<form method='post' action='/raidlead/read'><input type='hidden' name='difficulty' value='{e(difficulty)}'>"
-              f"<button class='btn ghost'>Read the roster again</button></form></section>")
-    spec_of = {n: sp for n, sp, _d in state["players"]}  # a player's class icon beside its name
+    groups = "".join(f"<optgroup label='{e(pretty(c))}'>" + "".join(
+        f"<option value='{e(f'{sp} {c}')}'>{e(pretty(f'{sp} {c}'))}</option>" for sp in specs) + "</optgroup>"
+                     for c, specs in CLASSES.items())
+    names = "".join(f"<option value='{e(n)}'>" for n, _s, _d in players)
+    edit = (f"<div class='rl-edit'><form method='post' action='/raidlead/player'><datalist id='rl-names'>{names}"
+            "</datalist><input name='name' list='rl-names' placeholder='Player' required maxlength='24' "
+            "aria-label='Player: a new one, or one of the roster to change their spec'>"
+            f"<select name='spec' aria-label='Spec'>{groups}</select><button class='btn ghost'>Add, or change "
+            f"their spec</button></form><form method='post' action='/raidlead/read'><input type='hidden' "
+            f"name='difficulty' value='{e(difficulty)}'><input name='log' placeholder='Another log: its link' "
+            "aria-label='Another log: its Warcraft Logs link (empty: your last raid again)'>"
+            "<button class='btn ghost'>Read the roster</button></form></div>")
+    roster_html = (f"<section class='rl-roster'><h2>Your roster <small class='muted'>{len(in_raid)} players</small>"
+                   f"<span class='rl-roles'>{roles}</span></h2>"
+                   f"<p class='small muted'>From {e(state.get('roster_from', ''))}{when} "
+                   f"&middot; <a href='https://www.warcraftlogs.com/reports/{e(state['report'])}' target='_blank' "
+                   f"rel='noopener'>the log &#8599;</a> &middot; click a player to bench them</p>"
+                   + (f"<p class='notice'>{e(state['error'])}</p>" if state.get("error") else "")
+                   + f"<div class='rl-chips'>{chips}</div>{edit}</section>")
+    spec_of = {n: sp for n, sp, _d in players}  # a player's class icon beside its name
     cards, missing = "", []
     everything = []
     strip: list[str] = []  # the night at a glance: a boss a cell, what it asks (fresh app reviews 1-3)
@@ -513,7 +542,7 @@ def page_body(difficulty: str) -> str:
                   f"{copy_button(text(sh, difficulty), 'Copy for Discord')}"
                   f"{copy_button(text(sh, difficulty, mrt=True), 'Copy MRT note')}</header>"
                   f"{tg or alone}"  # the table's header says what it is (fresh app review 7: nine headings)
-                  + _talents_h4(sh, len(state["players"]) - len(bench), said) + (f"<ul>{bd}</ul>" if bd else "")
+                  + _talents_h4(sh, len(players) - len(bench), said) + (f"<ul>{bd}</ul>" if bd else "")
                   + lust_block(sh, difficulty) + "</article>")
     allbtn = (copy_button("\n\n".join(text(sh, difficulty) for sh in everything), "Copy every boss for Discord")
               if everything else "")
@@ -526,7 +555,7 @@ def page_body(difficulty: str) -> str:
              "both the top players' builds, not a sim. The MRT note is the text the Method Raid Tools "
              "addon shows in game.</p>"
              ) if everything else ""
-    return (head + roster + f"<h2>Boss by boss</h2><nav class='rl-strip' aria-label='Every boss'>{''.join(strip)}</nav>"
+    return (head + roster_html + f"<h2>Boss by boss</h2><nav class='rl-strip' aria-label='Every boss'>{''.join(strip)}</nav>"
             f"<div class='rl-all'>{allbtn}</div>{words}<div class='rl-grid'>{cards}</div>"
             f"{_tools()}{COPY_JS}")
 
@@ -603,6 +632,71 @@ def toggle_bench(name: str) -> None:
     bench = set(state.get("bench") or [])
     bench ^= {name}
     state["bench"] = sorted(bench)
+    save(state)
+
+
+# every spec as Warcraft Logs names it, for a player added by hand (issue #42)
+CLASSES = {"DeathKnight": ("Blood", "Frost", "Unholy"), "DemonHunter": ("Havoc", "Vengeance", "Devourer"),
+           "Druid": ("Balance", "Feral", "Guardian", "Restoration"),
+           "Evoker": ("Devastation", "Augmentation", "Preservation"),
+           "Hunter": ("BeastMastery", "Marksmanship", "Survival"), "Mage": ("Arcane", "Fire", "Frost"),
+           "Monk": ("Brewmaster", "Mistweaver", "Windwalker"), "Paladin": ("Holy", "Protection", "Retribution"),
+           "Priest": ("Discipline", "Holy", "Shadow"), "Rogue": ("Assassination", "Outlaw", "Subtlety"),
+           "Shaman": ("Elemental", "Enhancement", "Restoration"),
+           "Warlock": ("Affliction", "Demonology", "Destruction"), "Warrior": ("Arms", "Fury", "Protection")}
+SPECS = [f"{sp} {cls}" for cls, specs in CLASSES.items() for sp in specs]
+
+
+def read_log(difficulty: str, link: str = "") -> None:
+    """Read the roster of this log (a pasted Warcraft Logs link), else of the raid's last log again."""
+    from paf.raidneed import report_code
+
+    code = None
+    if link.strip():
+        try:
+            code = report_code(link)
+        except ValueError:
+            state = load()
+            state["error"] = "Not a Warcraft Logs report link: paste the address of the log's page."
+            save(state)
+            return
+    start(difficulty, code)
+
+
+def roster(state: dict) -> list[tuple[str, str, float]]:
+    """The raid as the raid lead set it (issue #42, a tester: "no simple way to change the roster"): the log's
+    players, a spec changed by hand, the players added by hand (not in the log: no DPS, no talents)."""
+    specs = state.get("specs") or {}
+    out = [(n, specs.get(n, s), d) for n, s, d in state.get("players") or []]
+    seen = {n for n, _s, _d in out}
+    return out + [(n, s, 0.0) for n, s in state.get("added") or [] if n not in seen]
+
+
+def set_player(name: str, spec: str) -> bool:
+    """Add a player, or change a player's spec. True when the talent rankings of that spec are still to read."""
+    name = " ".join(name.split())[:24]
+    if not name or spec not in SPECS:
+        return False
+    state = load()
+    if any(n == name for n, _s, _d in state.get("players") or []):
+        specs = state.setdefault("specs", {})
+        if next(s for n, s, _d in state["players"] if n == name) == spec:
+            specs.pop(name, None)
+        else:
+            specs[name] = spec
+    else:
+        state["added"] = [[n, s] for n, s in state.get("added") or [] if n != name] + [[name, spec]]
+    save(state)
+    from paf.raidreview import _damage_spec
+
+    return _damage_spec(spec) and not any(k.endswith(f"|{spec}") for k in state.get("splits") or {})
+
+
+def remove_player(name: str) -> None:
+    """A player added by hand goes; a spec changed by hand goes back to the log's."""
+    state = load()
+    state["added"] = [[n, s] for n, s in state.get("added") or [] if n != name]
+    (state.get("specs") or {}).pop(name, None)
     save(state)
 
 

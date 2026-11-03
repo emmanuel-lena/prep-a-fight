@@ -109,3 +109,36 @@ def test_the_strip_says_what_each_boss_asks():
     # no spec with a pad/boss build on this boss (Coiled Altar): nothing compared, never "nothing to change"
     none = raidlead._strip_cell(x, {"targets": [], "builds": [], "no_split": 18}, 18)
     assert "no pad/boss build" in none and "n/a</b> talents" in none and "everyone on their build" not in none
+
+
+def test_the_raid_lead_adds_a_player_and_changes_a_spec_by_hand(tmp_path, monkeypatch):
+    # issue #42 (a tester): "no simple way to change the roster"
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    raidlead.save({**STATE, "splits": dict(STATE["splits"])})
+    assert raidlead.set_player("Newbie", "Devastation Evoker")  # a new damage spec: its rankings to read
+    assert not raidlead.set_player("Holy", "Holy Priest")  # a healer: no build to read
+    assert not raidlead.set_player("Ghost", "Nonsense Spec")  # not a spec: nothing
+    raidlead.set_player("Nolow", "Affliction Warlock")  # the log's own spec: no change
+    assert not raidlead.set_player("Frosty", "Affliction Warlock")  # a spec already read
+    state = raidlead.load()
+    assert raidlead.roster(state) == [
+        ("Nolow", "Affliction Warlock", 900_000), ("Frosty", "Affliction Warlock", 950_000),
+        ("Newbie", "Devastation Evoker", 0.0), ("Holy", "Holy Priest", 0.0)]
+    assert raidlead._talents(state, "Frosty") == []  # the log's talents are a Frost Mage's: unknown now
+    assert raidlead.builds(state, 7, 4, {}, NAMES)[0]["name"] == "Nolow"  # Frosty unread, never told to swap
+    assert "Frosty" in raidlead.unread(state, 7, 4)
+    raidlead.set_player("Frosty", "Frost Mage")  # back to the log's: its talents again
+    raidlead.remove_player("Newbie")
+    state = raidlead.load()
+    assert raidlead._talents(state, "Frosty") == [1] and [n for n, _s, _d in raidlead.roster(state)][-1] == "Holy"
+
+
+def test_a_pasted_link_that_is_no_log_is_said(tmp_path, monkeypatch):
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    started = []
+    monkeypatch.setattr(raidlead, "start", lambda diff, code=None: started.append(code))
+    raidlead.read_log("heroic", "https://www.warcraftlogs.com/reports/abcdABCD12345678#fight=3")
+    raidlead.read_log("heroic", "")
+    assert started == ["abcdABCD12345678", None]
+    raidlead.read_log("heroic", "my raid")
+    assert "Not a Warcraft Logs report link" in raidlead.load()["error"] and len(started) == 2

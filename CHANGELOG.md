@@ -13,6 +13,8 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 - The opener says what a guide adds: the shards (combo points, holy power...) you hold on a spender's or a big
   cooldown's icon, what of yours is up under a big cooldown (the Tyrant: your Imp Lord and Dreadstalkers), and what
   the sim presses more inside your cooldowns and between them (#41).
+- Raid lead: change your roster on the page. Add a player who was not in the log, set a player's spec (their
+  talents then count as unknown), or paste another log's link to read its roster; a click still benches (#42).
 - A bug report's log no longer fills up with the download's progress lines.
 
 ## 0.8.28 (2026-10-25)
