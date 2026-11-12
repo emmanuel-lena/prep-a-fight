@@ -157,3 +157,31 @@ def test_discovery_leaves_on_use_items_to_their_slot(monkeypatch, tmp_path):
     monkeypatch.setattr(optimize, "play_by_play", lambda *a, **k: events)
     apl = OrderedDict([("", ["ascendance", "use_item,slot=trinket1", "lightning_bolt"])])
     assert optimize.discover_cooldowns("", apl, tmp_path) == {"ascendance"}
+
+
+def test_a_round_races_only_the_rules_that_may_beat_it(monkeypatch, tmp_path):
+    # the owner, 2026-11-12: "optimise all that": a round's 27 rules at the coarse error, then the few that may gain
+    from collections import OrderedDict
+
+    from paf import optimize, simc
+    from paf.fight import Fight
+
+    rules = [optimize.Rule("default", "", lambda c: c)] + [optimize.Rule(f"r{i}", "", lambda c: c) for i in range(14)]
+    cds = [optimize.Cooldown("big_cd", "Big", True, rules)]
+    gain = {f"big_cd__{i}": (1.5 if i == 3 else -2.0) for i in range(1, 15)}  # r3 gains 1.5%, the others lose
+    calls = []
+
+    def run(text, run_dir, target_error=0.2, **kw):
+        names = sorted({line.split('"')[1] for line in text.splitlines() if line.startswith("profileset.")})
+        calls.append((run_dir.name, target_error, len(names)))
+        base = {"dps": simc.Metric(100.0, target_error), "prioritydps": simc.Metric(100.0, target_error)}
+        sets = [simc.ProfilesetResult(n, {"dps": simc.Metric(100 + gain[n], target_error),
+                                          "prioritydps": simc.Metric(100 + gain[n], target_error)}) for n in names]
+        return simc.SimResult(base, sets, tmp_path / "r.json")
+
+    monkeypatch.setattr(simc, "run", run)
+    monkeypatch.setattr(optimize, "apply_rules", lambda apl, choice: [f"# {k}={r.name}" for k, r in choice.items()])
+    plan = optimize.optimize_objective("rogue=x", OrderedDict(), cds, Fight("f", 300), "total", tmp_path,
+                                       max_rounds=1, log=lambda m: None)
+    assert calls == [("total-round1", 0.4, 14), ("total-round1-race", 0.2, 1)]  # one rule raced again, not 14
+    assert plan.choice["big_cd"].name == "r2"  # rules[3]

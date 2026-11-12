@@ -223,6 +223,10 @@ class Plan:
         return all(g > max(2 * self.error, 0.1) for g in self.sensitivity.values()) if self.sensitivity else True
 
 
+RACE_FROM = 12  # rules tried in a round: past this many, the round races (paf.topgear.race)
+RACE_COARSE = 2.0
+
+
 def optimize_objective(profile_text: str, apl: OrderedDict[str, list[str]], cds: list[Cooldown], fight: Fight,
                        objective: str, run_dir: Path, *, target_error: float = 0.2, max_rounds: int = 3,
                        log: Callable[[str], None] = print) -> Plan:
@@ -242,7 +246,15 @@ def optimize_objective(profile_text: str, apl: OrderedDict[str, list[str]], cds:
                 sets[name] = apply_rules(apl, {**choice, c.key: r})
                 owner[name] = (c.key, r)
         res = simc.run(simc.build_input(base, fight_lines, sets), run_dir / f"{objective}-round{rnd}",
-                       target_error=target_error)
+                       target_error=target_error * (RACE_COARSE if len(sets) >= RACE_FROM else 1))
+        if len(sets) >= RACE_FROM:  # a race (as paf.topgear.race): only the rules that may beat it, at the error
+            maybe = {ps.name for ps in res.profilesets if ps.name in owner
+                     and sum(metric_delta(res, ps, objective)) > 0}  # its gain plus its noise above zero
+            res = simc.run(simc.build_input(base, fight_lines, {k: v for k, v in sets.items() if k in maybe}),
+                           run_dir / f"{objective}-round{rnd}-race", target_error=target_error) if maybe else res
+            if not maybe:
+                log(f"  [{objective}] round {rnd}: no significant improvement")
+                break
         best: dict[str, tuple[float, Rule]] = {}
         for ps in res.profilesets:
             if ps.name not in owner:

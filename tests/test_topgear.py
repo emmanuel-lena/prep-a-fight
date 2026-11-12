@@ -136,3 +136,25 @@ def test_the_local_search_finds_a_swap_the_pruning_missed():
     out = refine(pool, start, score, {"f": 1.0}, 0, frozenset(), log=lambda m: None)
     ids = {g.item_id for o in out.options.values() for g in o.gears()}
     assert {2001, 3003} <= ids and out.scores["f"] == 1.4
+
+
+def test_pass_2_races_and_only_the_contenders_run_at_the_fine_error():
+    # the owner, 2026-11-12: "optimise all that" (143 Outlaw sets at 0.3%, 15 min, to keep one)
+    from paf.topgear import Combo, race
+
+    combos = [Combo(f"c{i}", {}) for i in range(30)]
+    true = {c.name: -0.25 * i for i, c in enumerate(combos)}  # c0 best, 0.25% apart
+    runs = []
+
+    def score(cs, error, tag):
+        runs.append((tag, error, len(cs)))
+        for c in cs:
+            c.scores["f"], c.errors["f"] = true[c.name], error
+
+    race(combos, 0.3, score, {"f": 1.0}, log=lambda m: None)
+    assert runs[0] == ("pass2", 0.6, 30)
+    assert runs[1][:2] == ("pass2-race", 0.3) and runs[1][2] == 5  # within 0.6 + 0.6 of the best: c0..c4
+    assert max(combos, key=lambda c: c.weighted({"f": 1.0})).name == "c0"
+    runs.clear()
+    race(combos[:5], 0.3, score, {"f": 1.0}, log=lambda m: None)
+    assert runs == [("pass2", 0.3, 5)]  # a few sets: no race

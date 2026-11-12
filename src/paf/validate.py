@@ -185,8 +185,10 @@ MOVEMENT_SCALES = (0.0, 0.25, 0.5, 0.75, 1.0)
 
 
 def calibrate_movement(checks: list[Check], fight: Fight, run_dir: Path,
-                       target_error: float = 0.3) -> tuple[float, list[tuple[float, float]]]:
-    """Movement scale for which the top players' simulated DPS matches their real DPS (median ratio 1)."""
+                       target_error: float = 0.6) -> tuple[float, list[tuple[float, float]]]:
+    """Movement scale for which the top players' simulated DPS matches their real DPS (median ratio 1). At 0.6%
+    (0.3% until 2026-11-12, a quarter of the iterations): the top players' own ratios spread over several %, the
+    scale stays within about 0.05."""
     per_scale: dict[float, list[float]] = {s: [] for s in MOVEMENT_SCALES}
     fixed = [line for line in fight.to_simc() if not line.startswith("raid_events")]
     for check in checks:

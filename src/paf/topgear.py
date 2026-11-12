@@ -337,7 +337,7 @@ def run_topgear(profile_text: str, pool: GearPool, fights: list[FightProfile], r
                     c.scores[fp.name] = score_of(res, ps, objective)
                     c.errors[fp.name] = ps.dps.error / base * 100 if base else 0
             log(f"  {fp.name}: {res.elapsed:.0f}s")
-    score(combos, pass2_error, "pass2")
+    race(combos, pass2_error, score, weights, log)
     if thorough and combos:
         top = sorted(combos, key=lambda c: -c.weighted(weights))[:25]
         log(f"Pass 3: the best {len(top)} sets again, at a fine error")
@@ -345,6 +345,30 @@ def run_topgear(profile_text: str, pool: GearPool, fights: list[FightProfile], r
         combos.append(refine(pool, max(top, key=lambda c: c.weighted(weights)), score, weights, min_tier, crafted,
                              log))
     return TopGearResult(fights, combos, run_dir)
+
+
+RACE_FROM = 12  # combinations: past this many, pass 2 races (a coarse error first)
+RACE_COARSE = 2.0  # the coarse error is this many times the asked one: a quarter of the iterations
+RACE_KEEP = 25  # contenders simmed again at the asked error, at most
+
+
+def race(combos: list[Combo], error: float, score, weights: dict[str, float], log: Callable[[str], None] = print
+         ) -> None:
+    """Pass 2 as a race (the owner, 2026-11-12: "optimise all that"; a prep's Outlaw Top Gear ran 143 sets at
+    0.3%, 15 min on 4 cores, to keep one): every set at a coarse error, then only the sets still within the noise of
+    the best at the asked error. A set left behind keeps its coarse score: far below the best, it never wins."""
+    if len(combos) < RACE_FROM:
+        score(combos, error, "pass2")
+        return
+    score(combos, error * RACE_COARSE, "pass2")
+    best = max(combos, key=lambda c: c.weighted(weights))
+
+    def err(c: Combo) -> float:
+        return max([*c.errors.values(), 0.0])
+    contenders = [c for c in combos if best.weighted(weights) - c.weighted(weights) <= err(best) + err(c)]  # 95% each
+    contenders = sorted(contenders, key=lambda c: -c.weighted(weights))[:RACE_KEEP]
+    log(f"Pass 2, the race: {len(contenders)} of {len(combos)} sets still in it, again at {error:g}%")
+    score(contenders, error, "pass2-race")
 
 
 def valid(pool: GearPool, gears: list[Gear], need_tier: int, max_crafted: int, crafted: frozenset[int],
