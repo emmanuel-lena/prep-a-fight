@@ -1601,7 +1601,10 @@ def cmd_prep(args: argparse.Namespace) -> int:
                     d.links.setdefault(t[0], f"spell={t[1]}")
     from paf import specgear
 
-    if len(specgear.DAMAGE_SPECS.get(cls, ())) > 1 and spec in specgear.DAMAGE_SPECS.get(cls, ()):
+    # the specs you ticked in the guide (the owner, 2026-11-12: "the ones I am OK to play"); none: no comparison
+    others = {x for x in (getattr(args, "specs", "") or "").split(",") if x in specgear.DAMAGE_SPECS.get(cls, ())
+              and x != spec}
+    if others and spec in specgear.DAMAGE_SPECS.get(cls, ()):
         step("Your class's specs on this boss")
         try:  # your character in each damage spec of your class, on this fight with your assignments (paf.specgear)
             from paf.prep_report import wanted
@@ -1610,7 +1613,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
             sg = specgear.compare(profile_text, client, enc, diff, diff_name, cls, spec, fight.to_simc(),
                                   root / "specs", character=_active_character(), target_error=args.error,
                                   metric="dps" if role == "total" else "bossdps", log=lambda m: print(m, flush=True),
-                                  own=getattr(args, "other_specs", False))  # your items in them: when you'd switch
+                                  specs=others)
             d.specs = specgear.to_json(sg) | {"role": role, "assigns": len(d.assigns)}
             print(f"  {d.specs['sentence']}")
         except Exception as ex:  # noqa: BLE001 - an extra of the prep: never fails it
@@ -3097,8 +3100,9 @@ def build_parser() -> argparse.ArgumentParser:
     pr2.add_argument("--ilvl", type=int, help="item level of the drops (default: median of your equipped items)")
     pr2.add_argument("--max-combos", type=int, default=300, help="Top Gear combination budget (default 300)")
     pr2.add_argument("--no-gear", action="store_true", help="skip Top Gear and loot (faster)")
-    pr2.add_argument("--other-specs", action="store_true",
-                     help="also Top Gear on your own items in each other damage spec of your class (slower)")
+    pr2.add_argument("--specs", default="",
+                     help="the other damage specs of your class you would play here, comma-separated (BeastMastery,"
+                          "Survival): each simmed, in the top players' gear and in your items; none: no comparison")
     pr2.add_argument("--no-optimize", action="store_true",
                      help="simple cooldown plans instead of the full optimizer (faster)")
     pr2.add_argument("--no-validate", action="store_true",

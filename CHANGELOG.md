@@ -9,9 +9,8 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 - A boss's page is now a short guide alone on the page, in large: your raid's log (your last guild raid already
   filled in), what you are assigned to (when the logs know this boss), then prepare. No goal to pick: your raid's log
   decides between the boss and the adds. The boss's abilities and your own plan are one link away.
-- The guide asks whether you would play another spec of your class on this boss. By default, only yours: the
-  specs are still compared in the top players' gear, but your own items are simmed in the others only if you say
-  yes (a few minutes saved).
+- The guide asks which specs of your class you would play on this boss: a box per damage spec, yours ticked. Only
+  the ones you tick are simmed (in your items and in the top players'); none ticked, no spec comparison (faster).
 - The prep no longer sims what the boss drops for you (faster; the Gear tool still says what to farm).
 - Faster preps: Top Gear and the cooldown plan race their candidates (all at a coarse precision, then only the
   ones still in the running at the full one), the movement calibration and the cooldown plan's final check need a quarter of their sims.

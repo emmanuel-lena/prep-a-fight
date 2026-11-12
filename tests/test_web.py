@@ -412,8 +412,9 @@ def test_the_guide_asks_a_dps_with_another_damage_spec_whether_to_sim_it(tmp_pat
     picks = {"class": "Rogue", "spec": "Subtlety"}
     monkeypatch.setattr(web.settings, "get", lambda k, default=None: picks.get(k, default))
     html = web.boss_page("7", "heroic").decode()
-    assert 'data-step="specs"' in html and "Only Subtlety" in html and "Yes, Assassination or Outlaw" in html
-    assert 'value="mine" checked' in html
+    assert 'data-step="specs"' in html and "Which specs would you play here?" in html
+    assert 'value="Subtlety" checked disabled>' in html and "Subtlety <span class=\"meta\">your spec</span>" in html
+    assert "Assassination</label>" in html and "Outlaw</label>" in html
     picks["spec"] = "Restoration"
     picks["class"] = "Druid"
     assert 'data-step="specs"' not in web.boss_page("7", "heroic").decode()  # a healer: no damage spec to weigh

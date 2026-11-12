@@ -338,14 +338,17 @@ def measured(boss_dps, dps, boss: bool) -> float:
 
 def compare(profile: str, client, enc, difficulty: int, diff_name: str, cls: str, mine: str, fight_lines: list[str],
             run_dir: Path, *, character: tuple[str, str, str] = ("", "", ""), target_error: float = 0.2,
-            metric: str = "bossdps", own: bool = True, log=print) -> Result:
-    """The whole comparison (sims run here: one per spec, and your character as you are)."""
+            metric: str = "bossdps", own: bool = True, specs: set[str] | None = None, log=print) -> Result:
+    """The whole comparison (sims run here: one per spec, and your character as you are). `specs`: the other specs
+    you would play (the owner, 2026-11-12: a box per spec, ticked if OK to play it); None: every one."""
     from paf import simc
 
     res = Result(enc.name, diff_name, mine, [], metric=metric, run_dir=run_dir)
     own_talents = (re.search(r"^talents=(\S+)", profile, re.M) or [None, None])[1]
     tree = talent_tree.load(cls)
     for spec in DAMAGE_SPECS.get(cls, (mine,)):
+        if specs is not None and spec != mine and spec not in specs:
+            continue
         t = tops(client, enc.id, difficulty, cls, spec, metric)
         if t is None:
             res.notes.append(f"{spec_label(spec)}: fewer than {MIN_TOPS} ranked players on this boss, not compared.")
