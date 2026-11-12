@@ -32,3 +32,13 @@ def test_nothing_is_sent_unless_turned_on(monkeypatch):
     monkeypatch.delenv("PAF_TELEMETRY_URL")
     monkeypatch.setattr(telemetry, "URL_FILE", telemetry.Path("/nonexistent"))
     assert not telemetry.enabled()  # no channel built in: never
+
+
+def test_the_summary_names_the_slowest_sims():
+    # the owner's i9, 2026-11-12: "Ideal cooldown plan" took 1086 s and nothing said which sims
+    from paf import telemetry
+
+    log = ("== Ideal cooldown plan per objective  [+10s]\n  [sim] boss-round1: 42s, 27 sets\n"
+           "  [sim] confirm: 120s, 3 sets\n  [sim] pass2-boss fight: 9s, 40 sets\n")
+    _title, body = telemetry.summary(["prep"], "done", log, 200)
+    assert "Slowest sims (3 said, 171 s in all):\n  confirm: 120 s, 3 sets\n  boss-round1: 42 s, 27 sets" in body

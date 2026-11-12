@@ -175,6 +175,9 @@ def build_input(profile: str, fight_lines: list[str] | None = None,
     return "\n".join(lines) + "\n"
 
 
+SIM_SAID = 5.0  # seconds: a sim this long is said in the log ("  [sim] boss-round1: 42s, 27 sets")
+
+
 def run(input_text: str, run_dir: Path, *, target_error: float = 0.2, iterations: int | None = None,
         threads: int = 0, metrics: tuple[str, ...] = ("dps", "prioritydps"), work_threads: int = 4,
         extra: list[str] | None = None, simc: str | None = None,
@@ -235,6 +238,8 @@ def run(input_text: str, run_dir: Path, *, target_error: float = 0.2, iterations
     res.elapsed = elapsed
     if key:
         sim_cache.sim_put(key, json_path)
+    if elapsed >= SIM_SAID:  # the run's slow sims in its log, for the run summaries (paf.telemetry)
+        print(f"  [sim] {run_dir.name}: {elapsed:.0f}s, {len(res.profilesets)} sets", flush=True)
     return res
 
 

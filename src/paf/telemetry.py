@@ -20,6 +20,8 @@ from paf import settings
 URL_FILE = Path(__file__).parent / "telemetry_url.txt"
 SAFE_ARGS = re.compile(r"^--?[a-z][a-z0-9-]*$")  # an option's name; its value may be personal (a profile, a log)
 PASS_LINE = re.compile(r"^(Pass \d.*|  kept: .*|  [\w .-]+: \d+s)$", re.M)  # Top Gear's passes and their times
+SIM_LINE = re.compile(r"^  \[sim\] ([\w .-]+): (\d+)s, (\d+) sets$", re.M)  # paf.simc.run's slow sims
+SLOWEST = 12
 TRACEBACK = re.compile(r"Traceback \(most recent call last\):\n(?:.*\n)*?\S.*(?:Error|Exception|Exit)[^\n]*")
 
 
@@ -47,9 +49,12 @@ def summary(args: list[str], status: str, log: str, seconds: float) -> tuple[str
 
     perf = performance(log)
     passes = "\n".join(m.group(0) for m in PASS_LINE.finditer(log))
+    sims = sorted(SIM_LINE.finditer(log), key=lambda m: -int(m[2]))
+    slow = "\n".join(f"  {m[1]}: {m[2]} s, {m[3]} sets" for m in sims[:SLOWEST])
     tb = TRACEBACK.search(log)
     body = (f"{system_line()}\nCommand: paf {command(args)}\nOutcome: {status} in {seconds:.0f} s\n\n{perf}\n"
             + (f"\nTop Gear passes:\n{passes}\n" if passes else "")
+            + (f"\nSlowest sims ({len(sims)} said, {sum(int(m[2]) for m in sims)} s in all):\n{slow}\n" if sims else "")
             + (f"\n--- error ---\n{tb.group(0)[-3000:]}\n" if tb and not status.startswith("done") else ""))
     title = f"[run] {args[0] if args else '?'} {status.split(' ')[0]}"
     return title, scrub(body)
