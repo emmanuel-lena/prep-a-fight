@@ -66,6 +66,8 @@ def test_movement_is_a_bar_not_an_event(monkeypatch):
     data = json.loads(re.search(r"var FV=(\{.*?\});</script>", fightview.html(d)).group(1))
     assert not any(a["k"] == "move" for a in data["anchors"])
     assert "Everyone moves · 1:40 to 1:55" in fightview.html(d)
+    d.movement = Movement(windows=[Window(60.0, 104.0, [])])  # the boss kited around for 104 s: the fight's rhythm
+    assert fightview.timeline(d).moves == []
 
 
 def test_no_fight_no_view():
@@ -78,7 +80,7 @@ def test_a_tank_only_cast_is_hidden_and_never_confirmed(monkeypatch):
     tl = fightview.timeline(d)
     assert tl.tank == ["Soul Transfer"] and not tl.others
     page = fightview.html(d)
-    assert "1 tank spell hidden" in page
+    assert "Soul Transfer" not in re.sub(r"<script>.*?</script>", "", page, flags=re.S)  # not drawn at all
     data = json.loads(re.search(r"var FV=(\{.*?\});</script>", page).group(1))
     assert "Soul Transfer" not in [a["n"] for a in data["anchors"]]
 
@@ -242,6 +244,7 @@ def test_a_cast_with_every_wave_is_the_wave_s_and_a_defensive_names_what_it_answ
                                                              (121.0, "Feint", "Ravenous Feast")])
     tl = fightview.timeline(d)
     assert [b.names for b in tl.boss] == [["Ravenous Feast"]] and tl.boss[0].sub == "you: Feint"
+    assert [m.tip.splitlines()[1] for m in tl.boss[0].marks] == ["You answer with Feint"] * 2  # each its own
     assert not any(x.name == "Rouse the Brood" for _t, x in tl.others)
     kill = next(lane for lane in tl.you if lane.kind == "kill")
     assert "Comes with Rouse the Brood (+1 s)" in kill.marks[0].tip

@@ -150,7 +150,8 @@
     var on = B.filter(function (b) {
       var e = eff(b.t);  // a movement, long or short, says until when on the boss line
       if (hb && Math.abs(b.t - hb.a.t) <= 1 && b.k !== 'immune') return false;  // with the late phase, not before it
-      return b.k !== 'tank' && !gone(b.t) && e <= t && t < until(b);
+      // what runs: adds, the boss immune, Bloodlust, a move; a cast is the next minute's (the review: a dense line)
+      return b.k !== 'tank' && b.k !== 'cast' && b.k !== 'mech' && !gone(b.t) && e <= t && t < until(b);
     });
     if (hb && hb.a.k === 'phase' && !on.some(function (b) { return b.k === 'immune'; })) on.unshift({ k: 'due', n: hb.a.n + ' due', t: hb.a.t, d: 0 });
     var moves = on.filter(function (b) { return b.k === 'move'; }).sort(function (a, b) { return until(b) - until(a); });
@@ -317,7 +318,10 @@
   /* the live view's timeline: the page's, cloned once, a line at the plan's time */
   function playhead(t) {
     var now = document.querySelector('#lv-tl .now');
-    if (now) { now.style.left = Math.max(0, Math.min(100, t / FV.end * 100)).toFixed(2) + '%'; now.style.display = t > 0 ? 'block' : 'none'; }
+    if (now) {
+      now.style.left = Math.max(0, Math.min(100, t / FV.end * 100)).toFixed(2) + '%'; now.style.display = t > 0 ? 'block' : 'none';
+      txt(now.querySelector('b'), clock(t));
+    }
   }
 
   /* the live view: what comes in the next minute, yours and the boss's, as bars that empty */

@@ -542,6 +542,8 @@ TRACK_PX = 1040  # the timeline's track at a desktop width: what a time label ha
 LABEL_PX = 62  # a press's time is printed when the next press of its lane is at least this far
 FOLD_OFFSET = 1.5  # a boss cast at the same offset (± this) into every wave of one add is part of that wave
 SAME_BURST = 3.0  # presses this close are one burst (the sentence on top)
+MOVE_SHOWN = 30.0  # longer moving windows are the fight's rhythm (a boss kited around), not a reposition: not drawn
+ANSWER_BEFORE, ANSWER_AFTER = 10.0, 6.0  # a defensive this long before (after) a cast answers that one
 
 
 @dataclass
@@ -609,11 +611,12 @@ def timeline(d) -> Timeline | None:
     boss = [(t, x) for t, x in its if x.side == "boss"]
     mine = [(t, x) for t, x in its if x.side == "you"]
     moves: list[list[float]] = []
-    for t, x in sorted((t, x) for t, x in boss if x.kind == "move"):
-        if moves and t <= moves[-1][1]:
+    for t, x in sorted(((t, x) for t, x in boss if x.kind == "move"), key=lambda p: p[0]):
+        if moves and t <= moves[-1][1] + 0.5:  # a move cut at a stage's start: one move
             moves[-1][1] = max(moves[-1][1], min(end, t + x.dur))
         else:
             moves.append([t, min(end, t + x.dur)])
+    moves = [m for m in moves if m[1] - m[0] <= MOVE_SHOWN]
     waves = [{"t": t, "it": x, "name": _clean(x.name), "dur": min(x.dur, end - t), "mine": False, "with": []}
              for t, x in boss if x.kind == "adds"]
     answered = {_answers(x) for _t, x in mine} - {""}
@@ -646,7 +649,10 @@ def timeline(d) -> Timeline | None:
         sub = f"you: {', '.join(by)}" if by else "may target you" if key else "in the journal"
         lane = Lane("key" if key else "journal", [name], [occ[0][1].icon], sub)
         for t, x in occ:
-            tip = [f"{name} · {_mmss(t)}"] + ([f"You answer with {', '.join(by)}"] if by else
+            now = sorted({y.name for at, y in mine if _answers(y) == name
+                          and t - ANSWER_BEFORE <= at <= t + ANSWER_AFTER})
+            tip = [f"{name} · {_mmss(t)}"] + ([f"You answer with {', '.join(now)}"] if now else
+                                              ["Your plan answers another one, not this one"] if by else
                                               ["It may target you"] if x.kind == "mech" else [])
             tip += [hint] if hint else []
             lane.marks.append(Mark(t, icon=x.icon, tip="\n".join(tip), label=_mmss(t)))
@@ -743,7 +749,8 @@ def timeline_html(d, tl: Timeline) -> str:
     if len(tl.phases) > 1:
         ph = "".join(f"<span class='seg-ph{' imm' if any(abs(t - a) < 2 for t, _i in tl.immune) else ''}' "
                      f"style='left:{x(a)};width:calc({w(a, b - a)} - 3px)'{_tip(f'{n} · {_mmss(a)} to {_mmss(b)}')}>"
-                     f"{e(n)}<em>{_mmss(a)}</em></span>" for n, a, b in tl.phases)
+                     f"<span>{e(n)}</span>{'<em>' + _mmss(a) + '</em>' if (b - a) * px > 9 * len(n) + 60 else ''}"
+                     f"</span>" for n, a, b in tl.phases)
         rows.append(row("fph", "<span class='lb'>Phases</span>", ph))
     wins = "".join(f"<span class='win lust' style='left:{x(t)};width:{w(t, it.dur)}'"
                    f"{_tip(f'{it.text} · {_mmss(t)} · lasts {it.dur:.0f} s')}>{_ic(it.icon)}Bloodlust</span>"
@@ -767,16 +774,19 @@ def timeline_html(d, tl: Timeline) -> str:
                 at = max(0.0, m.t)
                 track += f"<span class='bar k-{lane.kind}' style='left:{x(at)};width:{w(at, m.dur)}'></span>"
             if m.tops is not None:
-                said = f"Most top players: about {_mmss(m.tops)}"
-                track += f"<span class='ghost' style='left:{x(m.tops)}'{_tip(said)}></span>"
-            label = (f"<span class='tm'>{m.label}" + (f"<small>{m.dur:.0f} s</small>" if lane.kind == "kill" and m.dur
-                                                       and room > 110 else "") + "</span>") if room > LABEL_PX else ""
+                said = f"Most top players press it at about {_mmss(m.tops)}"
+                side = " early" if m.tops < m.t else ""  # its words away from the press's icon
+                track += (f"<span class='ghost{side}' style='left:{x(m.tops)}'{_tip(said)}><b>tops {_mmss(m.tops)}</b>"
+                          "</span>")
+            wide = " wide" if m.count else ""
+            long = f"<small>{m.dur:.0f} s</small>" if lane.kind == "kill" and m.dur and room > 110 else ""
+            label = f"<span class='tm{wide}'>{m.label}{long}</span>" if room > LABEL_PX else ""
             track += (f"<span class='ev k-{lane.kind}' style='left:{x(max(0.0, m.t))}'{_tip(m.tip)}>{_ic(m.icon)}"
                       + (f"<b class='n'>{m.count}</b>" if m.count else "")
                       + ("<b class='badge'>!</b>" if m.flag else "")
                       + f"{label}</span>")
         rows.append(row("you", head(lane), track))
-    if tl.boss or tl.others or tl.tank:
+    if tl.boss:
         rows.append("<div class='sec sb'><span>The boss <i>what concerns you</i></span></div>")
     for lane in tl.boss:
         track = "".join(f"<span class='bm' style='left:{x(m.t)}'{_tip(m.tip)}>{_ic(m.icon)}"
@@ -784,21 +794,23 @@ def timeline_html(d, tl: Timeline) -> str:
                             (lane.marks[k + 1].t if k + 1 < len(lane.marks) else end) - m.t) * px > 48 else "")
                         + "</span>" for k, m in enumerate(lane.marks))
         rows.append(row(f"boss{' m' if lane.kind != 'key' else ''}", head(lane), track))
-    if tl.others or tl.tank:
-        names = sorted({x.name for _t, x in tl.others})
-        said = (f"{len(names)} other cast{'s' if len(names) != 1 else ''}" if names else "") + (
-            f"{' · ' if names else ''}{len(tl.tank)} tank spell{'s' if len(tl.tank) != 1 else ''} hidden"
-            if tl.tank else "")
-        dots = "".join(f"<span class='dot' style='left:{x(t)}'{_tip(f'{it.name} · {_mmss(t)}')}></span>"
-                       for t, it in tl.others)
-        rows.append(row("boss ticks", f"<span class='lb' title='{e(', '.join(names + tl.tank))}'>{e(said)}</span>",
-                        dots))
     grid = "".join(f"<i class='gl{' h' if t % 60 else ''}' style='left:{x(t)}'></i>"
                    for t in range(0, int(end) + 1, 30))
     grid += "".join(f"<i class='immcol' style='left:{x(t)};width:{w(t, it.dur)}'></i>" for t, it in tl.immune)
-    grid += f"<i class='gl end' style='left:{x(end)}'></i><i class='cur'><b></b></i><i class='now'></i>"
+    grid += f"<i class='gl end' style='left:{x(end)}'></i><i class='cur'><b></b></i><i class='now'><b></b></i>"
+    kinds = {lane.kind for lane in tl.you}
+    key = [(k, t) for k, t in (("cd", "cooldown"), ("pot", "potion"), ("def", "defensive"), ("kill", "target alive"))
+           if k in kinds]
+    legend = "".join(f"<span><i class='kk k-{k}'></i>{t}</span>" for k, t in key)
+    if any(m.tops is not None for lane in tl.you for m in lane.marks):
+        legend += "<span><i class='kk ghostk'></i>where most top players press it</span>"
+    if any(m.flag for lane in tl.you for m in lane.marks):
+        legend += "<span><b class='badgek'>!</b>held by the plan, or pressed elsewhere by the tops</span>"
+    if tl.moves:
+        legend += "<span><i class='kk mvk'></i>everyone moves</span>"
     return (f"<div class='ftl' data-end='{end:.1f}' role='img' aria-label='The fight on one clock: your presses, the "
-            f"adds you kill and the boss spells that concern you'>{''.join(rows)}<div class='ov'>{grid}</div></div>")
+            f"adds you kill and the boss spells that concern you'>{''.join(rows)}<div class='ov'>{grid}</div></div>"
+            f"<div class='fkey' aria-hidden='true'>{legend}</div>")
 
 
 def summary(d, tl: Timeline) -> str:
@@ -871,8 +883,11 @@ def mrt_html(d) -> str:
     if not note:
         return ""
     return (f"<section class='card mrtc'><div class='mrth'><h2>MRT note</h2>{_btn('mrt', 'Copy', cls='btn ghost')}"
-            f"</div><textarea class='mrt-box' id='mrt-text' aria-label='MRT note' readonly "
-            f"rows='{min(16, note.count(chr(10)) + 1)}'>{e(note)}</textarea></section>")
+            f"</div><textarea class='mrt-box' id='mrt-text' aria-label='MRT note' readonly wrap='off' "
+            f"rows='{note.count(chr(10)) + 1}'>{e(note)}</textarea></section>")
+
+
+LIVE_TITLE = " title='Follow the pull live, on a second screen: what to press now and next'"
 
 
 def live_html(d) -> str:
@@ -930,12 +945,12 @@ def html(d) -> str:
     if tl is None or not (tl.you or tl.boss):
         return ""
     payload = json.dumps(data(d, tl.end)).replace("</", "<\\/")
-    live = (f"<div class='go-live'>{_btn('ss-open', 'Live view', 'L', 'btn primary')}<span class='muted'>to follow the "
-            f"pull on a second screen</span></div>")
-    return (f"<div class='fv'>{kill_switch(d)}<div class='fv-top'><div class='fv-lede'>{summary(d, tl)}{live}</div>"
+    live = f"<div class='go-live'>{_btn('ss-open', 'Live view', 'L', 'btn primary', more=LIVE_TITLE)}</div>"
+    return (f"<div class='fv'><div class='fv-top'><div class='fv-lede'>{summary(d, tl)}{live}</div>"
             f"{opener_html(d)}</div>"
             f"<section class='card tlc' id='tl' tabindex='-1' aria-labelledby='tl-h'><div class='tlh'><h2 id='tl-h'>"
-            f"The pull, minute by minute</h2><span class='muted'>hover anything for the details</span></div>"
+            f"The pull, minute by minute</h2><span class='muted'>hover anything for the details</span>"
+            f"{kill_switch(d)}</div>"
             f"{timeline_html(d, tl)}</section>"
             f"<div class='fv-below'>{differ_html(d)}{mrt_html(d)}</div>{live_html(d)}"
             "<div class='tip' id='fv-tip' role='tooltip' hidden></div>"

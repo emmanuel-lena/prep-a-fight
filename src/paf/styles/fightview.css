@@ -75,7 +75,7 @@
 .fv .foot{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .fv .bars{width:min(900px,100%);display:grid;gap:6px}
 .fv .fbar{position:relative;display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;height:36px;padding:0 12px 0 4px;border-radius:4px;background:var(--surface-2);overflow:hidden}
-.fv .fbar i.fill{position:absolute;inset:0 auto 0 0;width:100%;background:color-mix(in srgb,var(--c,var(--muted)) 38%,transparent);transform-origin:left}
+.fv .fbar i.fill{position:absolute;inset:0 auto 0 0;width:100%;background:color-mix(in srgb,var(--c,var(--muted)) 24%,transparent);transform-origin:left}
 .fv .fbar.mine{box-shadow:inset 3px 0 0 var(--go)}
 .fv .fbar span small{font:500 13px var(--font-body);color:var(--fg)}
 .fv .fbar .ic{position:relative;width:28px;height:28px}
@@ -260,3 +260,37 @@ body.playing .fv #play.btn.primary{background:var(--surface-2);color:var(--fg);b
 /* the sheet's section titles are small caps; the fight view's cards keep the reading face */
 .fv h2{text-transform:none;letter-spacing:0;color:var(--fg)}
 .fv .btn.primary kbd{color:inherit;border-color:currentColor;opacity:.75}
+/* fixes from the first reviews (a raider and a designer) */
+.fv .ftl{--gut:224px}
+.fv .ftl .nm{white-space:normal;line-height:1.15;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.fv .ftl .nm small{white-space:nowrap}
+.fv .ftl .r.you,.fv .ftl .r.boss{padding-block:2px}
+.fv .ftl .tm{background:color-mix(in srgb,var(--surface) 82%,transparent);padding:1px 3px;border-radius:3px;left:28px}
+.fv .ftl .tm.wide{left:34px}
+.fv .ftl .bm .tm{background:none;padding:0}
+.fv .ftl .ghost{top:auto;bottom:-1px;transform:none;width:0;height:9px;border:0;border-left:2px solid var(--warn);border-radius:0;z-index:2}
+.fv .ftl .ghost b{position:absolute;left:3px;bottom:-1px;font:600 9.5px/1 var(--font-data);color:var(--warn);white-space:nowrap}
+.fv .ftl .seg-ph span{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.fv .ftl .now b{position:absolute;top:2px;transform:translateX(-50%);font:600 12px/1 var(--font-data);background:var(--accent);color:var(--on-primary);border-radius:4px;padding:3px 6px}
+.fv .fkey{display:flex;gap:18px;flex-wrap:wrap;margin:10px 2px 0 var(--gut,224px);font-size:12px;color:var(--muted);align-items:center}
+.fv .fkey span{display:inline-flex;align-items:center;gap:6px}
+.fv .fkey .kk{display:inline-block;width:18px;height:9px;border-radius:3px;background:color-mix(in srgb,var(--kc) 22%,transparent);border:1px solid color-mix(in srgb,var(--kc) 55%,transparent)}
+.fv .fkey .k-cd{--kc:var(--off)} .fv .fkey .k-pot{--kc:var(--pot)} .fv .fkey .k-def{--kc:var(--def)} .fv .fkey .k-kill{--kc:var(--fg)}
+.fv .fkey .ghostk{width:0;height:10px;border:0;border-left:2px solid var(--warn);border-radius:0;background:none}
+.fv .fkey .mvk{height:4px;border:0;background:repeating-linear-gradient(90deg,var(--muted) 0 4px,transparent 4px 7px)}
+.fv .fkey .badgek{width:13px;height:13px;border-radius:50%;background:var(--warn);color:var(--on-status);font:700 10px/13px var(--font-data);text-align:center}
+.fv .tlh{flex-wrap:wrap}
+.fv .tlh .kill-switch{margin:0 0 0 auto}
+.fv .tlh .ks-lab{font-size:11px}
+.fv .tlh .ks{min-width:0;padding:4px 26px 4px 10px}
+.fv .tlh .ks b{font-size:13px} .fv .tlh .ks small{font-size:11px}
+.fv .tlh .ks-hint{display:none}
+.fv .fv-top .opseq ol{gap:10px 2px}
+.fv .fv-top .opseq li{padding-right:10px}
+.fv .fv-top .opseq li .ic{width:28px;height:28px}
+.fv .mrt-box{resize:none;overflow-x:auto;white-space:pre}
+.fv .lv .fbar{height:auto;min-height:36px;padding-block:4px}
+.fv .lv .fbar b{line-height:1.2}
+.fv .lv-tl .ftl{--gut:200px}
+.fv .lv .lv-side{max-height:calc(100vh - 330px);overflow:auto}
+.fv .ftl .ghost.early b{left:auto;right:3px}
