@@ -966,7 +966,7 @@ p.hidden=p.id!==id});document.querySelectorAll('.tabs a').forEach(function(a){
 var on=a.getAttribute('href')==='#'+id;a.classList.toggle('on',on);a.setAttribute('aria-selected',on)});
 var cur=document.querySelector('.tabs a.on');if(cur)cur.scrollIntoView({inline:'center',block:'nearest'});
 if(to)to.scrollIntoView();else scrollTo(0,0);
-if(window.__fv&&id==='fight')window.__fv.layout()}
+}
 addEventListener('hashchange',function(){show(location.hash.slice(1))});show(location.hash.slice(1));
 document.addEventListener('click',function(ev){var b=ev.target.closest('[data-copy]');if(!b)return;
 var t=b.getAttribute('data-copy'),done=function(){var o=b.textContent;b.textContent='Copied';

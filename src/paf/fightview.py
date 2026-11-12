@@ -1,13 +1,16 @@
 """The fight view of a prep sheet: what to do and when, before and during the pull.
 
-Left, sticky: your job on this boss, then a Now / Next card that plays the fight from the pull (or from a pull timer)
-and a second screen for a boss-mod look. Right: the fight on one clock, three lanes: the boss | the pull clock | you,
-with the duration of your cooldowns, the adds and Bloodlust drawn along it.
+The plan in a sentence (when you burst, the boss immune, your defensives) beside the opener; then the fight on one
+clock, a lane a row: the raid's windows (phases, Bloodlust, the boss immune, everyone moving), yours (a lane a spell,
+a bar as long as it lasts; a lane a unit you kill), then the boss's spells that concern you (one you answer, one that
+may target you, one the journal tells damage dealers about), the rest a dot each; each mark's details on hover.
+Below: where your plan and the top players differ, and the MRT note. The live view (one button, L) follows the pull
+on a second screen: a big clock, what to press now and then, what runs, the next minute, the timeline's playhead.
 
 Everything comes from the prep (generic across specs, PRODUCT.md): the boss's spells and add waves at the top raids'
 typical times, the strategy's movement, your cooldown plan (paf.optimize), your defensives (paf.defensives) and what
 the top players do on the boss (paf.actions). During the pull, one press ("it starts now") moves the moments still to
-come by the boss's delay, so the card follows a raid that is ahead or behind the plan.
+come by the boss's delay, so the live view follows a raid that is ahead or behind the plan.
 """
 
 from __future__ import annotations
@@ -21,7 +24,6 @@ from importlib.resources import files
 from paf import icons, simple, theme
 from paf.pulllog import BIG_CD
 
-ROW_GAP = 6.0  # seconds: events this close share one row of the timeline
 PRE = -2.0  # where "before the pull" sits
 ANCHORS = ("phase", "immune", "adds", "cast")  # boss events a press can confirm, and that name a row, in this order
 YOU_ORDER = ("do", "pot", "cd", "def", "move")  # your items in a row: the job first, then the burst, the move last
@@ -48,41 +50,6 @@ class Item:
     why: str = ""  # a press no boss event explains: the plan's rule or its cooldown, and what the top players do
     said_dur: bool = False  # its text says its length(s) already (two waves at one moment, one row)
     hint: str = ""  # a boss event: the Encounter Journal's line for damage dealers that names it
-
-
-@dataclass
-class Moment:
-    t: float
-    items: list[Item] = field(default_factory=list)
-
-    @property
-    def boss(self) -> list[Item]:
-        return [i for i in self.items if i.side == "boss"]
-
-    @property
-    def you(self) -> list[Item]:
-        return sorted((i for i in self.items if i.side == "you"),  # in time order, then by kind
-                      key=lambda i: (int(max(i.t, -1)), YOU_ORDER.index(i.kind)))
-
-    @property
-    def anchor(self) -> Item | None:
-        """The boss event that names this row, if any (movement and Bloodlust never do)."""
-        for kind in ANCHORS:
-            for i in self.boss:
-                if i.kind == kind:
-                    return i
-        return None
-
-    @property
-    def title(self) -> str:
-        if self.t < 0:
-            return "Before the pull"
-        if self.t < 1:
-            return "The pull"
-        a = self.anchor
-        if a is not None:
-            return a.text
-        return self.you[0].text if self.you else (self.boss[0].text if self.boss else "")
 
 
 def _span(v: float) -> str:
@@ -380,18 +347,6 @@ def _tops_off(d, name: str, t: float, presses: list[float] | None = None) -> str
     return f"⚠ {there[0]:.0%} of the top players at about {_mmss(there[1])}"
 
 
-def moments(d) -> list[Moment]:
-    """Events close in time share a row; a phase start always opens its own."""
-    out: list[Moment] = []
-    for t, it in items(d):
-        if (not out or t - out[-1].t > ROW_GAP or (it.kind in ("phase", "kill") and t - out[-1].t > 0.5)
-                or (it.side == "you" and it.kind == "cd" and t - out[-1].t >= 3)  # a press on its own time's row
-                or (t < 0) != (out[-1].t < 0)):  # (round 39: the kill and Shadow Blades 1:40 on a 3:57 / 1:34 pill)
-            out.append(Moment(t))
-        out[-1].items.append(it)
-    return out
-
-
 def _phases(d, dur: float) -> list[tuple[str, float, float]]:
     ph = sorted(d.phases, key=lambda p: p[1]) or [("The fight", 0.0)]
     if ph[0][0].strip().lower() in ("", d.boss.lower()):  # a first phase named after the boss: say what it is
@@ -405,7 +360,6 @@ def _phases(d, dur: float) -> list[tuple[str, float, float]]:
     return [(n, 0.0 if i == 0 else s, named[i + 1][1] if i + 1 < len(named) else dur) for i, (n, s) in enumerate(named)]
 
 
-
 def _ic(icon: str, cls: str = "ic") -> str:
     if not icon:
         return f"<i class='{cls} none' aria-hidden='true'></i>"
@@ -413,178 +367,9 @@ def _ic(icon: str, cls: str = "ic") -> str:
             f"{icons.CDN.format(size='medium', icon=icon)}')\"></i>")
 
 
-def _ev(it: Item, row_t: float | None = None) -> str:
-    bold = it.side == "you" and it.kind in ("cd", "pot", "def")
-    text = f"<b>{e(it.text)}</b>" if bold else e(it.text)
-    # any time its row does not show says so: the page never snaps an event to a time it does not have
-    notes = [f"at {_mmss(it.t)}"] if (row_t is not None and it.t >= 1 and _mmss(it.t) != _mmss(row_t)
-                                      and f"from {_mmss(it.t)}" not in it.text) else []
-    if it.dur and it.kind not in ("move", "immune") and not it.said_dur:
-        notes.append(f"lasts {it.dur:.0f} s")
-    warn = ""
-    if it.why:
-        why, _sep, flag = it.why.partition("⚠ ")  # the top players' other moment: an amber chip after the name, its
-        if flag:  # sentence on hover (fresh DPS review: buried at the end of a grey line)
-            at = re.search(r"at about (\d+:\d\d)", flag)
-            warn = (f" <span class='pill amb' title='{e(flag)}'>&#9888; tops &asymp;{at[1] if at else ''}</span>")
-        if why.strip("; "):
-            notes.append(why.strip("; "))
-    small = f"<small>{', '.join(notes)}</small>" if notes else ""
-    if it.hint:
-        small += f"<small class='hint' title='Journal: {e(it.hint)}'>&#128214; journal</small>"  # its words on hover
-    return (f"<div class='ev ek-{it.kind}'>{_ic(it.icon)}<div class='x'><span class='main'>{text}{warn}</span>{small}"
-            "</div></div>")
-
-
-def _row(m: Moment, i: int, gap: float = 0.0) -> str:
-    shown = [x for x in m.boss if x.kind != "phase"] or m.boss  # the phase's band says it, unless it is alone
-    boss = "".join(_ev(x, m.t) for x in shown)
-    you = "".join(_ev(x, m.t) for x in m.you)
-    when = "Before the pull" if m.t < 0 else ("Pull" if m.t < 1 else _mmss(m.t))
-    label = f"{when}, {m.title}: show this moment"
-    quiet = not m.you and all(x.kind == "tank" for x in m.boss)  # grey: only the tank's, nothing for you
-    cls = "fm quiet" if quiet else ("fm kill" if any(x.kind == "kill" for x in m.boss) else "fm")
-    room = f" style='min-height:{min(110, max(0, (gap - ROW_GAP) * 2.2)) + 34:.0f}px'" if gap > ROW_GAP else ""
-    return (f"<div class='{cls}{' has-boss' if boss else ''}' data-i='{i}' data-t='{m.t:g}' data-title='{e(m.title)}'"
-            f"{room}>"
-            f"<div class='boss'>{'<span class=vh>Boss: </span>' + boss if boss else ''}</div>"
-            f"<div class='spine'><button type='button' class='t' aria-label='{e(label)}'>{e(when)}</button></div>"
-            f"<div class='you'>{'<span class=vh>You: </span>' + you if you else ''}</div></div>")
-
-
-def _tc(t: float) -> str:
-    return f"<time class='tc'>{_mmss(t)}</time>"
-
-
-def _cadence_chips(ts: list[float]) -> str:
-    """Press times as a player reads them, as chips: up to five listed; more, the run at one cadence (one ⟲ badge)
-    then the rest listed (DPS round 17: "every 31 s (8 times)" hid the press held to 2:47 for the wave; fresh DPS
-    review: as sentences)."""
-    if len(ts) <= 5:
-        return "".join(_tc(t) for t in ts)
-    gaps = [b - a for a, b in zip(ts, ts[1:], strict=False)]
-    step = sorted(gaps)[len(gaps) // 2]
-    run = next((i for i, g in enumerate(gaps) if abs(g - step) > 3), len(gaps))
-    if run < 3:
-        return "".join(_tc(t) for t in ts)
-    return (_tc(ts[0]) + f"<span class='pill' title='about every {step:.0f} s from {_mmss(ts[0])} to "
-            f"{_mmss(ts[run])}'>&#10227; {step:.0f} s &rarr; {_mmss(ts[run])}</span>"
-            + "".join(_tc(t) for t in ts[run + 1:]))
-
-
 # a cooldown plan's rule as Your job's badge (its sentence on the badge's hover)
 RULE_BADGE = {"add_waves": "adds only", "secondary_targets": "burst targets only", "vulnerable_windows": "in the amp",
               "lust_pi": "with Bloodlust", "on_cooldown": "on cooldown", "not_before_move": "not before a move"}
-
-
-def job_html(d) -> str:
-    """Your job on this boss, a dozen lines at most: what kills a raid first, then your cooldowns and when."""
-    from paf.prep_report import rule_phrase
-
-    def at(name: str) -> str:  # the waves of that unit, as the fight tab places them
-        ts = [t for t, c, _l, n in d.waves if c and _clean(n) == name]
-        return " " + "".join(_tc(t) for t in ts) if ts else ""  # chips, as the cooldowns' (fresh DPS review)
-    rows = [(a.name, f"<b>{e(a.text.split(':')[0].split(' (')[0])}</b>{at(a.name)}") for a in d.actions
-            if a.kind in ("kill", "contact") or (a.kind == "interrupt" and a.text.startswith("Interrupt"))][:2]
-    kills = [a for a in d.actions if a.kind == "kill"][:2]
-    if len(kills) == 2 and at(kills[0].name) and at(kills[0].name) == at(kills[1].name):  # one wave, two units:
-        # one line (DPS round 11: "Kill the Shrouded Venom at 0:24, 1:48, 3:12", then the Burning Venom's same)
-        kills.sort(key=lambda a: next((i for i, w in enumerate(d.waves) if _clean(w[3]) == a.name), 99))
-        both = "Kill " + " and ".join(e(a.name) for a in kills)  # the timeline's words and order (DPS round 12)
-        rows = [r for r in rows if r[0] not in {a.name for a in kills}]
-        rows.insert(0, (kills[0].name, f"<b>{both}</b>{at(kills[0].name)}"))  # every line ends alike
-    hints = {it.name: it.hint for _t, it in items(d) if it.hint}
-    said = {_clean(a.name) for a in d.actions}
-    skip = {a.name for a in d.actions if a.kind == "ignore"}
-    for _t, c, _l, n in d.waves:  # adds the fight has but no action names (Nymrissa's murlocs): kill them
-        name = _clean(n)
-        if len(rows) < 2 and c and name not in said and name not in skip and n not in skip:
-            said.add(name)
-            why = next((h for k, h in hints.items() if name.lower() in h.lower()), "")
-            many = any(c2 > 1 for _t2, c2, _l2, n2 in d.waves if _clean(n2) == name) and not name.endswith("s")
-            rows.append((n, f"<b>Kill the {e(name)}{'s' if many else ''}</b>{at(name)}"))  # the why: on the rows
-            hints = {k: h for k, h in hints.items() if h != why}
-    imm = d.fight.invulnerable if d.fight is not None else []
-    for w in imm[:1]:
-        adds = [_clean(x[3]) for x in d.waves if w.start - 2 <= x[0] <= w.start + w.duration and x[1]]
-        shown = [int(x.start + x.duration) - int(x.start) for x in imm]  # from the times shown, so "1:41 to 2:40"
-        lo, hi = min(shown), max(shown)  # reads 59 s (DPS round 13: "(58 s)")
-
-        long = _span(lo) if lo == hi else f"{_span(lo)} to {_span(hi)} each"  # every time (the Sentinels: three)
-        if len(imm) == 1:
-            when = f"{_tc(w.start)}&rarr;{_tc(w.start + w.duration)}"
-        else:
-            when = "".join(_tc(x.start) for x in imm)
-        rows.append((IMMUNE_ICON, f"<b>Boss immune</b> {when}<span class='pill'>{long}</span>"
-                                  + (f"<span class='pill' title='your damage goes on the {e(adds[0])}'>&rarr; the "
-                                     f"{e(adds[0])}</span>" if adds else "")))
-        # chips (fresh DPS review: "Boss immune from 1:41 to 2:40 (59 s): your damage goes on the …")
-    if len(rows) < 2:  # the journal's lines for damage dealers about this fight's events (Sszorak: Dig In)
-        done = {r[0] for r in rows}
-        for _t, it in items(d):
-            if it.hint and it.hint in hints.values() and it.name not in done and len(rows) < 3:
-                done.add(it.name)
-                times = [max(0.0, x) for x, y in items(d) if y.side == "boss" and y.name == it.name]
-                rows.append((it.name, f"<b>{e(_clean(it.name))}</b> {''.join(_tc(x) for x in times[:5])}"  # its words
-                                      f"<span class='src' title='Journal: {e(it.hint)}'>&#128214;</span>"))  # book's
-                # hover: a description of the mechanic, not an order (fresh DPS review: the most-read card)
-    defs = _defensives(d)
-    if defs:
-        s, why = defs[0][1], defs[0][2]
-        at = ", ".join(_mmss(t) for t, x, _w in defs if x == s)  # every time the fight tab calls it
-        rows.append((s, f"<b>{e(s)}</b> {''.join(_tc(t) for t, x, _w in defs if x == s)}<span class='pill' "
-                        f"title='the top players&#39; defensive'>&#128737; "
-                        f"{'for ' + e(why.removesuffix(chr(39) + 's damage')) if why else 'defensive'}</span>"))
-    wins = d.movement.windows if d.movement else []
-    for t, it in items(d):  # a mobility spell the fight tab calls for a move: said, with who presses it
-        if it.side == "you" and it.kind == "move":
-            share = next((sh for w in wins if abs(w.start - t) <= 1.5 for n, sh in w.spells if n == it.name), None)
-            who = f" &middot; {share:.0%} of the tops" if share else ""
-            rows.append((it.name, f"<b>{e(it.name)}</b> {_tc(t)}<span class='pill' title='for the move; the share of "
-                                  f"the top players pressing it there'>&#8596; move{who}</span>"))
-    names, _order, _held = simple._pressed(d)
-    order: dict[str, list[float]] = {}  # the times the fight view calls (a burst moved onto its adds included)
-    for t, it in items(d):
-        if it.side == "you" and it.kind in ("cd", "pot"):  # every press of the plan, as the fight tab calls them
-            order.setdefault(it.name, []).append(0.0 if t < 0 else t)
-    names = list(order)
-    plan = simple._plan(d)
-    from paf.prep_report import cd_name
-
-    rules = {cd_name(d, k): r.name for k, r in (plan.choice.items() if plan else []) if r.name != "default"}  # the
-    # names Your job shows (round 43: Ancestral Call, a racial, without its badge)
-    in_lust = [n for n in names if n in rules and any(0 <= t <= 40 for t in order[n])]  # a held cooldown inside
-    if d.lust is not None and d.lust < 5 and in_lust:  # it, or no line (fresh DPS review: the big presses at 0:51)
-        rows.append(("Bloodlust", f"<b>Bloodlust</b> <span class='pill'>at the pull</span><span class='pill'>"
-                                  f"{e(_and_names(in_lust))} inside</span>"))
-    for n in sorted((n for n in names if n in order), key=lambda n: min(order[n])):  # in the order you first press them
-        pre = [t for t in order[n] if t < 0.5 and (n in d.precast or "potion" in n.lower())]
-        rest = [_mmss(t) for t in order[n] if t not in pre]
-        when = _cadence_chips([t for t in order[n] if t not in pre])  # a long list: its cadence, never cut
-        if pre:  # (DPS 16-17); chips, not a sentence (fresh DPS review)
-            when = "<span class='pill' title='before the pull'>pre-pull</span>" + (when if rest else "")
-        if all(t < 5 for t in order[n]) and "potion" not in n.lower():  # a short cooldown: the opener, then rotation
-            when += "<span class='pill' title='then with your rotation'>then rotation</span>"
-        hold = re.fullmatch(r"hold_(adds|vulnerable)_(\d+)", rules.get(n, ""))
-        badge = (f"hold &le;{hold[2]} s for {'adds' if hold[1] == 'adds' else 'the damage amp'}" if hold else
-                 RULE_BADGE.get(rules.get(n, "")))  # every rule a badge, its words on hover (fresh DPS review)
-        why = (f" <span class='pill hold' title='{e(rule_phrase(d, rules[n]))}'>{badge}</span>" if badge else
-               f": {e(rule_phrase(d, rules[n]))}" if n in rules else "")
-        same = next((r for r in rows if isinstance(r[0], list) and r[2] == (when, why)), None)
-        if same is not None:  # pressed together, by the same rule: one line, both icons (Ancestral Call and
-            same[0].append(n)  # Ascendance at 0:51, 2:52: the ninth line cut Ascendance off; a review)
-            continue
-        rows.append(([n], None, (when, why)))
-    rows = [((r[0][0], f"<b>{e(_and_names(r[0]))}</b> {r[2][0]}{r[2][1]}", r[0]) if isinstance(r[0], list)  # chips
-             else (*r, None)) for r in rows]
-    if not rows:
-        return ""
-    def pics(ic, many) -> str:  # a line's icon, or its cooldowns' side by side
-        if many and len(many) > 1:
-            return "<span class='ics2'>" + "".join(_ic(_icon(d, x)) for x in many) + "</span>"
-        return _ic(ic if ic == IMMUNE_ICON else _icon(d, ic) if ic else "")
-    lis = "".join(f"<li>{pics(ic, many)}<span>{txt}</span></li>" for ic, txt, many in rows[:12])  # every cooldown
-    return f"<section class='fbox job'><h2>Your job on this boss</h2><ul class='keys'>{lis}</ul></section>"
 
 
 def _and_names(names: list[str]) -> str:
@@ -618,36 +403,6 @@ PULL = {"t": 0, "n": "The pull", "k": "pull", "p": 0, "ic": ""}  # a pull timer 
 def _t1(t: float) -> float:
     """A time to a tenth, cut and not rounded: 201.98 s stays 3:21 on every surface (MRT note, job card, page)."""
     return int(t * 10) / 10
-
-
-def data(d, ms: list[Moment], dur: float) -> dict:
-    """What the page's script needs, each event at its own time on the plan's clock."""
-    its = items(d)
-    phases = _phases(d, dur)
-
-    def ph(t: float) -> int:
-        return max((i for i, p in enumerate(phases) if t >= p[1] - 0.5), default=0)
-
-    phase_starts = [s for _n, s, _e in phases[1:]]
-    acts = [{"t": _t1(t), "n": x.text, "k": x.kind, "ic": x.icon, "d": round(x.dur, 1),
-             "c": "" if x.kind == "move" else (_ctx(t, its, x.kind)
-                                               or ("default list timing" if x.kind == "cd" else "")),
-             "w": x.why}
-            for t, x in its if x.side == "you"]
-    acts.sort(key=lambda a: (a["t"], YOU_ORDER.index(a["k"])))
-    return {
-        "end": round(dur, 1),
-        "phases": [[n, _t1(s), _t1(t)] for n, s, t in phases],
-        "rows": [_t1(m.t) for m in ms],
-        "acts": acts,
-        "anchors": [PULL] + [{"t": _t1(t), "n": x.name if x.kind in ("phase", "immune") else x.text, "k": x.kind,
-                     "p": ph(t), "ic": x.icon} for t, x in its if x.side == "boss" and x.kind in ANCHORS and t >= 1
-                    and not (x.kind != "phase" and any(abs(t - s) <= 1 for s in phase_starts))],
-        "boss": [{"t": _t1(t), "d": round(x.dur, 1), "n": x.text, "k": x.kind, "ic": x.icon} for t, x in its
-                 if x.side == "boss" and x.kind not in ("phase",)],
-        "strips": [{"t": _t1(t), "d": round(x.dur, 1), "k": x.kind, "side": x.side, "n": x.name}
-                   for t, x in its if x.dur and x.kind in ("cd", "pot", "def", "lust", "adds", "move", "immune")],
-    }
 
 
 def mrt(d) -> str:
@@ -686,101 +441,14 @@ def note_lines(d, kinds: tuple[str, ...] = ("cd", "pot", "def", "move")) -> list
 
 def _btn(id_: str, label: str, keys: str = "", cls: str = "btn", hidden: bool = False, more: str = "") -> str:
     """A button of the card; `keys` its keyboard shortcut (aria-keyshortcuts, then shown as it reads)."""
-    shown = {"Space": "Space", "Alt+P": "Alt P", "Control+Shift+Space": "Ctrl ⇧ Space", "Escape": "Esc"}
+    shown = {"Space": "Space", "Alt+P": "Alt P", "Control+Shift+Space": "Ctrl ⇧ Space", "Escape": "Esc", "L": "L"}
     kbd = f"<kbd aria-hidden='true'>{shown[keys]}</kbd>" if keys else ""
     attrs = (f" aria-keyshortcuts='{keys}'" if keys else "") + (" hidden" if hidden else "") + more
     return f"<button type='button' class='{cls}' id='{id_}'{attrs}><span>{label}</span>{kbd}</button>"
 
 
-def _phase_html(name: str, start: float, end: float, pi: int, rows: str, its: list) -> str:
-    lasts = f"Starts around {_mmss(start)}; " if start >= 1 else "Starts at the pull; "
-    lanes = "".join(f"<span>{x}</span>" for x in ("The boss", "Pull clock", "You"))
-    mine = [(t, x) for t, x in its if start - 0.5 <= t < end - 0.5 and x.side == "boss"]
-    said = [x.text[0].lower() + x.text[1:] for _t, x in mine if x.kind == "immune"]
-    said += [f"{x.text} at {_mmss(t)}" for t, x in mine if x.kind == "adds"]
-    said += [f"everyone moves from {_mmss(t)} to {_mmss(t + x.dur)}" for t, x in mine  # every move the timeline
-             if x.kind == "move"]  # draws, one form (fresh DPS review: 2 named, 4 drawn; then two phrasings)
-    said.sort(key=lambda s: [int(v) for v in re.findall(r"(\d+):(\d\d)", s)[:1][0]] if re.search(r"\d+:\d\d", s)
-              else [0, 0])
-    lust = [t for t, x in mine if x.kind == "lust"]
-    if lust:
-        said.insert(0, "Bloodlust " + ("at the pull" if lust[0] < 5 else f"at {_mmss(lust[0])}"))
-    short = bool(mine) and all(x.kind in ("immune", "phase") for _t, x in mine)  # an immunity alone: its row says it
-    adv = _stage_strip(mine, start, end) if said and not short else ""  # a picture, each event's words on hover (the
-    # owner, 2026-10-26: "a block that hurts the eyes": every move, wave and lust of the stage in one sentence)
-    span = _span(int(end) - int(start))  # from the clock times shown (DPS round 13: "1:41" lasting "1 min 42 s")
-    m = re.fullmatch(r"(.*) \((\d+ of \d+)\)", name)
-    title = f"{e(m[1])} <span class='rep'>({m[2]})</span>" if m else e(name)
-    return (f"<section class='stl{' short' if short else ''}' aria-labelledby='ph{pi}-h'><div class='ph-band' "
-            f"id='ph{pi}'><div class='ph-name'><h2 id='ph{pi}-h'>{title}</h2><span>{lasts}lasts about {span}.</span>"
-            f"</div>{adv}<div class='ph-lanes' aria-hidden='true'>{lanes}</div></div>{rows}</section>")
-
-
-def _stage_strip(mine: list, start: float, end: float) -> str:
-    """A stage at a glance: its moves as bars, its add waves and boss units as icons, the boss's immunity and
-    Bloodlust as bands, a tick each minute; each one's words on hover."""
-    span = max(1.0, end - start)
-
-    def x(t: float) -> float:
-        return max(0.0, min(100.0, (t - start) / span * 100))
-    out = []
-    for t, it in mine:
-        if it.kind == "move":
-            out.append(f"<span class='ps-mv' style='left:{x(t):.2f}%;width:{max(0.6, x(t + it.dur) - x(t)):.2f}%' "
-                       f"title='everyone moves {_mmss(t)} to {_mmss(t + it.dur)}'></span>")
-        elif it.kind == "immune":
-            out.append(f"<span class='ps-im' style='left:{x(t):.2f}%;width:{x(t + it.dur) - x(t):.2f}%' "
-                       f"title='{e(it.text)}'></span>")
-        elif it.kind == "lust":
-            out.append(f"<span class='ps-lust' style='left:{x(t):.2f}%;width:{x(t + 40) - x(t):.2f}%' "
-                       f"title='Bloodlust at {_mmss(t)}'></span>")
-    def count(text: str) -> str:  # "3 × Spawn of Vexhul": its count on the icon, a boss unit alone none
-        m = re.match(r"(\d+)\s*×", text.replace("\u00a0", " "))
-        return f"<b>{m[1]}</b>" if m and m[1] != "1" else ""
-    icons_ = "".join(f"<span class='ps-ic' style='left:{x(t):.2f}%' title='{e(it.text)} at {_mmss(t)}'>{_ic(it.icon)}"
-                     f"{count(it.text)}</span>" for t, it in mine if it.kind == "adds")
-    ticks = "".join(f"<span class='ps-tk' style='left:{x(m):.2f}%'>{_mmss(m)}</span>"
-                    for m in range(60 * (int(start) // 60 + 1), int(end), 60) if x(m) < 96)
-    return (f"<div class='ps' role='img' aria-label='the stage: its moves, adds and Bloodlust'><div class='ps-row'>"
-            f"{''.join(out)}{icons_}</div><div class='ps-axis'>{ticks}</div></div>")
-
-
 def cap(s: str) -> str:
     return s[:1].upper() + s[1:]
-
-
-LEGEND_KINDS = (("cd", "your cooldown"), ("pot", "your potion"), ("def", "your defensive"), ("lust", "Bloodlust"),
-                ("adds", "adds alive"), ("move", "everyone moves"), ("immune", "boss immune"))
-
-
-def legend(its: list) -> str:
-    """The legend of the bars this fight has, none other."""
-    kinds = {x.kind for _t, x in its if x.dur}
-    spans = "".join(f"<span><i class='s-{k}'></i>{label}</span>" for k, label in LEGEND_KINDS if k in kinds)
-    grey = "<span>grey = the tank's</span>" if any(x.kind == "tank" for _t, x in its) else ""
-    # the rows are not spaced to scale: a bar runs down to its end's row, not a length in seconds (a review)
-    return f"<div class='fv-legend' aria-hidden='true'>{spans}{grey}</div>"  # a bar's end: its row (review 36)
-
-
-def _side(d) -> str:
-    note = mrt(d)
-    copy = (_btn("mrt", "Copy as MRT note", cls="btn ghost")
-            + f"<textarea class='mrt-box' id='mrt-text' aria-label='MRT note' readonly hidden>{e(note)}</textarea>"
-            if note else "")
-    speed = ("<span class='seg' role='group' aria-label='Speed'><button type='button' data-s='1' aria-pressed='true'>"
-             "×1</button><button type='button' data-s='4' aria-pressed='false'>×4</button></span>")
-    return ("<aside class='fside' aria-label='Your plan'><section class='fbox now' aria-labelledby='now-h'>"
-            "<h2 class='vh' id='now-h'>Now in the fight</h2>"
-            "<div class='clock'><b id='c-time'>0:00</b><span id='c-phase'></span></div>"
-            f"<div class='ctl'>{_btn('play', 'Play', 'Space', 'btn primary')}{speed}"
-            f"{_btn('pull', 'Start at 10 on the pull timer', 'Alt+P')}</div>"
-            "<h3 id='c-title'></h3><dl class='who'><dt>Fight</dt><dd id='c-boss'></dd><dt>You</dt>"
-            "<dd class='yd' id='c-you'></dd></dl><div class='call' id='c-call'></div><p class='then' id='c-then'></p>"
-            "<div class='nb'><p><span id='c-next'></span><b id='c-in'></b></p>"
-            "<div class='meter'><i id='c-meter'></i></div></div>"
-            f"{_btn('c-sync', '', 'Control+Shift+Space', hidden=True)}"
-            f"<div class='foot'>{_btn('ss-open', 'Second screen', cls='btn ghost')}{copy}</div></section>"
-            f"{job_html(d)}</aside>")  # no pointer to the Dig deeper tab: it is right there (review 36)
 
 
 def opener_html(d) -> str:
@@ -851,22 +519,6 @@ def _burst_html(d, notes) -> str:
             + row("Between them", "between them", sp.outside) + "</div>")
 
 
-def _second_screen(d) -> str:
-    return (f"<dialog class='ss' id='ss' aria-label='{e(d.boss)}, second screen' tabindex='-1'>"
-            f"<div class='ss-top'><h2><span id='ss-h'>{e(d.boss)}</span> {theme.diff_pill(d.difficulty)}</h2>"
-            "<span class='ss-clock' id='ss-clock'>0:00</span><span class='ss-phase' id='ss-phase'></span>"
-            "<span class='ss-boss' id='ss-boss' aria-label='Boss'></span>"
-            f"{_btn('ss-close', 'Back to the plan', 'Escape')}</div>"
-            "<div class='ss-mid'><div class='call' id='ss-call'></div><p class='ss-you' id='ss-you'></p>"
-            "<p class='then' id='ss-then'></p>"
-            "<div class='bars' id='ss-bars' role='list' aria-label='Coming up'></div></div>"
-            f"<div class='ss-bot'><div class='grp'>{_btn('ss-play', 'Play', cls='btn primary')}"
-            f"{_btn('ss-pull', 'Start at 10 on the pull timer', 'Alt+P')}"
-            f"{_btn('ss-sync', '', 'Control+Shift+Space', hidden=True)}</div>"
-            f"<div class='grp'>{_btn('ss-sound', 'Voice and beeps', cls='btn ghost', more=' aria-pressed=false')}"
-            f"{_btn('ss-wipe', 'Wipe, back to the pull', cls='btn ghost')}</div></div></dialog>")
-
-
 def kill_switch(d) -> str:
     """The kill times this boss is planned for (issue #26), one sheet each: the fight, the plan's presses and the
     notes are those of that kill time."""
@@ -882,25 +534,411 @@ def kill_switch(d) -> str:
             f"timings then approximate'>the closest to your kill</span></nav>")  # the rest on hover (review 36)
 
 
+
+
+# --- the fight on one screen (the owner, 2026-11-12: "a big wall"; a horizontal timeline chosen among four mockups) ---
+
+TRACK_PX = 1040  # the timeline's track at a desktop width: what a time label has room for
+LABEL_PX = 62  # a press's time is printed when the next press of its lane is at least this far
+FOLD_OFFSET = 1.5  # a boss cast at the same offset (± this) into every wave of one add is part of that wave
+SAME_BURST = 3.0  # presses this close are one burst (the sentence on top)
+
+
+@dataclass
+class Mark:
+    t: float
+    dur: float = 0.0
+    icon: str = ""
+    tip: str = ""
+    label: str = ""  # its time, or "pre"
+    count: str = ""  # an add wave's count
+    flag: bool = False  # the plan holds it, or the top players press it elsewhere
+    tops: float | None = None  # where most top players press it, when elsewhere
+
+
+@dataclass
+class Lane:
+    kind: str  # you: cd, pot, def, move, do, kill; boss: key, journal
+    names: list[str]
+    icons: list[str]
+    sub: str = ""
+    marks: list[Mark] = field(default_factory=list)
+
+
+@dataclass
+class Timeline:
+    end: float
+    phases: list[tuple[str, float, float]]
+    lust: list[tuple[float, Item]]
+    immune: list[tuple[float, Item]]
+    moves: list[list[float]]
+    you: list[Lane]
+    boss: list[Lane]
+    others: list[tuple[float, Item]]  # the other boss casts: a dot each
+    tank: list[str]  # the tank's spells, hidden for a damage dealer
+
+
+def _answers(it: Item) -> str:
+    """The boss event a press of yours answers ("Feint for Ravenous Feast": Ravenous Feast)."""
+    m = re.search(r"\bfor (.+)$", it.text)
+    if not m or m[1] == "the move":
+        return ""
+    return m[1].removesuffix("'s damage").strip()
+
+
+def _tops_at(why: str) -> float | None:
+    m = re.search(r"at about (\d+):(\d\d)", why or "")
+    return int(m[1]) * 60 + int(m[2]) if m else None
+
+
+def _say_why(why: str) -> str:
+    """A press's reason as a sentence for its hover."""
+    parts = [x.strip() for x in (why or "").split(";") if x.strip()]
+    parts = ["SimC presses it on cooldown" if x == "◷ on cooldown" else x.replace("⚠ ", "") for x in parts]
+    return ". ".join(cap(x) for x in parts)
+
+
+def timeline(d) -> Timeline | None:
+    """The fight as lanes (generic, every boss): yours first, a lane a spell (spells always pressed together share
+    one), a lane a unit you kill; then the boss's spells that concern you (one you answer, one that may target you,
+    one the journal tells damage dealers about); the rest a dot each, the tank's hidden."""
+    end = d.duration or (d.fight.duration if d.fight else 0)
+    if not end:
+        return None
+    its = [(t, x) for t, x in items(d) if t <= end + 0.5 and x.kind != "kill"]
+    boss = [(t, x) for t, x in its if x.side == "boss"]
+    mine = [(t, x) for t, x in its if x.side == "you"]
+    moves: list[list[float]] = []
+    for t, x in sorted((t, x) for t, x in boss if x.kind == "move"):
+        if moves and t <= moves[-1][1]:
+            moves[-1][1] = max(moves[-1][1], min(end, t + x.dur))
+        else:
+            moves.append([t, min(end, t + x.dur)])
+    waves = [{"t": t, "it": x, "name": _clean(x.name), "dur": min(x.dur, end - t), "mine": False, "with": []}
+             for t, x in boss if x.kind == "adds"]
+    answered = {_answers(x) for _t, x in mine} - {""}
+    casts: dict[str, list[tuple[float, Item]]] = {}
+    for t, x in boss:
+        if x.kind in ("cast", "mech"):
+            casts.setdefault(x.name, []).append((t, x))
+    for name, occ in casts.items():  # a cast that comes with every wave of one add, at one offset: the wave's
+        if name in answered or occ[0][1].kind == "mech" or len(occ) < 2:
+            continue
+        offs = []
+        for t, _x in occ:
+            w = max((w for w in waves if w["t"] - 1 <= t <= w["t"] + w["dur"] + 5), key=lambda w: w["t"], default=None)
+            offs.append((w, t - w["t"]) if w else None)
+        if all(offs) and len({w["name"] for w, _o in offs}) == 1 and \
+                max(o for _w, o in offs) - min(o for _w, o in offs) <= FOLD_OFFSET:
+            for w, o in offs:
+                w["with"].append((name, o))
+            casts[name] = []
+    boss_lanes, others = [], []
+    for name, occ in casts.items():
+        if not occ:
+            continue
+        key = name in answered or any(x.kind == "mech" for _t, x in occ)
+        hint = next((x.hint for _t, x in occ if x.hint), "")
+        if not key and not hint:
+            others += occ
+            continue
+        by = sorted({x.name for _t, x in mine if _answers(x) == name})
+        sub = f"you: {', '.join(by)}" if by else "may target you" if key else "in the journal"
+        lane = Lane("key" if key else "journal", [name], [occ[0][1].icon], sub)
+        for t, x in occ:
+            tip = [f"{name} · {_mmss(t)}"] + ([f"You answer with {', '.join(by)}"] if by else
+                                              ["It may target you"] if x.kind == "mech" else [])
+            tip += [hint] if hint else []
+            lane.marks.append(Mark(t, icon=x.icon, tip="\n".join(tip), label=_mmss(t)))
+        boss_lanes.append(lane)
+    boss_lanes.sort(key=lambda b: (b.kind != "key", b.marks[0].t))
+    groups: dict[tuple[str, str], Lane] = {}
+    for t, x in mine:
+        if x.kind == "do":
+            w = next((w for w in waves if w["name"] == _clean(x.name) and abs(w["t"] - t) < 3), None)
+            if w is not None and x.text.startswith("Kill"):
+                w["mine"] = True
+                continue
+        lane = groups.setdefault((x.kind, x.text if x.kind == "do" else x.name),
+                                 Lane(x.kind, [x.text if x.kind == "do" else x.name], [x.icon]))
+        why = _say_why(x.why)
+        c = _ctx(t, its, x.kind)
+        tops = _tops_at(x.why)
+        tip = [f"{x.text} · {'before the pull' if t < 0 else _mmss(t)}" + (f" · lasts {x.dur:.0f} s" if x.dur else "")]
+        tip += [cap(c)] if c else []
+        tip += [why] if why else []
+        lane.marks.append(Mark(t, x.dur, x.icon, "\n".join(tip), "pre" if t < 0 else _mmss(t),
+                               flag="⚠" in x.why or "hold" in x.why,
+                               tops=tops if tops is not None and abs(tops - t) > 3 else None))
+        if x.kind == "def" and _answers(x):
+            lane.sub = f"for {_answers(x)}"
+    lanes = list(groups.values())
+    merged: list[Lane] = []
+    for lane in lanes:  # cooldowns always pressed together: one lane (Ancestral Call + Ascendance + the Vile Vial)
+        same = next((m for m in merged if lane.kind == m.kind == "cd" and [round(x.t) for x in m.marks]
+                     == [round(x.t) for x in lane.marks]), None)
+        if same is None:
+            merged.append(lane)
+            continue
+        same.names.append(lane.names[0])
+        same.icons.append(lane.icons[0])
+        for a, b in zip(same.marks, lane.marks, strict=True):
+            a.dur = max(a.dur, b.dur)
+            a.tip += f"\nWith {lane.names[0]}" + (f" ({b.dur:.0f} s)" if b.dur else "")
+            a.flag = a.flag or b.flag
+    order = ("cd", "pot", "def", "move", "do")
+    merged.sort(key=lambda m: (order.index(m.kind), m.marks[0].t))
+    for m in merged:
+        if len(m.names) > 1:
+            m.sub = " + ".join(m.names[1:])
+    kills: dict[str, Lane] = {}
+    for w in waves:
+        if not w["mine"]:
+            continue
+        x = w["it"]
+        lane = kills.setdefault(w["name"], Lane("kill", [f"Kill {w['name']}"], [x.icon]))
+        n = re.match(r"(\d+)\s*×", x.text.replace(" ", " "))
+        tip = [f"Kill {x.text} · {_mmss(w['t'])} · alive {w['dur']:.0f} s in the top kills"]
+        tip += [f"Comes with {', '.join(f'{c} (+{o:.0f} s)' for c, o in w['with'])}"] if w["with"] else []
+        tip += [x.hint] if x.hint else []
+        lane.marks.append(Mark(w["t"], w["dur"], x.icon, "\n".join(tip), _mmss(w["t"]),
+                               n[1] if n and n[1] != "1" else ""))
+    for lane in kills.values():
+        total = sum(int(m.count or 1) for m in lane.marks)
+        lane.sub = f"{len(lane.marks)} wave{'s' if len(lane.marks) > 1 else ''}" + (
+            f" · {total} adds" if any(m.count for m in lane.marks) else "")
+    you = merged[:]
+    at = next((i for i, m in enumerate(you) if m.kind == "do"), len(you))
+    you[at:at] = kills.values()
+    return Timeline(end, _phases(d, end), [(t, x) for t, x in boss if x.kind == "lust"],
+                    [(t, x) for t, x in boss if x.kind == "immune"], moves, you, boss_lanes, others,
+                    sorted({x.name for _t, x in boss if x.kind == "tank"}))
+
+
+def _tip(text: str) -> str:
+    return f" data-tip='{e(text)}'" if text else ""
+
+
+def timeline_html(d, tl: Timeline) -> str:
+    end = tl.end
+
+    def x(t: float) -> str:
+        return f"{max(0.0, min(100.0, t / end * 100)):.2f}%"
+
+    def w(t: float, dur: float) -> str:
+        return f"{max(0.0, min(dur, end - t)) / end * 100:.2f}%"
+
+    def row(cls: str, head: str, track: str) -> str:
+        return f"<div class='r {cls}'><div class='g'>{head}</div><div class='tr'>{track}</div></div>"
+
+    def head(lane: Lane) -> str:
+        ics = "".join(_ic(i) for i in lane.icons[:4])
+        sub = f"<small>{e(lane.sub)}</small>" if lane.sub else ""
+        return (f"<span class='lics'>{ics}</span><span class='nm'>{e(lane.names[0])}{sub}</span>"
+                f"<span class='ct'>×{len(lane.marks)}</span>")
+    px = TRACK_PX / end
+    ticks = "".join(f"<span class='tick{' min' if t % 60 == 0 else ''}' style='left:{x(t)}'>{_mmss(t)}</span>"
+                    for t in range(0, int(end) + 1, 30) if (end - t) * px >= 64)
+    rows = [row("ax", "", ticks + f"<span class='killflag'>Kill ~{_mmss(end)}</span>")]
+    if len(tl.phases) > 1:
+        ph = "".join(f"<span class='seg-ph{' imm' if any(abs(t - a) < 2 for t, _i in tl.immune) else ''}' "
+                     f"style='left:{x(a)};width:calc({w(a, b - a)} - 3px)'{_tip(f'{n} · {_mmss(a)} to {_mmss(b)}')}>"
+                     f"{e(n)}<em>{_mmss(a)}</em></span>" for n, a, b in tl.phases)
+        rows.append(row("fph", "<span class='lb'>Phases</span>", ph))
+    wins = "".join(f"<span class='win lust' style='left:{x(t)};width:{w(t, it.dur)}'"
+                   f"{_tip(f'{it.text} · {_mmss(t)} · lasts {it.dur:.0f} s')}>{_ic(it.icon)}Bloodlust</span>"
+                   for t, it in tl.lust)
+    wins += "".join(f"<span class='win imm' style='left:{x(t)};width:{w(t, it.dur)}'"
+                    f"{_tip(f'Boss immune · {_mmss(t)} to {_mmss(t + it.dur)}')}>{_ic(it.icon)}Boss immune "
+                    f"<em>{it.dur:.0f} s</em></span>" for t, it in tl.immune)
+    if wins:
+        rows.append(row("raid", "<span class='lb'>Raid</span>", wins))
+    if tl.moves:
+        mv = "".join(f"<span class='mv' style='left:{x(a)};width:{w(a, b - a)}'"
+                     f"{_tip(f'Everyone moves · {_mmss(a)} to {_mmss(b)}')}></span>" for a, b in tl.moves)
+        rows.append(row("thin", "<span class='lb'>Everyone moves</span>", mv))
+    rows.append("<div class='sec'><span>You</span></div>")
+    for lane in tl.you:
+        track = ""
+        for k, m in enumerate(lane.marks):
+            nxt = lane.marks[k + 1].t if k + 1 < len(lane.marks) else end
+            room = (nxt - m.t) * px
+            if m.dur:
+                at = max(0.0, m.t)
+                track += f"<span class='bar k-{lane.kind}' style='left:{x(at)};width:{w(at, m.dur)}'></span>"
+            if m.tops is not None:
+                said = f"Most top players: about {_mmss(m.tops)}"
+                track += f"<span class='ghost' style='left:{x(m.tops)}'{_tip(said)}></span>"
+            label = (f"<span class='tm'>{m.label}" + (f"<small>{m.dur:.0f} s</small>" if lane.kind == "kill" and m.dur
+                                                       and room > 110 else "") + "</span>") if room > LABEL_PX else ""
+            track += (f"<span class='ev k-{lane.kind}' style='left:{x(max(0.0, m.t))}'{_tip(m.tip)}>{_ic(m.icon)}"
+                      + (f"<b class='n'>{m.count}</b>" if m.count else "")
+                      + ("<b class='badge'>!</b>" if m.flag else "")
+                      + f"{label}</span>")
+        rows.append(row("you", head(lane), track))
+    if tl.boss or tl.others or tl.tank:
+        rows.append("<div class='sec sb'><span>The boss <i>what concerns you</i></span></div>")
+    for lane in tl.boss:
+        track = "".join(f"<span class='bm' style='left:{x(m.t)}'{_tip(m.tip)}>{_ic(m.icon)}"
+                        + (f"<span class='tm'>{m.label}</span>" if lane.kind == "key" and (
+                            (lane.marks[k + 1].t if k + 1 < len(lane.marks) else end) - m.t) * px > 48 else "")
+                        + "</span>" for k, m in enumerate(lane.marks))
+        rows.append(row(f"boss{' m' if lane.kind != 'key' else ''}", head(lane), track))
+    if tl.others or tl.tank:
+        names = sorted({x.name for _t, x in tl.others})
+        said = (f"{len(names)} other cast{'s' if len(names) != 1 else ''}" if names else "") + (
+            f"{' · ' if names else ''}{len(tl.tank)} tank spell{'s' if len(tl.tank) != 1 else ''} hidden"
+            if tl.tank else "")
+        dots = "".join(f"<span class='dot' style='left:{x(t)}'{_tip(f'{it.name} · {_mmss(t)}')}></span>"
+                       for t, it in tl.others)
+        rows.append(row("boss ticks", f"<span class='lb' title='{e(', '.join(names + tl.tank))}'>{e(said)}</span>",
+                        dots))
+    grid = "".join(f"<i class='gl{' h' if t % 60 else ''}' style='left:{x(t)}'></i>"
+                   for t in range(0, int(end) + 1, 30))
+    grid += "".join(f"<i class='immcol' style='left:{x(t)};width:{w(t, it.dur)}'></i>" for t, it in tl.immune)
+    grid += f"<i class='gl end' style='left:{x(end)}'></i><i class='cur'><b></b></i><i class='now'></i>"
+    return (f"<div class='ftl' data-end='{end:.1f}' role='img' aria-label='The fight on one clock: your presses, the "
+            f"adds you kill and the boss spells that concern you'>{''.join(rows)}<div class='ov'>{grid}</div></div>")
+
+
+def summary(d, tl: Timeline) -> str:
+    """The plan in a sentence: when you burst and where, the boss immune, your defensives."""
+    its = items(d)
+    lust = [(t, t + it.dur) for t, it in tl.lust]
+    presses = sorted(((m.t, lane) for lane in tl.you if lane.kind in ("cd", "pot") for m in lane.marks if m.t >= 0),
+                     key=lambda p: p[0])
+    durs = {(round(m.t), lane.names[0]): m.dur for lane in tl.you for m in lane.marks}
+    bursts: list[list] = []
+    for t, lane in presses:
+        if bursts and t - bursts[-1][0] <= SAME_BURST:
+            bursts[-1][1].append(lane)
+        else:
+            bursts.append([t, [lane]])
+    big = [(t, ls) for t, ls in bursts if len(ls) >= 2 and any(durs.get((round(t), x.names[0])) for x in ls)]
+
+    def where(t: float) -> str:
+        if any(a <= t <= b for a, b in lust):
+            return "in Bloodlust"
+        c = _ctx(t, its, "cd")
+        return re.sub(r"^on the \d+ × ", "on the ", c) if c not in ("on the pull", "just after the pull") else ""
+    parts = []
+    if big:
+        ws = [where(t) for t, _ls in big]
+        if len(big) > 1 and len(set(ws)) == 1 and ws[0]:
+            parts.append(f"Burst at {' and '.join(f'<b>{_mmss(t)}</b>' for t, _ls in big)}, each {e(ws[0])}.")
+        else:
+            parts.append("Burst " + " and ".join(f"at <b>{_mmss(t)}</b>{' ' + e(wh) if wh else ''}"
+                                                 for (t, _ls), wh in zip(big, ws, strict=True)) + ".")
+    for t, it in tl.immune:
+        parts.append(f"The boss is immune from <b>{_mmss(t)}</b> to <b>{_mmss(t + it.dur)}</b>.")
+    defs: dict[tuple[str, str], int] = {}
+    for lane in tl.you:
+        if lane.kind == "def":
+            defs[(lane.names[0], lane.sub.removeprefix("for "))] = len(lane.marks)
+    if defs:
+        parts.append(", ".join(f"{e(n)} {'each' if k > 1 else 'for'} {e(w)}" if w else e(n)
+                               for (n, w), k in defs.items()) + ".")
+    return f"<p class='lede'>{' '.join(parts)}</p>" if parts else ""
+
+
+def differ_html(d) -> str:
+    """Where your plan and the top players differ: each press with a reason beyond its cooldown, said in full."""
+    its = items(d)
+    rows = []
+    for t, it in its:
+        if it.side != "you" or it.kind not in ("cd", "pot") or t < 5:
+            continue
+        parts = [x.strip() for x in (it.why or "").split(";") if x.strip()]
+        if not [x for x in parts if x not in ("◷ on cooldown", "when your rotation calls it")]:
+            continue
+        pct = re.search(r"(\d+)% of the top players", it.why)
+        tops = _tops_at(it.why)
+        c = _ctx(t, its, it.kind)
+        meter = (f"<div class='mtr'><span><i style='width:{pct[1]}%'></i></span>{pct[1]}% of the top players"
+                 f"{' at ' + _mmss(tops) if tops is not None else ' then'}</div>") if pct else ""
+        rows.append(f"<li>{_ic(it.icon)}<time>{_mmss(t)}</time><div><p><b>{e(it.text)}</b>"
+                    f"{' <span class=muted>' + e(c) + '</span>' if c else ''}</p><p>{e(_say_why(it.why))}</p>{meter}"
+                    f"</div></li>")
+    if not rows:
+        return ("<section class='card differ'><h2>Your plan and the top players</h2><p class='muted'>They press your "
+                "cooldowns at the same moments.</p></section>")
+    return (f"<section class='card differ'><h2>Where your plan and the top players differ</h2><ul>{''.join(rows)}"
+            f"</ul></section>")
+
+
+def mrt_html(d) -> str:
+    note = mrt(d)
+    if not note:
+        return ""
+    return (f"<section class='card mrtc'><div class='mrth'><h2>MRT note</h2>{_btn('mrt', 'Copy', cls='btn ghost')}"
+            f"</div><textarea class='mrt-box' id='mrt-text' aria-label='MRT note' readonly "
+            f"rows='{min(16, note.count(chr(10)) + 1)}'>{e(note)}</textarea></section>")
+
+
+def live_html(d) -> str:
+    """The live view (the owner's pick: the plan on one screen, the live of the player-first mockup): a big clock,
+    what to press now, then, what is running, what comes in the next minute, the timeline with a playhead."""
+    speed = ("<span class='seg' role='group' aria-label='Speed'><button type='button' data-s='1' aria-pressed='true'>"
+             "×1</button><button type='button' data-s='4' aria-pressed='false'>×4</button></span>")
+    return (f"<dialog class='lv' id='ss' aria-label='{e(d.boss)}, live' tabindex='-1'>"
+            "<div class='lv-top'><div class='lv-clock'><b id='c-time'>0:00</b><span><span class='lv-boss'>"
+            f"{e(d.boss)} {theme.diff_pill(d.difficulty)}</span><span id='c-phase'></span></span></div>"
+            f"<div class='lv-ctl'>{_btn('play', 'Play', 'Space', 'btn primary')}"
+            f"{_btn('pull', 'Start at 10 on the pull timer', 'Alt+P')}{speed}"
+            f"{_btn('c-sync', '', 'Control+Shift+Space', hidden=True)}"
+            f"{_btn('ss-sound', 'Voice and beeps', cls='btn ghost', more=' aria-pressed=false')}"
+            f"{_btn('ss-wipe', 'Wipe', cls='btn ghost')}{_btn('ss-close', 'Close', 'Escape', 'btn ghost')}</div></div>"
+            "<div class='lv-tl' id='lv-tl'></div>"
+            "<div class='lv-main'><section class='lv-now' aria-label='Now'><div class='call' id='c-call'></div>"
+            "<p class='then' id='c-then'></p></section>"
+            "<aside class='lv-side'><h3>Running now</h3><dl class='who'><dt>Fight</dt><dd id='c-boss'></dd><dt>You</dt>"
+            "<dd class='yd' id='c-you'></dd></dl><div class='nb'><p><span id='c-next'></span><b id='c-in'></b></p>"
+            "<div class='meter'><i id='c-meter'></i></div></div><h3>The next minute</h3>"
+            "<div class='bars' id='ss-bars' role='list' aria-label='Coming up'></div></aside></div></dialog>")
+
+
+def data(d, dur: float) -> dict:
+    """What the page's script needs, each event at its own time on the plan's clock."""
+    its = items(d)
+    phases = _phases(d, dur)
+
+    def ph(t: float) -> int:
+        return max((i for i, p in enumerate(phases) if t >= p[1] - 0.5), default=0)
+
+    phase_starts = [s for _n, s, _e in phases[1:]]
+    acts = [{"t": _t1(t), "n": x.text, "k": x.kind, "ic": x.icon, "d": round(x.dur, 1),
+             "c": "" if x.kind == "move" else (_ctx(t, its, x.kind)
+                                               or ("default list timing" if x.kind == "cd" else "")),
+             "w": x.why}
+            for t, x in its if x.side == "you"]
+    acts.sort(key=lambda a: (a["t"], YOU_ORDER.index(a["k"])))
+    return {
+        "end": round(dur, 1),
+        "phases": [[n, _t1(s), _t1(t)] for n, s, t in phases],
+        "acts": acts,
+        "anchors": [PULL] + [{"t": _t1(t), "n": x.name if x.kind in ("phase", "immune") else x.text, "k": x.kind,
+                     "p": ph(t), "ic": x.icon} for t, x in its if x.side == "boss" and x.kind in ANCHORS and t >= 1
+                    and not (x.kind != "phase" and any(abs(t - s) <= 1 for s in phase_starts))],
+        "boss": [{"t": _t1(t), "d": round(x.dur, 1), "n": x.text, "k": x.kind, "ic": x.icon} for t, x in its
+                 if x.side == "boss" and x.kind not in ("phase",)],
+    }
+
+
 def html(d) -> str:
     """The fight view, or '' when the prep has no fight to show."""
-    dur = d.duration or (d.fight.duration if d.fight else 0)
-    ms = moments(d)
-    if not dur or not ms:
+    tl = timeline(d)
+    if tl is None or not (tl.you or tl.boss):
         return ""
-    sections, phases, its = [], _phases(d, dur), items(d)
-    for pi, (name, start, end) in enumerate(phases):
-        last = pi == len(phases) - 1
-        rows = "".join(_row(m, i, (ms[i + 1].t if i + 1 < len(ms) else dur) - m.t) for i, m in enumerate(ms)
-                       if (m.t >= start - 0.5 or pi == 0) and (m.t < end - 0.5 or (last and m.t <= end)))
-        if rows:
-            sections.append(_phase_html(name, start, end, pi, rows, its))
-    payload = json.dumps(data(d, ms, dur)).replace("</", "<\\/")
-    return (f"<div class='fv'><a class='skip' href='#tl'>Skip to the fight</a>{kill_switch(d)}"
-            f"<div class='sheet-fv'>{_side(d)}"
-            f"<section class='ftl' id='tl' tabindex='-1' aria-label='The fight'>{opener_html(d)}{legend(its)}"
-            f"{''.join(sections)}"
-            f"<div class='tl-end'></div></section></div>{_second_screen(d)}"
+    payload = json.dumps(data(d, tl.end)).replace("</", "<\\/")
+    live = (f"<div class='go-live'>{_btn('ss-open', 'Live view', 'L', 'btn primary')}<span class='muted'>to follow the "
+            f"pull on a second screen</span></div>")
+    return (f"<div class='fv'>{kill_switch(d)}<div class='fv-top'><div class='fv-lede'>{summary(d, tl)}{live}</div>"
+            f"{opener_html(d)}</div>"
+            f"<section class='card tlc' id='tl' tabindex='-1' aria-labelledby='tl-h'><div class='tlh'><h2 id='tl-h'>"
+            f"The pull, minute by minute</h2><span class='muted'>hover anything for the details</span></div>"
+            f"{timeline_html(d, tl)}</section>"
+            f"<div class='fv-below'>{differ_html(d)}{mrt_html(d)}</div>{live_html(d)}"
+            "<div class='tip' id='fv-tip' role='tooltip' hidden></div>"
             "<p class='vh' id='sr' aria-live='polite' aria-atomic='false'></p>"
             f"<script>var FV={payload};</script><script>{JS}</script></div>")
 

@@ -1,6 +1,7 @@
-/* The fight view (paf.fightview): plays the fight on the plan's clock, says what to press next at its own time, and
-   follows a raid ahead of or behind the plan from one press on a boss event (a phase start first). FV comes from
-   the page: acts (what you press), anchors (boss events a press can confirm), boss (what the boss line shows). */
+/* The fight view (paf.fightview). On the page: the timeline's hover (each mark's details, the time under the
+   pointer). Live: plays the fight on the plan's clock, says what to press next at its own time, and follows a raid
+   ahead of or behind the plan from one press on a boss event (a phase start first). FV comes from the page: acts
+   (what you press), anchors (boss events a press can confirm), boss (what the boss line shows). */
 (function () {
   'use strict';
   var root = document.querySelector('.fv');
@@ -8,9 +9,8 @@
   var A = FV.acts, N = FV.anchors, B = FV.boss, $ = function (id) { return document.getElementById(id); };
   var LEAD = 5, NOW_FOR = 3, SAME = 1, BOUNCE = 3, QUIET = 1.5, LAST_PUSH = 30;
   var WIN = { pull: [-5, 10], phase: [-20, 25], immune: [-20, 25], adds: [-10, 12], cast: [-10, 12] }, FIRST = 10, NEAR = 4, CARRY = 10, FAR = 30, THEN = 180, HOLD = 60;
-  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var st = { cur: 0, playing: false, speed: 1, sound: false, conf: [], key: '', curRow: -1, target: -1, lastPress: -1e9,
-             quietUntil: 0, userScroll: 0, last: null, ssFrom: null, sq: [], sqAt: 0, said: {}, owed: [], globalHeld: false,
+  var st = { cur: 0, playing: false, speed: 1, sound: false, conf: [], key: '', target: -1, lastPress: -1e9,
+             quietUntil: 0, last: null, ssFrom: null, sq: [], sqAt: 0, said: {}, owed: [], globalHeld: false,
              called: {}, lastPressAt: -1e9 };
 
   function mmss(t) { var s = Math.max(0, Math.floor(t + 1e-6)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
@@ -181,17 +181,6 @@
     }
     return 'Your rotation';
   }
-  function title(t, cc) {
-    if (t < 0 || (cc.g && cc.g.at < 0 && !st.playing)) return 'Before the pull';  // idle at 0:00 with precasts due: their moment
-    if (cc.state === 'end') return 'Last push';
-    var cur = '';
-    N.forEach(function (a) {
-      var e = eff(a.t), b = B.filter(function (x) { return Math.abs(x.t - a.t) < 0.01 && x.n === a.n; })[0];
-      if (!gone(a.t) && e <= t && t < (b ? until(b) : e + 6)) cur = a.n;
-    });
-    if (!cur && cc.g && (cc.state === 'go' || cc.state === 'ready')) return cc.state === 'go' ? 'Press now' : 'Get ready';
-    return cur || (t < 6 ? 'The pull' : 'Your rotation');
-  }
   function phaseAt(t) {
     var p = FV.phases[0][0];
     FV.phases.forEach(function (x, k) {
@@ -272,22 +261,17 @@
 
   function render() {
     var t = st.cur, cc = call(t), sh = shift(1e9);
-    txt($('c-time'), clock(t)); txt($('ss-clock'), clock(t));
+    txt($('c-time'), clock(t));
     var ph = phaseAt(t) + (st.conf.length && Math.abs(Math.round(sh)) > 2 ? ' · boss ' + Math.abs(Math.round(sh)) + ' s ' + (sh > 0 ? 'behind' : 'ahead') : '');
-    txt($('c-phase'), ph); txt($('ss-phase'), ph);
+    txt($('c-phase'), ph);
     var pn = phaseAt(t);
     if (st.playing && st.lastPhase && pn !== st.lastPhase && performance.now() >= st.quietUntil) say(pn + '.');
     st.lastPhase = pn;
-    txt($('c-title'), title(t, cc));
-    var bl = bossNow(t); txt($('c-boss'), bl); txt($('ss-boss'), bl === '—' ? '' : bl);
-    var yn = youNow(t, cc); txt($('c-you'), yn);
-    var sy = cc.state === 'go' ? (yn.split(' · then ')[1] || '') : yn;  // the second screen: what the card does not say
-    var lab = (cc.html || '').replace(/<[^>]+>/g, ' ');  // the card being drawn now
-    if (sy === 'Your rotation' || (sy && lab.toLowerCase().indexOf(sy.toLowerCase()) >= 0)) sy = '';
-    txt($('ss-you'), sy ? sy.charAt(0).toUpperCase() + sy.slice(1) : '');
+    txt($('c-boss'), bossNow(t));
+    txt($('c-you'), youNow(t, cc));
     if (cc.state === 'go' && cc.g && st.called[gkey(cc.g)] == null) st.called[gkey(cc.g)] = st.cur;
-    ['c-call', 'ss-call'].forEach(function (id) { var el = $(id); set(el, cc.html); el.className = cc.cls; });
-    var th = then(t, cc); txt($('c-then'), th); txt($('ss-then'), th);
+    set($('c-call'), cc.html); $('c-call').className = cc.cls;
+    txt($('c-then'), then(t, cc));
     var n = nextAnchor(t);
     var hw = holding();
     if (hw) {
@@ -309,9 +293,9 @@
     }
     if (hl && st.playing && st.saidLate !== hl.a.t) { say(hl.a.n + ' is late: the plan waits for it.', true); st.saidLate = hl.a.t; }
     st.target = st.playing ? syncTarget(t) : -1;
-    ['c-sync', 'ss-sync'].forEach(function (id) {
+    ['c-sync'].forEach(function (id) {
       var b = $(id), hide = st.target < 0;
-      if (hide && !b.hidden && document.activeElement === b) $(id === 'c-sync' ? 'play' : 'ss-play').focus();
+      if (hide && !b.hidden && document.activeElement === b) $('play').focus();
       b.hidden = hide;
       if (!hide) {
         var both = N.filter(function (x) { return Math.abs(x.t - N[st.target].t) <= 1 && x.k !== 'pull'; }).map(function (x) { return x.n; });
@@ -325,29 +309,18 @@
       if (st.playing && cc.say) { say(cc.say, true); if (cc.state === 'go') beep(); }
       st.key = cc.key;
     }
-    row(t);
+    playhead(t);
     bars(t);
     playBtn();
   }
 
-  /* the current row: lit, aria-current on its time, that time the only one in the Tab order */
-  function row(t) {
-    var r = -1;
-    FV.rows.forEach(function (rt, i) { if (eff(rt) <= t + 0.01) r = i; });
-    if (r === st.curRow) return;
-    var old = root.querySelector('.fm.on');
-    if (old) { old.classList.remove('on'); old.querySelector('.t').setAttribute('aria-current', 'false'); }
-    var el = r >= 0 ? root.querySelector('.fm[data-i="' + r + '"]') : null;
-    if (el) {
-      el.classList.add('on'); el.querySelector('.t').setAttribute('aria-current', 'true');
-      roving(el.querySelector('.t'));
-      if (st.playing && performance.now() - st.userScroll > 4000) el.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
-    }
-    st.curRow = r;
+  /* the live view's timeline: the page's, cloned once, a line at the plan's time */
+  function playhead(t) {
+    var now = document.querySelector('#lv-tl .now');
+    if (now) { now.style.left = Math.max(0, Math.min(100, t / FV.end * 100)).toFixed(2) + '%'; now.style.display = t > 0 ? 'block' : 'none'; }
   }
-  function roving(cur) { root.querySelectorAll('.fm .t').forEach(function (b) { b.tabIndex = b === cur ? 0 : -1; }); }
 
-  /* second screen: what comes in the next minute, yours and the boss's, as bars that empty */
+  /* the live view: what comes in the next minute, yours and the boss's, as bars that empty */
   function bar(e, t, cls, ic, who, n) {
     return [e, '<div class="fbar ' + cls + '" role="listitem"><i class="fill" style="transform:scaleX(' + Math.max(0, Math.min(1, (e - t) / 60)).toFixed(3) + ')"></i>' + icon(ic) + '<b><span class="vh">' + who + ': </span>' + esc(n) + '</b><span>' + (e - t <= 0.5 ? 'now' : secs(e - t)) + '</span></div>'];
   }
@@ -393,7 +366,7 @@
   }
 
   function playBtn() {
-    ['play', 'ss-play'].forEach(function (id) {
+    ['play'].forEach(function (id) {
       var b = $(id), s = b.querySelector('span'); txt(s || b, st.playing ? 'Pause' : (st.cur !== 0 ? 'Resume' : 'Play'));
     });
     document.body.classList.toggle('playing', st.playing);
@@ -456,55 +429,21 @@
 
   function openSS() {
     st.ssFrom = document.activeElement;
-    var dlg = $('ss');
+    var dlg = $('ss'), box = $('lv-tl'), tl = document.querySelector('#tl .ftl');
+    if (box && tl && !box.firstChild) { var c = tl.cloneNode(true); c.removeAttribute('role'); c.setAttribute('aria-hidden', 'true'); box.appendChild(c); }
     if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
     dlg.classList.add('open'); document.body.classList.add('ss-on'); dlg.focus(); render();
   }
   function closeSS() {
     var dlg = $('ss');
     if (dlg.close && dlg.open) dlg.close(); else dlg.removeAttribute('open');
-    dlg.classList.remove('open'); document.body.classList.remove('ss-on'); st.curRow = -1; (st.ssFrom || $('ss-open')).focus(); render();
-  }
-
-  /* bars along the clock and the "now" marker, from the rows' positions */
-  function yAtFn() {
-    var tl = $('tl'), base = tl.getBoundingClientRect().top;
-    var pts = [].slice.call(tl.querySelectorAll('.fm')).map(function (r) { return [+r.dataset.t, r.getBoundingClientRect().top - base + 14]; })
-      .sort(function (a, b) { return a[0] - b[0]; });
-    return function (t) {
-      if (!pts.length) return 0;
-      if (t <= pts[0][0]) return pts[0][1];
-      for (var k = 1; k < pts.length; k++) if (t <= pts[k][0]) { var a = pts[k - 1], b = pts[k]; return a[1] + (b[1] - a[1]) * (t - a[0]) / Math.max(0.1, b[0] - a[0]); }
-      var l = pts[pts.length - 1]; return l[1] + (t - l[0]) * 2;
-    };
-  }
-  var LANE = { move: 0, adds: 1, immune: 2, lust: 2, cd: 0, pot: 1, def: 2 };
-  function layout() {
-    var tl = $('tl'); if (!tl || !tl.offsetParent) return;
-    tl.querySelectorAll('.strip').forEach(function (x) { x.remove(); });
-    var yAt = yAtFn(), spine = tl.querySelector('.fm .spine'); if (!spine) return;
-    var sb = spine.getBoundingClientRect(), tlb = tl.getBoundingClientRect(), lanes = { boss: 0, you: 0 };
-    FV.strips.forEach(function (s) {
-      var y0 = yAt(s.t), y1 = yAt(s.t + s.d), el = document.createElement('div');
-      // one lane per kind, the same in every stage: the same meaning always in the same column
-      var side = s.side === 'boss' ? -1 : 1, lane = LANE[s.k] != null ? LANE[s.k] : lanes[s.side]++ % 3;
-      var busy = lanes['b' + s.side] = lanes['b' + s.side] || {};
-      while ((busy[lane] || -1e9) > s.t) lane += 3;  // two at once of a kind: the second one further out
-      busy[lane] = s.t + s.d;
-      el.className = 'strip s-' + s.k; el.setAttribute('aria-hidden', 'true'); el.title = s.n + ', ' + Math.round(s.d) + ' s';
-      el.style.top = y0 + 'px'; el.style.height = Math.max(6, y1 - y0) + 'px';
-      el.style.left = (sb.left - tlb.left + sb.width / 2 + side * (14 + lane * 9) - 3) + 'px';
-      tl.appendChild(el);
-    });
+    dlg.classList.remove('open'); document.body.classList.remove('ss-on'); (st.ssFrom || $('ss-open')).focus(); render();
   }
 
   /* controls */
   $('play').addEventListener('click', function () { setPlay(!st.playing); });
-  $('ss-play').addEventListener('click', function () { setPlay(!st.playing); });
   $('pull').addEventListener('click', pullTimer);
-  $('ss-pull').addEventListener('click', pullTimer);
   $('c-sync').addEventListener('click', sync);
-  $('ss-sync').addEventListener('click', sync);
   $('ss-open').addEventListener('click', openSS);
   $('ss-close').addEventListener('click', closeSS);
   $('ss').addEventListener('cancel', function (ev) { ev.preventDefault(); closeSS(); });
@@ -517,24 +456,12 @@
       st.speed = +b.dataset.s; root.querySelectorAll('.seg [data-s]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
     });
   });
-  var pills = [].slice.call(root.querySelectorAll('.fm .t'));
-  pills.forEach(function (b, k) {
-    b.tabIndex = k ? -1 : 0;
-    b.addEventListener('click', function () {
-      var r = b.closest('.fm'), t = eff(+r.dataset.t); st.cur = t; st.key = ''; render();
-      say('At ' + clock(t) + ', ' + (r.dataset.title || b.textContent));
-    });
-    b.addEventListener('keydown', function (ev) {
-      var n = { ArrowDown: 1, ArrowUp: -1, Home: -1e9, End: 1e9 }[ev.key]; if (!n) return;
-      ev.preventDefault(); var to = pills[Math.max(0, Math.min(pills.length - 1, k + n))]; roving(to); to.focus();
-    });
-  });
   var mrtB = $('mrt');
   if (mrtB) mrtB.addEventListener('click', function () {
     var box = $('mrt-text'), lab = mrtB.querySelector('span');
-    var done = function () { txt(lab, 'Copied'); say('MRT note copied.'); setTimeout(function () { txt(lab, 'Copy as MRT note'); }, 1500); };
+    var done = function () { txt(lab, 'Copied'); say('MRT note copied.'); setTimeout(function () { txt(lab, 'Copy'); }, 1500); };
     var fallback = function () {
-      box.hidden = false; box.select(); var ok = false;
+      box.select(); var ok = false;
       try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
       if (ok) done(); else { txt(lab, 'Select and copy'); say('Select the note and copy it.'); }
     };
@@ -542,20 +469,39 @@
   });
   document.addEventListener('keydown', function (ev) {
     if (!visible()) return;
-    var tag = (ev.target.tagName || '').toLowerCase();
+    var tag = (ev.target.tagName || '').toLowerCase(), live = $('ss').open, typing = /^(input|textarea|select)$/.test(tag);
     if (ev.ctrlKey && ev.shiftKey && (ev.code === 'Space' || ev.key === ' ')) { ev.preventDefault(); sync(); return; }
-    if (ev.altKey && (ev.key === 'p' || ev.key === 'P')) { ev.preventDefault(); pullTimer(); return; }
-    if ((ev.code === 'Space' || ev.key === ' ') && !ev.ctrlKey && !ev.altKey && !ev.metaKey
-        && !/^(input|textarea|select|button|a|summary)$/.test(tag) && (root.contains(ev.target) || ev.target === document.body)) {
+    if (ev.altKey && (ev.key === 'p' || ev.key === 'P')) { ev.preventDefault(); if (!live) openSS(); pullTimer(); return; }
+    if (!live && !typing && !ev.ctrlKey && !ev.altKey && !ev.metaKey && (ev.key === 'l' || ev.key === 'L')) { ev.preventDefault(); openSS(); return; }
+    if (live && (ev.code === 'Space' || ev.key === ' ') && !ev.ctrlKey && !ev.altKey && !ev.metaKey
+        && !/^(input|textarea|select|button|a|summary)$/.test(tag)) {
       ev.preventDefault(); setPlay(!st.playing);
     }
   });
-  window.addEventListener('wheel', function () { st.userScroll = performance.now(); }, { passive: true });
-  window.addEventListener('keydown', function (ev) { if (/^(PageUp|PageDown|ArrowUp|ArrowDown|Home|End)$/.test(ev.key)) st.userScroll = performance.now(); });
-  var lt; window.addEventListener('resize', function () { clearTimeout(lt); lt = setTimeout(layout, 150); });
-  if (window.ResizeObserver) new ResizeObserver(function () { clearTimeout(lt); lt = setTimeout(layout, 100); }).observe($('tl'));
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
   window.addEventListener('pagehide', function () { globalKey(false); });
-  window.__fv = { st: st, render: render, layout: layout, sync: sync, eff: eff };
-  layout(); render();
+  window.__fv = { st: st, render: render, sync: sync, eff: eff, open: openSS };
+  render();
+})();
+
+/* the timeline's hover: each mark's details in a card, the time under the pointer on a line */
+(function () {
+  'use strict';
+  var tip = document.getElementById('fv-tip');
+  document.querySelectorAll('.fv .ftl').forEach(function (tl) {
+    var end = +tl.dataset.end, cur = tl.querySelector('.cur'), lab = cur && cur.querySelector('b'), ov = tl.querySelector('.ov');
+    tl.addEventListener('mousemove', function (ev) {
+      var r = ov.getBoundingClientRect(), f = (ev.clientX - r.left) / r.width;
+      if (cur && f >= 0 && f <= 1) {
+        var s = Math.round(f * end); cur.style.display = 'block'; cur.style.left = (f * 100).toFixed(2) + '%';
+        lab.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+      } else if (cur) cur.style.display = 'none';
+      var el = ev.target.closest('[data-tip]');
+      if (!tip || !el || !tl.contains(el)) { if (tip) tip.hidden = true; return; }
+      tip.textContent = el.dataset.tip; tip.hidden = false;
+      var x = Math.min(window.innerWidth - tip.offsetWidth - 12, ev.clientX + 14), y = ev.clientY + 18;
+      if (y + tip.offsetHeight > window.innerHeight - 8) y = ev.clientY - tip.offsetHeight - 12;
+      tip.style.left = x + 'px'; tip.style.top = y + 'px';
+    });
+    tl.addEventListener('mouseleave', function () { if (cur) cur.style.display = 'none'; if (tip) tip.hidden = true; });
+  });
 })();

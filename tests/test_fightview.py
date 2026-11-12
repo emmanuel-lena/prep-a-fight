@@ -25,18 +25,19 @@ def sheet(monkeypatch):
     return d
 
 
-def test_moments_put_the_boss_and_you_together(monkeypatch):
+def test_the_fight_reads_as_lanes_on_one_clock(monkeypatch):
+    # the owner (2026-11-12): "a big wall"; the fight on one screen, a lane a spell, yours first
     d = sheet(monkeypatch)
-    ms = fightview.moments(d)
-    first = ms[0]
-    assert first.t < 0 and first.title == "Before the pull" and first.you[0].kind == "pot"  # a pre-pot
-    adds = next(m for m in ms if m.t == 50.0)
-    assert adds.title == "4 × Amani" and adds.anchor.kind == "adds"
-    assert [y.text for y in adds.you] == ["Kill Amani", "Shadow Blades"]  # 52 s shares the adds' row, the job first
-    assert next(y for y in adds.you if y.text == "Shadow Blades").dur == 16.0  # its aura, from the game data
-    two = next(m for m in ms if m.t == 150.0)
-    assert two.title == "Stage Two begins"  # a phase always opens its own row
-    assert ms[-1].title == "The kill, around 5:00"
+    tl = fightview.timeline(d)
+    lanes = {lane.names[0]: lane for lane in tl.you}
+    assert [lane.kind for lane in tl.you] == ["cd", "pot", "kill"]
+    blades = lanes["Shadow Blades"]
+    assert [(m.t, m.dur, m.label) for m in blades.marks] == [(52.0, 16.0, "0:52"), (200.0, 16.0, "3:20")]
+    assert lanes["Potion"].marks[0].label == "pre"  # a pre-pot
+    kill = lanes["Kill Amani"]
+    assert kill.sub == "1 wave · 4 adds" and kill.marks[0].count == "4" and kill.marks[0].dur == 20.0
+    assert [n for n, _a, _b in tl.phases] == ["Stage One", "Stage Two"]
+    assert not tl.boss and [x.name for _t, x in tl.others] == ["Soul Transfer", "Soul Transfer"]  # nothing of yours
 
 
 def test_the_page_carries_its_data_and_one_script(monkeypatch):
@@ -44,16 +45,13 @@ def test_the_page_carries_its_data_and_one_script(monkeypatch):
     page = fightview.html(d)
     data = json.loads(re.search(r"var FV=(\{.*?\});</script>", page).group(1))
     assert data["end"] == 300 and [p[0] for p in data["phases"]] == ["Stage One", "Stage Two"]
-    assert any(s["k"] == "cd" and s["d"] == 16.0 for s in data["strips"])
     assert page.count("id='c-sync'") == 1 and "aria-keyshortcuts='Control+Shift+Space'" in page
-    assert "Your job on this boss" in page and "<b>Kill the Amani</b>" in page
-    assert ("<b>Shadow Blades</b> <time class='tc'>0:52</time><time class='tc'>3:20</time> <span class='pill hold' "
-            "title='hold for the next add wave if within 45 s, else use it'>hold &le;45 s for adds</span>" in page)
-    assert "<b>Potion</b> <span class='pill' title='before the pull'>pre-pull</span>" in page  # chips, not sentences
+    assert "<dialog class='lv' id='ss'" in page and "id='ss-open'" in page and "aria-keyshortcuts='L'" in page
+    assert "Your job on this boss" not in page and "class='ftl'" in page  # one timeline, no list beside it
     blades = [a for a in data["acts"] if a["n"] == "Shadow Blades"]
-    assert blades[0]["t"] == 52 and blades[0]["c"] == "on the 4 × Amani"  # called at its own time, not the row's
+    assert blades[0]["t"] == 52 and blades[0]["c"] == "on the 4 × Amani"  # called at its own time
     assert [a["k"] for a in data["anchors"]] == ["pull", "cast", "adds", "phase", "cast"]  # what a press can confirm
-    assert "<dialog class='ss' id='ss'" in page and "For those who dig" not in page  # the tab is there
+    assert "Burst" not in page  # one press at a time: no burst to say
     assert fightview.JS.strip().startswith("/*") and "</script" not in fightview.JS
 
 
@@ -62,24 +60,26 @@ def test_movement_is_a_bar_not_an_event(monkeypatch):
 
     d = sheet(monkeypatch)
     d.movement = Movement(windows=[Window(100.0, 15.0, [("Shadowstep", 0.8)])])
-    ms = fightview.moments(d)
-    row = next(m for m in ms if m.t == 100.0)
-    assert row.anchor is None and [y.text for y in row.you] == ["Shadowstep for the move"]
+    tl = fightview.timeline(d)
+    assert tl.moves == [[100.0, 115.0]] and any(lane.kind == "move" and lane.names == ["Shadowstep"]
+                                                for lane in tl.you)
     data = json.loads(re.search(r"var FV=(\{.*?\});</script>", fightview.html(d)).group(1))
-    assert not any(a["k"] == "move" for a in data["anchors"]) and any(s["k"] == "move" for s in data["strips"])
+    assert not any(a["k"] == "move" for a in data["anchors"])
+    assert "Everyone moves · 1:40 to 1:55" in fightview.html(d)
 
 
 def test_no_fight_no_view():
     assert fightview.html(PrepData("Boss", "heroic", "Subtlety", "Char")) == ""
 
 
-def test_a_tank_only_cast_is_dimmed_and_never_confirmed(monkeypatch):
+def test_a_tank_only_cast_is_hidden_and_never_confirmed(monkeypatch):
     d = sheet(monkeypatch)
     d.ability_roles = {"Soul Transfer": ["tank"]}
-    ms = fightview.moments(d)
-    first = next(m for m in ms if m.t == 21.0)
-    assert first.boss[0].kind == "tank" and first.boss[0].text == "Soul Transfer (tank)" and first.anchor is None
-    data = json.loads(re.search(r"var FV=(\{.*?\});</script>", fightview.html(d)).group(1))
+    tl = fightview.timeline(d)
+    assert tl.tank == ["Soul Transfer"] and not tl.others
+    page = fightview.html(d)
+    assert "1 tank spell hidden" in page
+    data = json.loads(re.search(r"var FV=(\{.*?\});</script>", page).group(1))
     assert "Soul Transfer" not in [a["n"] for a in data["anchors"]]
 
 
@@ -106,7 +106,7 @@ def test_a_press_no_boss_event_explains_says_why(monkeypatch):
     assert why[2] == ""  # the pull says it
     assert why[92] == "◷ on cooldown; 80% of the top players wait until 1:38"
     assert why[182] == "◷ on cooldown; 75% of the top players press it then"
-    acts = fightview.data(d, fightview.moments(d), 300)["acts"]
+    acts = fightview.data(d, 300)["acts"]
     assert next(a for a in acts if a["t"] == 92)["w"] == why[92]
     d.optimized = [Plan("boss", {"shadow_blades": Rule("hold_adds_10", "", None)}, 0.0, 0.2)]  # a held rule: said once
     why = {t: it.why for t, it in fightview.items(d) if it.name == "Shadow Blades"}
@@ -126,16 +126,14 @@ def test_a_boss_row_says_what_the_journal_tells_damage_dealers(monkeypatch):
     assert [it.hint for it in dig] == ["Dig In increases Sszorak's damage taken during Howling Maelstrom.", ""]
     assert not next(it for _t, it in fightview.items(d) if it.name == "Ravage").hint  # not a damage dealer's line
     page = fightview.html(d)
-    assert ("class='hint' title='Journal: Dig In increases Sszorak&#x27;s damage taken during Howling Maelstrom.'>"
-            "&#128214; journal") in page  # the timeline row: its words on hover, Your job says them
-    job = fightview.job_html(d)  # Your job names it with when, its words on the book's hover
-    assert "<b>Dig In</b> <time class='tc'>1:51</time><time class='tc'>4:09</time>" in job
-    assert "title='Journal: Dig In increases" in job
+    assert "Dig In increases Sszorak&#x27;s damage taken during Howling Maelstrom." in page  # on its marks' hover
+    lane = next(b for b in fightview.timeline(d).boss if b.names == ["Dig In"])
+    assert lane.kind == "journal" and lane.sub == "in the journal"
     d.waves = [(24.0, 5, 30.0, "Bubblefin Shorerunner")]
     d.role_bullets = ["[Alluring Bubble] attracts a large group of Bubblefin Shorerunners to rush toward the bubble."]
     assert next(it for _t, it in fightview.items(d) if it.kind == "adds").hint.startswith("Alluring Bubble attracts")
-    job = fightview.job_html(d)  # no action names the murlocs: Your job says to kill them, with the journal's why
-    assert "<b>Kill the Bubblefin Shorerunners</b> <time class='tc'>0:24</time></span>" in job  # the why: fight rows
+    kill = next(lane for lane in fightview.timeline(d).you if lane.kind == "kill")  # no action names the murlocs
+    assert kill.names == ["Kill Bubblefin Shorerunner"] and "Alluring Bubble attracts" in kill.marks[0].tip
 
 
 def test_two_adds_of_one_wave_are_one_kill_row(monkeypatch):
@@ -146,16 +144,6 @@ def test_two_adds_of_one_wave_are_one_kill_row(monkeypatch):
                  Action("kill", "Shrouded Venom", "Kill the Shrouded Venom (~15 per kill)")]
     you = [it.text for t, it in fightview.items(d) if t == 24.0 and it.side == "you"]
     assert you == ["Kill Burning Venom and Shrouded Venom"]
-    job = fightview.job_html(d)
-    assert "<b>Kill Burning Venom and Shrouded Venom</b> <time class='tc'>0:24</time>" in job
-
-
-def test_a_long_press_list_reads_as_its_cadence_then_its_exceptions():
-    # Elemental, Nek'zali (DPS rounds 16-17): "every 31 s (8 times)" hid the press held for the 2:47 wave
-    chips = fightview._cadence_chips([0, 31.4, 62.9, 93.7, 123.7, 168.0, 204.9, 235.2])  # Your job's form
-    assert re.sub("<[^>]+>", " ", chips).split() == ["0:00", "&#10227;", "31", "s", "&rarr;", "2:03", "2:48", "3:24",
-                                                     "3:55"]
-    assert re.sub("<[^>]+>", " ", fightview._cadence_chips([10.0, 60.0, 90.0])).split() == ["0:10", "1:00", "1:30"]
 
 
 def test_a_boss_cast_is_a_reason_for_a_defensive_only():
@@ -164,18 +152,6 @@ def test_a_boss_cast_is_a_reason_for_a_defensive_only():
     its = [(198.0, cast)]
     assert fightview._ctx(200.0, its, "cd") == ""
     assert fightview._ctx(200.0, its, "def") == "on Malignant Catalyst"
-
-
-def test_the_kill_and_a_press_a_few_seconds_on_open_their_own_rows(monkeypatch):
-    """Round 39: the kill at 4:01 on the 3:57 Malignant Catalyst row, Shadow Blades 1:40 on the 1:34 row."""
-    from paf import fightview
-
-    its = [(94.0, fightview.Item("boss", "cast", "Exploding Infection", "Exploding Infection")),
-           (100.0, fightview.Item("you", "cd", "Shadow Blades", "Shadow Blades")),
-           (237.0, fightview.Item("boss", "cast", "Malignant Catalyst", "Malignant Catalyst")),
-           (241.0, fightview.Item("boss", "kill", "The kill", "The kill, around 4:01"))]
-    monkeypatch.setattr(fightview, "items", lambda d: its)
-    assert [m.t for m in fightview.moments(None)] == [94.0, 100.0, 237.0, 241.0]
 
 
 def test_two_add_waves_at_one_moment_are_one_row():
@@ -255,15 +231,23 @@ def test_the_opener_keeps_only_what_the_action_list_presses(tmp_path):
     assert got == [116, 84714, 446209]
 
 
-def test_a_stage_reads_as_a_strip_not_a_sentence(monkeypatch):
-    # the owner (2026-10-26, Twin Fangs mythic): "everyone moves from 0:11 to 0:22; …" fifteen times in one block
-    its = [(0.0, fightview.Item("boss", "lust", "Bloodlust", "Bloodlust", "", 40.0)),
-           (11.0, fightview.Item("boss", "move", "Movement", "Movement, 11 s", "", 11.0)),
-           (35.0, fightview.Item("boss", "adds", "Spawn of Vexhul", "3 × Spawn of Vexhul", "ab_icon", 20.0))]
-    html = fightview._phase_html("Stage One", 0.0, 370.0, 0, "", its)
-    assert "everyone moves from" not in html and "class='ps'" in html
-    assert "title='everyone moves 0:11 to 0:22'" in html and "title='3 × Spawn of Vexhul at 0:35'" in html
-    assert "title='Bloodlust at 0:00'" in html and ">1:00</span>" in html and "<b>3</b></span>" in html
+def test_a_cast_with_every_wave_is_the_wave_s_and_a_defensive_names_what_it_answers(monkeypatch):
+    # Twin Fangs mythic (the owner's mockup pick): Rouse the Brood 1 s into every Spawn wave, no row of its own;
+    # Feint for Ravenous Feast: Ravenous Feast a boss lane, "you: Feint"
+    d = sheet(monkeypatch)
+    d.waves = [(35.0, 3, 11.0, "Spawn of Vexhul"), (96.0, 3, 11.0, "Spawn of Vexhul")]
+    d.actions = [Action("kill", "Spawn of Vexhul", "Kill the Spawn of Vexhul")]
+    d.boss_casts = [("Rouse the Brood", [36.0, 97.0]), ("Ravenous Feast", [61.0, 122.0])]
+    monkeypatch.setattr(fightview, "_defensives", lambda d: [(60.0, "Feint", "Ravenous Feast"),
+                                                             (121.0, "Feint", "Ravenous Feast")])
+    tl = fightview.timeline(d)
+    assert [b.names for b in tl.boss] == [["Ravenous Feast"]] and tl.boss[0].sub == "you: Feint"
+    assert not any(x.name == "Rouse the Brood" for _t, x in tl.others)
+    kill = next(lane for lane in tl.you if lane.kind == "kill")
+    assert "Comes with Rouse the Brood (+1 s)" in kill.marks[0].tip
+    feint = next(lane for lane in tl.you if lane.kind == "def")
+    assert feint.sub == "for Ravenous Feast"
+    assert "Feint each Ravenous Feast." in fightview.summary(d, tl)
 
 
 def test_the_opener_says_the_shards_at_a_spender_what_is_up_and_the_burst_split(monkeypatch, tmp_path):
