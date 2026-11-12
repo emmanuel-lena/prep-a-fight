@@ -39,6 +39,9 @@ class Mechanic:
     spec_share: float = 0.0  # share of the kills where the ranked player of your spec handled it
 
 
+AURA_SOAK_MARK = 255  # SpellEffect.EffectAura: damage taken from one spell increased (a soak's mark)
+
+
 def _cluster_times(per_kill: list[list[float]], support: float = 0.3) -> list[float]:
     waves = canonical_waves([[(t, 1, 0.0, [""]) for t in sorted(ts)] for ts in per_kill])
     return [w.t for w in waves if w.support >= support]
@@ -129,6 +132,14 @@ def mechanic_timings(con: sqlite3.Connection, encounter_id: int, difficulty: int
     return out
 
 
+def split_occurrences(text: str) -> tuple[str, set[int]]:
+    """'Guillotine @1,3' -> ('Guillotine', {1, 3}): the occurrences of a mechanic you take (a soak's group takes
+    one in two: the owner, 2026-11-12, "you can't soak it twice"); none said: every one."""
+    name, at, rest = text.partition("@")
+    which = {int(x) for x in rest.replace(" ", "").split(",") if x.isdigit()} if at else set()
+    return name.strip(), which
+
+
 def apply_assigns(fight: Fight, mechanics: list[Mechanic], chosen: list[str]) -> tuple[Fight, list[str]]:
     """Movement windows for every chosen mechanic (names or keys), each time it happens."""
     f = Fight(**{**fight.__dict__})
@@ -136,17 +147,19 @@ def apply_assigns(fight: Fight, mechanics: list[Mechanic], chosen: list[str]) ->
     notes = []
     by = {m.name.lower(): m for m in mechanics} | {m.key: m for m in mechanics}
     for c in chosen:
-        m = by.get(c.lower()) or by.get(c)
+        name, which = split_occurrences(c)
+        m = by.get(name.lower()) or by.get(name)
         if m is None:
-            notes.append(f"unknown mechanic {c!r}")
+            notes.append(f"unknown mechanic {name!r}")
             continue
         if m.cost <= 0:
             notes.append(f"{m.name}: no measurable cost, only noted")
             continue
-        for t in m.times:
+        times = [t for k, t in enumerate(m.times, 1) if not which or k in which]  # only the ones you take
+        for t in times:
             f.personal_movement.append(Window(t, m.cost))
         notes.append(f"{m.name}: {m.cost:g}s of movement at " + ", ".join(f"{int(t // 60)}:{int(t % 60):02d}"
-                                                                         for t in m.times))
+                                                                         for t in times))
     return f, notes
 
 
@@ -170,8 +183,29 @@ def load_mechanics(con: sqlite3.Connection, encounter_id: int, difficulty: int, 
 
     names = {**spell_names(), **dict(con.execute("SELECT id, name FROM ability").fetchall())}
     keep = boss_mechanic_names(con, encounter_id, difficulty, names)
-    return [m for m in mechanic_timings(con, encounter_id, difficulty, spec, names, keep)
-            if m.kind == "interrupt" or m.players_per_kill <= 12]
+    out = []
+    for m in mechanic_timings(con, encounter_id, difficulty, spec, names, keep):
+        soak = None if m.kind == "interrupt" else is_soak(int(m.key.split(":")[1]))
+        if soak is False:  # the boss's targets: nobody chooses it
+            continue
+        per_time = m.players_per_kill / max(1, len(m.times)) if soak else m.players_per_kill  # soakers rotate
+        if m.kind == "interrupt" or per_time <= 12:
+            out.append(m)
+    return out
+
+
+def is_soak(spell_id: int) -> bool | None:
+    """A debuff the game puts on whoever took a soak: more damage taken from the soaked spell for a while (aura 255;
+    Guillotine's soakers, +500%: why nobody soaks it twice). A debuff the boss puts on its targets (Dreadmarch,
+    Venomfang) is none: nobody chooses it (the owner, 2026-11-12: "useless to list what the boss targets you with").
+    None: no game data."""
+    from paf.gamedata import _filtered_rows
+
+    try:
+        rows = _filtered_rows("SpellEffect", "SpellID", spell_id)
+    except Exception:  # noqa: BLE001 - offline: unknown, kept
+        return None
+    return any(r.get("Effect") == "6" and r.get("EffectAura") == str(AURA_SOAK_MARK) for r in rows)
 
 
 def assigns_template(mechanics: list[Mechanic], spec: str) -> str:

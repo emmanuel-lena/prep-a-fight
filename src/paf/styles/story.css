@@ -41,3 +41,9 @@
 .boss-wizard .ob-actions .btn{font-size:18px;min-height:52px;padding:12px 26px}
 .boss-wizard .chips .chip{font-size:16px;padding:10px 14px}
 .boss-more{margin:22px 0 0;text-align:center;font-size:15px} .boss-more a{color:var(--muted)} .boss-more a:hover{color:var(--fg)}
+/* the soaks and kicks (the owner, 2026-11-12): a row each, a soak's times as boxes (the groups take turns) */
+.as-list{display:grid;gap:10px;margin:6px 0 4px}
+.as-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:10px 12px;border:1px solid var(--line);border-radius:12px}
+.as-n{flex:1 1 220px;font-weight:600} .as-n .meta{display:block;font-weight:400;font-size:13px;color:var(--muted)}
+.as-t{display:flex;flex-wrap:wrap;gap:6px;align-items:center} .as-t .meta{color:var(--muted);font-size:13px}
+.as-t .chip.t{padding:6px 12px;font-variant-numeric:tabular-nums}

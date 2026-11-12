@@ -5,6 +5,10 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 
 ## Unreleased
 
+- "Are you assigned to something?" lists only what you choose to do: the soaks (found by the mark the game
+  puts on whoever soaked) and the kicks; what the boss targets you with (Dreadmarch, Venomfang) is gone. A soak has a box
+  per time: tick the ones your group takes (Guillotine's groups take turns), the sim moves you only then and the
+  cooldown plan knows you are free at the others.
 - A sheet's "Edit & re-run" link is now "Prepare again".
 ## 0.8.30 (2026-11-12)
 

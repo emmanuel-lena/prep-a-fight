@@ -450,10 +450,6 @@ DEMAND_GAP = 3.0  # % a spec must gain in a window to be said ahead there (a win
 DEMAND_GLYPH = {"shield": "&#128737;", "adds": "&#9876;", "amp": "&#9650;", "immune": "&#8856;"}
 
 
-def _mmss(t: float) -> str:
-    return f"{int(t // 60)}:{int(t % 60):02d}"
-
-
 def _title(w: dict) -> str:
     """A demand's name: an immunity is its unit to kill ("Echo of Jawae", Tether of Awakening on hover)."""
     return w["unit"] if w["kind"] == "immune" and w.get("unit") else w["label"]

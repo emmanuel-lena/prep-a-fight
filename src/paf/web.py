@@ -1277,23 +1277,38 @@ def boss_page(boss_id: str, difficulty: str, info: bool = False) -> bytes:
             mechs = load_mechanics(con, enc.id, diff, spec)
         except Exception:  # noqa: BLE001
             mechs = []
-    current = {a.lower() for a in current_assigns(enc, difficulty)}
     if mechs:
+        from paf.assigns import split_occurrences
+        from paf.plan import mmss as _mmss
+
+        taken: dict[str, set[int]] = {}
+        for c in current_assigns(enc, difficulty):
+            name, which = split_occurrences(c)
+            taken[name.lower()] = which
         chips, seen = "", set()
         for m in mechs:
-            if m.name.lower() in seen:  # one box per mechanic, however many times the logs list it
+            if m.name.lower() in seen:  # one row per mechanic, however many times the logs list it
                 continue
             seen.add(m.name.lower())
-            when = ", ".join(f"{int(t // 60)}:{int(t % 60):02d}" for t in m.times[:4]) + ("…" if len(m.times) > 4 else "")
-            what = "interrupt" if m.kind == "interrupt" else f"{m.players_per_kill:.0f} players hit per kill"
-            cost = f", ~{m.cost:g} s of movement" if m.cost else ""
-            checked = " checked" if m.name.lower() in current or m.key in current else ""
-            at = f", around {e(when)}" if when else ""  # the times shown, not hidden in a tooltip
-            chips += (f'<label class="chip"><input type="checkbox" name="assign" value="{e(m.name)}"'
-                      f'{checked}>{e(m.name)} <span class="meta">{what}{cost}{at}</span></label>')
-        assigns = ('<p class="small muted">Tick what you handle. When it happens and what it costs you come from '
-                   'the logs.</p>'
-                   f'<div class="chips">{chips}</div>')
+            mine = taken.get(m.name.lower()) if m.name.lower() in taken else taken.get(m.key)
+            cost = f" · ~{m.cost:g} s of movement" if m.cost else ""
+            if m.kind == "interrupt":  # a kick: one box, its times said
+                when = ", ".join(_mmss(t) for t in m.times[:4]) + ("…" if len(m.times) > 4 else "")
+                boxes = (f'<label class="chip t"><input type="checkbox" name="assign" value="{e(m.name)}" '
+                         f'data-say="{e(m.name)}"{" checked" if mine is not None else ""}>kick</label>'
+                         f'<span class="meta">around {e(when)}</span>' if when else "")
+                kind = "interrupt"
+            else:  # a soak: a box per time (the groups take turns: nobody soaks it twice)
+                boxes = "".join(
+                    f'<label class="chip t"><input type="checkbox" name="assign" value="{e(m.name)}@{k}" '
+                    f'data-say="{e(m.name)} {_mmss(t)}"{" checked" if mine is not None and (not mine or k in mine) else ""}>'
+                    f'{_mmss(t)}</label>' for k, t in enumerate(m.times, 1))
+                kind = "soak: tick the ones you take"
+            chips += (f'<div class="as-row"><span class="as-n">{e(m.name)} <span class="meta">{kind}{cost}</span></span>'
+                      f'<span class="as-t">{boxes}</span></div>')
+        assigns = ('<p class="small muted">The soaks and kicks of this boss, when they happen and what they cost '
+                   'you, from the logs.</p>'
+                   f'<div class="as-list">{chips}</div>')
     elif kills:
         assigns = ('<p class="muted small">The mechanics are collected during the first prep (about 2 quota points '
                    'per kill); you can tick yours afterwards.</p>')
@@ -1454,6 +1469,7 @@ try { var g = localStorage.getItem(key); var r = g && f.querySelector('input[nam
 function recap(){
   var goal = (f.querySelector('input[name=goal]:checked') || f.querySelector('input[name=goal][type=hidden]') || {}).value || 'auto';
   var picked = [].slice.call(f.querySelectorAll('input[name=assign]:checked')).map(function(i){
+    if (i.dataset.say) return i.dataset.say;
     var t = i.parentNode.cloneNode(true); var m = t.querySelector('.meta'); if (m) m.remove(); return t.textContent.trim(); });
   var rf = f.querySelector('input[name=raid]'); if (rf) rf.value = rf.value.trim();  // spaces alone are an empty field
   var raid = (rf || {}).value || '';
@@ -1780,7 +1796,13 @@ def write_assigns(boss_id: int, difficulty: str, chosen: list[str]) -> None:
     ppath.parent.mkdir(parents=True, exist_ok=True)
     lines = ppath.read_text(encoding="utf-8-sig").splitlines() if ppath.is_file() else []
     lines = [line for line in lines if not line.strip().lower().startswith("assign ")]
-    lines += [f"assign {c}" for c in chosen]
+    from paf.assigns import split_occurrences
+
+    grouped: dict[str, set[int]] = {}
+    for c in chosen:  # "Guillotine@1", "Guillotine@2" -> "assign Guillotine @1,2"
+        name, which = split_occurrences(c)
+        grouped.setdefault(name, set()).update(which)
+    lines += [f"assign {n}" + (f" @{','.join(str(k) for k in sorted(w))}" if w else "") for n, w in grouped.items()]
     ppath.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
