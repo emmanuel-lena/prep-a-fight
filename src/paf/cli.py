@@ -1270,6 +1270,9 @@ def calibration_note(got: float, target: float, scale: float = 0.1) -> str:
             "Boss-only numbers are pessimistic, add damage optimistic.")
 
 
+FIRST_PREP = "First prep of this boss for this spec on this computer: every sim runs."
+
+
 def cmd_prep(args: argparse.Namespace) -> int:
     import webbrowser
 
@@ -1309,6 +1312,9 @@ def cmd_prep(args: argparse.Namespace) -> int:
 
     clock = Clock()
     step = clock.step  # prints the step with its time: the app predicts the time left from it
+    first = not (data_dir() / "reports" / f"prep-{report_key(enc.name, diff_name)}.html").is_file()
+    if first:  # its steps' times are kept apart, and the app predicts the time left from them (paf.progress)
+        print(FIRST_PREP, flush=True)
 
     from paf import pack
 
@@ -1814,7 +1820,7 @@ def cmd_prep(args: argparse.Namespace) -> int:
             for sp, tot, b in d.lust_spots}}
     out.with_suffix(".json").write_text(json.dumps(summary), encoding="utf-8")  # headline for the app's home
     step("Done")
-    clock.save()
+    clock.save(first)
     if pk is None and not args.refine and not args.queued:  # a queue runs the full pass itself (paf.raidqueue)
         _refine_later(con, enc, diff, out)
     from paf.prep_report import headline

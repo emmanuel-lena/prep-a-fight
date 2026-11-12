@@ -17,9 +17,7 @@ POINTS_PER_KILL = 10.0
 MECH_POINTS_PER_KILL = 2.0
 KILLS_PER_MIN = 25.0
 QUOTA = 3600.0
-SIM_STEPS = ("Calibrating the fight", "Validating the fight", "Your raid and the adds", "Simming your character",
-             "Cooldown timelines", "Talent builds", "Cooldown plans", "Top Gear", "What this boss drops",
-             "Ideal cooldown plan", "Analyzing the corpus")
+COLLECT = ("Collecting", "Using the prep pack")  # the steps of where the data comes from, counted apart
 TYPICAL_SIMS = 8.0  # minutes, a first prep on an average computer with everything checked
 
 
@@ -63,21 +61,34 @@ class Estimate:
         return f"~{max(1, round(self.minutes))} min to prepare{what}{wait}"
 
 
-def sims_minutes() -> float:
-    import statistics as st
-
-    from paf.progress import history
+def sims_minutes(first: bool = False) -> float:
+    """Every step after the data's, as this computer ran them (paf.progress._minutes: a first prep of a boss from
+    the first preps); none run yet: typical minutes."""
+    from paf.progress import PREP_STEPS, _minutes, history
 
     hist = history()
-    done = [st.median(v) for k, v in hist.items() if v and k.startswith(SIM_STEPS)]
-    return sum(done) / 60 if done else TYPICAL_SIMS
+    steps = [p for p, *_ in PREP_STEPS if not p.startswith(COLLECT) and hist.get(p)]
+    return sum(_minutes(p, hist, 0.0, first) for p in steps) if steps else TYPICAL_SIMS
 
 
-def plan(con, encounter_id: int, difficulty: int, class_name: str, spec: str, client=None) -> Estimate:
+def collect_minutes(kills: int, first_sheet: int) -> float:
+    """Downloading `kills` kills and who handles what in them: this computer's pace, else the typical rate."""
+    from paf.progress import _minutes, history
+
+    hist = history()
+    if not hist.get("Collecting the corpus"):
+        return kills / KILLS_PER_MIN
+    share = kills / max(1, first_sheet)
+    return share * (_minutes("Collecting the corpus", hist, 0.0) + _minutes("Collecting who handles", hist, 0.0))
+
+
+def plan(con, encounter_id: int, difficulty: int, class_name: str, spec: str, client=None,
+         first: bool = False) -> Estimate:
+    """`first`: no prep of this boss for this spec on this computer yet (every sim runs)."""
     from paf import pack
     from paf.cli import FIRST_SHEET
 
-    sims = sims_minutes()
+    sims = sims_minutes(first)
     local = pack.load(encounter_id, difficulty, class_name, spec)
     if local is not None and not pack.is_stale(local.created) and pack.usable(local):
         return Estimate("pack_local", sims, sims=sims)
@@ -100,5 +111,5 @@ def plan(con, encounter_id: int, difficulty: int, class_name: str, spec: str, cl
     if points > left:  # past what is left this hour: the reset, then whole hours
         extra = points - left
         wait = reset + 60.0 * max(0.0, extra / QUOTA - 1)
-    collect = kills / KILLS_PER_MIN
+    collect = collect_minutes(kills, FIRST_SHEET)
     return Estimate("collect", collect + wait + sims, kills=kills, wait=wait, sims=sims)

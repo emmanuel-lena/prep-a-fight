@@ -1337,8 +1337,10 @@ def boss_page(boss_id: str, difficulty: str, info: bool = False) -> bytes:
                    "</div></section>")
     try:  # where the data will come from, and how long: from what will really happen (paf.estimate)
         from paf import estimate
+        from paf.corpus.template import report_key
 
-        est = estimate.plan(con, enc.id, diff, settings.get("class"), spec, WCLClient())
+        first = not (data_dir() / "reports" / f"prep-{report_key(enc.name, difficulty)}.html").is_file()
+        est = estimate.plan(con, enc.id, diff, settings.get("class"), spec, WCLClient(), first=first)
     except Exception:  # noqa: BLE001 - an estimate never breaks the page
         est = None
     raid_now, found = current_raid(enc, difficulty), ""

@@ -68,14 +68,17 @@ class Clock:
         self.marks.append((msg, now))
         print(f"\n== {msg}  [+{int(now - self.start)}s]", flush=True)
 
-    def save(self) -> None:
-        """At the end of a prep: the duration of each step, by its PREP_STEPS prefix."""
+    def save(self, first: bool = False) -> None:
+        """At the end of a prep: the duration of each step, by its PREP_STEPS prefix; `first`: the first prep of
+        this boss for this spec on this computer, kept apart too (nothing reused: its sims all run)."""
         hist = history()
         ends = [t for _, t in self.marks[1:]] + [time.time()]
         for (msg, t0), t1 in zip(self.marks, ends, strict=True):
             prefix = step_of(msg)
             if prefix:
                 hist[prefix] = (hist.get(prefix, []) + [round(t1 - t0, 1)])[-10:]
+                if first:
+                    hist[FIRST + prefix] = (hist.get(FIRST + prefix, []) + [round(t1 - t0, 1)])[-10:]
         path = data_dir() / "web" / "step-times.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(hist), encoding="utf-8")
@@ -93,12 +96,23 @@ def step_of(msg: str) -> str:
     return next((p for p, *_ in PREP_STEPS if msg.startswith(p)), "")
 
 
-def _minutes(prefix: str, hist: dict[str, list[float]], default: float) -> float:
+FIRST = "first:"  # the history of the first preps of a boss (paf.progress.Clock.save)
+
+
+def _minutes(prefix: str, hist: dict[str, list[float]], default: float, first: bool = False) -> float:
+    """A step's minutes on this computer: the median of its last preps; for the first prep of a boss (the owner,
+    2026-11-12: "it said 6 minutes, it took 12"), the median of the first preps, else the slowest prep kept (a prep
+    again reuses its sims: its median says seconds for what takes minutes the first time)."""
+    if first and hist.get(FIRST + prefix):
+        return st.median(hist[FIRST + prefix]) / 60
     past = hist.get(prefix)
-    return st.median(past) / 60 if past else default
+    if not past:
+        return default
+    return (max(past) if first else st.median(past)) / 60
 
 
-def prep_progress(log: str, elapsed: float | None = None) -> tuple[list[tuple[str, str, str]], float]:
+def prep_progress(log: str, elapsed: float | None = None, first: bool = False
+                  ) -> tuple[list[tuple[str, str, str]], float]:
     """[(label, why, state)] with state done / now / next, and the minutes left. Steps that a prep skips (the
     corpus already there, no raid set, a pack used...) are not listed. elapsed: seconds since the prep started."""
     steps: list[tuple[str, int | None]] = []
@@ -113,6 +127,7 @@ def prep_progress(log: str, elapsed: float | None = None) -> tuple[list[tuple[st
     optional = OPTIONAL + (("Analyzing", "Validating") if any(s.startswith("Using the prep pack") for s in seen)
                            else ())
     hist = history()
+    first = first or "First prep of this boss" in log  # paf.cli.FIRST_PREP
     rows, left = [], 0.0
     for i, (prefix, label, why, minutes) in enumerate(PREP_STEPS):
         if i in idx:
@@ -123,10 +138,10 @@ def prep_progress(log: str, elapsed: float | None = None) -> tuple[list[tuple[st
             rows.append((label, why, state))
         elif not finished and i > last and not prefix.startswith(optional):
             rows.append((label, why, "next"))
-            left += _minutes(prefix, hist, minutes)
+            left += _minutes(prefix, hist, minutes, first)
     if last >= 0 and not finished:
         prefix = PREP_STEPS[last][0]
-        typical = _minutes(prefix, hist, PREP_STEPS[last][3])
+        typical = _minutes(prefix, hist, PREP_STEPS[last][3], first)
         since = None
         start = next((t for s, t in reversed(steps) if s.startswith(prefix)), None)
         if elapsed is not None and start is not None:
