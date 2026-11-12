@@ -446,6 +446,54 @@ def spec_html(d) -> str:
             + _short_note(missing, short_specs, mine_label) + "</div>")
 
 
+DEMAND_GAP = 3.0  # % a spec must gain in a window to be said ahead there (a window is a few seconds of the sims)
+DEMAND_GLYPH = {"shield": "&#128737;", "adds": "&#9876;", "amp": "&#9650;"}
+
+
+def _mmss(t: float) -> str:
+    return f"{int(t // 60)}:{int(t % 60):02d}"
+
+
+def demands_html(d) -> str:
+    """What the fight demands (paf.demands; the owner, 2026-11-12: the spec is chosen on them): its DPS checks, add
+    bursts and amps as a strip, and, with other specs ticked, each spec's damage in each of them against yours."""
+    dm = getattr(d, "demands", None)
+    if not dm or not dm.get("windows"):
+        return ""
+    wins = dm["windows"]
+
+    def head(w: dict) -> str:
+        times = ", ".join(_mmss(a) for a, _b in w["spans"][:6]) + ("…" if len(w["spans"]) > 6 else "")
+        n = f" &times;{len(w['spans'])}" if len(w["spans"]) > 1 else ""
+        return (f"<span class='dm-w {w['kind']}' title='{e(w['label'])}: {e(times)}"
+                f"{'. ' + e(w['detail']) if w.get('detail') else ''}'>{DEMAND_GLYPH.get(w['kind'], '')} "
+                f"{e(w['label'])}{n}</span>")
+    dmg = dm.get("damage") or {}
+    mine = getattr(d, "specs", None) and d.specs.get("mine")
+    grid = ""
+    if mine in dmg and len(dmg) > 1:
+        from paf.specgear import spec_label
+
+        cols = [("all", "Whole fight")] + [(w["label"], w["label"]) for w in wins]
+        best = {k: max(dmg, key=lambda sp: dmg[sp].get(k, 0)) for k, _ in cols}
+
+        def cell(sp: str, k: str) -> str:
+            if sp == mine:
+                return ("<td class='dm-me dm-best'>your spec, best</td>" if best[k] == sp else
+                        "<td class='dm-me'>your spec</td>")
+            base = dmg[mine].get(k) or 0
+            gap = 100 * (dmg[sp].get(k, 0) / base - 1) if base else 0.0
+            kind = "pos" if gap >= DEMAND_GAP else "neg" if gap <= -DEMAND_GAP else ""
+            return f"<td class='{kind}{' dm-best' if best[k] == sp else ''}'>{gap:+.0f}%</td>"
+        rows = "".join(f"<tr><th>{e(spec_label(sp))}</th>{''.join(cell(sp, k) for k, _ in cols)}</tr>"
+                       for sp in sorted(dmg, key=lambda x: x != mine))
+        grid = (f"<table class='dm-grid'><thead><tr><th></th>{''.join(f'<th>{e(n)}</th>' for _, n in cols)}</tr>"
+                f"</thead><tbody>{rows}</tbody></table><p class='small muted'>Your damage in each spec, in the top "
+                f"players' gear, during each window: a spec ahead by {DEMAND_GAP:g}% or more is green.</p>")
+    return (f"<div class='demands rv'><p class='specs-head'><b>What this fight demands</b></p>"
+            f"<div class='dm-row'>{''.join(head(w) for w in wins)}</div>{grid}</div>")
+
+
 def confidence_pill(d) -> str:
     if not d.validation:
         return ""

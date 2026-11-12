@@ -230,6 +230,7 @@ class SpecRow:
     own_error: float = 0.0
     own_changes: list[str] = field(default_factory=list)  # the swaps from what you wear
     own_missing: list[str] = field(default_factory=list)  # slots none of your items fits (another main stat)
+    timeline: list[float] = field(default_factory=list)  # damage per second in the top players' set (paf.demands)
 
 
 @dataclass
@@ -401,6 +402,7 @@ def compare(profile: str, client, enc, difficulty: int, diff_name: str, cls: str
             got[ps.name] = measured(ps.metrics.get("prioritydps"), ps.dps, boss)
         best = max(got, key=got.get)
         row.sim, row.error, row.talents = got[best], err, best
+        row.timeline = simc.timeline_dmg(sim)  # the first build's (a profileset has no timeline): the windows' split
         row.builds = got
         if "yours" in got:
             res.own_talents_sim = got["yours"]

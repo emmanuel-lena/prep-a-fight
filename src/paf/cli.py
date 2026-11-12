@@ -1381,6 +1381,11 @@ def cmd_prep(args: argparse.Namespace) -> int:
             fetch_council_stack(client, con, enc.id, diff, members)
         fetch_boss_auras(client, con, enc.id, diff, boss)
         fetch_npc_stack(client, con, enc.id, diff)
+        from paf import bossguide, demands
+
+        shields = demands.shield_spells(bossguide.load(enc.id, diff_name))  # the DPS checks (paf.demands)
+        with client.no_quota_wait():
+            demands.fetch_shields(client, con, enc.id, diff, shields)
         from paf.corpus.lust import MAX_KILLS, fetch_lust
 
         if (n := MAX_KILLS - con.execute("SELECT COUNT(*) FROM raid_lust l JOIN fight f USING(report, fight_id) "
@@ -1476,6 +1481,16 @@ def cmd_prep(args: argparse.Namespace) -> int:
         fight = planned
         d.assigns = described or [f"from your plan {ppath.name}"]
     d.fight = fight
+    try:  # what the fight demands: its DPS checks, its add bursts, its amps (paf.demands)
+        from dataclasses import asdict
+
+        from paf import bossguide, demands, stagetime
+
+        wins = demands.shield_windows(con, enc.id, diff, demands.shield_spells(bossguide.load(enc.id, diff_name)),
+                                      stagetime.clock(enc.id, diff)) + demands.fight_windows(fight)
+        d.demands = {"windows": [asdict(w) for w in wins], "damage": {}} if wins else None
+    except Exception as ex:  # noqa: BLE001 - an extra of the sheet: never fails the prep
+        print(f"  the fight's demands: skipped ({str(ex)[:120]})")
 
     if args.objective is not None:  # the player's own choice wins over the raid's log
         d.goal = "boss" if args.objective >= 0.5 else "total"
@@ -1616,6 +1631,10 @@ def cmd_prep(args: argparse.Namespace) -> int:
                                   specs=others)
             d.specs = specgear.to_json(sg) | {"role": role, "assigns": len(d.assigns)}
             print(f"  {d.specs['sentence']}")
+            timelines = {r.spec: r.timeline for r in sg.rows if r.timeline}
+            if d.demands and len(timelines) > 1:  # each spec's damage in the fight's windows: what decides a spec
+                wins = [demands.Window(**w) for w in d.demands["windows"]]
+                d.demands["damage"] = demands.compare(wins, timelines)
         except Exception as ex:  # noqa: BLE001 - an extra of the prep: never fails it
             print(f"  your class's specs: skipped ({str(ex)[:120]})")
     from paf.prep_report import _key as cd_key_of

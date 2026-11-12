@@ -9,6 +9,10 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 - A boss's page is now a short guide alone on the page, in large: your raid's log (your last guild raid already
   filled in), what you are assigned to (when the logs know this boss), then prepare. No goal to pick: your raid's log
   decides between the boss and the adds. The boss's abilities and your own plan are one link away.
+- "What this fight demands", on the What to change tab: the fight's DPS checks (a shield on an enemy, found in
+  the journal and read in the top kills: when it goes up, how fast the best raids break it), its add bursts and its
+  damage amps (with Bloodlust when it falls in it); with other specs ticked, each one's damage in each of them
+  against yours. Twin Fangs mythic: Outlaw +16% on the whole fight, Subtlety the best on the adds.
 - The guide asks which specs of your class you would play on this boss: a box per damage spec, yours ticked. Only
   the ones you tick are simmed (in your items and in the top players'); none ticked, no spec comparison (faster).
 - The prep no longer sims what the boss drops for you (faster; the Gear tool still says what to farm).

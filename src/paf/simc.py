@@ -95,6 +95,14 @@ def _metric(d: dict[str, Any] | None) -> Metric | None:
     return Metric(float(d["mean"]), float(err or 0.0))
 
 
+def timeline_dmg(res: SimResult) -> list[float]:
+    """The player's damage second by second (simc's mean over the iterations), [] when the report has none."""
+    sim = res.raw.get("sim", res.raw) if res.raw else {}
+    players = sim.get("players") or []
+    data = (((players[0].get("collected_data") or {}).get("timeline_dmg") or {}).get("data") if players else None)
+    return [float(x) for x in data] if isinstance(data, list) else []
+
+
 def parse_json(path: Path) -> SimResult:
     raw = json.loads(path.read_text(encoding="utf-8"))
     sim = raw.get("sim", raw)

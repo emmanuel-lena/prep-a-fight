@@ -111,3 +111,14 @@ details.more>summary{font:italic 400 17px var(--font-reading);color:var(--muted)
 /* a plan's rules as badges in "What matters for you", as in the change card */
 .moves .rbs{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px} .moves .rb{display:inline-flex;align-items:center;gap:5px}
 .moves .rb img{width:20px;height:20px}
+/* what the fight demands (paf.demands): its windows as chips, each ticked spec's damage in them */
+.demands{margin:14px 0 18px}
+.dm-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.dm-w{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;font:600 13px/1.3 var(--font-display);cursor:help;background:var(--surface-2)}
+.dm-w.shield{border-color:color-mix(in srgb,var(--neg) 55%,var(--line))}
+.dm-w.amp{border-color:color-mix(in srgb,var(--pos) 55%,var(--line))}
+.dm-grid{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px;width:auto;max-width:100%}
+.dm-grid th,.dm-grid td{padding:5px 12px;text-align:right;border-bottom:1px solid var(--line)}
+.dm-grid th:first-child{text-align:left;font:600 14px var(--font-body);text-transform:none;letter-spacing:0;color:var(--fg)} .dm-grid thead th{font:600 12px/1.2 var(--font-display);color:var(--muted);text-transform:none;letter-spacing:0;min-width:96px}
+.dm-grid td.pos{color:var(--pos);font-weight:700} .dm-grid td.neg{color:var(--neg)}
+.dm-grid td.dm-me{color:var(--muted);font-size:12.5px} .dm-grid td.dm-best{box-shadow:inset 0 -2px 0 currentColor}

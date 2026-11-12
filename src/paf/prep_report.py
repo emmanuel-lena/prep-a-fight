@@ -77,6 +77,7 @@ class PrepData:
     patchwerk_dps: float | None = None
     timeline_file: str = ""
     talents: object | None = None  # paf.talent_sim.TalentComparison
+    demands: dict | None = None  # paf.demands: the fight's windows, each ticked spec's damage in them
     specs: dict | None = None  # paf.specgear.to_json: your class's damage specs on this fight (the verdict first)
     plans: object | None = None  # paf.cdplan.PlanComparison
     gear: list[tuple[str, dict[str, float], float]] = field(default_factory=list)  # changes, per fight, weighted
@@ -1746,7 +1747,7 @@ equipped set">Single swap</th></tr>{body}</table>
     sections: dict[str, list[str]] = {
         "fight": notices + [fightview.html(d)],
         "change": [f"<div class='simple change-top'><div class='cards'>{card}</div></div>",
-                   briefing.spec_html(d), "" if "Nothing to change" in card and "Nothing to change" in sugg else
+                   briefing.spec_html(d), briefing.demands_html(d), "" if "Nothing to change" in card and "Nothing to change" in sugg else
                    ("<h2>Worth knowing</h2>" if "Nothing to change" in card else "<h2>Everything worth changing</h2>")
                    + sugg]
         + tabs["gear"],
