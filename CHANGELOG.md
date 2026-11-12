@@ -6,6 +6,7 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 ## Unreleased
 
 - After an update, the app opens again by itself (it closed and stayed closed).
+- "Your last raid" reads only your guild's raids: a pick-up raid's log is no longer analysed at launch.
 
 ## 0.8.29 (2026-11-12)
 

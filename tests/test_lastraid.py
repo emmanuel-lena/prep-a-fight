@@ -94,7 +94,9 @@ def test_a_log_without_a_boss_of_the_raid_is_skipped(home, monkeypatch):
 
     class Client:
         def query(self, q, v, cache_ttl=None):
-            return {"reportData": {"report": {"startTime": 0, "fights": logs[v["c"]]}}}
+            if "guilds" in q:
+                return {"characterData": {"character": {"guilds": [{"id": 7}]}}}
+            return {"reportData": {"report": {"startTime": 0, "guild": {"id": 7}, "fights": logs[v["c"]]}}}
 
     monkeypatch.setattr(lastraid, "who", lambda slug: ("Me", "Draenor", "eu"))
     monkeypatch.setattr(tracker, "character_reports", lambda *a: ["dungeon", "raid"])
@@ -102,6 +104,30 @@ def test_a_log_without_a_boss_of_the_raid_is_skipped(home, monkeypatch):
     state = {}
     assert lastraid.read_one(Client(), "me-shaman", state, ENCS, log=lambda *a: None)
     assert state["me-shaman"]["report"] == "raid" and state["me-shaman"]["bosses"][0]["name"] == "Ula'tek"
+
+
+def test_a_pick_up_raid_s_log_is_never_read(home, monkeypatch):
+    # the owner, 2026-11-12: the app read a pick-up raid at launch; only a guild's raid counts
+    from paf import jobrun, tracker
+
+    guild_of = {"pug": None, "other": {"id": 9}, "ours": {"id": 7}}
+
+    class Client:
+        def query(self, q, v, cache_ttl=None):
+            if "guilds" in q:
+                return {"characterData": {"character": {"guilds": [{"id": 7}]}}}
+            return {"reportData": {"report": {"startTime": 0, "guild": guild_of[v["c"]],
+                                              "fights": [{"encounterID": 1, "difficulty": 4, "kill": True}]}}}
+
+    monkeypatch.setattr(lastraid, "who", lambda slug: ("Me", "Draenor", "eu"))
+    monkeypatch.setattr(jobrun, "run_job", lambda args, log=None: ("j1", "done"))
+    monkeypatch.setattr(tracker, "character_reports", lambda *a: ["pug", "other"])
+    old = {"me": {"report": "pug"}}  # read by an older version: forgotten
+    assert not lastraid.read_one(Client(), "me", old, ENCS, log=lambda *a: None) and old == {}
+    monkeypatch.setattr(tracker, "character_reports", lambda *a: ["pug", "other", "ours"])
+    state = {}
+    assert lastraid.read_one(Client(), "me", state, ENCS, log=lambda *a: None) and state["me"]["report"] == "ours"
+    assert lastraid.guild_log({"guild": {"id": 9}}, set())  # no guild known for you: any guild's log
 
 
 def test_a_boss_in_two_difficulties_keeps_its_own_review(home, monkeypatch):

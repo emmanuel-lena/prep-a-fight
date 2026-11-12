@@ -27,9 +27,27 @@ from pathlib import Path
 from paf.config import data_dir
 from paf.theme import diff_pill
 
-FIGHTS = """query($c:String!){ reportData { report(code:$c) { startTime
+FIGHTS = """query($c:String!){ reportData { report(code:$c) { startTime guild { id }
   fights(killType: Encounters) { id encounterID difficulty kill bossPercentage startTime endTime } } } }"""
 URL = "https://www.warcraftlogs.com/reports/{}"
+GUILDS = """query($n:String!,$s:String!,$r:String!){ characterData { character(name:$n, serverSlug:$s,
+  serverRegion:$r) { guilds { id } } } }"""
+
+
+def guild_ids(client, name: str, server: str, region: str) -> set[int]:
+    """The guilds of a character on Warcraft Logs (none known: empty)."""
+    from paf.character import server_slug
+
+    ch = client.query(GUILDS, {"n": name, "s": server_slug(server), "r": (region or "eu").upper()},
+                      cache_ttl=3600)["characterData"]["character"] or {}
+    return {int(g["id"]) for g in ch.get("guilds") or [] if g.get("id")}
+
+
+def guild_log(report: dict, guilds: set[int]) -> bool:
+    """A log of your guild's raid (the owner, 2026-11-12: a pick-up raid read at launch, "only if it is in guild"):
+    a log filed under a guild, yours when Warcraft Logs knows your guilds. A personal log is a pick-up's."""
+    g = (report.get("guild") or {}).get("id")
+    return bool(g) and (not guilds or int(g) in guilds)
 
 
 def _path() -> Path:
@@ -156,12 +174,18 @@ def read_one(client, slug: str, state: dict, encs, log=print) -> bool:
     if not name or not server:
         return False
     code, rep, fights = None, {}, []
-    for c in tracker.character_reports(client, name, server, region):  # the latest log with a boss of the raid
+    guilds = guild_ids(client, name, server, region)
+    for c in tracker.character_reports(client, name, server, region):  # the latest guild log with a boss of the raid
         r = client.query(FIGHTS, {"c": c}, cache_ttl=120)["reportData"]["report"] or {}
-        if bosses_of(r.get("fights") or [], encs):
+        if guild_log(r, guilds) and bosses_of(r.get("fights") or [], encs):
             code, rep, fights = c, r, r.get("fights") or []
             break
     if not code:
+        old = (state.get(slug) or {}).get("report")
+        if old and not guild_log(client.query(FIGHTS, {"c": old}, cache_ttl=3600)["reportData"]["report"] or {},
+                                 guilds):  # a pick-up log read by an older version: no longer shown
+            state.pop(slug)
+            save(state)
         return False
     old = state.get(slug) or {}
     if old.get("report") == code and old.get("pulls") == len(fights) and old.get("finished"):
