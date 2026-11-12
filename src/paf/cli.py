@@ -1609,7 +1609,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
             role = wanted(d) or "boss"  # padding: total damage; else boss damage
             sg = specgear.compare(profile_text, client, enc, diff, diff_name, cls, spec, fight.to_simc(),
                                   root / "specs", character=_active_character(), target_error=args.error,
-                                  metric="dps" if role == "total" else "bossdps", log=lambda m: print(m, flush=True))
+                                  metric="dps" if role == "total" else "bossdps", log=lambda m: print(m, flush=True),
+                                  own=getattr(args, "other_specs", False))  # your items in them: when you'd switch
             d.specs = specgear.to_json(sg) | {"role": role, "assigns": len(d.assigns)}
             print(f"  {d.specs['sentence']}")
         except Exception as ex:  # noqa: BLE001 - an extra of the prep: never fails it
@@ -3096,6 +3097,8 @@ def build_parser() -> argparse.ArgumentParser:
     pr2.add_argument("--ilvl", type=int, help="item level of the drops (default: median of your equipped items)")
     pr2.add_argument("--max-combos", type=int, default=300, help="Top Gear combination budget (default 300)")
     pr2.add_argument("--no-gear", action="store_true", help="skip Top Gear and loot (faster)")
+    pr2.add_argument("--other-specs", action="store_true",
+                     help="also Top Gear on your own items in each other damage spec of your class (slower)")
     pr2.add_argument("--no-optimize", action="store_true",
                      help="simple cooldown plans instead of the full optimizer (faster)")
     pr2.add_argument("--no-validate", action="store_true",

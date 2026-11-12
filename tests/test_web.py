@@ -392,7 +392,28 @@ def test_the_boss_page_is_its_guide_alone(tmp_path, monkeypatch):
     assert "Your goal on this boss" not in html and "Pad the adds" not in html
     assert '<input type="hidden" name="goal" value="auto">' in html
     assert "Every ability, from the Encounter Journal" not in html and "Your fight plan" not in html
-    assert 'data-step="assigns"' not in html and "Step <b>1</b> of 2" in html  # no mechanics known: no step for them
+    assert 'data-step="assigns"' not in html and "Step <b>1</b> of 3" in html  # no mechanics known: no step for them
+    assert 'data-step="specs"' in html  # the default character, an Elemental Shaman: Enhancement too
     assert "/boss?boss=7&amp;difficulty=heroic&amp;info=1" in html
     info = web.boss_page("7", "heroic", info=True).decode()
     assert "Your fight plan" in info and 'name="goal"' not in info
+
+
+def test_the_guide_asks_a_dps_with_another_damage_spec_whether_to_sim_it(tmp_path, monkeypatch):
+    # the owner, 2026-11-12: "ask which spec they want to play, if they are OK to play 2" (the specs step: 387 s)
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+
+    class Enc:
+        id, name = 7, "Boss"
+
+    monkeypatch.setattr("paf.encounters.raid_encounters", lambda client: [Enc()])
+    monkeypatch.setattr("paf.wcl.WCLClient", lambda: None)
+    monkeypatch.setattr(web, "fight_has_no_adds", lambda *a: False)
+    picks = {"class": "Rogue", "spec": "Subtlety"}
+    monkeypatch.setattr(web.settings, "get", lambda k, default=None: picks.get(k, default))
+    html = web.boss_page("7", "heroic").decode()
+    assert 'data-step="specs"' in html and "Only Subtlety" in html and "Yes, Assassination or Outlaw" in html
+    assert 'value="mine" checked' in html
+    picks["spec"] = "Restoration"
+    picks["class"] = "Druid"
+    assert 'data-step="specs"' not in web.boss_page("7", "heroic").decode()  # a healer: no damage spec to weigh

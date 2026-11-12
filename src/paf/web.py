@@ -1382,6 +1382,18 @@ def boss_page(boss_id: str, difficulty: str, info: bool = False) -> bytes:
 <label class="ob-field">Paste its Warcraft Logs link<input name="raid" type="url" value="{e(raid_now)}" aria-describedby="raid-help"
 placeholder="https://www.warcraftlogs.com/reports/..."></label>
 <p class="small muted raid-help" id="raid-help" aria-live="polite">{e(raid_hint(no_adds, found))}</p>""")]
+    from paf.profile import HEALER_SPECS, TANK_SPECS
+    from paf.specgear import DAMAGE_SPECS, spec_label
+
+    others = [x for x in DAMAGE_SPECS.get((settings.get("class") or "").replace(" ", ""), ())
+              if x.lower() != (spec or "").replace(" ", "").lower()]
+    if others and (spec or "").lower() not in HEALER_SPECS | TANK_SPECS:  # a DPS with another damage spec
+        mine_l, alt = spec_label(spec or ""), " or ".join(spec_label(x) for x in others)
+        steps.append(("specs", f"""<h2>Would you play another spec here?</h2>
+<div class="goals"><label class="goal"><input type="radio" name="specs" value="mine" checked><span><b>Only {e(mine_l)}</b>
+<small>the prep still compares the specs in the top players' gear</small></span></label>
+<label class="goal"><input type="radio" name="specs" value="open"><span><b>Yes, {e(alt)} if it is better</b>
+<small>your own items in each spec too: a few minutes more</small></span></label></div>"""))
     if mechs:
         steps.append(("assigns", f"""<h2>Are you assigned to something?</h2>{assigns}
 <p class="small muted ob-note">Each assignment is simulated: its moves change your cooldown plan and your gear.</p>"""))
@@ -1389,6 +1401,7 @@ placeholder="https://www.warcraftlogs.com/reports/..."></label>
 <ul class="recap">
 <li data-if="goal=boss">For <b>boss damage</b>: no adds on this boss.</li>
 <li data-if="goal=auto">Your raid's log decides between boss damage and padding the adds.</li>
+<li data-if="specs=open">Your items in your class's other specs too.</li>
 <li data-if="assigns"><span class="recap-assigns-lab">With your assignments:</span> <b class="recap-assigns"></b></li>
 <li data-if="no-assigns">No assignment.</li>
 <li data-if="raid">Your raid: <b class="recap-raid"></b></li>
@@ -1449,7 +1462,8 @@ function recap(){
   f.querySelector('.recap-raid').textContent = raid;
   f.querySelectorAll('.recap [data-if]').forEach(function(li){
     var c = li.dataset.if;
-    li.hidden = !(c === 'goal=' + goal || (c === 'assigns' && picked.length) || (c === 'no-assigns' && !picked.length)
+    var sp = (f.querySelector('input[name=specs]:checked') || {}).value || 'mine';
+    li.hidden = !(c === 'goal=' + goal || c === 'specs=' + sp || (c === 'assigns' && picked.length) || (c === 'no-assigns' && !picked.length)
                   || (c === 'raid' && raid) || (c === 'no-raid' && !raid)); });
 }
 function show(i, back){
@@ -2358,6 +2372,8 @@ class Handler(BaseHTTPRequestHandler):
                 goal = (form.get("goal") or ["auto"])[0]
                 if goal in ("boss", "total"):
                     args += ["--objective", goal]
+                if (form.get("specs") or ["mine"])[0] == "open":
+                    args.append("--other-specs")
                 result = data_dir() / "reports" / f"prep-{report_key(enc.name, difficulty)}.html"
                 jid = JOBS.start(args, result)
                 self._redirect(f"/job/{jid}")
