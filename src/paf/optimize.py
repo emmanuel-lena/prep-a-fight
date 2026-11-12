@@ -275,8 +275,9 @@ def optimize_objective(profile_text: str, apl: OrderedDict[str, list[str]], cds:
 
 
 def confirm(profile_text: str, apl: OrderedDict[str, list[str]], plans: list[Plan], fight: Fight, run_dir: Path,
-            target_error: float = 0.05) -> None:
-    """Measure every plan against the default APL with a tight error, for all objectives."""
+            target_error: float = 0.1) -> None:
+    """Measure every plan against the default APL with a tight error, for all objectives. At 0.1% (0.05% until
+    2026-11-12, the owner: "0.1% is plenty"): a quarter of the iterations, the fight's own model uncertain by more."""
     base = "\n".join([profile_text.rstrip(), *apl_lines(apl)])
     sets = {p.objective: apply_rules(apl, p.choice) for p in plans
             if any(r.name != "default" for r in p.choice.values())}

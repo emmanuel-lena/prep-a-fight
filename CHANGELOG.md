@@ -10,7 +10,7 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
   filled in), what you are assigned to (when the logs know this boss), then prepare. No goal to pick: your raid's log
   decides between the boss and the adds. The boss's abilities and your own plan are one link away.
 - Faster preps: Top Gear and the cooldown plan race their candidates (all at a coarse precision, then only the
-  ones still in the running at the full one), and the movement calibration needs a quarter of its sims.
+  ones still in the running at the full one), the movement calibration and the cooldown plan's final check need a quarter of their sims.
 - The time a prep takes is predicted better: a boss you never prepared is no longer predicted from the preps that
   reused their sims (it said 6 min for 12), and every step counts.
 - "Your last raid" reads only your guild's raids: a pick-up raid's log is no longer analysed at launch.
