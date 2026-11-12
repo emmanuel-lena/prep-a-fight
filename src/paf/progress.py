@@ -48,7 +48,6 @@ PREP_STEPS = (
      "checks it on harder versions of the fight. The longest step: thousands of simulated pulls on your CPU.", 20),
     ("Cooldown plans", "Compare cooldown plans", "Simple cooldown plans, compared on this fight.", 5),
     ("Top Gear", "Best gear from your bags", "Every useful combination of the items in your bags.", 5),
-    ("What this boss drops", "What this boss drops for you", "Each drop of this boss, on your character.", 3),
 )
 OPTIONAL = ("Collecting", "Your raid", "Cooldown plans", "Using the prep pack")
 _STEP = re.compile(r"^== (.*?)(?:\s+\[\+(\d+)s\])?\s*$")

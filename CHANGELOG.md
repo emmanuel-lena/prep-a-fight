@@ -9,6 +9,7 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 - A boss's page is now a short guide alone on the page, in large: your raid's log (your last guild raid already
   filled in), what you are assigned to (when the logs know this boss), then prepare. No goal to pick: your raid's log
   decides between the boss and the adds. The boss's abilities and your own plan are one link away.
+- The prep no longer sims what the boss drops for you (faster; the Gear tool still says what to farm).
 - Faster preps: Top Gear and the cooldown plan race their candidates (all at a coarse precision, then only the
   ones still in the running at the full one), the movement calibration and the cooldown plan's final check need a quarter of their sims.
 - The time a prep takes is predicted better: a boss you never prepared is no longer predicted from the preps that

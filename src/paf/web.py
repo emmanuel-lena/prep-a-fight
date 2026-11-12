@@ -1395,7 +1395,7 @@ placeholder="https://www.warcraftlogs.com/reports/..."></label>
 <li data-if="no-raid">Your raid: <b>{e(raid_said) if raid_said else "none (the prep shows both plans)"}</b></li>
 </ul>
 <fieldset class="what-sim"><legend>What to sim</legend>
-<label><input type="checkbox" name="gear" checked><span>Best gear from your bags, and what this boss drops for you</span></label>
+<label><input type="checkbox" name="gear" checked><span>Best gear from your bags</span></label>
 <label><input type="checkbox" name="optimize" checked><span>Ideal cooldown plan <span class="muted small">(the slowest part: 20 to 40 min the first time)</span></span></label>
 <p class="small muted sim-none" hidden>Both off: the prep still gives the fight view, the boss journal and your talents.</p></fieldset>"""))
     if not mechs:  # no assignment step: nothing to recap of it
