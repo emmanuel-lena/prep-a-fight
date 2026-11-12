@@ -54,6 +54,7 @@ class Creature:
 class Model:
     encounter_id: int
     difficulty: str
+    boss: str = ""  # the journal's first unit: the boss (Nek'zali, Zul'jan)
     stages: list[str] = field(default_factory=list)
     abilities: list[Ability] = field(default_factory=list)
     creatures: list[Creature] = field(default_factory=list)
@@ -117,6 +118,20 @@ def effects_of(rows: list[dict], difficulty: str) -> list[Effect]:
 
 
 @cache
+def journal_boss(encounter_id: int) -> str:
+    """The journal's first unit of a boss (OrderIndex 0): the boss itself."""
+    from paf.gamedata import table_rows
+
+    try:
+        jid = next((r["ID"] for r in table_rows("JournalEncounter")
+                    if r.get("DungeonEncounterID") == str(encounter_id)), None)
+        rows = [r for r in table_rows("JournalEncounterCreature") if jid and r.get("JournalEncounterID") == jid]
+        return min(rows, key=lambda r: int(r.get("OrderIndex") or 0)).get("Name_lang") or "" if rows else ""
+    except Exception:  # noqa: BLE001 - offline
+        return ""
+
+
+@cache
 def journal_creatures(encounter_id: int) -> frozenset[str]:
     """The units the journal lists for a boss (its bosses and its adds), by name."""
     from paf.gamedata import table_rows
@@ -135,7 +150,7 @@ def build(encounter_id: int, difficulty: str) -> Model:
     from paf.gamedata import _filtered_rows
     from paf.mechanics import dedupe, encounter_sections
 
-    m = Model(encounter_id, difficulty)
+    m = Model(encounter_id, difficulty, journal_boss(encounter_id))
     sections = dedupe(encounter_sections(encounter_id), difficulty)
     casts, durs = _times()
     sev = _severities()

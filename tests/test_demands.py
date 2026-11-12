@@ -147,3 +147,19 @@ def test_the_sheet_says_the_spec_ahead_in_each_window():
     assert "<td class='dm-me dm-best'>your spec, best</td>" in html and "<th>Spirit Shield</th>" not in html
     d.demands["damage"] = {}
     assert "dm-grid" not in briefing.demands_html(d)  # no other spec ticked: the windows only
+
+
+def test_the_boss_out_of_reach_is_placed_on_its_immune_phases_and_windows_end_with_the_fight(monkeypatch, tmp_path):
+    # the audit (2026-11-12): Deathguard on Malacrass and Vitriolic Homeostasis had no unit; a wave ran past the kill
+    m = model(monkeypatch)
+    m.boss = "Hex Lord Malacrass"
+    m.abilities.append(encmodel.Ability(1304028, "Deathguard", "Intermission: The Claimed Vessel", "", [], None, 0.0,
+                                        None, [encmodel.Effect("damage_taken", -99, True)]))
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    con = db.connect()
+    fight = SimpleNamespace(add_waves=[SimpleNamespace(name="Spiteful Soulcoiler", time=600, lifetime=40)],
+                            vulnerable=[], invulnerable=[SimpleNamespace(start=169, duration=219)], lust_time=0,
+                            duration=625)
+    by = {w.label: w for w in demands.place(demands.from_model(m), m, con, 3429, 5, None, fight)}
+    assert by["Deathguard"].unit == "Hex Lord Malacrass" and by["Deathguard"].spans == [(169, 388)]
+    assert by["Spiteful Soulcoiler"].spans == [(600, 625)]  # cut at the kill

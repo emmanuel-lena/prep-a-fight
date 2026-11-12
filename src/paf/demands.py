@@ -68,7 +68,7 @@ def from_model(m) -> list[Window]:
                 spell=a.spell, unit=a.creature, severity=sev)
         elif reach := [x for x in a.has("damage_taken", on_caster=True) if x.size <= -90]:
             out[a.spell] = Window("immune", a.name, detail=f"{reach[0].size:g}% damage taken",
-                                  spell=a.spell, unit=a.creature, severity=sev)
+                                  spell=a.spell, unit=a.creature or m.boss, severity=sev)  # none said: the boss
         elif amp := [x for x in a.has("damage_taken", on_caster=True) if x.size > 0]:
             out[a.spell] = Window("amp", a.name, detail=f"+{amp[0].size:g}% damage taken"
                                   + (f" for {a.duration:g} s" if a.duration else ""), spell=a.spell,
@@ -215,13 +215,15 @@ def place(windows: list[Window], m, con: sqlite3.Connection, encounter_id: int, 
                 w.spans = [(round(st.median(x[0] for x in o), 1), round(st.median(x[0] for x in o) + a.duration, 1))
                            for o in occ]
         out.append(w)
-    if fight is not None:  # out of reach while its unit lives: that unit's waves in the rebuilt fight
-        for w in out:
+    if fight is not None:  # out of reach while its unit lives: that unit's waves in the rebuilt fight; the boss
+        for w in out:          # itself: its immune phases there
             if w.kind == "immune" and not w.spans and w.unit:
-                w.spans = [(x.time, x.time + x.lifetime) for x in fight.add_waves
-                           if _name(x.name) == _name(w.unit) and x.lifetime > 0]
-                if w.spans:
-                    w.detail += f", while {w.unit} lives"
+                if _name(w.unit) == _name(m.boss or ""):
+                    w.spans = [(i.start, i.start + i.duration) for i in getattr(fight, "invulnerable", []) or []]
+                else:
+                    w.spans = [(x.time, x.time + x.lifetime) for x in fight.add_waves
+                               if _name(x.name) == _name(w.unit) and x.lifetime > 0]
+                    w.detail += f", while {w.unit} lives" if w.spans else ""
     if fight is not None:  # the rebuilt fight's adds and amps place the game data's by name, or come in addition
         for fw in fight_windows(fight):
             same = next((w for w in out if _name(w.label) == _name(fw.label) and w.kind in (fw.kind, "adds")), None)
@@ -230,6 +232,10 @@ def place(windows: list[Window], m, con: sqlite3.Connection, encounter_id: int, 
             else:  # measured on the unit itself, in the sims' own time: it wins over a cast's
                 same.spans = fw.spans
                 same.detail = "; ".join(x for x in (same.detail, fw.detail) if x)
+    end = getattr(fight, "duration", None) if fight is not None else None
+    if end:  # a window ends with the fight (an add wave that outlives the kill in the template)
+        for w in out:
+            w.spans = [(a, min(b, end)) for a, b in w.spans if a < end]
     return out
 
 
