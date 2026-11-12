@@ -5,6 +5,8 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 
 ## Unreleased
 
+## 0.8.30 (2026-11-12)
+
 - After an update, the app opens again by itself (it closed and stayed closed).
 - A boss's page is now a short guide alone on the page, in large: your raid's log (your last guild raid already
   filled in), what you are assigned to (when the logs know this boss), then prepare. No goal to pick: your raid's log
