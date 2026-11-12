@@ -1381,11 +1381,14 @@ def cmd_prep(args: argparse.Namespace) -> int:
             fetch_council_stack(client, con, enc.id, diff, members)
         fetch_boss_auras(client, con, enc.id, diff, boss)
         fetch_npc_stack(client, con, enc.id, diff)
-        from paf import bossguide, demands
+        from paf import demands, encmodel
 
-        shields = demands.shield_spells(bossguide.load(enc.id, diff_name))  # the DPS checks (paf.demands)
-        with client.no_quota_wait():
-            demands.fetch_shields(client, con, enc.id, diff, shields)
+        try:  # the shields the game data shows (paf.encmodel): how fast the top raids break them
+            shields = {w.spell for w in demands.from_model(encmodel.build(enc.id, diff_name)) if w.kind == "shield"}
+            with client.no_quota_wait():
+                demands.fetch_shields(client, con, enc.id, diff, shields)
+        except Exception as ex:  # noqa: BLE001 - an extra of the sheet: never fails the prep
+            print(f"  shields: skipped ({str(ex)[:120]})")
         from paf.corpus.lust import MAX_KILLS, fetch_lust
 
         if (n := MAX_KILLS - con.execute("SELECT COUNT(*) FROM raid_lust l JOIN fight f USING(report, fight_id) "
@@ -1484,10 +1487,10 @@ def cmd_prep(args: argparse.Namespace) -> int:
     try:  # what the fight demands: its DPS checks, its add bursts, its amps (paf.demands)
         from dataclasses import asdict
 
-        from paf import bossguide, demands, stagetime
+        from paf import demands, encmodel
 
-        wins = demands.shield_windows(con, enc.id, diff, demands.shield_spells(bossguide.load(enc.id, diff_name)),
-                                      stagetime.clock(enc.id, diff)) + demands.fight_windows(fight)
+        model = encmodel.build(enc.id, diff_name)  # the game data first, the logs place it (in the sims' time)
+        wins = demands.place(demands.from_model(model), model, con, enc.id, diff, None, fight)
         d.demands = {"windows": [asdict(w) for w in wins], "damage": {}} if wins else None
     except Exception as ex:  # noqa: BLE001 - an extra of the sheet: never fails the prep
         print(f"  the fight's demands: skipped ({str(ex)[:120]})")

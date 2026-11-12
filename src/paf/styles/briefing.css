@@ -122,3 +122,4 @@ details.more>summary{font:italic 400 17px var(--font-reading);color:var(--muted)
 .dm-grid th:first-child{text-align:left;font:600 14px var(--font-body);text-transform:none;letter-spacing:0;color:var(--fg)} .dm-grid thead th{font:600 12px/1.2 var(--font-display);color:var(--muted);text-transform:none;letter-spacing:0;min-width:96px}
 .dm-grid td.pos{color:var(--pos);font-weight:700} .dm-grid td.neg{color:var(--neg)}
 .dm-grid td.dm-me{color:var(--muted);font-size:12.5px} .dm-grid td.dm-best{box-shadow:inset 0 -2px 0 currentColor}
+.dm-w.immune{border-style:dashed} .dm-w.off{opacity:.55} .dm-w.high{box-shadow:inset 3px 0 0 var(--neg)}

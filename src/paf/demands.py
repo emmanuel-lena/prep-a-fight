@@ -1,29 +1,32 @@
 """What the fight demands, found by itself (the owner, 2026-11-12: "a prep is 20% useful, the rest is noise"; what
-decides a spec is the fight's demands): the moments a raid must put out damage fast, and which spec of yours does.
+decides a spec is the fight's demands, and the game data says most of it before any log).
 
-- A DPS check: a shield on an enemy that must be broken (Coiled Altar mythic: Malacrass's Veil of Twilight, 34.8 M,
-  broken in 12 to 17 s by a top raid, or Eternal Nightfall wipes). Found in the Encounter Journal (a spell whose game
-  description absorbs damage), read in the top kills (when it goes up, when it breaks), placed in stage time.
-- A burst on adds: a short add wave (Twin Fangs mythic: 3 adds that live ~11 s in the top kills).
-- A damage amp, with Bloodlust when it falls in it (the boss takes x2: a spec with an execute there).
+From the game data (paf.encmodel), what each demand is:
+- a shield to break: an absorb an enemy puts on itself, within the cast it comes under when it has one (Coiled Altar:
+  Veil of Twilight on Malacrass, 4902 units mythic, to break within Eternal Nightfall's 17 s cast);
+- a unit out of reach: an enemy at -90% damage taken or less while something holds (Tether of Awakening, Spirit
+  Shield): what to kill first;
+- a damage amp: an enemy taking more damage for a while (Ghastly Regeneration, +100% for 35 s);
+- adds a spell brings (Spawn of Vexhul under Venomous Emergence): a burst.
+From the logs, only what the game data cannot say: when each happens (the casts of the top kills, in stage time), how
+fast the top raids break a shield and its real size, how long the adds live, Bloodlust.
 
 Each spec's damage in each window comes from the specs' sims (simc's per-second damage of the player), all in the top
 players' gear at the same item level: no sim of its own."""
 from __future__ import annotations
 
-import re
 import sqlite3
 import statistics as st
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-SHIELD_TEXT = re.compile(r"absorb\w*\s+\$s\d+\s+damage", re.I)  # "absorbing $s1 damage" (not "... healing")
-KILLS = 12  # kills read per boss for its shields (about 1.5 quota points each)
+KILLS = 12  # kills read per boss for its shields (about 2 quota points each)
+CAST_WINDOW = 5.0  # seconds: a cast this long at least is the time to break the shield it brings (Nightfall: 17)
 BURST_ADDS = 45.0  # seconds: an add wave that lives this long at most is a burst (a longer one is a second target)
 
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS enemy_shield(      -- shields on enemies (journal spells that absorb damage), paf.demands
+CREATE TABLE IF NOT EXISTS enemy_shield(      -- shields on enemies (paf.encmodel: absorbs on their caster)
   report TEXT, fight_id INT, ability_id INT, t_start REAL, t_end REAL, absorb REAL);
 CREATE TABLE IF NOT EXISTS shield_status(report TEXT, fight_id INT, PRIMARY KEY(report, fight_id));
 """
@@ -35,37 +38,47 @@ SHIELD_QUERY = """query($code:String!,$f:[Int]!,$s:Float!,$e:Float!,$x:String!){
 
 @dataclass
 class Window:
-    kind: str  # "shield" | "adds" | "amp"
+    kind: str  # "shield" | "immune" | "amp" | "adds"
     label: str  # "Veil of Twilight", "Add waves", "x2 amp"
-    spans: list[tuple[float, float]]  # (start, end) in the fight's time, every occurrence
-    detail: str = ""  # "broken in 13 s by the top raids", "Bloodlust in it"
+    spans: list[tuple[float, float]] = field(default_factory=list)  # (start, end) in the fight's time; [] unplaced
+    detail: str = ""  # the game data's then the logs' facts, one sentence
     spell: int = 0
+    unit: str = ""  # who carries it ("Hex Lord Malacrass")
+    severity: int | None = None  # Blizzard's warning severity of the ability behind it
 
 
-@dataclass
-class Demands:
-    windows: list[Window] = field(default_factory=list)
-    damage: dict[str, dict[str, float]] = field(default_factory=dict)  # spec -> window label -> damage (and "all")
+def from_model(m) -> list[Window]:
+    """The demands the game data shows (paf.encmodel.Model), unplaced: one per spell."""
+    from paf.encmodel import journal_creatures
 
-
-def shield_spells(sections) -> dict[int, str]:
-    """The journal's spells whose game description absorbs damage: {spell id: name}."""
-    from paf.gamedata import table_rows
-
-    ids: dict[int, str] = {}
-
-    def walk(xs):
-        for s in xs or []:
-            if s.spell_id:
-                ids.setdefault(int(s.spell_id), s.title)
-            walk(s.children)
-    walk(sections)
-    try:
-        text = {int(r["ID"]): r.get("Description_lang") or "" for r in table_rows("Spell")
-                if r.get("ID", "").isdigit() and int(r["ID"]) in ids}
-    except Exception:  # noqa: BLE001 - offline: no shield known
-        return {}
-    return {i: n for i, n in ids.items() if SHIELD_TEXT.search(text.get(i, ""))}
+    units = journal_creatures(m.encounter_id)
+    out: dict[int, Window] = {}
+    for a in m.abilities:
+        if a.spell in out:  # the same spell in a later stage: its unit when the first one did not say it
+            out[a.spell].unit = out[a.spell].unit or a.creature
+            continue
+        parent = m.ability(a.parent) if a.parent else None
+        sev = a.severity if a.severity is not None else parent.severity if parent else None
+        if shields := a.has("shield", on_caster=True):
+            within = parent.cast if parent and parent.cast >= CAST_WINDOW else 0.0
+            size = f", {shields[0].size:g} units ({m.difficulty})" if shields[0].size else ""
+            out[a.spell] = Window(
+                "shield", a.name, detail=(f"to break within {parent.name}'s {within:g} s cast" if within else
+                                          "a shield to break") + size,
+                spell=a.spell, unit=a.creature, severity=sev)
+        elif reach := [x for x in a.has("damage_taken", on_caster=True) if x.size <= -90]:
+            out[a.spell] = Window("immune", a.name, detail=f"{reach[0].size:g}% damage taken",
+                                  spell=a.spell, unit=a.creature, severity=sev)
+        elif amp := [x for x in a.has("damage_taken", on_caster=True) if x.size > 0]:
+            out[a.spell] = Window("amp", a.name, detail=f"+{amp[0].size:g}% damage taken"
+                                  + (f" for {a.duration:g} s" if a.duration else ""), spell=a.spell,
+                                  unit=a.creature, severity=sev)
+    for c in m.creatures:
+        if c.summoner and c.name in units and c.name not in {w.label for w in out.values()}:
+            src = m.ability(c.summoner)
+            out[-len(out) - 1] = Window("adds", c.name, detail=f"brought by {src.name}" if src else "",
+                                        severity=src.severity if src else None)
+    return list(out.values())
 
 
 def shield_events(events: list[dict], start: float) -> list[tuple[int, float, float, float]]:
@@ -83,7 +96,7 @@ def shield_events(events: list[dict], start: float) -> list[tuple[int, float, fl
     return out
 
 
-def fetch_shields(client, con: sqlite3.Connection, encounter_id: int, difficulty: int, spells: dict[int, str],
+def fetch_shields(client, con: sqlite3.Connection, encounter_id: int, difficulty: int, spells: set[int],
                   kills: int = KILLS, log: Callable[[str], None] = lambda s: print(s, flush=True)) -> int:
     """Each shield's up and broken times in the top kills (once per kill, kept in the corpus)."""
     from paf.corpus.analyze import kills_filter
@@ -119,59 +132,130 @@ def fetch_shields(client, con: sqlite3.Connection, encounter_id: int, difficulty
     return len(todo)
 
 
-def shield_windows(con: sqlite3.Connection, encounter_id: int, difficulty: int, spells: dict[int, str],
-                   clock=None) -> list[Window]:
-    """Each shield's typical occurrences: the k-th one of a kill at its median start (stage time when a clock is
-    given), lasting the median time the top raids took to break it. Seen in half the kills read at least."""
+TOGETHER = 8.0  # seconds: shields going up this close in a kill are one wave (a shield on each of 6 Restless Amani)
+
+
+def _together(rows) -> list[tuple]:
+    """Shield rows (report, fight, up, took, absorb) of one kill merged into waves: up at the first, broken at the
+    last, each one's absorb (its median)."""
+    out: list[list] = []
+    for rep, fid, t0, took, absorb in sorted(rows, key=lambda r: (r[0], r[1], r[2])):
+        cur = out[-1] if out else None
+        if cur and (cur[0], cur[1]) == (rep, fid) and t0 - cur[2] <= TOGETHER:
+            cur[3] = max(cur[3], t0 + took - cur[2])
+            cur[5].append(absorb)
+        else:
+            out.append([rep, fid, t0, took, absorb, [absorb]])
+    return [(r[0], r[1], r[2], r[3], st.median(r[5])) for r in out]
+
+
+def _occurrences(rows, read: int, clock) -> list[list[tuple]]:
+    """Rows (report, fight, t, *rest) of a kind of event, grouped by their rank in their kill (the k-th of each kill),
+    in stage time; a rank half the kills never reach is left out."""
+    per: dict[int, list[tuple]] = defaultdict(list)
+    nth: dict[tuple, int] = defaultdict(int)
+    for rep, fid, t, *rest in rows:
+        k = nth[(rep, fid)]
+        nth[(rep, fid)] += 1
+        at = clock.at((rep, fid), t) if clock else t
+        if at is not None:
+            per[k].append((at, *rest))
+    return [per[k] for k in sorted(per) if not read or len(per[k]) >= read / 2]
+
+
+def place(windows: list[Window], m, con: sqlite3.Connection, encounter_id: int, difficulty: int, clock=None,
+          fight=None) -> list[Window]:
+    """The demands in the fight's time, from the logs: a shield from the top kills' shields (else from the casts of
+    the spell it comes under), a unit out of reach or an amp from the casts of its spell or its parent's, the add
+    waves and the amps of the rebuilt fight. A demand the logs never show stays, unplaced (said, not drawn)."""
     from paf.corpus.analyze import kills_filter
 
+    where, params = kills_filter(encounter_id, difficulty)
+    kills = con.execute(f"SELECT COUNT(*) FROM fight f WHERE {where}", params).fetchone()[0]
     try:
         con.executescript(SCHEMA)
+        read = con.execute(f"SELECT COUNT(*) FROM shield_status a JOIN fight f USING(report, fight_id) WHERE {where}",
+                           params).fetchone()[0]
     except sqlite3.Error:
-        return []
-    where, params = kills_filter(encounter_id, difficulty)
-    read = con.execute(f"SELECT COUNT(*) FROM shield_status a JOIN fight f USING(report, fight_id) WHERE {where}",
-                       params).fetchone()[0]
-    rows = con.execute(f"SELECT s.report, s.fight_id, s.ability_id, s.t_start, s.t_end, s.absorb FROM enemy_shield s "
-                       f"JOIN fight f USING(report, fight_id) WHERE {where} ORDER BY s.t_start", params).fetchall()
-    per: dict[int, dict[int, list[tuple[float, float, float]]]] = defaultdict(lambda: defaultdict(list))
-    nth: dict[tuple, int] = defaultdict(int)
-    for rep, fid, aid, t0, t1, absorb in rows:
-        k = nth[(rep, fid, aid)]
-        nth[(rep, fid, aid)] += 1
-        at = clock.at((rep, fid), t0) if clock else t0
-        if at is not None:
-            per[aid][k].append((at, t1 - t0, absorb))
+        read = 0
+
+    def casts(spell: int) -> list[list[tuple]]:
+        rows = con.execute(f"SELECT e.report, e.fight_id, e.t FROM enemy_cast e JOIN fight f USING(report, fight_id) "
+                           f"WHERE {where} AND e.ability_id = ? AND e.type IN ('begincast', 'cast') "
+                           f"ORDER BY e.report, e.fight_id, e.t", (*params, spell)).fetchall()
+        firsts, last = [], {}
+        for rep, fid, t in rows:  # a begincast and its cast: one press
+            if last.get((rep, fid)) is None or t - last[(rep, fid)] > 3:
+                firsts.append((rep, fid, t))
+            last[(rep, fid)] = t
+        return _occurrences(firsts, kills, clock)
     out = []
-    for aid, occ in per.items():
-        spans, took, absorbs = [], [], []
-        for k in sorted(occ):
-            xs = occ[k]
-            if read and len(xs) < read / 2:  # an occurrence most kills never reach
-                continue
-            start, dur = st.median(x[0] for x in xs), st.median(x[1] for x in xs)
-            spans.append((round(start, 1), round(start + dur, 1)))
-            took += [x[1] for x in xs]
-            absorbs += [x[2] for x in xs if x[2]]
-        if spans:
-            size = f", {st.median(absorbs) / 1e6:.1f} M absorbed" if absorbs else ""
-            out.append(Window("shield", spells.get(aid, f"Shield {aid}"), spans,
-                              f"broken in {st.median(took):.0f} s by the top raids{size}", aid))
+    for w in windows:
+        a = m.ability(w.spell) if w.spell else None
+        parent = m.ability(a.parent) if a and a.parent else None
+        if w.kind == "shield":
+            rows = con.execute(
+                f"SELECT s.report, s.fight_id, s.t_start, s.t_end - s.t_start, s.absorb FROM enemy_shield s JOIN "
+                f"fight f USING(report, fight_id) WHERE {where} AND s.ability_id = ? ORDER BY s.report, s.fight_id, "
+                f"s.t_start", (*params, w.spell)).fetchall() if read else []
+            occ = _occurrences(_together(rows), read, clock)
+            if occ:
+                took = [x[1] for o in occ for x in o]
+                size = [x[2] for o in occ for x in o if x[2]]
+                w.spans = [(round(st.median(x[0] for x in o), 1), round(st.median(x[0] + x[1] for x in o), 1))
+                           for o in occ]
+                w.detail += (f"; the top raids break it in {st.median(took):.0f} s"
+                             + (f", {st.median(size) / 1e6:.1f} M" if size else ""))
+            elif parent and parent.cast >= CAST_WINDOW and (occ := casts(parent.spell)):
+                w.spans = [(round(st.median(x[0] for x in o), 1), round(st.median(x[0] for x in o) + parent.cast, 1))
+                           for o in occ]
+        elif w.kind in ("immune", "amp") and a is not None:
+            occ = casts(a.spell) or (casts(parent.spell) if parent else [])
+            if occ and a.duration:
+                w.spans = [(round(st.median(x[0] for x in o), 1), round(st.median(x[0] for x in o) + a.duration, 1))
+                           for o in occ]
+        out.append(w)
+    if fight is not None:  # out of reach while its unit lives: that unit's waves in the rebuilt fight
+        for w in out:
+            if w.kind == "immune" and not w.spans and w.unit:
+                w.spans = [(x.time, x.time + x.lifetime) for x in fight.add_waves
+                           if _name(x.name) == _name(w.unit) and x.lifetime > 0]
+                if w.spans:
+                    w.detail += f", while {w.unit} lives"
+    if fight is not None:  # the rebuilt fight's adds and amps place the game data's by name, or come in addition
+        for fw in fight_windows(fight):
+            same = next((w for w in out if _name(w.label) == _name(fw.label) and w.kind in (fw.kind, "adds")), None)
+            if same is None:
+                out.append(fw)
+            else:  # measured on the unit itself, in the sims' own time: it wins over a cast's
+                same.spans = fw.spans
+                same.detail = "; ".join(x for x in (same.detail, fw.detail) if x)
     return out
 
 
+def _name(label: str) -> str:
+    """'Ghastly Regeneration (boss aura)' -> 'ghastly regeneration': a unit's or an aura's name, the notes left."""
+    import re
+
+    return re.sub(r"\s*\([^)]*\)", "", label).strip().lower()
+
+
 def fight_windows(fight) -> list[Window]:
-    """The short add waves (all of them, one window) and each damage amp, from the rebuilt fight."""
+    """The rebuilt fight's short add waves (one window per kind of add) and its damage amps."""
     out = []
-    waves = [(w.time, w.time + w.lifetime) for w in fight.add_waves if 0 < w.lifetime <= BURST_ADDS]
-    if waves:
+    by: dict[str, list[tuple[float, float]]] = defaultdict(list)
+    for w in fight.add_waves:
+        if 0 < w.lifetime <= BURST_ADDS:
+            by[_name(w.name) and w.name.split(" (")[0] or "Adds"].append((w.time, w.time + w.lifetime))
+    for name, waves in by.items():
         life = st.median(b - a for a, b in waves)
-        out.append(Window("adds", "Add waves", waves, f"{len(waves)} waves that live ~{life:.0f} s"))
+        out.append(Window("adds", name, waves, f"{len(waves)} waves that live ~{life:.0f} s in the top kills"))
     lust = getattr(fight, "lust_time", None)
     for v in getattr(fight, "vulnerable", []) or []:
         a, b = v.start, v.start + v.duration
         bl = lust is not None and a - 10 <= lust <= b
-        out.append(Window("amp", f"x{v.multiplier:g} amp", [(a, b)], "Bloodlust in it" if bl else "", 0))
+        out.append(Window("amp", (v.name or "").split(" (")[0] or f"x{v.multiplier:g} amp", [(a, b)],
+                          f"x{v.multiplier:g} damage taken" + (", Bloodlust in it" if bl else "")))
     return out
 
 
@@ -181,6 +265,6 @@ def window_damage(timeline: list[float], spans: list[tuple[float, float]]) -> fl
 
 
 def compare(windows: list[Window], timelines: dict[str, list[float]]) -> dict[str, dict[str, float]]:
-    """spec -> window label -> damage in it ("all": the whole fight)."""
-    return {spec: {"all": sum(tl), **{w.label: window_damage(tl, w.spans) for w in windows}}
+    """spec -> window label -> damage in it ("all": the whole fight), placed windows only."""
+    return {spec: {"all": sum(tl), **{w.label: window_damage(tl, w.spans) for w in windows if w.spans}}
             for spec, tl in timelines.items() if tl}

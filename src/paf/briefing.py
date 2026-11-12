@@ -447,11 +447,16 @@ def spec_html(d) -> str:
 
 
 DEMAND_GAP = 3.0  # % a spec must gain in a window to be said ahead there (a window is a few seconds of the sims)
-DEMAND_GLYPH = {"shield": "&#128737;", "adds": "&#9876;", "amp": "&#9650;"}
+DEMAND_GLYPH = {"shield": "&#128737;", "adds": "&#9876;", "amp": "&#9650;", "immune": "&#8856;"}
 
 
 def _mmss(t: float) -> str:
     return f"{int(t // 60)}:{int(t % 60):02d}"
+
+
+def _title(w: dict) -> str:
+    """A demand's name: an immunity is its unit to kill ("Echo of Jawae", Tether of Awakening on hover)."""
+    return w["unit"] if w["kind"] == "immune" and w.get("unit") else w["label"]
 
 
 def demands_html(d) -> str:
@@ -463,18 +468,23 @@ def demands_html(d) -> str:
     wins = dm["windows"]
 
     def head(w: dict) -> str:
-        times = ", ".join(_mmss(a) for a, _b in w["spans"][:6]) + ("…" if len(w["spans"]) > 6 else "")
-        n = f" &times;{len(w['spans'])}" if len(w["spans"]) > 1 else ""
-        return (f"<span class='dm-w {w['kind']}' title='{e(w['label'])}: {e(times)}"
-                f"{'. ' + e(w['detail']) if w.get('detail') else ''}'>{DEMAND_GLYPH.get(w['kind'], '')} "
-                f"{e(w['label'])}{n}</span>")
+        spans = w.get("spans") or []
+        times = ", ".join(_mmss(a) for a, _b in spans[:6]) + ("…" if len(spans) > 6 else "")
+        n = f" &times;{len(spans)}" if len(spans) > 1 else ""
+        on = f" on {w['unit']}" if w.get("unit") else ""
+        when = times or "not seen in the top kills' logs"
+        hover = ". ".join(x for x in (f"{w['label']}{on}: {when}", w.get("detail") or "",
+                                      "Blizzard's own warning: high" if w.get("severity") == 2 else "") if x)
+        return (f"<span class='dm-w {w['kind']}{'' if spans else ' off'}{' high' if w.get('severity') == 2 else ''}'"
+                f" title='{e(hover)}'>{DEMAND_GLYPH.get(w['kind'], '')} {e(_title(w))}{n}</span>")
+    wins = sorted(wins, key=lambda w: (not w.get("spans"), -(w.get("severity") or 0)))  # placed, most severe first
     dmg = dm.get("damage") or {}
     mine = getattr(d, "specs", None) and d.specs.get("mine")
     grid = ""
     if mine in dmg and len(dmg) > 1:
         from paf.specgear import spec_label
 
-        cols = [("all", "Whole fight")] + [(w["label"], w["label"]) for w in wins]
+        cols = [("all", "Whole fight")] + [(w["label"], _title(w)) for w in wins if w["label"] in dmg[mine]]
         best = {k: max(dmg, key=lambda sp: dmg[sp].get(k, 0)) for k, _ in cols}
 
         def cell(sp: str, k: str) -> str:
