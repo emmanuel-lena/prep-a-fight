@@ -17,7 +17,10 @@ jobs:
       - name: Paris time
         id: when
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$(TZ=Europe/Paris date +%H)" = "16" ]; then
+          # GitHub starts a scheduled run hours late (2026-10-27, 11-03, 11-10: 19:02 to 20:38 UTC, none released):
+          # any Tuesday run from 16:00 Paris time on releases; a second one finds "Unreleased" empty and does nothing
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || { [ "$(TZ=Europe/Paris date +%u)" = "2" ] \
+              && [ "$(TZ=Europe/Paris date +%-H)" -ge 16 ]; }; then
             echo "go=1" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.when.outputs.go
