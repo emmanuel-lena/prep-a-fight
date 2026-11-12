@@ -153,7 +153,7 @@
 .fv .ftl .ct{margin-left:auto;font:500 11px var(--font-data);color:var(--muted);flex:none}
 .fv .ftl .lb{font:500 12px/1.2 var(--font-body);color:var(--muted)}
 .fv .ftl .tr{position:relative;height:30px}
-.fv .ftl .r.you,.fv .ftl .r.you .tr{min-height:32px;height:32px}
+.fv .ftl .r.you{min-height:32px} .fv .ftl .r.you .tr{height:auto;min-height:32px;align-self:stretch}
 .fv .ftl .r.you:nth-child(odd) .tr,.fv .ftl .r.you:nth-child(odd) .g{background:var(--row,color-mix(in srgb,var(--surface-2) 45%,transparent))}
 .fv .ftl .r.thin,.fv .ftl .r.thin .tr{min-height:16px;height:16px}
 .fv .ftl .r.boss .nm{font-weight:500;font-size:12.5px}
@@ -268,8 +268,8 @@ body.playing .fv #play.btn.primary{background:var(--surface-2);color:var(--fg);b
 .fv .ftl .tm{background:color-mix(in srgb,var(--surface) 82%,transparent);padding:1px 3px;border-radius:3px;left:28px}
 .fv .ftl .tm.wide{left:34px}
 .fv .ftl .bm .tm{background:none;padding:0}
-.fv .ftl .ghost{top:auto;bottom:-1px;transform:none;width:0;height:9px;border:0;border-left:2px solid var(--warn);border-radius:0;z-index:2}
-.fv .ftl .ghost b{position:absolute;left:3px;bottom:-1px;font:600 9.5px/1 var(--font-data);color:var(--warn);white-space:nowrap}
+.fv .ftl .ghost{top:auto;bottom:0;transform:none;width:0;height:9px;border:0;border-left:2px solid var(--warn);border-radius:0;z-index:2}
+.fv .ftl .ghost b{position:absolute;right:3px;bottom:0;font:600 9.5px/1 var(--font-data);color:var(--warn);white-space:nowrap}
 .fv .ftl .seg-ph span{overflow:hidden;text-overflow:ellipsis;min-width:0}
 .fv .ftl .now b{position:absolute;top:2px;transform:translateX(-50%);font:600 12px/1 var(--font-data);background:var(--accent);color:var(--on-primary);border-radius:4px;padding:3px 6px}
 .fv .fkey{display:flex;gap:18px;flex-wrap:wrap;margin:10px 2px 0 var(--gut,224px);font-size:12px;color:var(--muted);align-items:center}
@@ -286,11 +286,14 @@ body.playing .fv #play.btn.primary{background:var(--surface-2);color:var(--fg);b
 .fv .tlh .ks b{font-size:13px} .fv .tlh .ks small{font-size:11px}
 .fv .tlh .ks-hint{display:none}
 .fv .fv-top .opseq ol{gap:10px 2px}
-.fv .fv-top .opseq li{padding-right:10px}
+.fv .fv-top .opseq li{padding-right:13px}
 .fv .fv-top .opseq li .ic{width:28px;height:28px}
-.fv .mrt-box{resize:none;overflow-x:auto;white-space:pre}
+.fv .mrt-box{resize:none;white-space:pre-wrap;overflow-wrap:anywhere;field-sizing:content}
 .fv .lv .fbar{height:auto;min-height:36px;padding-block:4px}
 .fv .lv .fbar b{line-height:1.2}
 .fv .lv-tl .ftl{--gut:200px}
 .fv .lv .lv-side{max-height:calc(100vh - 330px);overflow:auto}
-.fv .ftl .ghost.early b{left:auto;right:3px}
+.fv .ftl .ghost.late b{right:auto;left:3px}
+.fv .ftl .bm.open .ic{box-shadow:0 0 0 1px #000,0 0 0 2.5px var(--neg)}
+.fv .lv .fbar i.fill{left:36px}
+.fv .ftl .r .g small{display:block}

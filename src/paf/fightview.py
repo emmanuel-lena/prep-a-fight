@@ -600,6 +600,17 @@ def _say_why(why: str) -> str:
     return ". ".join(cap(x) for x in parts)
 
 
+def _moves(boss: list[tuple[float, Item]], end: float) -> list[list[float]]:
+    """The repositions: the moving windows merged (a move cut at a stage's start is one), the long ones left out."""
+    moves: list[list[float]] = []
+    for t, x in sorted(((t, x) for t, x in boss if x.kind == "move"), key=lambda p: p[0]):
+        if moves and t <= moves[-1][1] + 0.5:
+            moves[-1][1] = max(moves[-1][1], min(end, t + x.dur))
+        else:
+            moves.append([t, min(end, t + x.dur)])
+    return [m for m in moves if m[1] - m[0] <= MOVE_SHOWN]
+
+
 def timeline(d) -> Timeline | None:
     """The fight as lanes (generic, every boss): yours first, a lane a spell (spells always pressed together share
     one), a lane a unit you kill; then the boss's spells that concern you (one you answer, one that may target you,
@@ -610,13 +621,7 @@ def timeline(d) -> Timeline | None:
     its = [(t, x) for t, x in items(d) if t <= end + 0.5 and x.kind != "kill"]
     boss = [(t, x) for t, x in its if x.side == "boss"]
     mine = [(t, x) for t, x in its if x.side == "you"]
-    moves: list[list[float]] = []
-    for t, x in sorted(((t, x) for t, x in boss if x.kind == "move"), key=lambda p: p[0]):
-        if moves and t <= moves[-1][1] + 0.5:  # a move cut at a stage's start: one move
-            moves[-1][1] = max(moves[-1][1], min(end, t + x.dur))
-        else:
-            moves.append([t, min(end, t + x.dur)])
-    moves = [m for m in moves if m[1] - m[0] <= MOVE_SHOWN]
+    moves = _moves(boss, end)
     waves = [{"t": t, "it": x, "name": _clean(x.name), "dur": min(x.dur, end - t), "mine": False, "with": []}
              for t, x in boss if x.kind == "adds"]
     answered = {_answers(x) for _t, x in mine} - {""}
@@ -646,16 +651,21 @@ def timeline(d) -> Timeline | None:
             others += occ
             continue
         by = sorted({x.name for _t, x in mine if _answers(x) == name})
-        sub = f"you: {', '.join(by)}" if by else "may target you" if key else "in the journal"
-        lane = Lane("key" if key else "journal", [name], [occ[0][1].icon], sub)
+        lane = Lane("key" if key else "journal", [name], [occ[0][1].icon])
+        answered_ = 0
         for t, x in occ:
-            now = sorted({y.name for at, y in mine if _answers(y) == name
-                          and t - ANSWER_BEFORE <= at <= t + ANSWER_AFTER})
-            tip = [f"{name} · {_mmss(t)}"] + ([f"You answer with {', '.join(now)}"] if now else
-                                              ["Your plan answers another one, not this one"] if by else
+            now = [(y.name, at - t) for at, y in mine if _answers(y) == name
+                   and t - ANSWER_BEFORE <= at <= t + ANSWER_AFTER]
+            answered_ += bool(now)
+            said = ", ".join(f"{n} ({'at its cast' if abs(o) < 1 else f'{abs(o):.0f} s '}"
+                             f"{'' if abs(o) < 1 else 'before' if o < 0 else 'after'})" for n, o in now)
+            tip = [f"{name} · {_mmss(t)}"] + ([f"You answer with {said}"] if now else
+                                              ["Your plan has no defensive for this one"] if by else
                                               ["It may target you"] if x.kind == "mech" else [])
             tip += [hint] if hint else []
-            lane.marks.append(Mark(t, icon=x.icon, tip="\n".join(tip), label=_mmss(t)))
+            lane.marks.append(Mark(t, icon=x.icon, tip="\n".join(tip), label=_mmss(t), flag=bool(by) and not now))
+        lane.sub = (f"you: {', '.join(by)}" + (f" ({answered_} of {len(occ)})" if answered_ < len(occ) else "")
+                    if by else "may target you" if key else "in the journal")
         boss_lanes.append(lane)
     boss_lanes.sort(key=lambda b: (b.kind != "key", b.marks[0].t))
     groups: dict[tuple[str, str], Lane] = {}
@@ -696,7 +706,7 @@ def timeline(d) -> Timeline | None:
     merged.sort(key=lambda m: (order.index(m.kind), m.marks[0].t))
     for m in merged:
         if len(m.names) > 1:
-            m.sub = " + ".join(m.names[1:])
+            m.sub = "\n".join(f"+ {n}" for n in m.names[1:])
     kills: dict[str, Lane] = {}
     for w in waves:
         if not w["mine"]:
@@ -739,7 +749,7 @@ def timeline_html(d, tl: Timeline) -> str:
 
     def head(lane: Lane) -> str:
         ics = "".join(_ic(i) for i in lane.icons[:4])
-        sub = f"<small>{e(lane.sub)}</small>" if lane.sub else ""
+        sub = "".join(f"<small>{e(x)}</small>" for x in lane.sub.split("\n")) if lane.sub else ""
         return (f"<span class='lics'>{ics}</span><span class='nm'>{e(lane.names[0])}{sub}</span>"
                 f"<span class='ct'>×{len(lane.marks)}</span>")
     px = TRACK_PX / end
@@ -775,12 +785,13 @@ def timeline_html(d, tl: Timeline) -> str:
                 track += f"<span class='bar k-{lane.kind}' style='left:{x(at)};width:{w(at, m.dur)}'></span>"
             if m.tops is not None:
                 said = f"Most top players press it at about {_mmss(m.tops)}"
-                side = " early" if m.tops < m.t else ""  # its words away from the press's icon
+                side = " late" if m.tops > m.t else ""  # its words away from the press's icon
                 track += (f"<span class='ghost{side}' style='left:{x(m.tops)}'{_tip(said)}><b>tops {_mmss(m.tops)}</b>"
                           "</span>")
             wide = " wide" if m.count else ""
             long = f"<small>{m.dur:.0f} s</small>" if lane.kind == "kill" and m.dur and room > 110 else ""
-            label = f"<span class='tm{wide}'>{m.label}{long}</span>" if room > LABEL_PX else ""
+            last = k + 1 == len(lane.marks)
+            label = f"<span class='tm{wide}'>{m.label}{long}</span>" if room > (40 if last else LABEL_PX) else ""
             track += (f"<span class='ev k-{lane.kind}' style='left:{x(max(0.0, m.t))}'{_tip(m.tip)}>{_ic(m.icon)}"
                       + (f"<b class='n'>{m.count}</b>" if m.count else "")
                       + ("<b class='badge'>!</b>" if m.flag else "")
@@ -789,7 +800,8 @@ def timeline_html(d, tl: Timeline) -> str:
     if tl.boss:
         rows.append("<div class='sec sb'><span>The boss <i>what concerns you</i></span></div>")
     for lane in tl.boss:
-        track = "".join(f"<span class='bm' style='left:{x(m.t)}'{_tip(m.tip)}>{_ic(m.icon)}"
+        track = "".join(f"<span class='bm{' open' if m.flag else ''}' style='left:{x(m.t)}'{_tip(m.tip)}>"
+                        f"{_ic(m.icon)}"
                         + (f"<span class='tm'>{m.label}</span>" if lane.kind == "key" and (
                             (lane.marks[k + 1].t if k + 1 < len(lane.marks) else end) - m.t) * px > 48 else "")
                         + "</span>" for k, m in enumerate(lane.marks))
@@ -883,8 +895,8 @@ def mrt_html(d) -> str:
     if not note:
         return ""
     return (f"<section class='card mrtc'><div class='mrth'><h2>MRT note</h2>{_btn('mrt', 'Copy', cls='btn ghost')}"
-            f"</div><textarea class='mrt-box' id='mrt-text' aria-label='MRT note' readonly wrap='off' "
-            f"rows='{note.count(chr(10)) + 1}'>{e(note)}</textarea></section>")
+            f"</div><textarea class='mrt-box' id='mrt-text' aria-label='MRT note' readonly "
+            f"rows='{sum(1 + len(x) // 60 for x in note.splitlines())}'>{e(note)}</textarea></section>")
 
 
 LIVE_TITLE = " title='Follow the pull live, on a second screen: what to press now and next'"
@@ -921,6 +933,7 @@ def data(d, dur: float) -> dict:
         return max((i for i, p in enumerate(phases) if t >= p[1] - 0.5), default=0)
 
     phase_starts = [s for _n, s, _e in phases[1:]]
+    moves = _moves([(t, x) for t, x in its if x.side == "boss"], dur)  # the repositions the page draws, no other
     acts = [{"t": _t1(t), "n": x.text, "k": x.kind, "ic": x.icon, "d": round(x.dur, 1),
              "c": "" if x.kind == "move" else (_ctx(t, its, x.kind)
                                                or ("default list timing" if x.kind == "cd" else "")),
@@ -935,7 +948,8 @@ def data(d, dur: float) -> dict:
                      "p": ph(t), "ic": x.icon} for t, x in its if x.side == "boss" and x.kind in ANCHORS and t >= 1
                     and not (x.kind != "phase" and any(abs(t - s) <= 1 for s in phase_starts))],
         "boss": [{"t": _t1(t), "d": round(x.dur, 1), "n": x.text, "k": x.kind, "ic": x.icon} for t, x in its
-                 if x.side == "boss" and x.kind not in ("phase",)],
+                 if x.side == "boss" and x.kind not in ("phase",)
+                 and (x.kind != "move" or any(a - 0.5 <= t <= b for a, b in moves))],
     }
 
 

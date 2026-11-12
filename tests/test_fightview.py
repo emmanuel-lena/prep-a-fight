@@ -244,10 +244,14 @@ def test_a_cast_with_every_wave_is_the_wave_s_and_a_defensive_names_what_it_answ
                                                              (121.0, "Feint", "Ravenous Feast")])
     tl = fightview.timeline(d)
     assert [b.names for b in tl.boss] == [["Ravenous Feast"]] and tl.boss[0].sub == "you: Feint"
-    assert [m.tip.splitlines()[1] for m in tl.boss[0].marks] == ["You answer with Feint"] * 2  # each its own
+    assert [m.tip.splitlines()[1] for m in tl.boss[0].marks] == ["You answer with Feint (1 s before)"] * 2  # its own
     assert not any(x.name == "Rouse the Brood" for _t, x in tl.others)
     kill = next(lane for lane in tl.you if lane.kind == "kill")
     assert "Comes with Rouse the Brood (+1 s)" in kill.marks[0].tip
+    monkeypatch.setattr(fightview, "_defensives", lambda d: [(60.0, "Feint", "Ravenous Feast")])  # one of two
+    lane = fightview.timeline(d).boss[0]
+    assert lane.sub == "you: Feint (1 of 2)" and [m.flag for m in lane.marks] == [False, True]
+    assert lane.marks[1].tip.splitlines()[1] == "Your plan has no defensive for this one"
     feint = next(lane for lane in tl.you if lane.kind == "def")
     assert feint.sub == "for Ravenous Feast"
     assert "Feint each Ravenous Feast." in fightview.summary(d, tl)
