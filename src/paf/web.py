@@ -636,7 +636,7 @@ def view_page(key: str, tab: str) -> bytes:
     boss_link = _boss_link(item)
     nav = (f'<label class="side-lab">Your sheets</label><select onchange="location=this.value" aria-label="Your sheets">'
            f'{others}</select><div class="side-links">{tabs}'
-           + (f'<a href="{e(boss_link)}">Edit &amp; re-run</a>' if boss_link else "")
+           + (f'<a href="{e(boss_link)}">Prepare again</a>' if boss_link else "")
            + (f'<a href="/share/{e(key)}">Share</a>' if "prep" in item["files"] else "")
            + f'<a href="{PUBLIC_BASE}{src}" target="_blank">Open alone</a>')
     css = theme.style("view")

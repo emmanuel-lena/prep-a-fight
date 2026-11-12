@@ -5,6 +5,7 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 
 ## Unreleased
 
+- A sheet's "Edit & re-run" link is now "Prepare again".
 ## 0.8.30 (2026-11-12)
 
 - After an update, the app opens again by itself (it closed and stayed closed).
