@@ -155,3 +155,4 @@ table.night th.n{text-align:right}
 .bt-card .glist.items li{grid-template-columns:44px minmax(0,1fr)}
 .bt-card .btn{justify-self:start}
 @media (max-width:900px){.bt-grid{grid-template-columns:minmax(0,1fr)}}
+.bt-hero{margin:0} .bt-hero s{color:var(--muted);text-decoration-color:var(--neg)}

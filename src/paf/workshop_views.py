@@ -775,7 +775,9 @@ def by_targets(d: dict) -> str:
         best = rows[0] if rows and rows[0]["gain"] > 2 * err else None
         if t:
             talents = (f"<div class='bt-h'><b>Talents</b><span class='l-val pos'>{_pct(t['gain'], 1)}</span></div>"
-                       f"{_swaps(t['swaps'], icons)}<small class='muted'>the {e(t['label'])}</small>"
+                       + (f"<p class='bt-hero'>Hero talents: <s>{e(t['hero'][0])}</s> &rarr; <b>{e(t['hero'][1])}"
+                          f"</b></p>" if t.get("hero") else "")
+                       + f"{_swaps(t['swaps'], icons)}<small class='muted'>the {e(t['label'])}</small>"
                        f"<button type='button' class='btn ghost' data-copy='{e(t['code'])}'>Copy the talents</button>")
         else:
             talents = "<div class='bt-h'><b>Talents</b><span class='l-val'>yours</span></div>"

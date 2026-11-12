@@ -104,6 +104,27 @@ def candidates(profile_text: str, cls: str, tops: list[Build], shipped: str | No
     return out
 
 
+def hero_change(mine: frozenset[int], theirs: frozenset[int]) -> tuple[tuple[str, str] | None, set[int]]:
+    """(your hero tree, the build's) when it plays another, and the spell ids of both trees' talents: one line
+    says the switch, not a swap per hero talent (Trickster to Deathstalker: 15 lines)."""
+    from collections import Counter
+
+    from paf.gamedata import hero_trees, talent_entries
+
+    try:
+        trees, entries = hero_trees(), talent_entries()
+    except Exception:  # noqa: BLE001 - without the tree data, every swap is listed
+        return None, set()
+
+    def tree(key: frozenset[int]) -> str:
+        got = Counter(trees[e] for e in key if e in trees).most_common(1)
+        return got[0][0] if got else ""
+    a, b = tree(mine), tree(theirs)
+    if not a or not b or a == b:
+        return None, set()
+    return (a, b), {entries[e][1] for e in mine | theirs if e in trees and e in entries}
+
+
 def best_rows(tc, counts: list[Count]) -> dict[str, object]:
     """Each dummy's build: the best beyond the noise (two sims of this error, at two standard deviations), else
     None (keep yours)."""
@@ -138,9 +159,12 @@ def run(profile_text: str, pool, builds: list[Build], secs: int, run_dir: Path, 
         text = with_talents(profile_text, row.build.code) if row is not None else profile_text
         entry: dict = {"targets": c.targets, "label": c.label, "talents": None}
         if row is not None:
+            hero, hero_spells = hero_change(builds[0].key, row.build.key)
+            swaps = [[list(a) if a else None, list(b) if b else None] for a, b in row.swaps
+                     if not all(t is None or t[1] in hero_spells for t in (a, b))]
             entry["talents"] = {"label": row.build.label, "players": row.build.count, "code": row.build.code,
-                                "gain": row.per_fight[c.fight][0],
-                                "swaps": [[list(a) if a else None, list(b) if b else None] for a, b in row.swaps]}
+                                "gain": row.per_fight[c.fight][0], "hero": list(hero) if hero else None,
+                                "swaps": swaps}
         if pool.candidates:
             log(f"== Gear on {c.label}" + (f", with the {row.build.label}" if row is not None else ""))
             res = run_topgear(text, pool, [FightProfile(c.fight, fights[c.fight])], run_dir / f"gear-{c.targets}",

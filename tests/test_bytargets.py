@@ -69,10 +69,22 @@ def test_the_gear_tool_answers_for_each_target_count_in_cards(monkeypatch, tmp_p
     ring = {"slot": "finger", "items": [{"name": "Band", "ilvl": 289, "item_id": 0, "source": "bags"}]}
     gear = {"error": 0.2, "rows": [{"gain": 1.4, "changes": [ring]}]}
     aoe = {"label": "top players on Coiled Altar", "players": 6, "code": "AOE", "gain": 5.2,
-           "swaps": [[["Ruthlessness", 0], ["Blade Rush", 0]]]}
+           "hero": ["Deathstalker", "Trickster"], "swaps": [[["Ruthlessness", 0], ["Blade Rush", 0]]]}
     page = workshop_views.render({"kind": "gear", "by_targets": {"length": 300, "counts": [
         {"targets": 1, "label": "1 target", "talents": None, "gear": gear},
         {"targets": 2, "label": "2 targets", "talents": None, "gear": gear},
         {"targets": 5, "label": "3+ targets", "talents": aoe, "gear": {"error": 0.2, "rows": []}}]}})
     assert page.count("class='bt-card") == 3 and "Same as 1 target." in page  # 2 targets: nothing new
+    assert "<s>Deathstalker</s> &rarr; <b>Trickster</b>" in page
     assert "Blade Rush" in page and "data-copy='AOE'" in page and "Band" in page and "what you wear" in page
+
+
+def test_another_hero_tree_is_one_line_not_a_swap_per_hero_talent(monkeypatch):
+    # the owner's Rogue on 5 targets (2026-11-12): Deathstalker to Trickster listed 13 hero swaps among 18
+    monkeypatch.setattr("paf.gamedata.hero_trees", lambda: {10: "Deathstalker", 11: "Deathstalker", 20: "Trickster"})
+    monkeypatch.setattr("paf.gamedata.talent_entries", lambda: {10: ("Darkest Night", 110, 0, 0, 0),
+                                                                11: ("Shadewalker", 111, 0, 0, 0),
+                                                                20: ("Unseen Blade", 120, 0, 0, 0)})
+    hero, spells = bytargets.hero_change(frozenset({1, 10, 11}), frozenset({2, 20}))
+    assert hero == ("Deathstalker", "Trickster") and spells == {110, 111, 120}
+    assert bytargets.hero_change(frozenset({1, 10}), frozenset({2, 11}))[0] is None  # the same tree: talents listed
