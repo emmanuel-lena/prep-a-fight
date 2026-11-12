@@ -33,7 +33,7 @@ GROUPS = (("gear", "Your gear and talents"), ("cds", "Your cooldowns and rotatio
 
 TOOLS: tuple[Tool, ...] = (
     Tool("gear", "What to equip, what to farm", "Your /simc on one fight: your best set, then the drops worth farming.",
-         "inv_misc_bag_10", "gear", "15-60", ("boss~", "targets", "length", "difficulty", "goal", "depth", "simc"),
+         "inv_misc_bag_10", "gear", "15-60", ("boss~", "targets+", "length", "difficulty", "goal", "depth", "simc"),
          "Your best set from your bags and vault, then every usable drop of the boss (or the raid) ranked by its "
          "gain on top of it.", needs_prep=False),  # a local Raidbots (the owner, 2026-10-24)
     Tool("topgear", "Best gear from your bags", "Your bags' best set for this boss.",
@@ -198,8 +198,11 @@ def _field(kind: str, encounters: list) -> str:
     if kind == "goal3":
         return _segs("objective", "Your goal", [("boss", "Boss damage", ""), ("total", "Pad the adds", ""),
                                                 ("all", "Both, a plan for each", "")], "all")  # the wizard's words
-    if kind == "targets":  # a training dummy's, as Raidbots asks them (the owner, 2026-10-24)
-        return _segs("targets", "Targets (dummy)", [(str(n), str(n), "") for n in (1, 2, 3, 5, 8)], "1")
+    if kind in ("targets", "targets+"):  # a training dummy's, as Raidbots asks them (the owner, 2026-10-24); the Gear
+        # tool also answers for each count at once (#43)
+        each = [("each", "1 · 2 · 3+", "talents and gear for each target count, one card each")] if kind == "targets+" \
+            else []
+        return _segs("targets", "Targets (dummy)", [(str(n), str(n), "") for n in (1, 2, 3, 5, 8)] + each, "1")
     if kind == "length":
         return _segs("length", "Fight length (dummy)", [("180", "3 min", ""), ("300", "5 min", ""),
                                                          ("420", "7 min", "")], "300")
@@ -266,7 +269,9 @@ def args(cmd: str, form: dict[str, list[str]]) -> list[str] | None:
         out += ["--objective", one("objective")]
     if one("raid"):
         out += ["--raid", one("raid")]
-    if not boss and one("targets") and one("targets") != "1":  # the dummy's options: a boss is its own fight
+    if not boss and one("targets") == "each" and cmd == "gear":  # by target count (#43)
+        out.append("--by-targets")
+    elif not boss and one("targets") and one("targets") not in ("1", "each"):  # a boss is its own fight
         out += ["--targets", one("targets")]
     if not boss and one("length") and one("length") != "300":
         out += ["--length", one("length")]

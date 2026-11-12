@@ -759,9 +759,56 @@ def enchant_table(d: dict) -> str:
             f"{body}</table></div>")
 
 
+def by_targets(d: dict) -> str:
+    """The Gear tool by target count (#43): a card for 1, 2 and 3+ targets, each with only what changes from what you
+    wear, talents first, and its gain; a card that says what the one before it says points to it."""
+    counts = d.get("counts") or []
+    swaps = [p for c in counts for p in (c.get("talents") or {}).get("swaps") or []]
+    icons = _spell_icons(swaps)
+    items = _item_icons([i for c in counts for r in ((c.get("gear") or {}).get("rows") or [])[:1]
+                         for x in r["changes"] for i in x["items"]])
+    cards, before = [], None
+    for c in counts:
+        t = c.get("talents")
+        rows = (c.get("gear") or {}).get("rows") or []
+        err = (c.get("gear") or {}).get("error") or 0.2
+        best = rows[0] if rows and rows[0]["gain"] > 2 * err else None
+        if t:
+            talents = (f"<div class='bt-h'><b>Talents</b><span class='l-val pos'>{_pct(t['gain'], 1)}</span></div>"
+                       f"{_swaps(t['swaps'], icons)}<small class='muted'>the {e(t['label'])}</small>"
+                       f"<button type='button' class='btn ghost' data-copy='{e(t['code'])}'>Copy the talents</button>")
+        else:
+            talents = "<div class='bt-h'><b>Talents</b><span class='l-val'>yours</span></div>"
+        if best:
+            li = "".join(f"<li class='icard'>{_img(items.get(i.get('item_id') or 0, ''))}<span class='l-name'><b>"
+                         f"{e(i['name'] or '?')}</b><small>{e(SLOTS.get(x['slot'], x['slot']))}"
+                         f"{' &middot; ' + str(i['ilvl']) if i.get('ilvl') else ''}</small></span></li>"
+                         for x in best["changes"] for i in x["items"])
+            gear_ = (f"<div class='bt-h'><b>Gear</b><span class='l-val pos'>{_pct(best['gain'], 1)}</span></div>"
+                     f"<ul class='glist items'>{li}</ul>")
+        elif c.get("gear"):
+            gear_ = "<div class='bt-h'><b>Gear</b><span class='l-val'>what you wear</span></div>"
+        else:
+            gear_ = ""
+        said = ((t or {}).get("code"), tuple(str(x["items"]) for x in (best or {}).get("changes") or []))
+        same = before is not None and said == before[1]
+        cards.append(f"<section class='bt-card{' same' if same else ''}'><h3>{e(c['label'])}</h3>"
+                     + (f"<p class='muted'>Same as {e(before[0])}.</p>" if same else talents + gear_)
+                     + "</section>")
+        before = (c["label"], said) if not same else before
+    secs = d.get("length") or 300
+    return (f"<p class='ws-lead'>Simmed on a training dummy, {secs // 60} min, targets alive all fight; 3+ on 5 "
+            f"targets.</p><div class='bt-grid'>{''.join(cards)}</div><p class='ws-fine'>Talents: yours, "
+            f"SimulationCraft's and the top players' builds on the bosses you prepared, one taken beyond the noise "
+            f"only. Gear: your bags and vault, with that card's talents.</p>")
+
+
 def gear(d: dict) -> str:
     """What to equip (Top Gear), then what to farm (the drops on top of that set), on the fight picked."""
     from paf.results import fight_label
+
+    if d.get("by_targets"):
+        return by_targets(d["by_targets"])
 
     def said(name: str) -> str:  # "a training dummy, 1 target 3 min" or the boss's fight ("Nek Zali … Heroic")
         return fight_label(name) if name.startswith("dummy ") else name.replace("-", " ").title()

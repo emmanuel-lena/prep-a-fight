@@ -427,6 +427,8 @@ def cmd_gear(args: argparse.Namespace) -> int:
 
     profile_text, origin = _load_profile(args.profile)
     profile = parse_simc_export(profile_text)
+    if getattr(args, "by_targets", False) and not args.boss:
+        return _gear_by_targets(args, profile_text, profile, origin)
     fights = _gear_fights(args)
     if fights is None:
         return 1
@@ -518,6 +520,57 @@ def cmd_gear(args: argparse.Namespace) -> int:
         run_droptimizer(worn, best_profile, items, fights, root / "farm", ilvl, objective=args.objective)
         out["farm"] = results.loot(items, weights, boss_ev(items, weights), ilvl, [x.name for x in encs])
     results.write(root, "gear", out)
+    print(f"Runs: {root}")
+    return 0
+
+
+def _gear_by_targets(args: argparse.Namespace, profile_text: str, profile, origin: str) -> int:
+    """The Gear tool by target count (#43): the talents, then your set, on a dummy of 1, 2 and 3+ targets."""
+    import sqlite3
+
+    from paf import bytargets, results, simc
+    from paf.corpus import db
+    from paf.gamedata import item_inventory_types, item_sets
+    from paf.profile import wcl_class_spec
+    from paf.specgear import bundled_talents
+    from paf.topgear import GearPool
+    from paf.wcl import WCLClient
+
+    cs = wcl_class_spec(profile)
+    if cs is None:
+        print("This profile has no class and spec: export /simc again.")
+        return 1
+    cls, spec = cs
+    secs = args.length or 300
+    root = simc.new_run_dir(label="gear-targets")
+    print(f"{profile.name} ({origin}); training dummies of 1, 2 and 3+ targets, {secs // 60} min")
+    tops: list = []
+    path = db.db_path(cls, spec)
+    if path.is_file():  # the top players' builds on the bosses you prepared
+        try:
+            from paf.encounters import raid_encounters
+            from paf.talent_sim import fetch_codes
+
+            client = WCLClient()
+            try:
+                bosses = {x.id: x.name for x in raid_encounters(client)}
+            except Exception:  # noqa: BLE001 - offline: the bosses by number
+                bosses = {}
+            con = sqlite3.connect(path)
+            con.row_factory = sqlite3.Row
+            tops = bytargets.corpus_builds(con, spec, bosses, fetch=lambda bs: fetch_codes(client, con, bs))
+        except Exception as ex:  # noqa: BLE001 - yours and simc's builds still compare
+            print(f"  the top players' builds could not be read: {str(ex)[:120]}")
+    builds = bytargets.candidates(profile_text, cls, tops, bundled_talents(cls, spec))
+    pool = GearPool(profile, item_inventory_types(), item_sets())
+    if not pool.candidates:
+        print("No items in bags or vault: the talents only (export /simc with its bags for the gear).")
+    out = bytargets.run(profile_text, pool, builds, secs, root, max_combos=args.max_combos, objective=args.objective,
+                        log=lambda m: print(m, flush=True))
+    print("By target count:")
+    for line in bytargets.summary(out):
+        print(line)
+    results.write(root, "gear", {"by_targets": out})
     print(f"Runs: {root}")
     return 0
 
@@ -2943,6 +2996,8 @@ def build_parser() -> argparse.ArgumentParser:
     ge.add_argument("--objective", type=_objective, default=0.0)
     ge.add_argument("--profile", help="simc profile (default: your character's)")
     ge.add_argument("--max-combos", type=int, default=1500)
+    ge.add_argument("--by-targets", action="store_true",
+                    help="no boss: talents and gear for a dummy of 1, 2 and 3+ targets, one answer each")
     ge.add_argument("--thorough", action="store_true",
                     help="more items kept, 20000 sets, the best ones at a fine error, then a local search (up to an "
                          "hour on a desktop)")

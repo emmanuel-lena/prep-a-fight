@@ -145,3 +145,13 @@ table.night th.n{text-align:right}
 .st{font-style:normal;font-weight:700;margin-left:2px} .st.go{color:var(--accent)} .st.ok{color:var(--pos)} .st.warn{color:var(--neg)}
 .who-chip.st-go{border-color:var(--accent)} .roster-key{display:flex;flex-wrap:wrap;gap:4px 14px}
 .st.away{color:var(--muted);font-weight:600} .who-chip.st-away{opacity:.75}
+/* the Gear tool by target count (#43): a card per count, side by side */
+.bt-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0}
+.bt-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;
+  gap:10px;align-content:start}
+.bt-card h3{margin:0;font-size:1.15rem}
+.bt-card.same{opacity:.7}
+.bt-h{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);padding-top:10px}
+.bt-card .glist.items li{grid-template-columns:44px minmax(0,1fr)}
+.bt-card .btn{justify-self:start}
+@media (max-width:900px){.bt-grid{grid-template-columns:minmax(0,1fr)}}
