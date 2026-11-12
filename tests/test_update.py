@@ -61,3 +61,14 @@ def test_the_app_knows_its_own_version():
 
     project = tomllib.loads((Path(__file__).parent.parent / "pyproject.toml").read_text(encoding="utf-8"))
     assert paf.__version__ == project["project"]["version"]
+
+
+def test_the_app_reopens_once_the_installer_is_done(tmp_path):
+    # the owner, 2026-11-12: "when I update, paf closes and never comes back"
+    from paf import update
+
+    cmd = update.relaunch_command(4242, tmp_path / "O'Brien" / "prep-a-fight")
+    assert cmd[0] == "powershell.exe" and "Hidden" in cmd
+    script = cmd[-1]
+    assert script.startswith("Wait-Process -Id 4242 ")
+    assert "O''Brien" in script and "pythonw.exe' -ArgumentList '-m','paf.desktop'" in script

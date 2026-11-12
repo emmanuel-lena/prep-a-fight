@@ -113,11 +113,25 @@ def download(rel: Release) -> Path:
 
 
 def run_installer(setup: Path, folder: Path) -> None:
-    """Start the installer over this install, detached; it closes nothing itself (the app quits right after)
-    and relaunches the app when done."""
+    """Start the installer over this install, detached; it closes nothing itself (the app quits right after).
+    The app reopens from a watcher, not from the installer (the owner, 2026-11-12: "it closes and never comes
+    back"): a hidden PowerShell that waits for the installer to end, then starts the app from its new files. The
+    installer writes its log next to the download (updates/setup.log) to say why when it fails."""
     flags = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
-    subprocess.Popen([str(setup), "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", f"/DIR={folder}", "/RELAUNCH=1"],
-                     creationflags=flags, close_fds=True)
+    log = setup.parent / "setup.log"
+    proc = subprocess.Popen([str(setup), "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", f"/DIR={folder}",
+                             f"/LOG={log}"], creationflags=flags, close_fds=True)
+    subprocess.Popen(relaunch_command(proc.pid, folder), creationflags=flags, close_fds=True)  # no console: no window
+
+
+def relaunch_command(pid: int, folder: Path) -> list[str]:
+    """PowerShell (outside the install folder: it locks none of the files the installer replaces): wait for the
+    installer, then open the app as its shortcut does."""
+    exe = str(folder / "python" / "pythonw.exe").replace("'", "''")
+    script = (f"Wait-Process -Id {pid} -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; "
+              f"Start-Process -FilePath '{exe}' -ArgumentList '-m','paf.desktop' "
+              "-WorkingDirectory ([Environment]::GetFolderPath('MyDocuments'))")
+    return ["powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script]
 
 
 STATE: dict = {"release": None}

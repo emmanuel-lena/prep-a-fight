@@ -61,7 +61,7 @@ Name: "{autodesktop}\prep-a-fight"; Filename: "{app}\python\pythonw.exe"; Parame
 [Run]
 Filename: "{app}\python\pythonw.exe"; Parameters: "-m paf.desktop"; WorkingDir: "{userdocs}"; \
   Description: "{cm:LaunchProgram,prep-a-fight}"; Flags: nowait postinstall skipifsilent
-; an update started from the app (/RELAUNCH=1) reopens it
+; an update started by an app of 0.8.29 or older (/RELAUNCH=1) reopens it; newer apps reopen themselves (paf.update)
 Filename: "{app}\python\pythonw.exe"; Parameters: "-m paf.desktop"; WorkingDir: "{userdocs}"; Flags: nowait; \
   Check: RelaunchRequested
 

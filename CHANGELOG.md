@@ -5,6 +5,8 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 
 ## Unreleased
 
+- After an update, the app opens again by itself (it closed and stayed closed).
+
 ## 0.8.29 (2026-11-12)
 
 - The opener reads as a guide writes it: what you cast before the pull, then your presses in order, numbered, to
