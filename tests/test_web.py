@@ -375,3 +375,24 @@ def test_the_boss_page_opens_on_the_fight_strip(monkeypatch, tmp_path):
     assert "&#215;6" in strip and "&#215;14" in strip and "boss away 1:41 to 2:40" in strip
     assert "Bloodlust at 0:00" in strip and ">4:15<" in strip
     assert "aria-label='In a 4:15 kill: adds at 0:52, 2:47; the boss away 1:41 to 2:40.'" in strip
+
+
+def test_the_boss_page_is_its_guide_alone(tmp_path, monkeypatch):
+    # the owner, 2026-11-12: "a big wall"; no goal to pick ("a player always says pad the adds"), the raid's log
+    # decides; the journal and the plan on their own page
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+
+    class Enc:
+        id, name = 7, "Boss"
+
+    monkeypatch.setattr("paf.encounters.raid_encounters", lambda client: [Enc()])
+    monkeypatch.setattr("paf.wcl.WCLClient", lambda: None)
+    monkeypatch.setattr(web, "fight_has_no_adds", lambda *a: False)
+    html = web.boss_page("7", "heroic").decode()
+    assert "Your goal on this boss" not in html and "Pad the adds" not in html
+    assert '<input type="hidden" name="goal" value="auto">' in html
+    assert "Every ability, from the Encounter Journal" not in html and "Your fight plan" not in html
+    assert 'data-step="assigns"' not in html and "Step <b>1</b> of 2" in html  # no mechanics known: no step for them
+    assert "/boss?boss=7&amp;difficulty=heroic&amp;info=1" in html
+    info = web.boss_page("7", "heroic", info=True).decode()
+    assert "Your fight plan" in info and 'name="goal"' not in info

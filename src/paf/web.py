@@ -1255,7 +1255,9 @@ if(s&&b)s.addEventListener('change',function(){{b.textContent=s.options[s.select
 {last}{board}{mine}"""
 
 
-def boss_page(boss_id: str, difficulty: str) -> bytes:
+def boss_page(boss_id: str, difficulty: str, info: bool = False) -> bytes:
+    """A boss before its prep: a guide of three steps, alone on the page (the owner, 2026-11-12: "a big wall"; the
+    step by step bigger, the rest not there at first); `info`: the boss's journal and what you know of it."""
     from paf.assigns import load_mechanics
     from paf.corpus import db
     from paf.encounters import raid_encounters
@@ -1289,10 +1291,8 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
             at = f", around {e(when)}" if when else ""  # the times shown, not hidden in a tooltip
             chips += (f'<label class="chip"><input type="checkbox" name="assign" value="{e(m.name)}"'
                       f'{checked}>{e(m.name)} <span class="meta">{what}{cost}{at}</span></label>')
-        label = f"{spec} {settings.get('class') or ''}".strip()  # "Subtlety Rogue", as everywhere else
-        article = "an" if label[:1].lower() in "aeiou" else "a"
-        assigns = (f'<p class="small muted">Tick what you handle on this fight. Timings and the movement it costs '
-                   f'{article} {e(label)} come from the logs, with when each one happens.</p>'
+        assigns = ('<p class="small muted">Tick what you handle. When it happens and what it costs you come from '
+                   'the logs.</p>'
                    f'<div class="chips">{chips}</div>')
     elif kills:
         assigns = ('<p class="muted small">The mechanics are collected during the first prep (about 2 quota points '
@@ -1341,51 +1341,52 @@ def boss_page(boss_id: str, difficulty: str) -> bytes:
         est = estimate.plan(con, enc.id, diff, settings.get("class"), spec, WCLClient())
     except Exception:  # noqa: BLE001 - an estimate never breaks the page
         est = None
-    raid_now = current_raid(enc, difficulty)
+    raid_now, found = current_raid(enc, difficulty), ""
+    if not raid_now:  # your last guild raid, found at launch (paf.lastraid): the log decides by default
+        try:
+            from paf import characters as chars_
+            from paf import lastraid
+
+            cur = lastraid.load().get(chars_.current_slug()) or {}
+            if cur.get("report"):
+                raid_now = lastraid.URL.format(cur["report"])
+                found = time.strftime("%a %d %b", time.localtime(cur.get("date") or 0))
+        except Exception:  # noqa: BLE001 - none found: the field stays empty
+            pass
     g = settings.get("guild")
     raid_said = f"the latest public log of {g}" if g else ""
     nxt = "<button type='button' class='btn go next'>Next &rarr;</button>"
     back = "<button type='button' class='btn ghost prev'>&larr; Previous step</button>"  # not the sidebar's Back
     no_adds = fight_has_no_adds(enc, diff, difficulty, spec)  # a boss without adds has nothing to pad (Sszorak)
-    if no_adds:
-        goal_html = ('<section class="ob-step" data-step="goal"><h2><span class="vh">Step 1 of 4: </span>Your goal on this boss</h2>'
-                     '<p>No adds on this boss: the prep plays for <b>boss damage</b>.</p>'
-                     '<input type="hidden" name="goal" value="boss">'
-                     f'<div class="ob-actions">{nxt}</div></section>')
-    else:  # each goal its glyph: the boss's face, a whirlwind for the adds, the raid's (fresh app review 4)
-        from paf import icons
-
-        boss_ic = (f"<img class='goal-ic' src='/bossimg/{enc.id}.png' alt='' "
-                   "onerror=\"this.style.visibility='hidden'\">")
-        pad_ic = icons.img("ability_warrior_bladestorm", "medium", "goal-ic")
-        raid_ic = icons.img("inv_misc_groupneedmore", "medium", "goal-ic")
-        goal_html = ('<section class="ob-step" data-step="goal"><h2><span class="vh">Step 1 of 4: </span>Your goal on this boss</h2>'
-                     '<div class="goals">' + f"""<label class="goal"><input type="radio" name="goal" value="boss"><span><b>{boss_ic}Boss damage</b>
-<small>cooldowns and gear for the boss</small></span></label>
-<label class="goal"><input type="radio" name="goal" value="total"><span><b>{pad_ic}Pad the adds</b>
-<small>for total damage</small></span></label>
-<label class="goal"><input type="radio" name="goal" value="auto" checked><span><b>{raid_ic}Let my raid decide</b>
-<small>from your raid's log</small></span></label>
-""" + f'</div><div class="ob-actions">{nxt}</div></section>')
+    # no goal to pick (the owner, 2026-11-12: "asked, a player always says pad the adds"): the raid's log decides
+    goal = "boss" if no_adds else "auto"
     est_badge = (f"<p class='est-badge' title='{e(est.lead)}'>&#9201; {e(est.badge)}</p>" if est else "")
-    body = f"""<div class="boss-cols"><div class="boss-main"><h1>{e(enc.name)} {diff_pill(difficulty)}</h1>
-{fight_strip(enc, difficulty) or f'<p class="lead">{boss_line(enc, difficulty)}</p>'}{est_badge}{f'<p class="last-sheet">{last.strip()}</p>' if last.strip() else ""}
-<form method="post" action="/prep" class="ob story" data-boss="{enc.id}-{e(difficulty)}">
-<input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
-<div class="ob-where" aria-hidden="true"><ol class="ob-dots"><li></li><li></li><li></li><li></li></ol><span class="ob-n">Step <b>1</b> of 4</span></div>
-{goal_html}
-<section class="ob-step" data-step="assigns"><h2><span class="vh">Step 2 of 4: </span>Are you assigned to something?</h2>{assigns}
-<p class="small muted ob-note">Each assignment is simulated: its moves and its downtime change your cooldown plan and your gear.</p>
-<div class="ob-actions">{back}{nxt}</div></section>
-<section class="ob-step" data-step="raid"><h2><span class="vh">Step 3 of 4: </span>Your raid</h2>
-<label class="ob-field">Your raid's log<input name="raid" type="url" value="{e(raid_now)}" aria-describedby="raid-help"
+    here = f"/boss?boss={enc.id}&amp;difficulty={e(difficulty)}"
+    if info:
+        body = f"""<p class="crumb"><a href="{here}">&larr; Prepare {e(enc.name)}</a></p>
+<div class="boss-cols"><div class="boss-main"><h1>{e(enc.name)} {diff_pill(difficulty)}</h1>
+{fight_strip(enc, difficulty) or f'<p class="lead">{boss_line(enc, difficulty)}</p>'}</div>
+{(f"<aside class='boss-guide'>{guide}</aside>") if guide else ""}</div>{journal}
+<h2>What you know that the logs cannot <span class="pill">optional</span></h2>
+<section class="adv"><h3>Your fight plan: your own movements, Bloodlust, Power Infusion</h3>
+{plan_block(enc, difficulty)}</section>
+<section class="adv"><h3>What you know about this boss: damage amps, targets to ignore</h3>
+{notes_block(enc, difficulty)}</section>"""
+        return page(enc.name, body)
+    more = (f"<p class='boss-more'><a href='{here}&amp;info=1'>The boss's abilities, and what you know that the logs "
+            "cannot (your own moves, Bloodlust) &rarr;</a></p>")
+    # the steps: an assignment step only when the logs gave this boss's mechanics (nothing to tick otherwise)
+    steps = [("raid", f"""<h2>Your raid's log</h2>
+<label class="ob-field">Paste its Warcraft Logs link<input name="raid" type="url" value="{e(raid_now)}" aria-describedby="raid-help"
 placeholder="https://www.warcraftlogs.com/reports/..."></label>
-<p class="small muted raid-help" id="raid-help" aria-live="polite">{e(raid_hint(no_adds))}</p>
-<div class="ob-actions">{back}{nxt}</div></section>
-<section class="ob-step" data-step="go"><h2><span class="vh">Step 4 of 4: </span>Ready to prepare</h2>
+<p class="small muted raid-help" id="raid-help" aria-live="polite">{e(raid_hint(no_adds, found))}</p>""")]
+    if mechs:
+        steps.append(("assigns", f"""<h2>Are you assigned to something?</h2>{assigns}
+<p class="small muted ob-note">Each assignment is simulated: its moves change your cooldown plan and your gear.</p>"""))
+    steps.append(("go", f"""<h2>Ready to prepare</h2>
 <ul class="recap">
-<li data-if="goal=boss">For <b>boss damage</b>.</li><li data-if="goal=total">For <b>total damage</b> (pad the adds).</li>
-<li data-if="goal=auto">Your raid's log decides between boss damage and padding.</li>
+<li data-if="goal=boss">For <b>boss damage</b>: no adds on this boss.</li>
+<li data-if="goal=auto">Your raid's log decides between boss damage and padding the adds.</li>
 <li data-if="assigns"><span class="recap-assigns-lab">With your assignments:</span> <b class="recap-assigns"></b></li>
 <li data-if="no-assigns">No assignment.</li>
 <li data-if="raid">Your raid: <b class="recap-raid"></b></li>
@@ -1393,19 +1394,27 @@ placeholder="https://www.warcraftlogs.com/reports/..."></label>
 </ul>
 <fieldset class="what-sim"><legend>What to sim</legend>
 <label><input type="checkbox" name="gear" checked><span>Best gear from your bags, and what this boss drops for you</span></label>
-<label><input type="checkbox" name="optimize" checked><span>Ideal cooldown plan{" for boss damage" if no_adds else " for your goal"}
-<span class="muted small">(the slowest part: 20 to 40 min the first time; the estimate above comes from this computer's last preps, faster when their sims are reused)</span></span></label><p class="small muted sim-none" hidden>Both off: the prep still gives the fight view, the boss journal and your talents, without a gear or cooldown plan.</p></fieldset>
-<div class="ob-actions">{back}<button class="btn go" aria-describedby="go-why">Prepare this fight &rarr;</button><span class="go-why" id="go-why" hidden>Fix
-the raid log link (step 3) or leave it empty first.</span></div>
-<p class="small muted ob-note">Runs on your computer; you can follow it live.</p></section>
-</form></div>
-{(f"<aside class='boss-guide'>{guide}</aside>") if guide else ""}</div>{journal}
-{_story_css()}{STORY_JS}
-<h2>What you know that the logs cannot <span class="pill">optional</span></h2>
-<section class="adv"><h3>Your fight plan: your own movements, Bloodlust, Power Infusion</h3>
-{plan_block(enc, difficulty)}</section>
-<section class="adv"><h3>What you know about this boss: damage amps, targets to ignore</h3>
-{notes_block(enc, difficulty)}</section>"""
+<label><input type="checkbox" name="optimize" checked><span>Ideal cooldown plan <span class="muted small">(the slowest part: 20 to 40 min the first time)</span></span></label>
+<p class="small muted sim-none" hidden>Both off: the prep still gives the fight view, the boss journal and your talents.</p></fieldset>"""))
+    if not mechs:  # no assignment step: nothing to recap of it
+        steps[-1] = ("go", steps[-1][1].replace('<li data-if="no-assigns">No assignment.</li>\n', ""))
+    n = len(steps)
+    html_steps = ""
+    for k, (key, inner) in enumerate(steps):
+        acts = (back if k else "") + (nxt if key != "go" else "<button class='btn go' aria-describedby='go-why'>Prepare "
+                                       "this fight &rarr;</button><span class='go-why' id='go-why' hidden>Fix the raid "
+                                       "log link (step 1) or leave it empty first.</span>")
+        html_steps += (f'<section class="ob-step" data-step="{key}">'
+                       + inner.replace("<h2>", f'<h2><span class="vh">Step {k + 1} of {n}: </span>', 1)
+                       + f'<div class="ob-actions">{acts}</div></section>\n')
+    body = f"""<div class="boss-wizard"><h1>{e(enc.name)} {diff_pill(difficulty)}</h1>
+<div class="boss-meta">{est_badge}{f'<p class="last-sheet">{last.strip()}</p>' if last.strip() else ""}</div>
+<form method="post" action="/prep" class="ob story" data-boss="{enc.id}-{e(difficulty)}">
+<input type="hidden" name="boss" value="{enc.id}"><input type="hidden" name="difficulty" value="{e(difficulty)}">
+<input type="hidden" name="goal" value="{goal}">
+<div class="ob-where" aria-hidden="true"><ol class="ob-dots">{"<li></li>" * n}</ol><span class="ob-n">Step <b>1</b> of {n}</span></div>
+{html_steps}</form>{more}</div>
+{_story_css()}{STORY_JS}"""
     return page(enc.name, body)
 
 
@@ -1628,16 +1637,13 @@ def current_raid(enc, difficulty: str) -> str:
         return ""
 
 
-def raid_hint(no_adds: bool = False) -> str:
+def raid_hint(no_adds: bool = False, found: str = "") -> str:
+    """What the raid's log does, in two short sentences (the owner, 2026-11-12: less text)."""
     g = settings.get("guild")
-    if no_adds:  # nothing to pad: the log says how your last pull compares
-        return ((f"Left empty, the latest public log of {g} is used. " if g else "Optional. ")
-                + "The log shows how your last pull compares with the top players' pulls.")
-    what = ("The log shows who plays what in your raid and how your last pull compares with the top players' pulls; "
-            "with \"Let my raid decide\", it also decides between padding the adds and the boss.")
-    if g:
-        return f"Left empty, the latest public log of {g} is used. {what}"
-    return f"Optional. {what} Or set your guild once on the home page."
+    src = (f"Your last guild raid ({found}), found by the app." if found else
+           f"Left empty: the latest log of {g}." if g else "Optional: left empty, you get both plans.")
+    return src + (" It compares your last pull with the top players'." if no_adds else
+                  " It decides between padding the adds and the boss.")
 
 
 def write_raid(boss_id: int, difficulty: str, url: str) -> None:
@@ -2025,7 +2031,8 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/raid/strip":
                 self._send(queue_strip(settings.get("difficulty")).encode(), ctype="text/html; charset=utf-8")
             elif url.path == "/boss":
-                self._send(boss_page(q.get("boss", ""), q.get("difficulty", settings.get("difficulty"))))
+                self._send(boss_page(q.get("boss", ""), q.get("difficulty", settings.get("difficulty")),
+                                     info=bool(q.get("info"))))
             elif url.path == "/reclear":
                 self._send(page("Reclear", reclear_page()))
             elif url.path == "/tools":
@@ -2152,7 +2159,7 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 enc = next(x for x in raid_encounters(WCLClient()) if x.id == boss_id)
                 notes_path(template_path(enc.name, difficulty)).write_text(text, encoding="utf-8")
-                self._redirect(f"/boss?boss={boss_id}&difficulty={difficulty}")
+                self._redirect(f"/boss?boss={boss_id}&difficulty={difficulty}&info=1")  # back where it was saved
             elif self.path.startswith("/tool/"):
                 from paf import workshop
                 from paf.webtools import tool_args
@@ -2258,7 +2265,7 @@ class Handler(BaseHTTPRequestHandler):
                 p = _plan_path(enc, difficulty)
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text(text, encoding="utf-8")
-                self._redirect(f"/boss?boss={boss_id}&difficulty={difficulty}")
+                self._redirect(f"/boss?boss={boss_id}&difficulty={difficulty}&info=1")  # back where it was saved
             elif self.path == "/raid/prepare":
                 from paf import characters, raidqueue
 
