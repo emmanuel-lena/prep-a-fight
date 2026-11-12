@@ -349,7 +349,7 @@ def run_topgear(profile_text: str, pool: GearPool, fights: list[FightProfile], r
 
 RACE_FROM = 12  # combinations: past this many, pass 2 races (a coarse error first)
 RACE_COARSE = 2.0  # the coarse error is this many times the asked one: a quarter of the iterations
-RACE_KEEP = 25  # contenders simmed again at the asked error, at most
+RACE_KEEP = 12  # contenders simmed again at the asked error, at most (more within the noise: equivalent sets)
 
 
 def race(combos: list[Combo], error: float, score, weights: dict[str, float], log: Callable[[str], None] = print
