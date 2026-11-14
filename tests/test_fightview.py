@@ -61,11 +61,19 @@ def test_movement_is_a_bar_not_an_event(monkeypatch):
     d = sheet(monkeypatch)
     d.movement = Movement(windows=[Window(100.0, 15.0, [("Shadowstep", 0.8)])])
     tl = fightview.timeline(d)
-    assert tl.moves == [[100.0, 115.0]] and any(lane.kind == "move" and lane.names == ["Shadowstep"]
-                                                for lane in tl.you)
+    assert [m[:2] for m in tl.moves] == [(100.0, 115.0)] and any(lane.kind == "move" and lane.names == ["Shadowstep"]
+                                                                 for lane in tl.you)
     data = json.loads(re.search(r"var FV=(\{.*?\});</script>", fightview.html(d)).group(1))
     assert not any(a["k"] == "move" for a in data["anchors"])
-    assert "Everyone moves · 1:40 to 1:55" in fightview.html(d)
+    assert "The top players move 1:40 to 1:55 (15 s)\nNo boss spell starts it" in fightview.html(d)
+    assert "Everyone moves" not in fightview.html(d)  # the owner (2026-11-14): "everyone moves" says nothing
+    d.movement = Movement(windows=[Window(158.0, 10.0, [])])  # Soul Transfer cast at 2:40 starts it
+    page = fightview.html(d)
+    soul = next(lane for lane in fightview.timeline(d).boss if lane.names == ["Soul Transfer"])  # its own lane
+    assert soul.sub == "you move 10 s (1 of 2)" and fightview.timeline(d).moves == []
+    assert "You move 2:38 to 2:48 (10 s), as the top players do" in soul.marks[1].tip and soul.marks[0].move is None
+    data = json.loads(re.search(r"var FV=(\{.*?\});</script>", page).group(1))
+    assert [b["n"] for b in data["boss"] if b["k"] == "move"] == ["Move for Soul Transfer"]
     d.movement = Movement(windows=[Window(60.0, 104.0, [])])  # the boss kited around for 104 s: the fight's rhythm
     assert fightview.timeline(d).moves == []
 

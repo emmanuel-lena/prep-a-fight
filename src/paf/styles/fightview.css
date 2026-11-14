@@ -155,7 +155,6 @@
 .fv .ftl .tr{position:relative;height:30px}
 .fv .ftl .r.you{min-height:32px} .fv .ftl .r.you .tr{height:auto;min-height:32px;align-self:stretch}
 .fv .ftl .r.you:nth-child(odd) .tr,.fv .ftl .r.you:nth-child(odd) .g{background:var(--row,color-mix(in srgb,var(--surface-2) 45%,transparent))}
-.fv .ftl .r.thin,.fv .ftl .r.thin .tr{min-height:16px;height:16px}
 .fv .ftl .r.boss .nm{font-weight:500;font-size:12.5px}
 .fv .ftl .r.boss.m .g{opacity:.78}
 .fv .ftl .r.ticks,.fv .ftl .r.ticks .tr{min-height:22px;height:22px}
@@ -174,7 +173,13 @@
 .fv .ftl .win em{font:500 11px var(--font-data);font-style:normal;color:var(--muted)}
 .fv .ftl .win.lust{background:color-mix(in srgb,var(--lust) 22%,transparent);border:1px solid color-mix(in srgb,var(--lust) 60%,transparent)}
 .fv .ftl .win.imm{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--muted) 22%,transparent) 0 5px,transparent 5px 10px);border:1px solid color-mix(in srgb,var(--muted) 45%,transparent)}
-.fv .ftl .mv{position:absolute;top:6px;height:4px;border-radius:2px;background:repeating-linear-gradient(90deg,var(--muted) 0 4px,transparent 4px 7px);opacity:.75}
+/* a move: the dashed bar as long as it lasts, then the boss spell that starts it */
+.fv .ftl .r.mvr,.fv .ftl .r.mvr .tr{min-height:24px;height:24px}
+.fv .ftl .mvw{position:absolute;top:2px;bottom:2px;display:flex;align-items:center;gap:5px;overflow:hidden;white-space:nowrap;font:500 11.5px/1 var(--font-body);color:var(--fg)}
+.fv .ftl .mvw .ic{width:16px;height:16px;border-radius:3px;flex:none}
+.fv .ftl .mvw span{overflow:hidden;text-overflow:ellipsis}
+.fv .ftl .mv{flex:none;height:4px;border-radius:2px;background:repeating-linear-gradient(90deg,var(--muted) 0 4px,transparent 4px 7px)}
+.fv .ftl .r.boss .mv{position:absolute;bottom:3px}
 /* your marks: an icon at the press, a bar as long as it lasts, its time beside */
 .fv .ftl .ev{position:absolute;top:50%;transform:translateY(-50%);height:24px;display:flex;align-items:center;z-index:1}
 .fv .ftl .ev .ic{width:24px;height:24px;border-radius:4px;box-shadow:0 0 0 1px #000,0 0 0 2.5px var(--kc)}
@@ -240,7 +245,7 @@
 .fv .btn#ss-sound[aria-pressed="true"]::after{content:" on"/"";color:var(--fg)}
 body.playing .fv #play.btn.primary{background:var(--surface-2);color:var(--fg);border-color:var(--line)}
 .fv .lv-tl{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
-.fv .lv-tl .r.boss,.fv .lv-tl .r.thin,.fv .lv-tl .sec.sb{display:none}
+.fv .lv-tl .r.boss,.fv .lv-tl .r.mvr,.fv .lv-tl .sec.sb{display:none}
 .fv .lv-tl .ftl{--gut:180px}
 .fv .lv-main{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);gap:18px;align-items:start}
 .fv .lv-now{display:grid;gap:10px}

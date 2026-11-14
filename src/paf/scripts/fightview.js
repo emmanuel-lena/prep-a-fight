@@ -157,7 +157,7 @@
     var moves = on.filter(function (b) { return b.k === 'move'; }).sort(function (a, b) { return until(b) - until(a); });
     on = on.filter(function (b) { return b.k !== 'move' || b === moves[0]; });  // overlapping moves: the longest
     return on.length ? on.map(function (b) {
-      if (b.k === 'move') return 'Moving until ' + mmss(moveEnd(b));
+      if (b.k === 'move') return b.n + ' until ' + mmss(moveEnd(b));
       if (b.k === 'immune') return waiting(b.t) ? 'Intermission due: the boss goes immune any moment' : 'Boss immune, back in ' + secs(until(b) - t);
       return b.n;
     }).join(' · ') : '—';
@@ -343,7 +343,7 @@
     groups.forEach(function (g) { out.push(bar(g.e, t, 'mine', g.ic, 'You', g.n.join(' + '))); });
     B.forEach(function (b) {  // the moves to come: a boss mod shows them too
       var e = eff(b.t);
-      if (b.k === 'move' && b.d >= 5 && !gone(b.t) && e >= t - 0.5 && e <= t + 60) out.push(bar(e, t, 'boss', b.ic || '', 'Boss', 'Movement, ' + Math.round(b.d) + ' s'));
+      if (b.k === 'move' && b.d >= 5 && !gone(b.t) && e >= t - 0.5 && e <= t + 60) out.push(bar(e, t, 'boss', b.ic || '', 'Boss', b.n + ', ' + Math.round(b.d) + ' s'));
     });
     N.forEach(function (a) {
       var e = eff(a.t);

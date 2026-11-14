@@ -11,8 +11,8 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
   cooldown plan knows you are free at the others.
 - A sheet's "Edit & re-run" link is now "Prepare again".
 - The fight tab is redone: the whole pull on one screen, a lane per spell of yours with bars as long as they last,
-  the adds you kill, then only the boss spells that concern you (one you answer, one that may target you, one the
-  journal names); a sentence on top says when you burst. Below: where your plan and the top players differ, and the
+  the adds you kill, then only the boss spells that concern you (one you answer, one that makes you move, with the
+  move under its icon, one that may target you, one the journal names); a sentence on top says when you burst. Below: where your plan and the top players differ, and the
   MRT note. Following the pull live is one button (L): a big clock, what to press now, what comes next.
 - Gear, without a boss: a new "1 · 2 · 3+" target choice answers for each target count at once, a card each: the
   talents to play (yours, SimulationCraft's, or the top players' builds on the bosses you prepared, taken only beyond
