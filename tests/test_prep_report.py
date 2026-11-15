@@ -293,7 +293,9 @@ def test_the_adds_to_kill_render_as_a_table():
     d.waves = [(52.0, 6, 18.0, "Restless Amani"), (73.0, 1, 75.0, "Echo of Jawae")]  # a unit no action names
     page = render(d)
     assert "Echo of Jawae</td><td class='n'>&times;1</td>" in page and "Kill the Echo of Jawae" not in page
-    assert "<table class='kills fit'>" in page and "&times;21" in page and "19 s" in page and "width:23%" in page
+    assert "<table class='kills fit'>" in page and "19 s" in page and "width:23%" in page
+    # as many as the fight tab's waves of the median kill, not the mean of every kill (a review: x14 beside "15 adds")
+    assert ">in 4:15</th>" in page and "Restless Amani</td><td class='n'>&times;6</td>" in page
     assert "Kill the Odd Add whenever it comes." in page  # a line the table cannot read keeps its words
 
 
@@ -319,3 +321,24 @@ def test_actions_read_as_a_short_muted_line():
     assert "stays ~3 min" in jawae and "leave it" in jawae
     odd = action_row(d, Action("contact", "X", "X: handled by contact."))
     assert "X: handled by contact." in odd and "title=" not in odd
+
+
+def test_a_unit_whose_cast_is_kicked_is_not_called_a_soak():
+    # The Twin Fangs, Subtlety (a fresh review): "Units handled by contact (soak)" said the top raids do not damage
+    # the Broodling while Interrupts said "Visceral Burst ~50 kicks a kill, your job" (its cast)
+    from paf.actions import Action
+
+    d = PrepData("The Twin Fangs", "mythic", "Subtlety", "Char", duration=366)
+    d.guide_summary = "<div class='guide'><p>x</p></div>"
+    brood = Action("contact", "Broodling", "Broodling: the top raids do not damage it; players get its debuffs "
+                   "instead: Visceral Burst (~2 per kill). It is handled by contact (soak / breaking it), not by "
+                   "damage.")
+    kick = Action("interrupt", "Visceral Burst", "Interrupt Visceral Burst: top Subtlety players kick it in 34% of the "
+                  "kills (~50 kicks per kill), far more than one player in twenty would: it is part of your job.")
+    d.actions = [brood, kick]
+    boss = render(d).split('id="boss"', 1)[1].split("</section>", 1)[0]
+    assert "Units to kick, not kill" in boss and "(soak)" not in boss and "soak" not in boss
+    assert "<b>Broodling</b> <span class='muted small'>kick its cast (Visceral Burst), don&#x27;t kill it" in boss
+    d.actions = [brood]  # nobody kicks it: handled by contact, said shortly
+    boss = render(d).split('id="boss"', 1)[1].split("</section>", 1)[0]
+    assert "Units handled by contact (soak)" in boss and "Visceral Burst (~2 a kill): handled by contact" in boss

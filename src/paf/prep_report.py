@@ -780,12 +780,24 @@ def defensives_html(d: PrepData) -> str:
                 names.append(lead[1])
         return f" <span class='muted small'>({e(' / '.join(names))} starts just before)</span>" if names else ""
 
+    casts = dict(d.boss_casts)
+
+    def cast_times(ability: str, ms: list) -> str:  # the boss's cast each moment answers, at the fight tab's time
+        out = []  # (a review: Ravenous Feast 1:03 here, 1:01 there; a moment's time is the top players' median
+        for m in ms:  # press, the fight tab's the boss cast's); no cast close by (a hit long after it): the press
+            near = [c for c in casts.get(ability, []) if m.time - 8 <= c <= m.time + 12]  # as the fight tab reads it
+            said = (_mmss(min(near, key=lambda c: abs(c - m.time))) if near else
+                    f"{_mmss(m.time)} <span class='muted'>pressed</span>")
+            if said not in out:
+                out.append(said)
+        return ", ".join(out)
+
     def row(ability: str, ms: list) -> str:
         sid = ms[0].boss_spell_id
         who = (f"{icons.img(d.icons.get(ability, ''), 'small')}{link(ability, f'spell={sid}')}" if ability else
                "<span class='muted'>None tied in the logs</span>")
         who += (f" <span class='muted'>&times;{len(ms)}</span>" if len(ms) > 1 else "") + ("" if ability else leads(ms))
-        times = ", ".join(_mmss(m.time) for m in ms)
+        times = cast_times(ability, ms) if ability else "pressed at " + ", ".join(_mmss(m.time) for m in ms)
         lo, hi = min(m.share for m in ms), max(m.share for m in ms)
         share = f"{lo:.0%}" if f"{lo:.0%}" == f"{hi:.0%}" else f"{lo:.0%}&ndash;{hi:.0%}"
         spells: dict[tuple, float] = {}
@@ -801,7 +813,7 @@ def defensives_html(d: PrepData) -> str:
     method = (f"Top players: the share of them pressing a defensive then ({df.kills} kills; the fight tab calls the "
               f"moments where {fightview_support():.0%} or more of them press one). A defensive answers a boss cast "
               "within about 10 s, or one long before for damage that lands later.")
-    table = (f"<div class='scroll'><table><tr><th>Boss ability</th><th>When</th><th class='n'>Top players</th>"
+    table = (f"<div class='scroll'><table><tr><th>Boss ability</th><th>Cast at</th><th class='n'>Top players</th>"
              f"<th>Defensive</th></tr>{rows}</table></div><p class='small muted'>{e(method)}</p>") if df.moments else (
         "<p class='small'>The top players do not press their defensives at one shared moment on this boss: use them "
         "when you take damage.</p>")
@@ -1000,9 +1012,29 @@ ACTION_CHIPS.insert(0, (KILL_TEXT, lambda m: ([f"&times;{m['n'] or 1} a kill", f
                                               + ([f"your spec {m['share']}% on them"] if m["share"] else []), "")))
 
 
+# a unit nobody kills, handled by its debuffs (paf.actions): its name, the debuffs players get, "Name (~2 per kill)"
+CONTACT_TEXT = re.compile(r"(?P<name>.+?): the top raids do not (?:kill|damage) it; players get its debuffs instead: "
+                          r"(?P<how>.+)\. It is handled by contact \(soak / breaking it\), not by damage\.")
+
+
+def kicked_casts(d, a) -> list[str]:
+    """The debuffs of a unit handled by contact that are casts the logs interrupt (the Broodling's Visceral Burst,
+    ~50 kicks a kill): the unit is kicked, not soaked (a review: "soak" beside "Interrupts: your job")."""
+    m = CONTACT_TEXT.fullmatch(a.text) if a.kind == "contact" else None
+    if not m:
+        return []
+    kicks = {x.name for x in (d.actions or []) if x.kind == "interrupt"}
+    return [n for n, _k in re.findall(r"(.+?) \(~(\d+) per kill\)(?:, |$)", m["how"]) if n in kicks]
+
+
 def action_inner(d, a) -> str:
     """An action as its icon, its name and a muted line of its facts; a sentence no pattern reads stays as is."""
     pic = icons.img(d.icons.get(a.name, "") or _sfallback(d, a.name), "small")
+    if (m := CONTACT_TEXT.fullmatch(a.text) if a.kind == "contact" else None) is not None:
+        kicked = kicked_casts(d, a)
+        what = (f"kick its cast ({', '.join(kicked)}), don't kill it" if kicked else
+                f"{m['how'].replace(' per kill', ' a kill')}: handled by contact (soak / breaking it), not by damage")
+        return f"<span class='act'>{pic}<b>{e(m['name'])}</b> <span class='muted small'>{e(what)}</span></span>"
     for pat, read in ACTION_CHIPS:
         m = pat.fullmatch(a.text)
         if m:
@@ -1315,6 +1347,8 @@ def render(d: PrepData) -> str:
             blocks = ""
             for kind, title in groups.items():
                 rows = [a for a in d.actions if a.kind == kind]
+                if kind == "contact" and rows and all(kicked_casts(d, a) for a in rows):
+                    title = "Units to kick, not kill"  # their casts are interrupted in the logs: no soak to say
                 gates = gate_kills(d) if kind == "kill" else []  # the unit that ends an immunity comes first
                 if kind == "kill":  # a wave's unit no action names, as Your job says it (Nek'zali's Echo of Jawae)
                     named = {a.name for a in d.actions} | {re.sub(r"\s*\([^)]*\)", "", n).strip() for n, _t in gates}
@@ -1345,13 +1379,20 @@ def render(d: PrepData) -> str:
                     # (fresh DPS review: bullet sentences)
                     done = [x for x, _m in parsed]  # by identity: an Action is no set member (it crashed a prep)
                     rows = [a for a in rows if not any(a is x for x in done)]
+                    def count(m: re.Match) -> str:  # how many in the rebuilt kill, as the fight tab counts them
+                        n = sum(w[1] for w in d.waves if w[1] and (re.sub(r"\s*\([^)]*\)", "", w[3]).strip()
+                                                                   or w[3]) == m["name"])  # (a review: "x14"
+                        return f"&times;{n}" if n else f"&times;{m['n'] or 1}"  # here, "15 adds" there: the mean
+                    # of every kill against the waves of the median one)
+                    head_n = f"in {_mmss(d.duration)}" if d.duration else "a kill"
                     blocks += (f"<h3>{e(title)}</h3><table class='kills fit'><thead><tr><th>Add</th>"
-                               "<th class='n'>a kill</th><th class='n' title='how long they live in the top kills: the median of every add; "
+                               f"<th class='n' title='how many in the rebuilt kill, the median top kill, as the fight "
+                               f"tab counts them'>{head_n}</th><th class='n' title='how long they live in the top kills: the median of every add; "
                                "the fight tab gives each wave its own'>"  # (a review: 18 s there, 19 s here)
                                "&#9201; killed in</th><th title='the share of the top players&#39; damage on them while "
                                "they are up'>your spec on them</th></tr></thead><tbody>" + "".join(
                                    f"<tr><td>{icons.img(d.icons.get(a.name, '') or _sfallback(d, a.name), 'small')}"
-                                   f"{e(m['name'])}</td><td class='n'>&times;{m['n'] or 1}</td><td class='n'>"
+                                   f"{e(m['name'])}</td><td class='n'>{count(m)}</td><td class='n'>"
                                    f"{m['life']} s</td><td>" + (
                                        f"<span class='kbar'><span style='width:{m['share']}%'></span></span> "
                                        f"{m['share']}%" if m['share'] else "<span class='muted' title='not measured "
