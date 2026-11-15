@@ -544,13 +544,16 @@ def night(d: dict) -> str:
         if name in clean:
             continue
         pot = v["pulls_damage_potion"]
+        bare = v["bare"] >= 3 and v["bare"] * 2 >= v["deaths"]  # one rule a column, red only past it (a fresh review:
+        few = pot * 2 < len(pulls)  # the whole column was red, and 0/35 red but 4/35 not)
         rows += (f"<tr><td class='who-c'>{ic(name)}<b>{e(name)}</b></td><td class='n'>{v['deaths']}</td>"
-                 f"<td class='n {'bad' if v['bare'] else ''}'>{v['bare']}</td><td class='n'>{v['healthstone']}</td>"
-                 f"<td class='n'>{v['health']}</td><td class='n {'bad' if not pot else ''}'>{pot}/{len(pulls)}</td></tr>")
+                 f"<td class='n {'bad' if bare else ''}'>{v['bare']}</td><td class='n'>{v['healthstone']}</td>"
+                 f"<td class='n'>{v['health']}</td><td class='n {'bad' if few else ''}'>{pot}/{len(pulls)}</td></tr>")
     table = (f"<div class='scroll'><table class='night'><tr><th>Player</th><th class='n'>Deaths</th><th class='n'>Without a "
              f"healthstone or potion</th><th class='n'>Healthstones</th><th class='n'>Health potions</th><th class='n'>"
              f"Pulls with a damage potion</th></tr>{rows}"
-             "</table></div>") if rows else ""
+             "</table></div><p class='ws-fine'>Red: half or more of a player's deaths (3 or more) with nothing "
+             "pressed first; a damage potion in fewer than half the pulls.</p>") if rows else ""
     if clean:
         table += (f"<p class='night-ok'>&#10003; {len(clean)} {'player' if len(clean) == 1 else 'players'}: no death, "
                   "a damage potion every pull: <span class='whos'>"
@@ -745,7 +748,8 @@ def rotation(d: dict) -> str:
                   f"<ul class='glist cov-list'>{rows}</ul></div>")
     if cards:
         out += ("<h3>Your spells, by number of targets</h3><p class='ws-fine'>Bar: your share of casts; mark: the "
-                "rotation's (SimulationCraft's default rotation, your gear and talents, same number of targets).</p>"
+                "rotation's (SimulationCraft's default rotation, your gear and talents, same number of targets); an amber bar is 8 "
+                "points or more away from it.</p>"
                 f"<div class='jobs wide'>{cards}</div>")
     dots = d.get("dots", [])
     if dots:
