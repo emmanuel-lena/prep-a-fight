@@ -59,7 +59,6 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .rb-face .rb-img:not(.none),.rb-in .rb-img:not(.none){position:absolute;inset:0;background:#15121c}
 .rb-in{position:relative} .rb-face .rb-img.none,.rb-in .rb-img.none{position:absolute;inset:0}
 .rb-boss.grey .rb-face{filter:grayscale(1) brightness(.75);box-shadow:0 0 0 2px var(--line)}
-.rb-boss:not(.grey) .rb-face{box-shadow:0 0 0 2px var(--pos)}
 .rb-n{position:absolute;left:50%;bottom:3px;transform:translateX(-50%);min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:rgba(0,0,0,.65);
   color:#fff;font:700 11px/18px var(--font-data);text-align:center}
 .rb-name{font-size:12px;font-weight:600;text-align:center;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;
@@ -349,7 +348,8 @@ textarea[name=plan],textarea[name=notes]{white-space:pre;overflow-x:auto;max-hei
 body.has-side>main .hero-week.lr h2{font-size:30px;line-height:1.15;margin:4px 0 8px}
 /* round 11 */
 .home-hero .rq{justify-content:flex-start} .home-hero .rq-txt{flex:0 1 auto}
-@media (min-width:1100px){.home-hero{grid-template-columns:minmax(0,1fr)}}
+@media (min-width:1100px){.home-hero{grid-template-columns:minmax(0,1fr)}
+  .home-hero:has(>.hero-side){grid-template-columns:minmax(0,1fr) minmax(0,1fr)}} /* the last raid on the right, or one column */
 .status .btn{white-space:nowrap} .status .val form{width:176px}
 .ws-cards{max-width:1000px} .lr-grid{max-width:80ch}
 .lr-row{margin:6px 0 0} .lr-row h2{margin-top:10px}
@@ -423,8 +423,8 @@ table.rl-tg{table-layout:fixed} table.rl-tg th:nth-child(1),table.rl-tg td:nth-c
 .rb-boss.st-nosim .rb-face{outline:2px dashed var(--muted);outline-offset:2px;border-radius:50%}
 .rb-boss.grey.st-old .rb-face{filter:brightness(.8)} /* a sheet to redo: in colour, darker, its amber ring seen */
 .mx-legend .pill.nosim::before{display:none}
-@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .pill.diff.normal::before{background:#1a9e00}}
-:root[data-theme="light"] .pill.diff.normal::before{background:#1a9e00}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .pill.diff.normal::before,:root:not([data-theme="dark"]) .dsh.normal{background:#1a9e00}}
+:root[data-theme="light"] .pill.diff.normal::before,:root[data-theme="light"] .dsh.normal{background:#1a9e00}
 table.mx a.mx.nosim{border:1px dashed var(--muted);opacity:1;background:transparent}
 .rl-more{font-size:12px;color:var(--muted);padding:1px 6px}
 .rl-boss h4 .rl-ok,.rl-boss h4 .rl-unread{display:inline-block;margin-left:10px;padding:1px 9px;border-radius:999px;border:1px solid var(--line);font:600 12px var(--font-body)}
@@ -447,7 +447,6 @@ table.mx a.mx.nosim.old{border:1px dashed var(--warn)} /* no sim first, its age'
 textarea.fit-rows{height:auto;min-height:0} /* sized to its lines (rows), not a fixed box */
 table.lr-cmp th small{text-transform:none;letter-spacing:0;font:500 12px var(--font-data)} table.lr-cmp th a{text-transform:none;letter-spacing:0;font:500 13px var(--font-body)} /* a link reads as one */
 .mx-legend .pill.nosim{border:1px dashed var(--muted)} /* the cells' own dashed outline (fresh app review) */
-.mx-legend .pill{text-transform:none;letter-spacing:0} /* the cells' own case (fresh app review 2) */
 section.adv textarea{max-width:920px} /* the content column, never to the window's edge */
 .rl-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:6px;margin:8px 0 16px;max-width:1000px} /* the ten bosses on one row */
 .rl-sb{display:grid;justify-items:center;gap:3px;padding:8px 6px;border:1px solid var(--line);border-radius:var(--radius);text-decoration:none;color:var(--fg);text-align:center;font-size:12px}
@@ -487,3 +486,72 @@ table.status td:first-child{padding-right:18px;white-space:nowrap}
 .rl-edit form{display:flex;gap:6px;align-items:center;margin:0}
 .rl-edit input,.rl-edit select{font-size:13.5px;padding:6px 10px}
 .rl-edit input[name=name]{width:150px} .rl-edit input[name=log]{width:230px}
+/* home review: the gold button and "Prepare the whole raid" on one row; the last raid in the right column */
+.go-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:14px 0 0}
+.go-row .rq,.home-hero .go-row .rq{margin:0;flex:0 1 auto;max-width:none} .go-row .rq.on{flex-basis:100%}
+.start-next .pill.diff{font-size:13px;vertical-align:3px}
+.hero-side{margin:0} body.has-side>main .hero-side h2{margin:4px 0 12px}
+.lr-lines{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:0;max-width:560px}
+.lr-lines .lr-line{display:grid;grid-template-columns:34px max-content max-content 1fr;align-items:center;gap:10px;
+  padding:8px 0;border-top:1px solid var(--line);font-size:15px;max-width:none}
+.lr-lines .lr-line:last-child{border-bottom:1px solid var(--line)} .lr-lines .lr-line b{font-weight:600}
+.lr-k{justify-self:end;display:inline-flex;align-items:center;gap:8px;color:var(--muted);font:500 14px var(--font-body);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.lr-lines .lr-hp{width:90px}
+/* the sheets: your spec's row alone keeps the amber "to redo"; the active row on Surface 2 with an accent edge */
+.mx-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;margin:34px 0 10px}
+body.has-side>main .mx-head h2{margin:0} .mx-head .mx-legend{margin:0}
+table.mx tr.mine td,table.mx tr.mine th{background:var(--surface-2)}
+table.mx tr.mine th{box-shadow:inset 2px 0 0 var(--accent)}
+table.mx tr:not(.mine) a.mx.old{border:1px solid var(--line)}
+table.mx tr:not(.mine) a.mx.nosim.old{border:1px dashed var(--muted)}
+.mx-legend .pill.mx{text-transform:none;letter-spacing:0} /* the marks in the cells' case; difficulties as everywhere */
+.home-hero .me{flex-wrap:wrap;row-gap:6px} .home-hero .me .stale{margin-left:0} /* the age badge wraps in its column */
+/* raid lead review: drawn icons, the build pill beside the name, another build in muted words, the legend in pills */
+.rl-svg{vertical-align:-2px;flex:none} .rl-role{display:inline-flex;align-items:center;gap:4px}
+.rl-boss li.rl-b{grid-template-columns:20px max-content max-content 1fr} .rl-boss li.rl-b .rl-ts{grid-column:2/-1}
+.rl-other{border:0;padding:1px 0;color:var(--muted);font:500 13px var(--font-body)}
+.rl-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:13.5px;color:var(--muted);margin:0 0 12px;max-width:none}
+.rl-legend .rl-side,.rl-legend .rl-t{color:var(--fg)} .rl-lg{margin-left:6px;font-style:italic}
+.rl-sv.none{font-size:12px}
+/* raid lead: a boss with nothing to do, a row of a list after the cards */
+.rl-qh{font:600 19px/1.3 var(--font-reading);margin:26px 0 6px;max-width:1000px}
+.rl-quiet{list-style:none;margin:0 0 10px;padding:0;max-width:1000px}
+.rl-q{display:grid;grid-template-columns:30px minmax(150px,max-content) 1fr max-content max-content;align-items:center;gap:6px 12px;
+  padding:7px 0;border-top:1px solid var(--line);font-size:14px;max-width:none}
+.rl-q:last-child{border-bottom:1px solid var(--line)}
+.rl-q img{width:28px;height:28px;border-radius:50%;object-fit:cover;background:#15121c} .rl-q b{font:600 16px var(--font-reading)}
+.rl-qw{color:var(--muted);min-width:0} .rl-q .rl-ok,.rl-q .rl-unread{margin:0}
+@media (max-width:640px){.rl-q{grid-template-columns:30px 1fr} .rl-q>*:nth-child(n+3){grid-column:2}}
+/* the roster's two forms, a row each */
+.rl-edit{flex-direction:column;align-items:flex-start;gap:8px}
+.rl-note,.rl-intro{max-width:none} /* one line each (review) */
+/* Reclear review: the table read in a sentence, its pulls' time and log on one line, one face for every number */
+.lr-cmp-lede{font:400 17px/1.45 var(--font-reading);color:var(--fg);margin:8px 0 4px;max-width:68ch}
+table.lr-cmp th .lr-ph{display:block;margin-top:2px;white-space:nowrap}
+table.lr-cmp td:nth-child(n+2),table.lr-cmp td:nth-child(n+2) b{font:500 14px var(--font-data);font-variant-numeric:tabular-nums}
+table.lr-cmp td:nth-child(2) b{font-weight:700} table.lr-cmp td.gap{font-weight:600}
+.lr-links{align-items:center} .lr-links a.btn.lr-cmpbtn{color:var(--fg);text-decoration:none;padding:5px 12px;font-size:13px}
+.lr-again{display:inline;margin:0} .lr-again-l{all:unset;cursor:pointer;color:var(--muted);text-decoration:underline;
+  text-underline-offset:3px;text-decoration-color:color-mix(in srgb,currentColor 45%,transparent)} .lr-again-l:hover{color:var(--fg)}
+.lr-again-l:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+.rc .lr,.rc .lr>div{max-width:1000px} .rc .lr-sub{max-width:none}
+@media (min-width:1200px){.rc .ws-cards{grid-template-columns:repeat(3,minmax(0,1fr))}} /* three tools, one row */
+/* Characters review: the one you play stands out as a card, "Playing now" a pill by its name, Remove quiet */
+.ccards{max-width:1000px}
+.ccard.on{background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px 18px;box-shadow:var(--shadow);margin:0 0 10px} .ccard.on+.ccard{border-top:0}
+.ccard .cc-txt>b{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.cc-txt .cc-on{display:inline-flex;align-items:center;gap:6px;padding:1px 10px;border-radius:999px;border:1px solid var(--line);
+  background:var(--surface-2);font:600 12px/1.6 var(--font-body);color:var(--fg);align-self:center}
+.cc-txt .cc-on::before{width:7px;height:7px;background:var(--pos)}
+.cc-up .stale-dot{display:inline-block;margin-right:7px;vertical-align:1px}
+.rm>summary.btn.cc-rm{border-color:transparent;color:var(--muted)}
+/* Settings review: a number with its unit, which way Warcraft Logs is read said first, Save always in reach */
+.set-ctl{display:flex;align-items:center;gap:10px;min-width:0} .set-ctl input{flex:0 1 160px;min-width:0}
+.set-unit{color:var(--muted);font-size:13.5px;white-space:nowrap}
+.wcl-using{font-weight:600;margin:0 0 12px} .wcl-using code{font:500 13px var(--font-data);background:none;padding:0;border:0}
+.settings .cta,.settings.dirty .cta{position:sticky;bottom:0;z-index:2;background:var(--bg);padding:12px 0;margin:0;
+  border-top:1px solid var(--line);box-shadow:0 -10px 14px -10px rgba(0,0,0,.18)}
+.settings.dirty .cta{border-top:2px solid var(--accent)}
+.fb-form textarea{font:400 15px/1.5 var(--font-body)} /* a message, written in the body face (review) */

@@ -376,6 +376,23 @@ def _signed_word(gap: str, kind: str | None) -> str:
     return gap
 
 
+def _cmp_lede(rows: list[dict]) -> str:
+    """The table read first, in a sentence (review: a table with no sentence over it)."""
+    said = {r["cmp"][0][5:]: r["cmp"] for r in rows if r["cmp"][0].startswith("You: ")}
+
+    def gap(row) -> tuple[str, str] | None:
+        d = _delta(row[1], row[2]) if row else ""
+        return (d.lstrip("+-"), "less" if d.startswith("-") else "more") if d and d.lstrip("+-") != "0 pts" else None
+    parts = []
+    if g := gap(said.get("boss DPS")):
+        parts.append(f"did {g[0]} {g[1]} boss DPS")
+    if g := gap(said.get("active time")):
+        parts.append(f"was active {g[0]} {g[1]}")
+    if not parts:
+        return ""
+    return f"<p class='lr-cmp-lede'>Your best clean pull {e(' and '.join(parts))} than your weakest.</p>"
+
+
 def _cmp_table(rows: list[dict], report: str = "") -> str:
     """The best pull against the weaker one, a measure a row, the better value marked (good or bad for you)."""
     if not rows:
@@ -387,15 +404,17 @@ def _cmp_table(rows: list[dict], report: str = "") -> str:
 
     def head(word: str, i: int) -> str:  # its length, and its fight in the log to check it (app confirm round 6)
         clock = "&#9201;&nbsp;" if re.fullmatch(r"\d+:\d\d", lab[i] or "") else ""  # a length, not a moment
-        t = f" <small>{clock}{e(lab[i])}</small>" if lab[i] else ""
+        t = f"<small>{clock}{e(lab[i])}</small>" if lab[i] else ""
         if report and fights[i]:
-            t += (f"<br><a href='https://www.warcraftlogs.com/reports/{e(report)}#fight={fights[i]}' "
-                  f"target='_blank' rel='noopener' title='fight {fights[i]} in the log (its ids count trash too)'>in the log "
+            t += ((" &middot; " if t else "")
+                  + f"<a href='https://www.warcraftlogs.com/reports/{e(report)}#fight={fights[i]}' "
+                  f"target='_blank' rel='noopener' title='fight {fights[i]} in the log (its ids count trash too)'>log "
                   "&#8599;</a>")  # leaves the app: marked; no "fight 14" read as the 14th pull (app confirm round 9)
+        t = f"<span class='lr-ph'>{t}</span>" if t else ""  # the time and the log on one line (review)
         return f"<th title='no death in the pull'>{word}{t}</th>"
     # the comparison's own pulls: its best and worst without a death (paf.pulldiff), not the night's best pull
-    return ("<table class='lr-cmp fit'><thead><tr><th></th>"
-            + head("Best 0-death pull", 0) + head("Weakest 0-death pull", 1) + "<th>Gap</th></tr>"  # no
+    return (_cmp_lede(rows) + "<table class='lr-cmp fit'><thead><tr><th></th>"
+            + head("Best clean pull", 0) + head("Weakest clean pull", 1) + "<th>Gap</th></tr>"  # no
             # death said, not left to a hover (fresh app review 7: read against the night's 58%)
             "</thead><tbody>"
             + "".join(f"<tr class='{e(r.get('kind', ''))}'><td>{e(r['cmp'][0])}</td>"  # bars: fresh app review 5
@@ -474,8 +493,12 @@ def card(slug: str, heading: bool = True) -> str:
     done = sum(len(b["jobs"]) for b in cur["bosses"])
     when = datetime.fromtimestamp(cur["date"]).strftime("%a %d %b") if cur.get("date") else ""  # as the raid lead
     night = f"<a href='/job/{e(cur['night'])}'>the night, pull by pull</a> &middot; " if cur.get("night") else ""
+    again = ("" if not cur.get("finished") or reading else  # a small link at the end of the line (review)
+             " &middot; <button class='lr-again-l' form='lr-again'>read it again</button>")  # its form after the
+    # line: a form inside a paragraph would close it
     head = (("<h2>Your last raid</h2>" if heading else "") + f"<p class='lr-sub'>{e(when)} &middot; {_pulls(cur['pulls'])} &middot; {night}"
-            f"<a href='{e(URL.format(cur['report']))}' target='_blank' rel='noopener'>the log &#8599;</a></p>")
+            f"<a href='{e(URL.format(cur['report']))}' target='_blank' rel='noopener'>the log &#8599;</a>{again}</p>"
+            + ("<form method='post' action='/lastraid/again' id='lr-again' hidden></form>" if again else ""))
     if not cur["bosses"]:
         return f"<section class='lr' id='lastraid'>{head}<p>No boss of the current raid in this log.</p></section>"
     rows, folded = "", ""
@@ -490,9 +513,11 @@ def card(slug: str, heading: bool = True) -> str:
                      f"best pull with the boss at {b['best']:.0f}% health, {_pulls(b['pulls'])}")  # confirm round)
         says = ([x for x in boss_says if _key(x) not in skip and not (isinstance(x, dict) and x.get("cmp"))][:3]
                 + [x for x in boss_says if isinstance(x, dict) and x.get("cmp")][:6])  # a table: more rows fit
-        links = "".join(f"<a href='/job/{e(jid)}'>{label}</a>" for kind, label in
+        btn = " class='btn ghost lr-cmpbtn'"
+        links = "".join(f"<a href='/job/{e(jid)}'{btn if kind == 'diff' else ''}>{label}</a>"
+                        for kind, label in
                         (("rotation", "Your rotation"), ("wipe", "Why it did not die"), ("diff", "Compare these two pulls"))
-                        if (jid := b["jobs"].get(kind)) and not _failed(jid))
+                        if (jid := b["jobs"].get(kind)) and not _failed(jid))  # the comparison: a button (review)
         prep = "The prep"
         if not b["kill"] and (_failed(b["jobs"].get("wipe")) or not b["jobs"].get("wipe")):  # needs the boss prepared:
             prep = f"{e(b['name'])}'s prep &rarr; why it did not die"  # the link says it, first (app confirm rounds 3-4)
@@ -525,9 +550,6 @@ def card(slug: str, heading: bool = True) -> str:
         rows = f"<div>{h3}<div class='lr-grid'>{rows}</div></div>"
     progress = (f"<p class='lr-wait'><span class='pl-spin'></span> Reading your raid: {done} of {total} analyses"
                 f"&hellip;</p>" if not cur["finished"] else "")
-    again_btn = ("" if not cur["finished"] or reading else
-                 "<form method='post' action='/lastraid/again' class='lr-again'><button class='btn ghost'>Read the "
-                 "last log again</button></form>")
     priced = sorted(((x, b["name"]) for b, says in zip(cur["bosses"], said, strict=True) for x in says
                      if isinstance(x, dict) and x.get("value")),  # the simmed costs first, then the upper bounds
                     key=lambda xb: (xb[0].get("approx", False), -xb[0]["value"]))
@@ -550,7 +572,7 @@ def card(slug: str, heading: bool = True) -> str:
     wide = ("<div class='lr-wide'><b>On the whole raid</b><ul>" + "".join(f"<li>{e(x)}</li>" for x in raid_wide)
             + "</ul></div>") if raid_wide else ""
     return (f"<section class='lr' id='lastraid'{' data-reading=1' if not cur['finished'] else ''}>{head}{progress}"
-            f"{first}{wide}<div class='lr-cols'>{folded}{rows}</div>{again_btn}</section>")
+            f"{first}{wide}<div class='lr-cols'>{folded}{rows}</div></section>")
 
 
 CARD_JS = """<script>(function(){var s=document.getElementById('lastraid');if(!s||!s.dataset.reading)return;

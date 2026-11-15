@@ -345,14 +345,32 @@ def _strip_cell(x, sh, total: int = 0, difficulty: str = "heroic") -> str:
         adds_row = (f"<span class='rl-sv'><b class='rl-num'>{adds}</b> on adds</span>" if adds else
                     "<span class='rl-sv ok' title='nobody to put on an add'><b class='rl-num ok'>&#10003;</b> "
                     "boss only</span>")
-        talent_row = (f"<span class='rl-sv'><b class='rl-num'>{n}</b> talents</span>" if n else
-                      f"<span class='rl-sv none' title='{NO_BUILD}'><b class='rl-num'>n/a</b> talents</span>"
+        talent_row = (f"<span class='rl-sv' title='players to change talents'><b class='rl-num'>{n}</b> retalent"
+                      "</span>" if n else  # players, said as such (review: "4 talents" counted players)
+                      f"<span class='rl-sv none' title='{NO_BUILD}'>&ndash; same builds</span>"
                       if nobuild else
                       "<span class='rl-sv ok' title='everyone on their build'><b class='rl-num ok'>&#10003;</b> "
-                      "talents</span>")
+                      "builds ok</span>")
         say = f"<span class='rl-rows'>{adds_row}{talent_row}</span>"
     img = (f"<img src='/bossimg/{x.id}.png' alt='' loading='eager' onerror=\"this.remove()\">")
     return (f"<a class='rl-sb{' none' if sh is None else ''}' href='#boss-{x.id}'>{img}<b>{e(x.name)}</b>{say}</a>")
+
+
+# one-stroke icons drawn like the side bar's (theme._svg), never colour emoji beside them (review)
+SHIELD = "M12 3.5 19 6v5.5c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V6z"
+CROSS = "M12 4.5v15M4.5 12h15"
+SWORDS = "M4 4l10 10M4 4v4M4 4h4M20 4 10 14M20 4v4M20 4h-4M7 17l3-3M14 14l3 3M5.5 18.5 7 17M18.5 18.5 17 17"
+GROUP = ("M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.5 20a5.5 5.5 0 0 1 11 0M16 11a3 3 0 1 0 0-6"
+         "M18 20a5.5 5.5 0 0 0-3-4.9")
+
+
+def svg(path: str) -> str:
+    return (f"<svg class='rl-svg' viewBox='0 0 24 24' width='15' height='15' aria-hidden='true'><path d='{path}' "
+            "fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>")
+
+
+def all_badge(n: int) -> str:
+    return f"<span class='rl-everyone' title='the whole raid'>{svg(GROUP)} all {n}</span>"
 
 
 def _ic(spec: str) -> str:
@@ -407,7 +425,7 @@ def page_body(difficulty: str) -> str:
     state = load()
     diff = settings.DIFFICULTIES.get(difficulty, 4)
     diffs = "".join(f'<label class="seg"><input type="radio" name="difficulty" value="{d}"{" checked" if d == difficulty else ""} '
-                    f'onchange="this.form.submit()"><span>{e(DIFF_LABELS.get(d, d))}</span></label>'
+                    f'onchange="this.form.submit()"><span><i class="dsh {d}"></i>{e(DIFF_LABELS.get(d, d))}</span></label>'
                     for d in settings.DIFFICULTIES if d != "lfr")
     lead = ("<p class='lead'>Your raid's roles on every boss, from your roster and the top raids: who hits which "
             "add, who changes talents, which spec change is worth it. The strategy stays yours.</p>")
@@ -463,9 +481,9 @@ def page_body(difficulty: str) -> str:
 
     heal = sum(1 for s in in_raid if s in HEALERS or pretty(s) in HEALERS)
     tanks = said - heal  # the roles as icons and counts, the rule on hover (fresh app review 7: a sentence)
-    roles = (f"<span class='rl-role' title='tanks: {NO_BUILD}'>&#128737; {tanks}</span>"
-             f"<span class='rl-role' title='healers: {NO_BUILD}'>&#10010; {heal}</span>"
-             f"<span class='rl-role' title='damage dealers'>&#9876; {len(in_raid) - said}</span>")
+    roles = (f"<span class='rl-role' title='tanks: {NO_BUILD}'>{svg(SHIELD)} {tanks}</span>"
+             f"<span class='rl-role' title='healers: {NO_BUILD}'>{svg(CROSS)} {heal}</span>"
+             f"<span class='rl-role' title='damage dealers'>{svg(SWORDS)} {len(in_raid) - said}</span>")
     groups = "".join(f"<optgroup label='{e(pretty(c))}'>" + "".join(
         f"<option value='{e(f'{sp} {c}')}'>{e(pretty(f'{sp} {c}'))}</option>" for sp in specs) + "</optgroup>"
                      for c, specs in CLASSES.items())
@@ -473,11 +491,12 @@ def page_body(difficulty: str) -> str:
     edit = (f"<div class='rl-edit'><form method='post' action='/raidlead/player'><datalist id='rl-names'>{names}"
             "</datalist><input name='name' list='rl-names' placeholder='Player' required maxlength='24' "
             "aria-label='Player: a new one, or one of the roster to change their spec'>"
-            f"<select name='spec' aria-label='Spec'>{groups}</select><button class='btn ghost'>Add, or change "
-            f"their spec</button></form><form method='post' action='/raidlead/read'><input type='hidden' "
-            f"name='difficulty' value='{e(difficulty)}'><input name='log' placeholder='Another log: its link' "
+            f"<select name='spec' aria-label='Spec'>{groups}</select><button class='btn ghost' title='Add a player, or "
+            f"change the spec of one of the roster'>Set spec</button></form><form method='post' "
+            f"action='/raidlead/read'><input type='hidden' name='difficulty' value='{e(difficulty)}'><input name='log' "
+            "placeholder='Another Warcraft Logs link' "
             "aria-label='Another log: its Warcraft Logs link (empty: your last raid again)'>"
-            "<button class='btn ghost'>Read the roster</button></form></div>")
+            "<button class='btn ghost'>Read this log</button></form></div>")
     roster_html = (f"<section class='rl-roster'><h2>Your roster <small class='muted'>{len(in_raid)} players</small>"
                    f"<span class='rl-roles'>{roles}</span></h2>"
                    f"<p class='small muted'>From {e(state.get('roster_from', ''))}{when} "
@@ -486,7 +505,7 @@ def page_body(difficulty: str) -> str:
                    + (f"<p class='notice'>{e(state['error'])}</p>" if state.get("error") else "")
                    + f"<div class='rl-chips'>{chips}</div>{edit}</section>")
     spec_of = {n: sp for n, sp, _d in players}  # a player's class icon beside its name
-    cards, missing = "", []
+    cards, missing, quiet = "", [], ""
     everything = []
     strip: list[str] = []  # the night at a glance: a boss a cell, what it asks (fresh app reviews 1-3)
     for x in journal_order(_encounters()):
@@ -505,7 +524,7 @@ def page_body(difficulty: str) -> str:
             # "best specs in the top raids" said once, in the header)
             f"<tr><td><b>{e(t['name'])}</b>"
             + (" <span class='rl-side'>a second boss</span>" if t["second_boss"] else "") + "</td><td>" + (
-                f"<span class='rl-everyone' title='the whole raid'>&#128101; all {len(in_raid)}</span>"
+                all_badge(len(in_raid))
                 if t["whole_raid"] and not t["players"] else
                 ("".join(f"<span class='rl-n'>{_ic(spec_of.get(n, ''))}{e(n)}</span>" for n in t["players"])
                  if t["players"] else "<span class='muted'>nobody fits</span>"))
@@ -514,17 +533,17 @@ def page_body(difficulty: str) -> str:
             + "</td></tr>" for t in sh["targets"])
         everyone = sh["targets"] and all(t["whole_raid"] and not t["players"] for t in sh["targets"])
         seconds = [t for t in sh["targets"] if t["second_boss"]]
-        tg = ("<p class='rl-allrow'><span class='rl-everyone' title='the whole raid'>&#128101; all "  # nothing to
-              f"{len(in_raid)}</span> on " + ", ".join(e(t["name"]) for t in sh["targets"])  # assign: one line
+        tg = ("<p class='rl-allrow'>" + all_badge(len(in_raid))  # nothing to assign: one line
+              + " on " + ", ".join(e(t["name"]) for t in sh["targets"])
               + (f" <span class='rl-side'>{'a second boss' if len(seconds) == 1 else f'{len(seconds)} second bosses'}"
                  "</span>" if seconds else "") + "</p>" if everyone else
               f"<table class='rl-tg'><thead><tr><th>Target</th><th>Your raid</th><th>Best specs in the top raids</th>"
               f"</tr></thead><tbody>{tg}</tbody></table>") if tg else ""
-        alone = (f"<p class='rl-allrow'><span class='rl-everyone' title='the whole raid'>&#128101; all {len(in_raid)}"
-                 f"</span> on {e(x.name)}</p>")  # no add: the same badge as the others (round 40)
+        alone = (f"<p class='rl-allrow'>{all_badge(len(in_raid))} on {e(x.name)}</p>")  # no add: the same badge as
+        # the others (round 40)
         bd = "".join(  # one line a player: who, which build, then each talent to take (+) or drop (-)
             f"<li class='rl-b'><span title='{e(pretty(b['spec']))}'>{_ic(b['spec'])}</span><b>{e(b['name'])}</b>"  # the
-            "<small></small>"  # spec its icon (fresh app review 7)
+            # spec its icon (fresh app review 7); its build pill right after the name (review: 280 px away)
             f"<span class='rl-side {'pad' if b['side'] == 'pad' else 'boss'}'>"
             f"{'pad build &middot; on an add' if b['side'] == 'pad' else 'boss build'}</span>"
             + "<span class='rl-ts'>" + (
@@ -538,6 +557,16 @@ def page_body(difficulty: str) -> str:
                    + "".join(f"<span class='rl-t free'>{e(t)}</span>" for t in b["choice"]) if b.get("choice") else ""))
             + "</span></li>"
             for b in sh["builds"])
+        if not (sh["builds"] or sh.get("unread") or sh.get("lust") or any(t["players"] for t in sh["targets"])):
+            # nothing to do (everyone on the boss and on their build, no lust to pick): a row, not a card (review)
+            nobuild = sh.get("no_split", 0) >= len(players) - len(bench)
+            on = (", ".join(e(t["name"]) for t in sh["targets"]) or e(x.name))
+            quiet += (f"<li class='rl-q' id='boss-{x.id}'><img src='/bossimg/{x.id}.png' alt='' loading='lazy' "
+                      f"onerror=\"this.remove()\"><b>{e(x.name)}</b><span class='rl-qw'>{all_badge(len(in_raid))} on "
+                      f"{on}</span>" + ("<span class='rl-unread' title='" + NO_BUILD + "'>&ndash; same builds</span>"
+                                        if nobuild else "<span class='rl-ok'>&#10003; builds ok</span>")
+                      + f"{copy_button(text(sh, difficulty), 'Copy for Discord')}</li>")
+            continue
         cards += (f"<article class='rl-boss' id='boss-{x.id}'><header><h3>{e(x.name)}</h3>"
                   f"{copy_button(text(sh, difficulty), 'Copy for Discord')}"
                   f"{copy_button(text(sh, difficulty, mrt=True), 'Copy MRT note')}</header>"
@@ -551,13 +580,14 @@ def page_body(difficulty: str) -> str:
               + f", for the {len(state['players']) - len(bench)} players of your raid.</p>") if n else ""
     if answer:  # the answer is the page's lead; what the page does goes
         head = head.replace(lead, answer)
-    words = ("<p class='rl-words'>Pad build: the talents for an add (more targets); boss build: for single target; "
-             "both the top players' builds, not a sim. The MRT note is the text the Method Raid Tools "
-             "addon shows in game.</p>"
-             ) if everything else ""
+    words = ("<p class='rl-legend'><span class='rl-side pad'>pad build</span> on an add (more targets) "
+             "<span class='rl-side boss'>boss build</span> single target <span class='rl-t take'>+ take</span> "
+             "<span class='rl-t drop'>&minus; drop</span> <span class='rl-lg'>the top players&#39; builds, not a sim"
+             "</span></p>") if everything else ""
     return (head + roster_html + f"<h2>Boss by boss</h2><nav class='rl-strip' aria-label='Every boss'>{''.join(strip)}</nav>"
             f"<div class='rl-all'>{allbtn}</div>{words}<div class='rl-grid'>{cards}</div>"
-            f"{_tools()}{COPY_JS}")
+            + (f"<h3 class='rl-qh'>Nothing to change</h3><ul class='rl-quiet'>{quiet}</ul>" if quiet else "")
+            + f"{_tools()}{COPY_JS}")
 
 
 def lust_block(sh: dict, difficulty: str) -> str:
@@ -568,6 +598,7 @@ def lust_block(sh: dict, difficulty: str) -> str:
         return ""
     current = lust_spot(sh)
     spec, gains, noise, kill = sh.get("lust_gains") or ("", {}, 0.0, 0.0)
+    spots = [x for x in spots if x.share >= 0.05 or x is current]  # a spot under 5%: in "elsewhere" (review)
     rows = ""
     for x in spots:
         g = gains.get(x.label)
@@ -598,18 +629,19 @@ def lust_block(sh: dict, difficulty: str) -> str:
                 + ", ".join(f"{y.share:.0%} {e(y.phrase)}" for y in spots if y.t is not None) + ".</p>")
     who = ("Your pick goes into your preps here and into the Discord text." if sh.get("lust_pick") else
            "Checked by default: the top raids' most used spot, since lust timing is a raid-wide call and one spec's "
-           "gain is only a hint. Your pick goes into your preps here and into the Discord text.")
-    rest = 1 - sum(x.share for x in spots)
-    notes = ([f"{rest:.0%} of the top raids lust elsewhere, each spot under 5%."] if rest >= 0.03 else
-             [f"The other {rest:.0%}: elsewhere."] if rest >= 0.005 else [])  # the shares add to 100% (a review: 98%)
-    notes.append(f"Simmed on the newest {e(spec)} prep here{f' ({_mmss(kill)} kill)' if kill else ''}, with "
-                 f"Bloodlust at each spot against the spot it played (baseline). Other specs may gain differently."
-                 if gains else "Prepare this boss to see what each spot gives.")
-    return (f"<h4>Bloodlust</h4>{lead}<p class='rl-intro'>{sh.get('lust_kills', 0)} top kills read. {who}</p>"
+           "gain is only a hint. Your pick goes into your preps here and into the Discord text.")  # on hover: the
+    rest = 1 - sum(x.share for x in spots)  # intro is one line (review)
+    notes = ([f"{rest:.0%} of the top raids lust elsewhere."] if rest >= 0.005 else [])  # the shares add to 100%
+    notes.append(f"Simmed on the newest {e(spec)} prep{f' ({_mmss(kill)} kill)' if kill else ''}, against the spot it "
+                 "played." if gains else "Prepare this boss to see what each spot gives.")
+    how = ("Bloodlust at each spot against the spot it played (baseline). Other specs may gain differently."
+           if gains else "")
+    return (f"<h4>Bloodlust</h4>{lead}<p class='rl-intro' title='{e(who)}'>{sh.get('lust_kills', 0)} top kills read."
+            "</p>"
             f"<form method='post' action='/raidlead/lust' class='rl-lusts' role='radiogroup' aria-label='Bloodlust'>"
             f"<input type='hidden' name='enc' value='{sh['enc']}'><input type='hidden' name='diff' value='{sh['diff']}'>"
             f"<input type='hidden' name='difficulty' value='{e(difficulty)}'>{rows}</form>"
-            f"<p class='rl-note'>{' '.join(notes)}</p>")
+            f"<p class='rl-note' title='{e(how)}'>{' '.join(notes)}</p>")
 
 
 def _mmss(t: float) -> str:

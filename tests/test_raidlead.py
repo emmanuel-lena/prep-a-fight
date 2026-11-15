@@ -102,13 +102,13 @@ def test_the_strip_says_what_each_boss_asks():
     x = SimpleNamespace(id=7, name="Vashnik")
     sh = {"targets": [{"players": ["A", "B"]}, {"players": []}], "builds": [{}, {}, {}]}
     cell = raidlead._strip_cell(x, sh)
-    assert "href='#boss-7'" in cell and "2</b> on adds" in cell and "3</b> talents" in cell
+    assert "href='#boss-7'" in cell and "2</b> on adds" in cell and "3</b> retalent" in cell  # players
     fine = raidlead._strip_cell(x, {"targets": [], "builds": []})  # two rows always: the adds, the talents
-    assert "boss only" in fine and "everyone on their build" in fine
+    assert "boss only" in fine and "everyone on their build" in fine and "builds ok" in fine
     assert "no kills read" in raidlead._strip_cell(x, None)
     # no spec with a pad/boss build on this boss (Coiled Altar): nothing compared, never "nothing to change"
     none = raidlead._strip_cell(x, {"targets": [], "builds": [], "no_split": 18}, 18)
-    assert "no pad/boss build" in none and "n/a</b> talents" in none and "everyone on their build" not in none
+    assert "no pad/boss build" in none and "same builds" in none and "everyone on their build" not in none
 
 
 def test_the_raid_lead_adds_a_player_and_changes_a_spec_by_hand(tmp_path, monkeypatch):
@@ -142,3 +142,25 @@ def test_a_pasted_link_that_is_no_log_is_said(tmp_path, monkeypatch):
     assert started == ["abcdABCD12345678", None]
     raidlead.read_log("heroic", "my raid")
     assert "Not a Warcraft Logs report link" in raidlead.load()["error"] and len(started) == 2
+
+
+def test_a_boss_with_nothing_to_do_is_a_row(tmp_path, monkeypatch):
+    # review: a boss where everyone stays on their build with no lust to pick took a whole card
+    from types import SimpleNamespace
+
+    from paf import web
+
+    monkeypatch.setenv("PAF_HOME", str(tmp_path))
+    raidlead.save({"players": STATE["players"], "report": "abcd", "roster_from": "a pull"})
+    encs = [SimpleNamespace(id=1, name="Busy Boss"), SimpleNamespace(id=2, name="Quiet Boss")]
+    monkeypatch.setattr(web, "_encounters", lambda: encs)
+    monkeypatch.setattr(web, "journal_order", lambda x: x)
+    busy = {"boss": "Busy Boss", "targets": [{"name": "Add", "whole_raid": False, "second_boss": False,
+                                               "players": ["Frosty"], "best": []}], "builds": []}
+    quiet = {"boss": "Quiet Boss", "targets": [], "builds": []}
+    monkeypatch.setattr(raidlead, "sheet", lambda state, x, diff: busy if x.id == 1 else quiet)
+    monkeypatch.setattr(raidlead, "lust_block", lambda sh, difficulty: "")
+    page = raidlead.page_body("heroic")
+    assert "<article class='rl-boss' id='boss-1'>" in page and "id='boss-2'" in page
+    assert "<article class='rl-boss' id='boss-2'>" not in page and "<li class='rl-q' id='boss-2'>" in page
+    assert "Nothing to change" in page and "&#128101;" not in page  # drawn icons, no colour emoji

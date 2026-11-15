@@ -96,4 +96,4 @@ def test_an_export_a_week_old_is_flagged(tmp_path, monkeypatch):
     c = characters.all_characters()[0]
     assert characters.stale_days(c) == 9
     assert "Export 9 days old" in web.stale_badge(c) and "stale-dot" in web.character_menu()
-    assert "Export 9 days old" in web.characters_page()
+    assert "Update export &middot; 9 days old" in web.characters_page()  # on the button (review)

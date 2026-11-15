@@ -24,6 +24,11 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 - The prep sheet is cleaner and says each thing once: Dig deeper is less than half as long (your raid's night and
   best pull as one line each, linked to their tools; no repeats of the other tabs), "keep yours" gear and talents show
   the closest three, the boss's defensives are grouped by the ability they answer, and every tab's headings match.
+- The main pages are tidier: the home board only rings a boss green when it is ready in the difficulty you picked, your
+  last raid sits beside "Prepare a boss", and only your own sheets light up "to redo"; Raid lead turns a boss with
+  nothing to change into one line and counts players to retalent; Reclear says what your best clean pull did better;
+  Characters puts the export's age on its update button; Settings says whether you read Warcraft Logs with a key or
+  your account.
 ## 0.8.30 (2026-11-12)
 
 - After an update, the app opens again by itself (it closed and stayed closed).

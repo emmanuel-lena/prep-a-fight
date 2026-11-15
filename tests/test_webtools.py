@@ -32,6 +32,9 @@ def test_settings_page_changes_the_warcraft_logs_key(tmp_path, monkeypatch):
     monkeypatch.setenv("WCL_CLIENT_ID", "9a1b2c3d-long-client-id")
     page = webtools.settings_page()
     assert "9a1b2c3d…" in page and "long-client-id" not in page
+    # which way the logs are read, said first (review): the key's first 8 characters only
+    assert "Reading with your own API key (<code>9a1b2c3d</code>&hellip;)" in page
+    assert "pts/hour of 3,600" in page and "Top players from" in page
     assert 'action="/credentials"' in page and 'name="back" value="settings"' in page
 
 

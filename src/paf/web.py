@@ -599,12 +599,13 @@ def sheets_matrix(items: list[dict], encs, mine: str = "") -> str:
         return icons.spec_img(sp) + e(sp)  # the spec's own icon (fresh app review 7)
     rows = "".join(f"<tr{' class=mine' if sp.lower() == mine.lower() else ''}><th scope='row'>{who(sp)}</th>"
                    + "".join(f"<td>{cell(sp, n)}</td>" for n in names) + "</tr>" for sp in specs)
-    return (f"<h2>Your sheets</h2><div class='mx-wrap'><table class='mx'><thead><tr><th></th>{head}</tr></thead>"
-            f"<tbody>{rows}</tbody></table></div><p class='mx-legend'>"
-            + " ".join(diff_pill(k) for k in ("normal", "heroic", "mythic") if any(i["difficulty"] == k for i in items))
-            + (" <span class='pill diff mx nosim'>no sim yet</span>" if any("prep" not in i["files"] for i in items)
-               else "") + " <span class='pill diff mx chk'>&#10003; ready</span>"
-            + " <span class='pill diff mx old'>&#8635; to redo</span></p>")  # only the marks present
+    legend = ("<p class='mx-legend'>"  # beside the heading: read before the table (review)
+              + " ".join(diff_pill(k) for k in ("normal", "heroic", "mythic") if any(i["difficulty"] == k for i in items))
+              + (" <span class='pill diff mx nosim'>no sim yet</span>" if any("prep" not in i["files"] for i in items)
+                 else "") + " <span class='pill diff mx chk'>&#10003; ready</span>"
+              + " <span class='pill diff mx old'>&#8635; to redo</span></p>")  # only the marks present
+    return (f"<div class='mx-head'><h2>Your sheets</h2>{legend}</div><div class='mx-wrap'><table class='mx'><thead>"
+            f"<tr><th></th>{head}</tr></thead><tbody>{rows}</tbody></table></div>")
 
 
 TABS = (("prep", "Prep sheet"), ("timeline", "Top players' timelines"))
@@ -900,7 +901,7 @@ def characters_page() -> str:
         logs = (f'<form method="post" action="/character/autologs" class="cc-logs"><input type="hidden" name="slug" '
                 f'value="{e(c.slug)}"><input type="hidden" name="on" value="{"0" if c.slug in auto else "1"}">'
                 f'<label><input type="checkbox"{" checked" if c.slug in auto else ""} onchange="this.form.submit()"> '
-                f'<span>Auto-read its last raid (<a href="/reclear">Reclear</a>)</span>'
+                f'<span>Read its raid log after each raid night (<a href="/reclear">Reclear</a>)</span>'
                 f'</label></form>')
         ic = icons.img(icons.CLASS_ICON.format(cls=c.class_name.lower()), "large", "cc-ic")
         badge = ('<span class="muted small">from a log: no bags</span>' if c.imported else
@@ -908,19 +909,25 @@ def characters_page() -> str:
         updated = ("" if stale_days(c) else  # the age badge says it (fresh app review 5: the dates twice)
                    f"<span class='muted small'>&middot; updated <span>{ago(c.mtime)}</span></span>")
         rg, _, sv = c.realm.partition("/")
+        old = stale_days(c)  # an old export: its age on the button that updates it, no badge apart (review)
+        age = (f' &middot; {old} days old' if old else "")
+        dot = '<span class="stale-dot" aria-hidden="true"></span>' if old else ""
         refresh = (f"<form method='post' action='/character/import'><input type='hidden' name='name' value='{e(c.name)}'>"
                    f"<input type='hidden' name='server' value='{e(sv)}'><input type='hidden' name='region' "
-                   f"value='{e(rg.lower())}'><button class='btn ghost'>Refresh from Warcraft Logs</button></form>"
+                   f"value='{e(rg.lower())}'><button class='btn ghost cc-up'>{dot}Refresh from Warcraft Logs{age}"
+                   "</button></form>"
                    if c.imported and sv else "")  # its latest logged fight again (issue #37: no way to update it)
-        play = ('<span class="cc-on">Playing now</span>' if c.current else
+        paste = (f"{dot}Update export{age}" if old and not refresh else "Paste a new export")
+        play = ("" if c.current else
                 f'<form method="post" action="/character/select"><input type="hidden" name="slug" value="{e(c.slug)}">'
                 f'<button class="btn ghost">Play this character</button></form>')
         cards += (f'<div class="ccard{" on" if c.current else ""}">{ic}<div class="cc-txt"><b>{e(c.name)}'
-                  f'{(" <small class=muted>" + e(c.realm) + "</small>") if c.realm else ""}</b>'
+                  f'{(" <small class=muted>" + e(c.realm) + "</small>") if c.realm else ""}'
+                  f'{" <span class=cc-on>Playing now</span>" if c.current else ""}</b>'
                   f'<span class="cc-spec">{e(c.spec.title())} {e(c.class_name.title())}'
                   f'{f" <span class=cc-ilvl>ilvl {c.ilvl}</span>" if c.ilvl else ""}</span><span>{badge} '
-                  f'{updated}</span>{stale_badge(c, "#simc-box")}</div><div class="cc-act">{play}{refresh}'
-                  f'<a class="btn ghost" href="#simc-box" onclick="setTimeout(function(){{document.getElementById(\'simc-box\').focus()}},50)">Paste a new export</a>'
+                  f'{updated}</span></div><div class="cc-act">{play}{refresh}'
+                  f'<a class="btn ghost cc-up" href="#simc-box" onclick="setTimeout(function(){{document.getElementById(\'simc-box\').focus()}},50)">{paste}</a>'
                   f'<details class="rm"><summary class="btn ghost cc-rm">Remove</summary><div class="rm-ask">'
                   f'<span>Remove this character? Its /simc export is deleted.</span>'
                   f'<form method="post" action="/character/remove"><input type="hidden" name="slug" value="{e(c.slug)}">'
@@ -946,7 +953,7 @@ def characters_page() -> str:
              "account's characters in one click.</p>") if not mine and wcllogin.available() and not wcllogin.logged_in() \
         else ""
     return (f"<h1>Your characters</h1><p class='lead'>{lead}</p><div class='ccards'>{cards}</div>{empty}"
-            f"<h2 id='add'>Add a character</h2>{acc}{ADD_FORM}{after}")
+            f"<h2 id='add'>Add or update a character</h2>{acc}{ADD_FORM}{after}")
 
 
 DIFF_SHAPES = (("normal", "tri"), ("heroic", "sq"), ("mythic", "penta"))  # WoW's green, blue, purple
@@ -1118,8 +1125,8 @@ function soon(){requestAnimationFrame(fit)}b.addEventListener('pointerenter',soo
 
 
 def raid_board(encs, class_name: str, spec: str) -> str:
-    """The raid at a glance for the active character: a row of the bosses' portraits (grey while not prepared at any
-    difficulty); hovering or tapping one opens, under it, its three difficulties, like a talent's tooltip: a green
+    """The raid at a glance for the active character: a row of the bosses' portraits (grey while not prepared at the
+    chosen difficulty); hovering or tapping one opens, under it, its three difficulties, like a talent's tooltip: a green
     triangle (normal), a blue square (heroic), a purple pentagon (mythic), each prepared (since when), to redo (made
     before this week's reset), in progress or not yet, and a link straight to the sheet or the prep."""
     from datetime import UTC, datetime
@@ -1171,7 +1178,6 @@ def raid_board(encs, class_name: str, spec: str) -> str:
             elif item and "prep" in item["files"]:
                 stale = pack.is_stale(datetime.fromtimestamp(item["mtime"], UTC).isoformat())
                 href, state, word = f"/view/{e(key)}", "old" if stale else "ok", "to redo" if stale else ago(item["mtime"])
-                ready = ready or not stale
             else:
                 href, state, word = f"/boss?boss={x.id}&amp;difficulty={diff}", "no", "prepare"
             if diff == settings.get("difficulty"):  # said under the portrait, without pointing at it
@@ -1179,6 +1185,8 @@ def raid_board(encs, class_name: str, spec: str) -> str:
                         "old": "&#8635; to redo"}.get(state, word)  # the table's marks too (round 43); a sheet without
                 # a sim (timelines) is no "not prepared"
                 here = f"<small class='rb-st {state}'>{said}</small>"
+                ready = state == "ok"  # in colour as its ring and its word say: the chosen difficulty only (a
+                # mythic sheet never rang green over "not prepared" in heroic)
                 ring = f" st-{state}" + (" st-nosim" if state == "no" and item else "")  # the face's ring says it
             states += (f"<a class='rb-d {state}' href='{href}'><span class='rb-frame {shape}'><span class='rb-in'>"
                        f"{portrait(x)}</span></span><b>{e(DIFF_LABELS.get(diff, diff))}</b><small>{word}</small></a>")
@@ -1206,12 +1214,14 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
     where = e(DIFF_LABELS.get(diff, diff))
     if nxt is not None:  # the next boss to prepare: no list to scroll, the board below picks another one
         pick = (f'<input type="hidden" name="boss" value="{nxt.id}">'  # the button names it (the owner, 2026-10-24)
-                + (f'<p class="start-next">{len(ready)} of {len(encs)} bosses ready this week.</p>' if ready else ''))
+                + (f'<p class="start-next">{len(ready)} of {len(encs)} bosses ready this week in '
+                   f'{diff_pill(diff)}</p>' if ready else ''))  # which difficulty, named (review: it read as all)
     else:
         pick = ((f'<p class="start-say">Every boss is ready this week in {where}: pick one to prepare again.</p>'
                  if encs else "") + f'<select name="boss" aria-label="Boss" class="big">{options}</select>')
     diffs = "".join(f'<label class="seg"><input type="radio" name="difficulty" value="{d}"{" checked" if d == diff else ""}>'
-                    f'<span>{e(DIFF_LABELS.get(d, d))}</span></label>' for d in settings.DIFFICULTIES if d != "lfr")
+                    f'<span><i class="dsh {d}"></i>{e(DIFF_LABELS.get(d, d))}</span></label>' for d in settings.DIFFICULTIES
+                    if d != "lfr")  # the rarity shape before the word (DESIGN.md), as on the tools
     ic = icons.img(icons.CLASS_ICON.format(cls=loaded.class_name.lower()), "large", "me-ic")
     items = prepared()
     board = raid_board(encs, loaded.class_name, loaded.spec)
@@ -1220,18 +1230,26 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
         from paf import characters, lastraid
 
         slug = characters.current_slug()
-        last, said = lastraid.card(slug), lastraid.headline(slug)
-        if said and "data-reading" not in last:  # read: one line beside the prep, the details on Reclear
-            import re
+        last, read = lastraid.card(slug), lastraid.load().get(slug) or {}
+        if read.get("bosses") and "data-reading" not in last:  # read: beside the prep, a boss a row, the details
+            byname = {x.name: x for x in encs}  # on Reclear (review: the hero's right half stood empty)
 
-            pct = re.search(r"got it to (\d+)%", said)  # the boss's face and its health left as a bar (fresh app
-            boss = next((x for x in encs if said.startswith(x.name)), None)  # review 7: a sentence)
-            face = (f"<img class='lr-face' src='/bossimg/{boss.id}.png' alt='' onerror=\"this.remove()\">"
-                    if boss else "")
-            bar = (f"<span class='lr-hp' title='boss health left at the end of your best pull'><i style='width:"
-                   f"{int(pct[1])}%'></i></span>" if pct else "")
-            last = (f"<section class='lr lr-row'><h2>Your last raid</h2><p class='lr-line'>{face}{e(said)} {bar}"
-                    "<a href='/reclear'>Reclear &rarr;</a></p></section>")
+            def lr_row(b: dict) -> str:
+                boss = byname.get(b["name"])
+                face = (f"<img class='lr-face' src='/bossimg/{boss.id}.png' alt='' onerror=\"this.remove()\">"
+                        if boss else "")
+                if b.get("kill"):
+                    state = "<span class='lr-k'>&#10003; killed</span>"
+                elif b.get("best") is not None:  # the boss's health left as a bar
+                    state = (f"<span class='lr-k'>best pull {b['best']:.0f}%<span class='lr-hp' title='boss health "
+                             f"left at the end of your best pull'><i style='width:{int(b['best'])}%'></i></span></span>")
+                else:
+                    state = "<span class='lr-k'>not killed</span>"
+                return f"<li class='lr-line'>{face}<b>{e(b['name'])}</b>{diff_pill(b['difficulty'])}{state}</li>"
+            last_side = ("<section class='lr hero-side'><h2>Your last raid</h2><ul class='lr-lines'>"
+                         + "".join(lr_row(b) for b in read["bosses"][:4])
+                         + "</ul><a class='btn ghost' href='/reclear'>What to clean on Reclear &rarr;</a></section>")
+            last = ""
         else:
             last = last + lastraid.CARD_JS if last else ""
     except Exception:  # noqa: BLE001 - the home always shows
@@ -1245,12 +1263,13 @@ def simple_home(loaded, encs, character: str, guild: str, creds: str) -> str:
         stale = stale_badge(cur) if cur else ""
     except Exception:  # noqa: BLE001 - the home always shows
         stale = ""
-    return f"""<section class="home-hero"><div><form method="get" action="/boss" class="start"><h1>Prepare a boss</h1>
+    return f"""<section class="home-hero"><div><form method="get" action="/boss" class="start" id="start"><h1>Prepare a boss</h1>
 <p class="me">{ic}<span>for <b>{e(loaded.name)}</b>, {e(loaded.spec.title())} {e(loaded.class_name.title())}\
 {(" &middot; " + e(g)) if g else ""}</span>{stale}</p>{pick}
-<div class="segs" role="radiogroup" aria-label="Difficulty">{diffs}</div>
-<button class="btn go">Prepare <span class="go-boss">{e(nxt.name if nxt else (encs[0].name if encs else "this boss"))}</span>
-&rarr;</button></form>{queue_strip(diff) if encs else ""}</div>{last_side}</section>
+<div class="segs" role="radiogroup" aria-label="Difficulty">{diffs}</div></form>
+<div class="go-row"><button class="btn go" form="start">Prepare <span class="go-boss">\
+{e(nxt.name if nxt else (encs[0].name if encs else "this boss"))}</span> &rarr;</button>{queue_strip(diff) if encs else ""}\
+</div></div>{last_side}</section>
 <script>(function(){{var s=document.querySelector('.start select'),b=document.querySelector('.go-boss');
 if(s&&b)s.addEventListener('change',function(){{b.textContent=s.options[s.selectedIndex].text}})}})()</script>
 {last}{board}{mine}"""
@@ -1815,14 +1834,13 @@ def feedback_page(jid: str = "", note: str = "") -> str:
     dest = ("sent to the prep-a-fight team" if feedback.endpoint() else
             "opened as a GitHub issue in your browser, for you to post (a free GitHub account is needed)")
     return f'''<h1>Send feedback</h1>{note}<p class="lead">A bug, a wrong number, an idea: it is {dest}.</p>
-<form method="post" action="/feedback" class="card"><input type="hidden" name="job" value="{e(jid)}">
+<form method="post" action="/feedback" class="card fb-form"><input type="hidden" name="job" value="{e(jid)}">
 <label>Your message <textarea name="message" required placeholder="What you did, what you expected, what you got.
 Your spec and the boss help us."></textarea></label>
 {f"""<label class="check-row"><input type="checkbox" name="log" checked><span> Attach the {"log of this prep" if jid else "app's log"}
 (below; your Warcraft Logs key, user folder and email addresses are removed)</span></label>""" if log.strip() else ""}
-<label class="check-row"><input type="checkbox" name="perf" checked><span> Attach performance measures: your computer's CPU,
-cores and memory, and how long each step took (nothing personal: no name, no log, no folder). They help make the app
-faster on every computer.</span></label>
+<label class="check-row"><input type="checkbox" name="perf" checked><span> Attach your computer's speed (CPU, cores,
+memory, time per step). Nothing personal.</span></label>
 <div class="cta"><button class="btn go">{"Send" if feedback.endpoint() else "Open it on GitHub"}</button></div></form>
 <h2>Exactly what is sent</h2><div class="card"><pre class="log">{e(preview[-20000:])}</pre></div>'''
 
