@@ -206,7 +206,9 @@ def test_gear_and_loot_inside_the_noise_get_one_verdict_and_no_colour():
     d.gear_fights, d.gear_error = ["boss fight"], 0.29
     d.loot, d.loot_error = [("Sanguine Rancor", "trinket", 0.31, -0.15)], 0.20
     page = render(d)
-    assert "<b>Keep yours:</b> the best swap, trinket: A (334), is +0.57% &plusmn;0.29, within the noise." in page
+    # the threshold the colours use, twice the error, said as is (a review: "+0.56% ±0.29, within the noise")
+    assert "<b>Keep yours:</b> the best swap, trinket: A (334), is +0.57%, under the &plusmn;0.58% noise." in page
+    assert "Gain\n&plusmn;0.58%</th>" in page and "a gap under &plusmn;0.40% is noise" in page
     assert "keep yours</span>" not in page and "&asymp; best</span>" not in page  # the sentence says it once
     assert "&asymp; best: within" not in page
     assert '<span class="">+0.31%</span>' in page and '<span class="pos">' not in page.split("What this boss drops")[1]

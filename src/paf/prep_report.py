@@ -1591,8 +1591,9 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
         lead = ""
         if keep:
             best_set = "; ".join(lk(c) for c in d.gear[0][0].split("; "))
-            lead = (f"<p><b>Keep yours:</b> the best swap, {best_set}, is {top:+.2f}% &plusmn;{d.gear_error:.2f}, "
-                    "within the noise.</p>")
+            lead = (f"<p><b>Keep yours:</b> the best swap, {best_set}, is {top:+.2f}%, "  # the threshold used,
+                    + (f"under the &plusmn;{2 * d.gear_error:.2f}% noise.</p>" if top >= -2 * d.gear_error else  # 2x
+                       "a loss: every swap loses.</p>"))  # the error (a review: "+0.56% ±0.29, within the noise")
         for i, (ch, per, w) in enumerate(uniq[:3] if keep else uniq[:8]):
             noise = (i and top > 2 * d.gear_error and top - w <= 2 * d.gear_error  # never "about the best" on a
                      and w >= 0)  # loss, nor under a best that is itself "keep yours" (a review: two verdicts)
@@ -1610,8 +1611,9 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
         tabs["gear"].insert(0, f"""<h2>Best gear from your bags, for this fight</h2><div class="card scroll">
 {"<p class='small warn'>&#9888; Every set here loses more than 5%: a sim gone wrong, not a reading. Keep the gear you wear.</p>" if top < -5 else ""}{lead}
 <table><tr><th title="Simmed {e(d.gear_plan or 'with the default priority list')}, {e(mine)}">Swaps vs your equipped gear
-</th><th class="n">Gain &plusmn;{d.gear_error:.2f}%</th>{head}</tr>{body}</table>
-{"<p class='tiny muted'>&asymp; best: within the error of the best set.</p>" if "&asymp; best<" in body else ""}</div>""")
+</th><th class="n" title="a gain under &plusmn;{2 * d.gear_error:.2f}% (twice the sims&#39; error) is noise">Gain
+&plusmn;{2 * d.gear_error:.2f}%</th>{head}</tr>{body}</table>
+{f"<p class='tiny muted'>&asymp; best: within {2 * d.gear_error:.2f}% of the best set.</p>" if "&asymp; best<" in body else ""}</div>""")
 
     # loot
     if d.loot:
@@ -1630,7 +1632,7 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
 Top Gear sets, the rest rearranged around it (its real value; below a single swap when your best set already beats what you
 wear)">In your best sets</th><th class="n" title="vs the gear you wear: the classic droptimizer value, one swap on your
 equipped set">Single swap</th></tr>{body}</table>
-<p class="small muted">At item level {d.loot_ilvl}{_track_top(d)}; statistical error about &plusmn;{d.loot_error:.2f}%.</p></div>""")
+<p class="small muted">At item level {d.loot_ilvl}{_track_top(d)}; a gap under &plusmn;{2 * d.loot_error:.2f}% is noise.</p></div>""")
 
     notes = [re.sub(r"^SimC puts (\d+%) of your damage on the boss vs (\d+%) in the top players' logs, even with more "
                     r"adds:", r"Even with the add waves counted at the minimum, SimC's default priority list puts \1 "
