@@ -77,17 +77,20 @@ def test_the_raid_lead_picks_a_spot():
 
     pull = Spot("pull", "On pull", 0.52, 52, 0.0)
     s2 = Spot("phase", "Start of Stage Two", 0.40, 40, 262.0, "Stage Two", 4.0)
-    sh = {"boss": "Nek'zali", "targets": [], "builds": [], "enc": 3470, "diff": 5, "lust": [pull, s2],
+    tiny = Spot("time", "Around 2:00", 0.03, 3, 120.0)  # under 5%: in "elsewhere" until picked (review)
+    sh = {"boss": "Nek'zali", "targets": [], "builds": [], "enc": 3470, "diff": 5, "lust": [pull, s2, tiny],
           "lust_pick": "", "lust_kills": 100,
           "lust_gains": ("Elemental", {"On pull": [0.0, 0.0], "Start of Stage Two": [1.24, 0.8]}, 0.3, 389.8)}
     assert raidlead.lust_spot(sh) is pull  # no pick: the top raids' most used spot
     html = raidlead.lust_block(sh, "mythic")
     assert "value='On pull' checked" in html and "+1.2%<small>&plusmn;0.3%</small>" in html and ">baseline<" in html
     assert "<b>Start of Stage Two, <span class='t'>4:22</span></b>" in html
-    assert "8% of the top raids lust elsewhere" in html
+    assert "8% of the top raids lust elsewhere" in html and "Around 2:00" not in html
     assert "Lust at the start of Stage Two: +1.2% damage for the Elemental prep over lust on pull." in html
     assert "The top raids are split: 52% on pull, 40% at the start of Stage Two." in html
     assert "(6:29 kill)" in html
     assert "Bloodlust: on pull" in raidlead.text(sh, "mythic")
     sh["lust_pick"] = "Start of Stage Two"
     assert raidlead.lust_spot(sh) is s2 and "value='Start of Stage Two' checked" in raidlead.lust_block(sh, "mythic")
+    sh["lust_pick"] = "Around 2:00"
+    assert "value='Around 2:00' checked" in raidlead.lust_block(sh, "mythic")
