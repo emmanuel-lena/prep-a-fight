@@ -94,6 +94,27 @@ def test_two_pulls_with_other_talents_lead_with_the_build():
     assert "pull B next to pull A" in page and "the gap is gameplay" in page
 
 
+def test_review_names_the_players_with_nothing_to_do_in_sight():
+    def player(name, verdict):
+        return {"name": name, "spec": "Rogue-Subtlety", "verdict": verdict, "target": "Boss",
+                "shares": {"Boss": 0.9}, "habit": {"Boss": 0.9}}
+    page = wv.render({"kind": "review", "fight": "Boss, kill of 5:00", "targets": [
+        {"name": "Boss", "main": True, "covered": True, "raid": 0.9, "tops": 0.9}],
+        "players": [player("Aa", "ok"), player("Bb", "unknown")]})
+    assert "<details" not in page and "Play like the top players of their spec (1)" in page
+    assert "<b>Aa</b>" in page and "Not measured (1)" in page
+
+
+def test_specgear_shows_your_sim_your_kill_and_the_tops_and_points_to_the_gear_tool():
+    rows = [{"spec": "Sub", "label": "Subtlety", "sim": 180e3, "tops": 232e3, "error": 0.1},
+            {"spec": "Out", "label": "Outlaw", "sim": 170e3, "tops": 218e3, "error": 0.1}]
+    page = wv.render({"kind": "specgear", "mine": "Sub", "verdict": "ok", "title": "Stay Subtlety", "rows": rows,
+                      "now": 160e3, "kills": {"best": 162e3, "median": 150e3, "n": 1},
+                      "gear_sentence": "The top players' gear is worth +12.5%."})
+    assert "Stay Subtlety" in page and "<b>160k</b>" in page and "<b>162k</b>" in page and "<b>232k</b>" in page
+    assert "href='/tool/gear'" in page and "101% of your sim" in page
+
+
 def _talents_row(code, gain, swaps, players=3):
     return {"code": code, "gain": gain, "players": players, "swaps": swaps}
 

@@ -324,11 +324,12 @@ def review(d: dict) -> str:
         lst = [p for p in players if p["verdict"] == key]
         if not lst:
             continue
-        items = "".join(who(p) for p in lst)
-        if key in ("ok", "unknown"):
-            blocks += f"<details class='more'><summary>{e(title)} ({len(lst)})</summary><ul class='plist'>{items}</ul></details>"
+        if key in ("ok", "unknown"):  # nothing to do for them: their names in sight, in one row (no fold)
+            chips = "".join(f"<span class='who-chip' title='{e(_spaced(p['spec']))}'>{icons.spec_any(p['spec'])}"
+                            f"<b>{e(p['name'])}</b></span>" for p in lst)
+            blocks += f"<h3>{e(title)} ({len(lst)})</h3><div class='whos compact'>{chips}</div>"
         else:
-            blocks += f"<h3>{e(title)}</h3><ul class='plist'>{items}</ul>"
+            blocks += f"<h3>{e(title)}</h3><ul class='plist'>{''.join(who(p) for p in lst)}</ul>"
     return (f"{head}<h3>Where your raid's damage goes</h3><ul class='glist cov-list'>{rows}</ul>{blocks}"
             "<p class='ws-fine'>Your raid's share of damage on each target, the mark is the top raids'. This compares "
             "habits: it does not know your raid's assignments (a soak, a kick, an add someone must hold).</p>")
@@ -845,11 +846,27 @@ def specgear(d: dict) -> str:
                       f"{who}</small></span>{_bar(gain, scale)}<span class='l-val "
                       f"{'pos' if gain > noise else 'neg' if gain < -noise else ''}'>"
                       f"{'&ndash;' if r is mine else _pct(gain)}</span></li>")
-    you = (f"<p>{e(d['gear_sentence'])}</p>" if d.get("gear_sentence") else "")
-    you += f"<p>{e(d['kills_sentence'])}</p>" if d.get("kills_sentence") else ""
+    kills = d.get("kills") or {}
+    now = d.get("now")
+
+    def k(v: float) -> str:
+        return f"{v / 1000:,.0f}k"
+    tiles = ""
+    if now and kills.get("n"):  # your sim, your kills and the top players' figure, side by side
+        tiles = (f"<div class='kts'><div class='kt'><small>Your sim, as you are</small><b>{k(now)}</b></div>"
+                 f"<div class='kt'><small>Your best kill here</small><b>{k(kills['best'])}</b><span>"
+                 f"{kills['n']} ranked {'kill' if kills['n'] == 1 else 'kills'} &middot; {kills['best'] / now:.0%} of "
+                 f"your sim</span></div>"
+                 + (f"<div class='kt'><small>Top {e(mine['label'])} players</small><b>{k(mine['tops'])}</b>"
+                    "<span>median of the top 100</span></div>" if mine and mine.get("tops") else "")
+                 + "</div>")
+    you = tiles or (f"<p>{e(d['kills_sentence'])}</p>" if d.get("kills_sentence") else "")
+    if d.get("gear_sentence"):  # what the gear is worth, and where to act on it
+        you += (f"<p class='sg-gear'><span>{e(d['gear_sentence'])}</span> <a class='btn ghost' href='/tool/gear'>"
+                "What to equip and farm first</a></p>")
     notes = "".join(f"<p class='ws-fine'>{e(n)}</p>" for n in d.get("notes") or [])
     return (f"{head}<h3>Each spec on you, in the top players' gear at {ilvl}</h3><ul class='glist'>{lines}</ul>"
-            f"<h3>You</h3>{you}{notes}"
+            f"<h3>You, your kills and your gear</h3>{you}{notes}"
             f"<p class='ws-fine'>Boss damage per second on the fight rebuilt from the top kills. The top players' "
             f"figure is the median of the top 100 of each spec. Each spec is simmed in the set its top "
             f"{d.get('gear_tops', 20)} players wear most, slot by slot, at item level {ilvl}, with the best of three "

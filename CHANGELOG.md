@@ -17,6 +17,9 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 - Gear, without a boss: a new "1 · 2 · 3+" target choice answers for each target count at once, a card each: the
   talents to play (yours, SimulationCraft's, or the top players' builds on the bosses you prepared, taken only beyond
   the noise) and the set from your bags and vault with those talents, only what changes from what you wear (#43).
+- Tool results read at a glance: two pulls played with other talents say so first, the raid night numbers its pulls
+  and marks each one's first death, a long build is two columns (take, drop) with its Copy button on top, enchants
+  within the noise are muted, and nothing hides behind a click any more.
 ## 0.8.30 (2026-11-12)
 
 - After an update, the app opens again by itself (it closed and stayed closed).
