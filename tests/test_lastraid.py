@@ -82,7 +82,7 @@ def test_the_home_card(home, monkeypatch):
                                "best": 0.0, "jobs": {"rotation": "r1"}}]}})
     html = lastraid.card("me")
     assert "Your last raid" in html and "killed in 3 pulls" in html and "Keep Ascendance for the adds." in html
-    assert "/job/r1" in html and "/job/n1" in html and "Read the last log again" in html
+    assert "/job/r1" in html and "/job/n1" in html and "read it again</button>" in html and "id='lr-again'" in html
     assert lastraid.card("nobody") == ""
 
 
@@ -180,7 +180,7 @@ def test_the_comparison_headers_keep_the_time_when_the_health_is_a_row():
     rows = [{"cmp": ("Boss health left at 2:38", "66%", "69%"), "kind": "good",
              "pulls": ["wipe at 66% after 2:38", "wipe at 69% after 2:44"]}]
     out = lastraid._cmp_table(rows)
-    assert "Best 0-death pull <small>&#9201;&nbsp;2:38</small>" in out and "wipe at 66%" not in out
+    assert "Best clean pull<span class='lr-ph'><small>&#9201;&nbsp;2:38</small>" in out and "wipe at 66%" not in out
 
 
 def test_a_one_boss_wipe_night_has_no_empty_state_line(home, monkeypatch):
@@ -204,3 +204,13 @@ def test_the_prepare_line_survives_a_full_comparison_table(home, monkeypatch):
     html = lastraid.card("me")
     assert "<nav class='lr-links'><a href='/boss?boss=1&amp;difficulty=mythic'>Sszorak's prep &rarr; why it" in html
     assert "lr-cmp" in html  # the table too
+
+
+def test_the_comparison_is_read_in_a_sentence_first():
+    # review: a table of the two pulls with no sentence over it
+    rows = [{"cmp": ("You: boss DPS", "252k", "209k"), "kind": "good", "pulls": ["2:38", "2:44"]},
+            {"cmp": ("You: active time", "99%", "89%"), "kind": "good"}]
+    out = lastraid._cmp_table(rows)
+    assert out.startswith("<p class='lr-cmp-lede'>Your best clean pull did 21% more boss DPS and was active 10 pts "
+                          "more than your weakest.</p>")
+    assert lastraid._cmp_lede([{"cmp": ("Boss health left at 2:38", "66%", "69%")}]) == ""
