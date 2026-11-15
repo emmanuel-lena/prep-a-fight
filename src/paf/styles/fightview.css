@@ -300,3 +300,4 @@ body.playing .fv #play.btn.primary{background:var(--surface-2);color:var(--fg);b
 .fv .ftl .bm.open .ic{box-shadow:0 0 0 1px #000,0 0 0 2.5px var(--neg)}
 .fv .lv .fbar i.fill{left:36px}
 .fv .ftl .r .g small{display:block}
+.fv .fkey .openk{width:12px;height:12px;border-radius:3px;background:none;border:0;box-shadow:0 0 0 2px var(--neg)}

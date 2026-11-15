@@ -396,7 +396,8 @@ def _ctx(t: float, its: list[tuple[float, Item]], kind: str = "def") -> str:
     if near:
         order = ("adds", "cast", "immune", "phase")  # what you press it for, the most concrete first
         x = min(near, key=lambda x: (order.index(x.kind), abs(x.t - t)))
-        return ("on the " + x.text if x.kind == "adds" else "when it starts" if x.kind == "phase" else
+        unit = "the " if re.match(r"\d+\s*×", x.text) else ""  # "the 3 × Spawn of Vexhul", but "Ithraz": a name
+        return (f"on {unit}{x.text}" if x.kind == "adds" else "when it starts" if x.kind == "phase" else
                 "when the boss goes immune" if x.kind == "immune" else "on " + x.text)
     return ""
 
@@ -837,6 +838,8 @@ def timeline_html(d, tl: Timeline) -> str:
         legend += "<span><i class='kk ghostk'></i>where most top players press it</span>"
     if any(m.flag for lane in tl.you for m in lane.marks):
         legend += "<span><b class='badgek'>!</b>held by the plan, or pressed elsewhere by the tops</span>"
+    if any(m.flag for lane in tl.boss for m in lane.marks):  # the red ring (a fresh review: never explained)
+        legend += "<span><i class='kk openk'></i>no defensive in your plan for this one</span>"
     if any(m.move for b in tl.boss for m in b.marks):
         legend += f"<span><i class='kk runk'>{RUN}</i>the top players move for it</span>"
     return (f"<div class='ftl' data-end='{end:.1f}' role='img' aria-label='The fight on one clock: your presses, the "
