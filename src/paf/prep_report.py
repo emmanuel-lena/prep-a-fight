@@ -424,8 +424,9 @@ def raid_section(r: RaidInfo, gear: bool = True, who: str = "") -> str:
     you = (f"you ({e(r.you[0])}, {r.you[1] / 1000:,.0f}k DPS"
            + (f" <span class='pill'>your log: {e(r.logged_as)}</span>" if r.logged_as else "") + ")" if r.you_found else
            f"{'an' if r.you[0][:1].lower() in 'aeiou' else 'a'} {e(r.you[0])} at your raid's median DPS ({r.you[1] / 1000:,.0f}k; " + (f"you are in that log as {e(r.logged_as)}, swapped out)" if r.logged_as else f"you are not in that log as {e(r.you[0])})"))  # another spec of yours may be
-    head = (f"<p class='small'>From your raid's log <a href='https://www.warcraftlogs.com/reports/{e(r.report)}' "
-            f"target='_blank' rel='noopener'>{e(r.report)}</a> ({e(r.fight)}, {r.players} players), with {you}.</p>")
+    head = (f"<p class='small'>From <a href='https://www.warcraftlogs.com/reports/{e(r.report)}' target='_blank' "
+            f"rel='noopener'>your raid's log</a> ({e(r.fight)}, {r.players} players), with {you}.</p>")  # never a raw
+    # report code as words (a review); the log's date is not in the prep's data
     if not r.verdicts:
         return (f"<h2>Your raid and the adds</h2><div class='card'>{head}<p>No add takes a real share of the damage "
                 f"on this boss: nothing to decide, play for the boss.</p>{who}</div>")
@@ -981,9 +982,20 @@ def _tools_html() -> str:
     """The tools that dig further into this boss (the sheet is shown in a frame: they open in the app's window)."""
     from paf import workshop
 
-    return ("<h2>Dig further, one question at a time</h2>"
-            + workshop.cards(("topgear", "droptimizer", "talents", "specgear", "optimize", "timeline", "assigns",
-                              "mechanics"), target="_top"))
+    cards = workshop.cards(("topgear", "droptimizer", "talents", "specgear", "optimize", "timeline", "assigns",
+                            "mechanics"), target="_top")
+    # the last thing on a long tab hidden at load: lazy icons there stayed blank slots (a review: a 54 px indent
+    # with no icon); eight small icons, loaded with the page
+    return "<h2>Dig further, one question at a time</h2>" + cards.replace(' loading="lazy"', "")
+
+
+def _review_html(d: PrepData) -> str:
+    """Your last pull (paf.simple) with its bars named by what they measure: the share of the fight spent casting,
+    spent moving (a review: "Moving: You 65%" read as casting while moving)."""
+    from paf import simple
+
+    return (simple.review_card(d).replace("<div class='cmp'><b>Casting", "<div class='cmp'><b>Time casting")
+            .replace("<div class='cmp'><b>Moving", "<div class='cmp'><b>Time moving"))
 
 
 # the other actions' sentences (paf.actions), read back into a short muted line after the name: (its facts, what it
@@ -1729,7 +1741,7 @@ equipped set">Single swap</th></tr>{body}</table>
                    + sugg]
         + tabs["gear"],
         "boss": tabs["boss"],
-        "deeper": tabs["overview"] + [f"<div class='simple'>{simple.review_card(d)}</div>"] + tabs["cooldowns"] + tabs["raid"] + tabs["fight"]
+        "deeper": tabs["overview"] + [f"<div class='simple'>{_review_html(d)}</div>"] + tabs["cooldowns"] + tabs["raid"] + tabs["fight"]
         + [_tools_html()],
     }
     sections["deeper"] = [_contents("".join(sections["deeper"]))]
