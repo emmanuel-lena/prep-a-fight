@@ -500,7 +500,7 @@ def prepared_block() -> str:
         f'{diff_pill(x["difficulty"])} '
         + (f'<span class="pill">{e(x["spec"])}</span> ' if x["spec"] else "")
         + f'<span class="pill">{"prep sheet + timelines" if len(x["files"]) == 2 else "prep sheet only" if "prep" in x["files"] else "timelines only"}</span>'
-        + (f'<div class="top"><b class="pos">{x["headline"]["gain"]:+.1f}%</b> {e(x["headline"]["what"])}</div>'
+        + (f'<div class="top"><b class="pos">{x["headline"]["gain"]:+.1f}%</b> {e(html.unescape(x["headline"]["what"]))}</div>'
            if x.get("headline", {}).get("gain") is not None else "")
         + f'<div class="when">updated {time.strftime("%d %b %H:%M", time.localtime(x["mtime"]))}</div></a>'
         for x in items)

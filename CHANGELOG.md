@@ -17,6 +17,7 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 - Gear, without a boss: a new "1 · 2 · 3+" target choice answers for each target count at once, a card each: the
   talents to play (yours, SimulationCraft's, or the top players' builds on the bosses you prepared, taken only beyond
   the noise) and the set from your bags and vault with those talents, only what changes from what you wear (#43).
+- The tools have their own place in the side bar and read better: each form beside what it gives and how long it takes, only the choices that count (a training dummy's targets hide once a boss is picked), "Prepare <boss> →" when the boss has no sheet yet; renamed for what they answer (Should you switch spec?, Best talents for this boss, What the deaths cost...). The Gear result says what each item replaces and shows its other sets and drops without folds.
 ## 0.8.30 (2026-11-12)
 
 - After an update, the app opens again by itself (it closed and stayed closed).
