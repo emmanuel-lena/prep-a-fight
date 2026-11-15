@@ -36,7 +36,7 @@ HEAD = ('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="p
 
 BACK = ("<button type='button' class='nav-back' hidden aria-label='Go back' title='Go back' onclick='history.back()'>"
         "&larr; <span>Go back</span></button><script>(function(){var b=document.currentScript.previousElementSibling;"
-        "if(history.length>1&&['/','/reclear','/raidlead','/characters','/settings','/feedback'].indexOf(location.pathname)<0)"
+        "if(history.length>1&&['/','/reclear','/raidlead','/characters','/tools','/settings','/feedback'].indexOf(location.pathname)<0)"
              "b.hidden=false;})();</script>")
 # a Home button with a little house, back to the home page from anywhere (hidden on the home page itself)
 HOME = ("<a class='nav-back nav-home' href='/' hidden aria-label='Home' title='Home'><svg viewBox='0 0 24 24' "
@@ -67,6 +67,8 @@ PLACES = (
     ("/characters", "Characters", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20.5a7.5 7.5 0 0 1 15 0"),
     ("/tool/gear", "Gear", "M9 3.5 4 6.5l2 4.5 2-1v10.5h8V10l2 1 2-4.5-5-3a3 3 0 0 1-6 0z"),  # a local Raidbots (the
     # owner, 2026-10-24: a /simc, a fight, then what to wear and farm)
+    ("/tools", "Tools", "M14.7 6.3a4 4 0 0 0-5.4 5.2L3.5 17.3a1.8 1.8 0 0 0 2.5 2.5l5.8-5.8a4 4 0 0 0 5.2-5.4l-2.5 2.5"
+                        "-2.3-.6-.6-2.3z"),  # the tools had no place: lit under Settings (reviews, 2026-11-15)
     ("/settings", "Settings", "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7 7 0 0 1-2 1.2L14.8"
                               " 21h-4l-.3-2a7 7 0 0 1-2-1.2l-1.9.7-2-3.4 1.6-1.2a7 7 0 0 1 0-2.4L4.6 9.3l2-3.4 1.9.7a7 7"
                               " 0 0 1 2-1.2L10.8 3h4l.3 2a7 7 0 0 1 2 1.2l1.9-.7 2 3.4-1.6 1.2a7 7 0 0 1 0 2.4z"),
@@ -75,27 +77,29 @@ FEEDBACK = ("<a class='side-fb' href='/feedback' title='Feedback'>" + _svg("M4 5
 BACK_ICON = ("<button type='button' class='side-back' hidden aria-label='Go back' title='Go back' "
              "onclick='history.back()'>" + _svg("M15 5l-7 7 7 7") + "<span>Back</span></button>"
              "<script>(function(){var b=document.currentScript.previousElementSibling;"
-             "if(history.length>1&&['/','/reclear','/raidlead','/characters','/settings','/feedback'].indexOf(location.pathname)<0)"
+             "if(history.length>1&&['/','/reclear','/raidlead','/characters','/tools','/settings','/feedback'].indexOf(location.pathname)<0)"
              "b.hidden=false;})();</script>")
 # the place the page belongs to, lit in the side bar
-SIDE_JS = ("<script>(function(){var p=location.pathname,best=null;document.querySelectorAll('.side-nav a').forEach("
-           "function(a){var h=a.getAttribute('href');if(p===h||(h!=='/'&&p.indexOf(h)===0)){best=a}});"
+SIDE_JS = ("<script>(function(){var p=location.pathname,best=null,side=document.querySelector('aside.side');"
+           "var pl=side&&side.dataset.place;"  # a page whose address does not say its place (a tool's job page)
+           "document.querySelectorAll('.side-nav a').forEach("
+           "function(a){var h=a.getAttribute('href');if(pl?h===pl:(p===h||(h!=='/'&&p.indexOf(h)===0))){best=a}});"
            "var fb=document.querySelector('.side-fb');if(!best&&fb&&p.indexOf('/feedback')===0)best=fb;"
            "if(!best&&(p.indexOf('/view/')===0||p.indexOf('/boss')===0||p.indexOf('/job/')===0||p.indexOf('/raid/')===0"
            "||p.indexOf('/share/')===0))"
            "best=document.querySelector(\".side-nav a[href='/']\");"
-           "var near=null;if(!best&&p.indexOf('/tool')===0)near=document.querySelector(\".side-nav a[href='/settings']\");"
-           "if(near)near.classList.add('on');"  # a tool: lit under Settings, which files them, but not 'the current page'
+           "if(!best&&p.indexOf('/tool/')===0)best=document.querySelector(\".side-nav a[href='/tools']\");"
            "if(best){best.classList.add('on');"
            "best.setAttribute('aria-current','page')}})();</script>")
 
 
-def sidebar(extra: str = "", who: str = "", foot: str = "") -> str:
+def sidebar(extra: str = "", who: str = "", foot: str = "", place: str = "") -> str:
     """The app's side bar (DESIGN.md): the brand (home), Back (the desktop window has no browser buttons), the app's
     places, `extra` (what this page adds: a sheet's boss and links), and at the bottom `foot` and the character
     menu `who`. A rail of icons on a narrow window, a bar at the bottom on a phone."""
     links = "".join(f"<a href='{h}' title='{label}'>{_svg(d)}<span>{label}</span></a>" for h, label, d in PLACES)
-    return (f"<aside class='side'><div class='side-top'><a class='brand' href='/'>prep-a-<b>fight</b></a>"
+    at = f" data-place='{place}'" if place else ""
+    return (f"<aside class='side'{at}><div class='side-top'><a class='brand' href='/'>prep-a-<b>fight</b></a>"
             f"{BACK_ICON}</div><nav class='side-nav' aria-label='The app'>{links}</nav>"
             + (f"<div class='side-extra'>{extra}</div>" if extra else "")
             + f"<div class='side-foot'>{FEEDBACK}{foot}{who}</div></aside>{SIDE_JS}")

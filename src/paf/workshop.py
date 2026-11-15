@@ -43,10 +43,10 @@ TOOLS: tuple[Tool, ...] = (
          "Every item worth it for you, with its gain in %, best first.", needs_prep=False),
     Tool("bonusroll", "Where to use your bonus rolls", "Which boss is worth your bonus roll.", "inv_misc_coin_17", "gear", "5-10", ("difficulty", "goal"),
          "Every boss of the raid ranked by what a bonus roll brings you, with its best item.", needs_prep=False),
-    Tool("specgear", "Which spec, which gear", "Your best spec here; the top players' gear (ilvl 334) on you.", "achievement_bg_topdps", "gear", "1-3", ("boss", "difficulty"),
+    Tool("specgear", "Should you switch spec?", "Your best spec here, in your items and in the top players'.", "achievement_bg_topdps", "gear", "1-3", ("boss", "difficulty"),
          "Your character simmed in each spec in the top players' gear, their gap in the logs, your own kills, and one "
          "sentence."),
-    Tool("talents", "The top players' talents, on you", "Which top players' build does the most on you.", "inv_misc_book_11", "gear", "3-6", ("boss", "difficulty"),
+    Tool("talents", "Best talents for this boss", "The top players' builds simmed on you: which does the most.", "inv_misc_book_11", "gear", "3-6", ("boss", "difficulty"),
          "The builds compared on your character, with their gain and the talents to change."),
     Tool("optimize", "When to press your cooldowns", "Hold each cooldown for a moment, or press it on cooldown.", "spell_holy_borrowedtime", "cds", "20-40",
          ("boss", "difficulty", "goal3"), "The best cooldown plan for each goal you pick, and the pull played with it."),
@@ -60,11 +60,11 @@ TOOLS: tuple[Tool, ...] = (
     Tool("comp", "Who hits what in your raid", "Who hits the adds you cannot skip, in your raid.", "achievement_guildperk_everybodysfriend", "raid", "1",
          ("boss", "difficulty", "raid"), "Each add with who takes it in the top raids and in your pull, and who "
          "should, in their own spec."),
-    Tool("wipe", "Your best pull, in detail", "What the deaths cost, and when the boss would have died.", "spell_shadow_soulleech_3", "raid", "1", ("boss", "difficulty", "raid"),
+    Tool("wipe", "What the deaths cost", "Your best pull: when the boss would have died without them.", "spell_shadow_soulleech_3", "raid", "1", ("boss", "difficulty", "raid"),
          "The boss's health over your best pull, as played and without the deaths, and what each death cost."),
     Tool("night", "Your raid night, pull by pull", "Deaths, healthstones and potions, pull by pull; live too.", "inv_stone_04", "raid", "1", ("raid",),
          "Each player over the night, then each pull: deaths, healthstones, potions.", needs_prep=False),
-    Tool("diff", "Pick two pulls, side by side", "What went better in one pull than another, raid and you.", "inv_misc_spyglass_02", "raid", "1-2", ("boss", "difficulty", "raid"),
+    Tool("diff", "Two pulls side by side", "What went better in one pull than another, raid and you.", "inv_misc_spyglass_02", "raid", "1-2", ("boss", "difficulty", "raid"),
          "From the log you give: its worst and best pulls without a death (else its best wipe and the kill), with "
          "both pulls' boss health, deaths, damage per target, and your damage, casts and buffs in each.",
          needs_prep=False),
@@ -74,7 +74,7 @@ TOOLS: tuple[Tool, ...] = (
     Tool("mechanics", "The boss's mechanics", "Every ability from the Encounter Journal, by role.",
          "inv_misc_book_09", "boss", "1", ("boss", "difficulty"),
          "The boss's abilities by role, and who handles what in the top kills.", needs_prep=False),
-    Tool("assigns", "Assignments you can take", "Which mechanics a player can take, when, at what cost.", "ability_warrior_rallyingcry", "boss", "1", ("boss", "difficulty"),
+    Tool("assigns", "Mechanics you can take", "Which mechanics a player can take, when, at what cost.", "ability_warrior_rallyingcry", "boss", "1", ("boss", "difficulty"),
          "Each assignable mechanic with its timings and the damage it costs.", needs_prep=False),  # reads the kills
 )
 BY_CMD = {t.cmd: t for t in TOOLS}
@@ -87,24 +87,32 @@ def _icon(name: str, cls: str = "") -> str:
     return icons.img(name, "large", cls)
 
 
-def cards(cmds: tuple[str, ...] | list[str], target: str = "") -> str:
-    """The tools' cards, each a link to its page; `target` for a page shown in a frame (the sheet)."""
+PART_OF = {"topgear": "gear", "droptimizer": "gear"}  # a tool another one already answers (the reviews, 2026-11-15)
+
+
+def cards(cmds: tuple[str, ...] | list[str], target: str = "", cols: str = "") -> str:
+    """The tools' cards, each a link to its page; `target` for a page shown in a frame (the sheet); `cols` a grid of
+    the caller's (the index: three a row)."""
     tgt = f" target='{target}'" if target else ""
     n = sum(1 for c in cmds if c in BY_CMD)
-    cols = {2: " c2", 4: " c2", 5: " c5", 8: " c4"}.get(n, "")  # rows that close: never one card alone
+    cols = cols or {2: " c2", 4: " c2", 5: " c5", 8: " c4"}.get(n, "")  # rows that close: never one card alone
+
+    def part(t: Tool) -> str:
+        whole = BY_CMD.get(PART_OF.get(t.cmd, ""))
+        return f"<span class='ws-meta'>Also in &ldquo;{e(whole.title)}&rdquo;</span>" if whole else ""
     return f"<div class='ws-cards{cols}'>" + "".join(
         f"<a class='ws-card' href='/tool/{t.cmd}'{tgt}>{_icon(t.icon, 'ws-ic')}<span class='ws-txt'><b>{e(t.title)}</b>"
-        f"<span class='ws-q'>{e(t.question)}</span></span></a>"
+        f"<span class='ws-q'>{e(t.question)}</span>{part(t)}</span></a>"
         for c in cmds if (t := BY_CMD.get(c))) + "</div>"
 
 
 def index() -> str:
     groups = ""
     for gid, title in GROUPS:
-        groups += f"<h2>{e(title)}</h2>{cards([t.cmd for t in TOOLS if t.group == gid])}"
+        groups += f"<h2>{e(title)}</h2>{cards([t.cmd for t in TOOLS if t.group == gid], cols=' c3')}"
 
-    return (f"<div class='ws'><header class='ws-head'><div><h1>Tools</h1><p class='lead'>A boss's prep runs them "
-            f"all; run one again to dig further.</p></div>"
+    return (f"<div class='ws'><header class='ws-head'><div><h1>Tools</h1><p class='lead'>Your prep already ran "
+            f"most of these; run one again with other choices.</p></div>"
             f"</header>{groups}</div>{CSS}")
 
 
@@ -141,8 +149,10 @@ function update(init){
     if(g)g.hidden=!!o.value&&!!f.querySelector('option[value=""]')});  // a dummy's: a boss is its own fight (args)
   var why=f.dataset.addsOnly&&na?'noadds':(f.dataset.needsPrep&&!sheet(o,d)?'noprep':'');
   f.querySelectorAll('.ws-noadds,.ws-noprep').forEach(function(n){n.hidden=n.className.indexOf('ws-'+why)<0||!why});
-  var g=f.querySelector('.ws-go .btn');if(g)g.disabled=!!why;
-  var a=f.querySelector('.ws-prep');if(a&&o.value)a.href='/boss?boss='+o.value+'&difficulty='+(d||'')}
+  var g=f.querySelector('.ws-go button'),a=f.querySelector('.ws-prep');
+  if(g){g.disabled=!!why||(!s.value&&!f.querySelector('option[value=""]:not([disabled])'));g.hidden=why==='noprep'&&!!a}
+  if(a){a.hidden=why!=='noprep';if(o.value){a.href='/boss?boss='+o.value+'&difficulty='+(d||'');
+    a.textContent='Prepare '+(o.dataset.n||'this boss')+' \u2192'}}}
 f.addEventListener('change',function(){update()});document.addEventListener('DOMContentLoaded',function(){update(1)});update(1)
 })(document.currentScript.previousElementSibling.querySelector('select'))</script>"""
 
@@ -183,8 +193,11 @@ def _boss_select(encounters: list, optional: str = "", last: bool = False) -> st
 
 
 def _segs(name: str, label: str, options: list[tuple[str, str, str]], checked: str) -> str:
-    segs = "".join(f"<label class='seg' title='{e(hint)}'><input type='radio' name='{name}' value='{e(v)}'"
-                   f"{' checked' if v == checked else ''}><span>{e(text)}</span></label>" for v, text, hint in options)
+    def word(v: str, text: str) -> str:  # a difficulty keeps its rarity shape (DESIGN.md), as everywhere
+        return f"<i class='dsh {v}'></i>{e(text)}" if name == "difficulty" else e(text)
+    segs = "".join(f"<label class='seg{' sep' if v == 'each' else ''}' title='{e(hint)}'><input type='radio' "
+                   f"name='{name}' value='{e(v)}'{' checked' if v == checked else ''}><span>{word(v, text)}</span>"
+                   f"</label>" for v, text, hint in options)
     return f"<div class='ws-f'><span>{e(label)}</span><div class='segs'>{segs}</div></div>"
 
 
@@ -205,25 +218,26 @@ def _field(kind: str, encounters: list) -> str:
                                                 ("all", "Both, a plan for each", "")], "all")  # the wizard's words
     if kind in ("targets", "targets+"):  # a training dummy's, as Raidbots asks them (the owner, 2026-10-24); the Gear
         # tool also answers for each count at once (#43)
-        each = [("each", "1 · 2 · 3+", "talents and gear for each target count, one card each")] if kind == "targets+" \
+        each = [("each", "All counts: 1 · 2 · 3+", "talents and gear for each target count, one card each")] if kind == "targets+" \
             else []
         return _segs("targets", "Targets (dummy)", [(str(n), str(n), "") for n in (1, 2, 3, 5, 8)] + each, "1")
     if kind == "length":
         return _segs("length", "Fight length (dummy)", [("180", "3 min", ""), ("300", "5 min", ""),
                                                          ("420", "7 min", "")], "300")
     if kind == "depth":  # the owner, 2026-10-24: "an hour if need be" for the best of the best
-        return _segs("depth", "How deep", [("quick", "Quick", "the usual: about 15 min"),
-                                           ("thorough", "Thorough", "more items kept, the best sets checked at a fine "
-                                                                    "error, then every swap tried: up to an hour")],
+        return _segs("depth", "How deep", [("quick", "Quick · 15 min", "the usual"),
+                                           ("thorough", "Thorough · up to 1 h", "more items kept, the best sets checked "
+                                                                               "at a fine error, then every swap tried")],
                      "thorough")
     if kind == "simc":
-        return ("<label class='ws-f'><span>Another character</span><textarea name='simc' rows='4' placeholder='Paste "
-                "a /simc export here to sim it instead of your character'></textarea></label>")
+        return ("<label class='ws-f'><span>Another character <em>optional</em></span><textarea name='simc' rows='2' "
+                "placeholder='Paste a /simc export here to sim it instead of your character'></textarea></label>")
     if kind == "raid":
         g = settings.get("guild")
-        hint = f"Empty: the latest public log of {g}." if g else "Or set your guild in Settings."
-        return (f"<label class='ws-f'><span>Your raid's log</span><input name='raid' placeholder='https://www.warcraftlogs"
-                f".com/reports/...'><small class='muted'>{e(hint)}</small></label>")
+        hint = f"Empty: the latest public log of {g}, or paste a report link" if g else \
+            "Paste a Warcraft Logs report link (or set your guild in Settings)"
+        return (f"<label class='ws-f'><span>Your raid's log{' <em>optional</em>' if g else ''}</span><input name='raid' "
+                f"placeholder='{e(hint)}'></label>")
     return ""
 
 
@@ -239,15 +253,18 @@ def tool_page(cmd: str, encounters: list) -> str | None:
     return (f"<div class='ws'>"
             f"<header class='ws-tool'>{_icon(t.icon, 'ws-big')}<div><h1>{e(t.title)}</h1><p class='lead'>{e(t.question)}"
             f"</p></div></header>"
-            f"<form method='post' action='/tool/{e(cmd)}' class='ws-form'{' data-adds-only=1' if cmd in ADDS_ONLY else ''}"
+            f"<div class='ws-split'><form method='post' action='/tool/{e(cmd)}' class='ws-form'{' data-adds-only=1' if cmd in ADDS_ONLY else ''}"
             f"{' data-needs-prep=1' if t.needs_prep else ''}>"
             f"<input type='hidden' name='_curated' value='1'>"
-            f"{fields}<p class='ws-gives'><b>You get:</b> {e(t.gives)}</p>{note}"
+            f"{fields}{note}"
             "<p class='ws-note ws-noadds' hidden>No adds on this boss: nothing for this tool to read. Pick a boss with "
-            "adds.</p><p class='ws-note ws-noprep' hidden>No sheet for this boss at this difficulty yet: <a href='/' "
-            "class='ws-prep'>prepare it</a> first, then run this tool.</p>"
-            f"<div class='ws-go'><button class='btn go'>Run it &rarr;</button><span class='muted small'>About "
-            f"{e(t.minutes)} min, on your computer. You can leave the page: it keeps running.</span></div></form></div>{CSS}")
+            "adds.</p><p class='ws-note ws-noprep' hidden>No sheet yet for this boss at this difficulty: this tool reads "
+            "it.</p>"
+            "<div class='ws-go'><button class='btn go'>Run it &rarr;</button><a class='btn go ws-prep' href='/' hidden>"
+            "Prepare this boss &rarr;</a></div></form>"
+            f"<aside class='ws-side'><p class='ws-gives'><b>You get</b>{e(t.gives)}</p><p class='ws-time'>&asymp; "
+            f"{e(t.minutes.replace('-', '–'))} min on your computer &middot; it keeps running if you leave the page</p>"
+            f"</aside></div></div>{CSS}")
 
 
 def args(cmd: str, form: dict[str, list[str]]) -> list[str] | None:

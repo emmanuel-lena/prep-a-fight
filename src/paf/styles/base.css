@@ -90,10 +90,10 @@ a.wh{color:inherit;text-decoration:none;border-bottom:1px dotted var(--muted)}
   .topbar .nav a{white-space:nowrap}}
 /* a difficulty: its word and its rarity shape (never gold: gold is a selection) */
 .pill.diff{display:inline-flex;align-items:center;gap:6px;color:var(--fg);vertical-align:middle}
-.pill.diff::before{content:"";width:9px;height:9px;flex:none;background:var(--muted)}
-.pill.diff.normal::before{background:#1eff00;clip-path:polygon(50% 0,100% 100%,0 100%)}
-.pill.diff.heroic::before{background:#0070dd;border-radius:2px}
-.pill.diff.mythic::before{background:#a335ee;clip-path:polygon(50% 0,100% 38%,81% 100%,19% 100%,0 38%)}
+.pill.diff::before,.dsh{display:inline-block;margin-right:6px;vertical-align:1px;content:"";width:9px;height:9px;flex:none;background:var(--muted)}
+.pill.diff.normal::before,.dsh.normal{background:#1eff00;clip-path:polygon(50% 0,100% 100%,0 100%)}
+.pill.diff.heroic::before,.dsh.heroic{background:#0070dd;border-radius:2px}
+.pill.diff.mythic::before,.dsh.mythic{background:#a335ee;clip-path:polygon(50% 0,100% 38%,81% 100%,19% 100%,0 38%)}
 /* a checkbox with a sentence: a plain row (a chip is for a short word) */
 .check-row{display:flex;gap:10px;align-items:flex-start;margin:10px 0;max-width:72ch;cursor:pointer}
 .check-row input{margin-top:4px;flex:none}

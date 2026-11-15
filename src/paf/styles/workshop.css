@@ -63,3 +63,16 @@
 .ws-card:hover{transform:none;box-shadow:none;border-color:var(--line)} .ws-card:hover b{color:var(--link)}
 .ws-ic{width:40px;height:40px;box-shadow:none}
 @media (min-width:1200px){.ws-cards,.ws-cards.c5,.ws-cards.c4{grid-template-columns:repeat(2,minmax(0,1fr))} .ws-cards.c5>*,.ws-cards.c5>:nth-child(n+4){grid-column:auto}}
+/* the form beside what it gives (DESIGN.md: two columns from 1100px); the run line short */
+.ws-split{display:grid;gap:22px;align-items:start}
+@media (min-width:1100px){.ws-split{grid-template-columns:minmax(0,720px) minmax(260px,380px)}}
+.ws-side{display:grid;gap:12px;margin-top:22px}
+.ws-side .ws-gives{display:grid;gap:4px;padding:16px 18px;border-radius:14px;border:1px solid var(--line);background:var(--surface)}
+.ws-side .ws-gives b{font:600 12px/1 var(--font-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ws-time{margin:0;padding:0 4px;font-size:13.5px;color:var(--muted)}
+.ws-f>span em{font-style:normal;font-weight:400;color:var(--muted);font-size:13px;margin-left:6px}
+.ws-f textarea{min-height:3.2em;transition:min-height .15s} .ws-f textarea:focus,.ws-f textarea:not(:placeholder-shown){min-height:9em}
+.segs .seg.sep{margin-left:12px}
+.ws-go .btn[hidden]{display:none}
+.ws-go button.btn:disabled{background:none;border:1px solid var(--line);color:var(--muted);filter:none;opacity:1}
+@media (min-width:1200px){.ws-cards.c3{grid-template-columns:repeat(3,minmax(0,1fr))}} /* the index: three a row, none alone */

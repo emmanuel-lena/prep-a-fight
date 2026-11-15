@@ -33,8 +33,9 @@ def bossguide_css() -> str:
 CSS = theme.CSS + bossguide_css() + theme.style("web")
 
 
-def page(title: str, body: str, refresh: int | None = None, nav: str = "", job: str = "") -> bytes:
-    """job: the prep whose own page this is (its banner is not repeated on top)."""
+def page(title: str, body: str, refresh: int | None = None, nav: str = "", job: str = "", place: str = "") -> bytes:
+    """job: the prep whose own page this is (its banner is not repeated on top); place: the side bar's link to light
+    when the address does not say it (a tool's job page: Tools)."""
     from paf import loading
 
     meta = f'<meta http-equiv="refresh" content="{refresh}">' if refresh else ""
@@ -45,7 +46,7 @@ def page(title: str, body: str, refresh: int | None = None, nav: str = "", job: 
     return (f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, '
             f'initial-scale=1">{meta}<title>{e(title)}</title>{theme.HEAD}<style>{CSS}{loading.CSS}</style>'
             f"{_class_style()}</head><body class='has-side'>"
-            f"{theme.sidebar(nav, who=character_menu(), foot=lang_switch())}{loading.LOADER}"
+            f"{theme.sidebar(nav, who=character_menu(), foot=lang_switch(), place=place)}{loading.LOADER}"
             f"<main>{update_banner()}{running}{body}</main>{loading.JS}</body></html>").encode()
 
 
@@ -1879,7 +1880,8 @@ def job_page(jid: str, part: str = "") -> bytes:
 
         nice = workshop.job_page(jid, job, log, elapsed, new_reports(job["started"]) if status == "done" else [])
         if nice is not None:
-            return page(workshop.BY_CMD[name].title, nice, 5 if status == "running" else None, job=jid)
+            return page(workshop.BY_CMD[name].title, nice, 5 if status == "running" else None, job=jid,
+                        place="/tool/gear" if name == "gear" else "/tools")
         if status == "running":
             return page(name, f"<h1>Running: {e(name)}</h1><p class='lead'><span id='el' "
                               f"data-start='{job['started']:.0f}'>{elapsed // 60} min {elapsed % 60:02d} s</span>. "
