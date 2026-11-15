@@ -27,3 +27,36 @@ def test_an_enchant_within_the_noise_is_muted_and_listed_last():
     assert page.index("Pick") < page.index("Real") < page.index("Small")
     assert "&asymp; +0.10%" in page and "class=noise" in page
     assert "<td class='n neg'>&minus;0.50%</td>" in page and "Ring 1" in page and "finger1" not in page
+
+
+def _talents_row(code, gain, swaps, players=3):
+    return {"code": code, "gain": gain, "players": players, "swaps": swaps}
+
+
+def test_a_build_within_the_noise_says_same_without_a_copy_button():
+    a, b = ["Ethereal Cloak", 0], ["Bait and Switch", 0]
+    page = wv.render({"kind": "talents", "error": 0.1, "boss": "X", "rows": [
+        _talents_row("MINE", 0, []), _talents_row("NOISE", 0.1, [[a, b], [a, b]]),
+        _talents_row("WORSE", -2.0, [[b, a]])]})
+    assert "l-val same'>same<" in page and "data-copy='NOISE'" not in page and "data-copy='WORSE'" in page
+    assert page.count("Ethereal Cloak") == 2  # a pair listed twice is said once (and once in the worse build)
+
+
+def test_the_best_build_is_said_once_in_the_verdict():
+    swap = [["Dark Shadow", 0], ["Potent Powder", 0]]
+    page = wv.render({"kind": "talents", "error": 0.1, "boss": "X", "rows": [
+        _talents_row("MINE", 0, []), _talents_row("BEST", 3.0, [swap])]})
+    assert "Change 1 talent" in page and page.count("data-copy='BEST'") == 1 and "other builds" not in page
+
+
+def test_gear_by_target_count_says_nothing_to_change_and_gives_a_long_build_the_width():
+    many = [[[f"Old {i}", 0], [f"New {i}", 0]] for i in range(8)]
+    page = wv.by_targets({"length": 120, "counts": [
+        {"label": "1 target", "talents": None, "gear": {"error": 0.2, "rows": []}},
+        {"label": "3+ targets", "gear": {"error": 0.2, "rows": []}, "talents": {
+            "label": "top players on Some Boss", "players": 5, "code": "AOE", "gain": 2.8, "hero": None,
+            "swaps": many}}]})
+    assert "Nothing to change at 1 target." in page and "Talents</b><span class='bt-keep'>" not in page
+    assert "Copy this build, +2.8%" in page and "a build the top players play on Some Boss" in page
+    assert "bt-card wide" in page and "has-wide" in page
+    assert page.index(">Take<") < page.index("New 0") < page.index(">Drop<") < page.index("Old 0")

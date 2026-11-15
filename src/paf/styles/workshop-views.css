@@ -131,8 +131,10 @@ table.night td.muted{color:var(--muted)} table.night tr.noise td{opacity:.6} /* 
 .bd-swaps small{display:block;margin:4px 6px 0;color:var(--muted);font-size:13px}
 .bd-side{display:flex;gap:12px;align-items:center}
 @media (max-width:640px){.glist.builds li.bd{grid-template-columns:minmax(0,1fr)} .bd-side{justify-content:space-between}}
-.ws-answer .swaps{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px;max-width:640px}
-.ws-answer .swaps .sw{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:6px;align-items:center}
+.ws-answer .swaps{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px;max-width:640px;
+  grid-template-columns:minmax(0,max-content) 18px minmax(0,max-content);justify-content:start}
+.ws-answer .swaps .sw{display:grid;grid-column:1/-1;grid-template-columns:subgrid;gap:6px;align-items:center}
+.l-val.same{color:var(--muted);font:500 14px var(--font-body)}
 .ws-answer .tal{display:inline-flex;gap:7px;align-items:center;min-width:0;color:var(--fg);text-decoration:none;font-size:14px;
   padding:3px 6px;border-radius:8px}
 .ws-answer a.tal:hover{background:var(--surface);text-decoration:none}
@@ -148,7 +150,20 @@ table.night th.n{text-align:right}
 .who-chip.st-go{border-color:var(--fg)} .roster-key{display:flex;flex-wrap:wrap;gap:4px 14px}
 .st.away{color:var(--muted);font-weight:600} .who-chip.st-away{opacity:.75}
 /* the Gear tool by target count (#43): a card per count, side by side */
-.bt-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0}
+.bt-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0;align-items:start;
+  grid-auto-flow:row dense}
+.bt-grid.has-wide{display:flex;align-items:flex-start} .bt-grid.has-wide>*{flex:1 1 0;min-width:0}
+.bt-grid.has-wide>.wide{flex-grow:2} .bt-stack{display:grid;gap:14px}
+.bt-keep{color:var(--muted);font:400 14px var(--font-body)}
+.bt-none{margin:0;color:var(--muted)}
+.bt-h .btn{padding:4px 12px;font-size:13.5px}
+/* a build's changes: what to take, what to drop, side by side */
+.td{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px}
+.td-col{min-width:0} .td-col ul{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:2px}
+.td-col li{break-inside:avoid}
+.td-t{font:600 11.5px var(--font-display);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.td-take .td-t{color:var(--pos)}
+.ws-answer .td-drop .tal{opacity:.75} .ws-answer .td-drop .tal span{text-decoration:line-through;text-decoration-color:var(--neg)}
 .bt-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;
   gap:10px;align-content:start}
 .bt-card h3{margin:0;font-size:1.15rem}
@@ -156,7 +171,8 @@ table.night th.n{text-align:right}
 .bt-h{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);padding-top:10px}
 .bt-card .glist.items li{grid-template-columns:44px minmax(0,1fr)}
 .bt-card .btn{justify-self:start}
-@media (max-width:900px){.bt-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:900px){.bt-grid{grid-template-columns:minmax(0,1fr)} .bt-grid.has-wide{flex-direction:column;align-items:stretch}}
+.bt-h:has(.btn){align-items:center}
 .bt-hero{margin:0} .bt-hero s{color:var(--muted);text-decoration-color:var(--neg)}
 /* the best set's items say what they replace; the other sets are said by what they do differently */
 .icard .was{display:block;color:var(--muted);font-size:12px}

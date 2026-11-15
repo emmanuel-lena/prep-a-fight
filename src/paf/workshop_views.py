@@ -90,10 +90,34 @@ def _talent(t, icons: dict[str, str]) -> str:
             f"rel='noopener'>{pic}<span>{e(name)}</span></a>")
 
 
+def _unique(swaps: list) -> list:
+    """The swaps once each: a pair listed twice (a name on two nodes) says nothing more the second time."""
+    seen, out = set(), []
+    for a, b in swaps:
+        key = (tuple(a) if a else None, tuple(b) if b else None)
+        if key not in seen:
+            seen.add(key)
+            out.append((a, b))
+    return out
+
+
 def _swaps(swaps: list, icons: dict[str, str]) -> str:
     return "<ul class='swaps'>" + "".join(
         f"<li class='sw'>{_talent(a, icons)}<span class='arr' aria-label='becomes'>&rarr;</span>{_talent(b, icons)}</li>"
-        for a, b in swaps) + "</ul>"
+        for a, b in _unique(swaps)) + "</ul>"
+
+
+def _take_drop(swaps: list, icons: dict[str, str]) -> str:
+    """A build's changes as two columns, what to take and what to drop: the pairs of a swap list are arbitrary when
+    many talents change at once."""
+    pairs = _unique(swaps)
+    take = [b for _a, b in pairs if b]
+    drop = [a for a, _b in pairs if a]
+
+    def col(cls: str, title: str, lst: list) -> str:
+        return (f"<div class='td-col {cls}'><span class='td-t'>{title}</span><ul>"
+                + "".join(f"<li>{_talent(t, icons)}</li>" for t in lst) + "</ul></div>") if lst else ""
+    return f"<div class='td'>{col('td-take', 'Take', take)}{col('td-drop', 'Drop', drop)}</div>"
 
 
 def _row_swaps(r: dict) -> list:
@@ -121,7 +145,10 @@ def talents(d: dict) -> str:
         return (f"<button type='button' class='{cls}' data-copy='{e(r['code'])}'>{label}</button>"
                 if r.get("code") else "")
     same = f" {yours['players']} of the top players play exactly your build." if yours else ""
-    if best and best["gain"] > noise:
+    go = bool(best and best["gain"] > noise)
+    if go:  # the best build is said once, in the verdict with its Copy button: not again in the list
+        others = [r for r in others if r is not best]
+    if go:
         n = len(_row_swaps(best))
         head = _verdict("go", f"Change {n} talent{'s' if n != 1 else ''}",
                         f"Played by {best['players']} of the top players: {_pct(best['gain'], 1)} on you on this "
@@ -134,9 +161,10 @@ def talents(d: dict) -> str:
     for r in sorted(others, key=lambda r: -r["gain"]):
         cls = "pos" if r["gain"] > noise else "neg" if r["gain"] < -noise else ""
         lines += (f"<li class='bd'><div class='bd-swaps'>{_swaps(_row_swaps(r), icons)}<small>played by "
-                  f"{r['players']} top players</small></div><div class='bd-side'><span class='l-val {cls}'>"
-                  f"{_pct(r['gain'], 1) if cls else 'same'}</span>{copy(r, 'Copy')}</div></li>")
-    return (f"{head}<h3>The top players' other builds, on you</h3><ul class='glist builds'>{lines}</ul>"
+                  f"{r['players']} top players</small></div><div class='bd-side'><span class='l-val {cls or 'same'}'>"
+                  f"{_pct(r['gain'], 1) if cls else 'same'}</span>{copy(r, 'Copy') if cls else ''}</div></li>")
+    lines = (f"<h3>The top players' other builds, on you</h3><ul class='glist builds'>{lines}</ul>" if lines else "")
+    return (f"{head}{lines}"
             f"<p class='ws-fine'>Each build shown by what it changes from yours; "
             f"simmed on your character on {e(d.get('boss', 'the boss'))}. Differences under &plusmn;{noise:.1f}% "
             f"are noise and shown as \"same\".</p>")
@@ -810,13 +838,16 @@ def by_targets(d: dict) -> str:
         err = (c.get("gear") or {}).get("error") or 0.2
         best = rows[0] if rows and rows[0]["gain"] > 2 * err else None
         if t:
-            talents = (f"<div class='bt-h'><b>Talents</b><span class='l-val pos'>{_pct(t['gain'], 1)}</span></div>"
+            label = t["label"] or ""
+            origin = (f"a build the top players play on {label[len('top players on '):]}"
+                      if label.startswith("top players on ") else f"the {label}")
+            talents = (f"<div class='bt-h'><b>Talents</b><button type='button' class='btn ghost' "
+                       f"data-copy='{e(t['code'])}'>Copy this build, {_pct(t['gain'], 1)}</button></div>"
                        + (f"<p class='bt-hero'>Hero talents: <s>{e(t['hero'][0])}</s> &rarr; <b>{e(t['hero'][1])}"
                           f"</b></p>" if t.get("hero") else "")
-                       + f"{_swaps(t['swaps'], icons)}<small class='muted'>the {e(t['label'])}</small>"
-                       f"<button type='button' class='btn ghost' data-copy='{e(t['code'])}'>Copy the talents</button>")
+                       + f"{_take_drop(t['swaps'], icons)}<small class='muted'>{e(origin)}</small>")
         else:
-            talents = "<div class='bt-h'><b>Talents</b><span class='l-val'>yours</span></div>"
+            talents = "<div class='bt-h'><b>Talents</b><span class='bt-keep'>yours</span></div>"
         if best:
             li = "".join(f"<li class='icard'>{_img(items.get(i.get('item_id') or 0, ''))}<span class='l-name'><b>"
                          f"{e(i['name'] or '?')}</b><small>{e(SLOTS.get(x['slot'], x['slot']))}"
@@ -825,18 +856,37 @@ def by_targets(d: dict) -> str:
             gear_ = (f"<div class='bt-h'><b>Gear</b><span class='l-val pos'>{_pct(best['gain'], 1)}</span></div>"
                      f"<ul class='glist items'>{li}</ul>")
         elif c.get("gear"):
-            gear_ = "<div class='bt-h'><b>Gear</b><span class='l-val'>what you wear</span></div>"
+            gear_ = "<div class='bt-h'><b>Gear</b><span class='bt-keep'>what you wear</span></div>"
         else:
             gear_ = ""
         said = ((t or {}).get("code"), tuple(str(x["items"]) for x in (best or {}).get("changes") or []))
-        same = before is not None and said == before[1]
-        cards.append(f"<section class='bt-card{' same' if same else ''}'><h3>{e(c['label'])}</h3>"
-                     + (f"<p class='muted'>Same as {e(before[0])}.</p>" if same else talents + gear_)
-                     + "</section>")
-        before = (c["label"], said) if not same else before
+        nothing = not t and not best
+        same = not nothing and before is not None and said == before[1]
+        wide = len(_unique((t or {}).get("swaps") or [])) > 6  # a long build: two columns of the grid
+        if nothing:  # one line, not two headers that each say "yours"
+            body = f"<p class='bt-none'>Nothing to change at {e(c['label'])}.</p>"
+        elif same:
+            body = f"<p class='muted'>Same as {e(before[0])}.</p>"
+        else:
+            body = talents + gear_
+        cls = " same" if same or nothing else " wide" if wide else ""
+        cards.append(f"<section class='bt-card{cls}'><h3>{e(c['label'])}</h3>{body}</section>")
+        before = (c["label"], said) if not same and not nothing else before
+    if any("bt-card wide" in c for c in cards):  # a long build takes twice the width; the cards around it stack in
+        # one column each side, in their order (not a third column left empty under a short card)
+        cols: list[list[str]] = []
+        for c in cards:
+            if "bt-card wide" in c or not cols or "bt-card wide" in cols[-1][0]:
+                cols.append([c])
+            else:
+                cols[-1].append(c)
+        grid = "<div class='bt-grid has-wide'>" + "".join(
+            col[0] if "bt-card wide" in col[0] else f"<div class='bt-stack'>{''.join(col)}</div>" for col in cols)
+    else:
+        grid = f"<div class='bt-grid'>{''.join(cards)}"
     secs = d.get("length") or 300
     return (f"<p class='ws-lead'>Simmed on a training dummy, {secs // 60} min, targets alive all fight; 3+ on 5 "
-            f"targets.</p><div class='bt-grid'>{''.join(cards)}</div><p class='ws-fine'>Talents: yours, "
+            f"targets.</p>{grid}</div><p class='ws-fine'>Talents: yours, "
             f"SimulationCraft's and the top players' builds on the bosses you prepared, one taken beyond the noise "
             f"only. Gear: your bags and vault, with that card's talents.</p>")
 
