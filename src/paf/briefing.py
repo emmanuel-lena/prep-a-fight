@@ -1,6 +1,5 @@
-"""The overview of a prep sheet as a raid lead's briefing: a few lines that say what the fight is, the changes that
-matter for you in order (said plainly when a change barely matters), the fight drawn as an annotated timeline, and
-what to keep in mind once the pull starts (a list to tick, which fills the "ready" ring of the header).
+"""The top of Dig deeper as a raid lead's briefing: a few lines that say what the fight is, what to aim for and how
+much to trust it; and the spec tiles and the fight's demands of What to change.
 Written to read like a person's notes rather than a dashboard: serif headings, sentences, one accent colour.
 Everything is readable without JavaScript and without motion.
 """
@@ -10,7 +9,7 @@ from __future__ import annotations
 import html
 import re
 
-from paf import icons, theme
+from paf import theme
 
 e = html.escape
 FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;'
@@ -19,10 +18,6 @@ FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=
 
 def _mmss(t: float) -> str:
     return f"{int(t // 60)}:{int(t % 60):02d}"
-
-
-def _pct(t: float, dur: float) -> float:
-    return max(0.0, min(100.0, 100 * t / dur)) if dur else 0.0
 
 
 # --- the few lines on top --------------------------------------------------------------------------------------------
@@ -62,237 +57,6 @@ def lede_html(d) -> str:
     return f"<p class='lede rv'>{first}{second}</p>"
 
 
-# --- what matters for you, in order ---------------------------------------------------------------------------------
-
-def _moves(d) -> list[tuple[float, str, str, str]]:
-    """(gain, the sentence, its detail, a button) of each change worth saying, biggest first."""
-    from paf.prep_report import _goal, best_build, copy_button, linkify, wanted
-
-    out = []
-    best = best_build(d)
-    if d.talents:
-        g = best.per_fight.get(d.talents.fights[0], (0.0, None))[0] if best else 0.0
-        if best is not None and g > 2 * d.talents.error:
-            from paf.talents import utility
-
-            takes = list(dict.fromkeys(x for x in best.add if x not in best.drop))  # one name both ways (a rank
-            drops = list(dict.fromkeys(x for x in best.drop if x not in best.add))  # or another node): no change
-            free = utility(takes + drops, getattr(d, "class_name", ""), d.spec)  # the player's choice: not counted
-            takes, drops = [x for x in takes if x not in free], [x for x in drops if x not in free]
-            add = ", ".join(takes)
-            say = (f"It takes {e(add)}." if takes and len(takes) + len(drops) <= 6 else  # a few: named; more: counted,
-                   f"+{len(takes)} / &minus;{len(drops)} talents: see What to change." if takes or drops else "")
-            # never a cut list read as the whole swap (DPS round 12: 6 of 10 named, the drops unsaid)
-            out.append((g, f"Switch to <b>{e(best.build.label)}</b>, the talents of {best.build.count} top players.",
-                        say,
-                        copy_button(best.build.code, "Copy the talent string") if best.build.code else ""))
-        else:
-            out.append((0.0, f"Keep your talents: no build of the top players beats yours by more than "
-                             f"{2 * d.talents.error:.1f}% on this fight.", "", ""))
-    want = wanted(d) or "boss"
-    plans = [p for p in d.optimized if p.objective in ("boss", "total")]
-    plan = next((p for p in plans if p.objective == want and p.gain > 2 * p.error), None)
-    if plan is None and wanted(d) is None:
-        plan = max((p for p in plans if p.gain > 2 * p.error), key=lambda p: p.gain, default=None)
-    from paf.simple import fallen
-
-    if plan is not None and fallen(plan):  # the fight tab plays the default list (a review: "Play your cooldowns
-        # for total damage +0.6%" beside a plan tagged not played)
-        out.append((0.0, "Play SimC's default priority list: the plan's small gain turns into a loss on a slower "
-                         "kill.", "", ""))
-    elif plan is not None:
-        from paf.simple import _rule_badges
-
-        say = _rule_badges(d, plan) + ("" if getattr(plan, "robust", True) else  # Your job's badges, each rule on
-                                       " <span class='pill warn' title='the gain can vanish on a harder fight'>not "
-                                       "robust</span>")  # hover (fresh DPS review: a semicolon list)
-        out.append((plan.gain, f"Play your cooldowns for {e(_goal(plan.objective))} damage.", say,
-                    copy_button(d.mrt[plan.objective], "Copy the MRT note") if d.mrt.get(plan.objective) else ""))
-    elif plans:
-        role = {"total": " for padding the adds", "boss": " for boss damage"}.get(wanted(d) or "", "")
-        out.append((0.0, f"Play SimC's default priority list: no cooldown plan beats it{role} here.", "", ""))
-    if d.gear:
-        changes, _, w = d.gear[0]
-        if w > 2 * d.gear_error:
-            out.append((w, "Swap some gear from your bags.", "; ".join(linkify(c, d.links) for c in changes.split("; ")), ""))
-        else:
-            out.append((0.0, "Keep the gear you wear: nothing in your bags beats it beyond the sims' noise here.", "", ""))
-    return sorted(out, key=lambda m: -m[0])
-
-
-def moves_html(d) -> str:
-    moves = _moves(d)
-    if not moves:
-        return ""
-    from paf.prep_report import places
-
-    items = []
-    gains = [m[0] for m in moves]
-    for i, (gain, say, more, button) in enumerate(moves, 1):
-        g = f"{gain:+.{places(gain, gains)}f}%"  # two that round alike: two decimals
-        if gain >= 3:
-            tag = f"<span class='gain big'>{g}</span>"
-        elif gain >= 1:
-            tag = f"<span class='gain'>{g}</span>"
-        elif gain > 0:
-            tag = f"<span class='gain tiny' title='barely matters'>{g}</span>"
-        else:
-            tag = "<span class='gain ok'>&#10003;</span>"
-        body = f"<p class='say'>{say}</p>" + (f"<div class='why'>{more}{(' ' + button) if button else ''}</div>"
-                                              if (more or button) else "")
-        items.append(f"<li class='rv'><span class='n'>{i}</span><div class='mv'>{body}</div>{tag}</li>")
-    top = moves[0][0]
-    note = ("" if top >= 1 else
-            "<p class='aside rv'>Your setup is already right here: the changes below are small.</p>" if top > 0 else
-            "<p class='aside rv'>Your setup is already right here: nothing below changes it.</p>")
-    return f"<h2 class='rv'>What matters for you</h2>{note}<ol class='moves'>{''.join(items)}</ol>"
-
-
-# --- the fight, drawn ------------------------------------------------------------------------------------------------
-
-WIDTH_PX = 1000  # the timeline's width on a desktop (labels are placed for it, and wrap rows on phones)
-FLIP_AT = 72  # % of the fight after which a label opens to the left of its pin
-
-
-def _label_px(label: str, icon: bool) -> float:
-    return len(label) * 6.9 + (20 if icon else 0) + 18
-
-
-def _rows(events: list[tuple[float, str, bool]], dur: float) -> list[int]:
-    """A row for each label (in time order) so that labels never overlap; a label past FLIP_AT opens leftwards."""
-    spans: list[list[tuple[float, float]]] = []
-    rows = []
-    for t, label, icon in events:
-        x = _pct(t, dur)
-        w = _label_px(label, icon) / WIDTH_PX * 100
-        a, b = (x - w, x) if x > FLIP_AT else (x, x + w)
-        row = next((r for r, taken in enumerate(spans) if all(b < s - .4 or a > e + .4 for s, e in taken)), None)
-        if row is None:
-            spans.append([])
-            row = len(spans) - 1
-        spans[row].append((a, b))
-        rows.append(row)
-    return rows
-
-
-def _short(name: str) -> str:
-    return name.split(" (after")[0].split(" (boss aura)")[0].strip()
-
-
-def _note(t: float, dur: float, row: int, side: str, label: str, title: str, text: str, kind: str, icon: str = "") -> str:
-    pic = icons.img(icon, "small", "nt-ic") if icon else ""
-    flip = " flip" if _pct(t, dur) > FLIP_AT else ""
-    return (f"<button class='note {side} {kind}{flip}' style='left:{_pct(t, dur):.2f}%;--row:{row}' "
-            f"data-t='{_mmss(t)}' data-title='{e(title)}' data-text='{e(text)}' aria-label='{e(_mmss(t) + ' ' + title)}'>"
-            f"<span class='pin'></span><span class='lab'>{pic}{e(label)}</span></button>")
-
-
-def fight_map_html(d) -> str:
-    from paf.prep_report import _goal, wanted
-
-    dur = d.duration or (d.fight.duration if d.fight else 0)
-    if not dur:
-        return ""
-    phases = sorted(d.phases, key=lambda p: p[1])
-    brackets = ""
-    for i, (name, start) in enumerate(phases):
-        end = phases[i + 1][1] if i + 1 < len(phases) else dur
-        short = name  # the full name: the game's table translates it
-        brackets += (f"<div class='ph' style='left:{_pct(start, dur):.2f}%;width:{_pct(end - start, dur):.2f}%' "
-                     f"title='{e(name)}'><span>{e(short)}</span></div>")
-    above: list[tuple[float, str, str, str, str, str]] = []  # t, label, title, text, kind, icon
-    shade = ""
-    for t, count, life, name in d.waves:
-        if count == 0:
-            shade += (f"<div class='burst' style='left:{_pct(t, dur):.2f}%;width:{max(_pct(life, dur), .6):.2f}%'></div>")
-            above.append((t, "burst", name, f"The boss takes more damage for {life:.0f} s: a good moment for your "
-                                             f"big cooldowns, if they are ready.", "k-burst", ""))
-        else:
-            shade += (f"<div class='adds' style='left:{_pct(t, dur):.2f}%;width:{max(_pct(life, dur), .6):.2f}%'></div>")
-            what = f"{count} × {_short(name)}" if count > 1 and name else (_short(name) if name else f"{count} adds")
-            above.append((t, f"{count} adds" if count > 1 else _short(name or "add"), what,
-                          f"Alive about {life:.0f} s.", "k-adds", ""))
-    for f in (d.fight.focus if d.fight is not None else []):
-        above.append((f.start, f.name, f"Focus {f.name}", f"{f.support:.0%} of the top players' kills hit {f.name} here.",
-                      "k-focus", ""))
-    if d.lust is not None:
-        above.append((d.lust, "Bloodlust", "Bloodlust", "Bloodlust usually goes out here: worth having your cooldowns ready "
-                      "for it.",
-                      "k-lust", ""))
-    below: list[tuple[float, str, str, str, str, str]] = []
-    want = wanted(d) or "boss"
-    plan = next((p for p in d.optimized if p.objective == want), None) or next(iter(d.optimized), None)
-    if plan is not None and d.fight is not None:
-        from paf.optimize import plan_moments
-
-        seen: set[str] = set()
-        for t, labels in plan_moments(plan, d.fight, d.cd_names):
-            names = list(dict.fromkeys(labels))
-            ic = next((d.icons.get(n) for n in names if d.icons.get(n)), "")
-            label = " + ".join(names) if not (ic and set(names) <= seen) else ""  # a cooldown seen before: its icon
-            seen.update(names)
-            below.append((t, label, ", ".join(names),
-                          f"A good moment for {', '.join(names)}: the sim does best pressing it here "
-                          f"({_goal(plan.objective)} damage). Your raid's calls come first.", "k-you", ic))
-    if d.defensives:
-        for m in d.defensives.moments:
-            name = m.spells[0][0] if m.spells else "a defensive"
-            why = f" for {m.boss_ability}" if m.boss_ability else ""
-            below.append((m.time, name, f"{name}{why}", f"{m.share:.0%} of the top players press {name}{why} here.",
-                          "k-def", d.icons.get(name, "")))
-    if not (above or below):
-        return ""
-    above.sort()
-    below.sort()
-    ra = _rows([(t, lab, bool(ic)) for t, lab, _, _, _, ic in above], dur)
-    rb = _rows([(t, lab, bool(ic)) for t, lab, _, _, _, ic in below], dur)
-    notes = "".join(_note(t, dur, r, "up", lab, ti, tx, k, ic) for (t, lab, ti, tx, k, ic), r in zip(above, ra, strict=True))
-    notes += "".join(_note(t, dur, r, "down", lab, ti, tx, k, ic) for (t, lab, ti, tx, k, ic), r in zip(below, rb, strict=True))
-    ticks = "".join(f"<span style='left:{_pct(t, dur):.2f}%'>{_mmss(t)}</span>"
-                    for t in range(0, int(dur) + 1, 60 if dur <= 480 else 120))
-    up, down = (max(ra) + 1 if ra else 0), (max(rb) + 1 if rb else 0)
-    focus_legend = "<span class='lg k-focus'>focus</span>" if d.fight is not None and d.fight.focus else ""
-    return f"""<h2 class='rv'>How the fight goes</h2>
-<div class='tl-scroll rv'><div class='tl' style='--up:{up};--down:{down}' data-dur='{dur:.0f}'>
-<div class='tl-phases'>{brackets}</div><div class='tl-zone up'></div>
-<div class='tl-axis'>{shade}<div class='tl-ticks'>{ticks}</div></div><div class='tl-zone down'></div>
-{notes}<div class='tl-legend small muted'><span class='lg k-adds'>adds</span><span class='lg k-burst'>burst window</span>{focus_legend}
-<span class='lg k-you'>suggested cooldowns</span><span class='lg k-def'>defensives</span></div></div></div>
-<p class='margin rv' aria-live='polite'><b class='m-t'></b> <span class='m-title'>Point at a note on the timeline</span>
-<span class='m-text'>: what comes then, and what can help.</span></p>"""
-
-
-# --- once the pull starts --------------------------------------------------------------------------------------------
-
-def _fight_items(d) -> list[tuple[str, str]]:
-    from paf.prep_report import checklist_items
-
-    skip = ("Talents:", "Gear", "Cooldowns (", "Talents :")
-    return [(w, x) for w, x in checklist_items(d) if not w.startswith(skip)]
-
-
-def checklist_html(d) -> str:
-    items = _fight_items(d)
-    if not items:
-        return ""
-    lines = "".join(f"<li class='rv'><label><input type='checkbox'><span class='box' aria-hidden='true'></span>"
-                    f"<span class='t'>{what}</span></label>{extra}</li>" for what, extra in items)
-    return f"<h2 class='rv' id='checks'>Once the pull starts</h2><ul class='checks'>{lines}</ul>"
-
-
-def ready_count(d) -> int:
-    return len(_fight_items(d))
-
-
-def ready_ring(n: int) -> str:
-    if not n:
-        return ""
-    return (f"<a class='ready' href='#checks' title='Tick the {n} points of &quot;Once the pull starts&quot; as you learn them'>"
-            f"<svg viewBox='0 0 44 44' aria-hidden='true'>"
-            f"<circle cx='22' cy='22' r='19' class='r-bg'/><circle cx='22' cy='22' r='19' class='r-fg'/></svg>"
-            f"<div class='r-txt'><b class='r-n'>0/{n}</b><span>checked</span></div></a>")
-
-
 def _k(v: float) -> str:
     return f"{v / 1000:,.0f}k" if v >= 10000 else f"{v:,.0f}"
 
@@ -326,12 +90,6 @@ def aim_html(d) -> str:
                 f"(the top 100 do {_k(p.dps)} in all). Trust the boss figure and the gaps between plans more than this "
                 f"total.{f' Your best kill here: {_k(best)} in all.' if best else ''}</p>")
     return f"<div class='aim rv'>{cells}</div>{note}"
-
-
-def _wanted(d):
-    from paf.prep_report import wanted
-
-    return wanted(d) if hasattr(d, "goal") else None
 
 
 def _profile(d):
@@ -506,20 +264,16 @@ def confidence_pill(d) -> str:
     med = d.validation[1]
     gap = abs(med - 1)
     level = "high" if gap <= 0.05 else "medium" if gap <= 0.12 else "low"
-    say = {"high": "the top players' own characters, simmed on this fight, do "
-                   f"{med:.0%} of their real damage: trust the numbers"
+    say = {"high": "trust the numbers"
                    + (", the boss figure and the gaps more than the total (above)." if overshoot(d) else "."),
-           "medium": f"the sim does {med:.0%} of the damage the best players really did: trust which option wins "
-                     f"more than the exact %.",
-           "low": f"the sim does {med:.0%} of the damage the best players really did: read the numbers as hints."}[level]
+           "medium": "trust which option wins more than the exact %.",
+           "low": "read the numbers as hints."}[level]  # the validation and the boss split: in Notes, once
     share = next((m for n in d.notes if (m := re.search(r"puts (\d+)% of (?:its|your) damage on the boss vs (\d+)%", n))),
                  None)
     if share and int(share[1]) != int(share[2]):  # the total is right, the split between boss and adds is not
-        low = int(share[1]) < int(share[2])
-        say += (f" The split leans {'to the adds' if low else 'to the boss'}: SimC's default list in the top players' "
-                f"gear puts {share[1]}% of its damage on the boss, they put {share[2]}%"
-                + ("; the plan you play pads the adds, so your own figure puts less on the boss." if
-                   getattr(d, "aim_plan", False) and _wanted(d) == "total" else "."))
+        say += f" The sim leans {'to the adds' if int(share[1]) < int(share[2]) else 'to the boss'} (see Notes)."
+    if getattr(d, "sim_boss_dps", None) and d.sim_dps and d.waves:  # your own split, said nowhere else
+        say += f" Your character puts {d.sim_boss_dps / d.sim_dps:.0%} of its damage on the boss in the sim."
     return f"<p class='trust {level} rv'><span>How much to trust this:</span> {e(say)}</p>"
 
 
@@ -537,28 +291,5 @@ var io = 'IntersectionObserver' in window ? new IntersectionObserver(function(es
 document.querySelectorAll('.rv').forEach(function(el){ io ? io.observe(el) : el.classList.add('in'); });
 // never hidden for good: a preview, a print or a slow window shows every block after a moment
 setTimeout(function(){ document.querySelectorAll('.rv').forEach(function(el){ el.classList.add('in'); }); }, 1500);
-// the timeline: a note tells its story in the margin below
-document.querySelectorAll('.tl').forEach(function(tl){
-  var m = tl.closest('section').querySelector('.margin');
-  function show(n){ tl.querySelectorAll('.note.on').forEach(function(o){ o.classList.remove('on'); });
-    n.classList.add('on'); m.querySelector('.m-t').textContent = n.dataset.t;
-    m.querySelector('.m-title').textContent = n.dataset.title;
-    m.querySelector('.m-text').textContent = ' \\u2014 ' + n.dataset.text; }
-  tl.querySelectorAll('.note').forEach(function(n){ n.addEventListener('click', function(){ show(n); });
-    n.addEventListener('mouseenter', function(){ show(n); }); n.addEventListener('focus', function(){ show(n); }); });
-});
-// once the pull starts: ticks fill the ring of the header, remembered on this computer
-var boxes = [].slice.call(document.querySelectorAll('.checks input')), ring = document.querySelector('.ready');
-var key = 'paf-ready:' + document.title;
-try { var saved = JSON.parse(localStorage.getItem(key) || '[]'); boxes.forEach(function(b, i){ b.checked = !!saved[i]; }); } catch (e) {}
-function update(bump){ if (!ring) return; var n = boxes.filter(function(b){ return b.checked; }).length;
-  ring.querySelector('.r-n').textContent = n + '/' + boxes.length;
-  ring.querySelector('.r-fg').style.strokeDashoffset = 119.4 * (1 - n / Math.max(1, boxes.length));
-  ring.classList.toggle('done', n === boxes.length && n > 0);
-  if (bump && !reduce){ ring.classList.remove('pop'); void ring.offsetWidth; ring.classList.add('pop'); } }
-boxes.forEach(function(b){ b.addEventListener('change', function(){
-  try { localStorage.setItem(key, JSON.stringify(boxes.map(function(x){ return x.checked; }))); } catch (e) {}
-  update(true); }); });
-update(false);
 })();
 </script>"""

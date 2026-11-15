@@ -344,52 +344,6 @@ def headline(d: PrepData) -> list[str]:
 CSS = theme.CSS + bossguide.CSS + theme.style("prep")
 
 
-def kpi_tiles(d: PrepData) -> str:
-    """The prep at a glance: model check, your raid's verdict, cooldowns, gear, talents."""
-    tiles = []
-
-    def tile(label: str, value: str, sub: str, cls: str = "") -> None:
-        tiles.append(f'<div class="tile kpi {cls}"><div class="l">{e(label)}</div><div class="v">{value}</div>'
-                     f'<div class="s">{e(sub)}</div></div>')
-
-    if d.goal in ("boss", "total"):
-        tile("Your role", "Boss" if d.goal == "boss" else "Pad the adds", "your choice for this prep")
-    elif d.raid and d.raid.objective:
-        tile("Your role", "Boss" if d.raid.objective == "boss" else "Pad the adds",
-             "the others cover the adds" if d.raid.objective == "boss" else "your raid needs your damage on them")
-    want = wanted(d)
-    plans = [p for p in d.optimized if p.objective in ("boss", "total")]
-    best = next((p for p in plans if p.objective == want), None) or (max(plans, key=lambda p: p.gain) if plans else None)
-    if best is not None:
-        tile("Cooldown plan", f"{best.gain:+.1f}%", f"{_goal(best.objective)} damage, vs using them on cooldown",
-             "good" if best.gain > 2 * best.error else "")
-    r = best_build(d)
-    if r is not None:
-        g = r.per_fight.get(d.talents.fights[0], (0.0, None))[0]
-        tile("Talents", f"{g:+.1f}%" if g > 2 * d.talents.error else "OK",
-             f"{r.build.label}, vs your current talents" if g > 2 * d.talents.error
-             else "your talents match the top players'", "good" if g > 2 * d.talents.error else "")
-    if d.gear:
-        w = d.gear[0][2]
-        tile("Gear", f"{w:+.2f}%" if w > 2 * d.gear_error else "Best",
-             "swaps from your bags, vs your equipped gear" if w > 2 * d.gear_error
-             else "no swap from your bags beats it beyond the error", "good" if w > 2 * d.gear_error else "")
-    conf = ""
-    if d.validation:
-        lo, med, hi = d.validation
-        level = "high" if abs(med - 1) <= 0.05 else "medium" if abs(med - 1) <= 0.12 else "low"
-        gap = abs(med - 1)
-        meaning = ("the sim matches reality: trust the gains below." if level == "high" else
-                   f"the sim is off by {gap:.0%}: trust which option wins more than the exact %." if level == "medium"
-                   else f"the sim is off by {gap:.0%}: this fight is badly rebuilt for your spec, use the gains as "
-                        f"hints only.")
-        conf = (f'<p class="conf small"><span class="pill {"on" if level == "high" else ""}">Confidence: {level} '
-                f'&middot; sim {med:.0%} of real</span> <b>{e(meaning)}</b> <span class="muted">The top players, simmed '
-                f'on this rebuilt fight with their own gear, get {med:.0%} of the DPS they really did (100% = perfect). '
-                f'Gains are % of your DPS.</span></p>')
-    return (f'<div class="kpis">{"".join(tiles)}</div>' if tiles else "") + conf
-
-
 def wanted(d: PrepData) -> str | None:
     """The objective to follow: the player's own choice, else the verdict from the raid's log, else none."""
     if d.goal in ("boss", "total"):
@@ -419,7 +373,54 @@ def healers_left(r) -> tuple[int, bool]:
     return r.players - sum(len(ps) for ps in r.archetypes.values()) - int(swapped), swapped
 
 
-def raid_section(r: RaidInfo, gear: bool = True) -> str:
+def raid_comp_html(comp: dict | None) -> str:
+    """Who hits the adds in your raid (paf.comp), its second boss left to the Comp tool, and how it is read in sight."""
+    targets = [t for t in (comp or {}).get("targets") or [] if not t.get("second_boss")]
+    if not targets:
+        return ""
+    from paf import workshop_views
+
+    out = workshop_views.render({"kind": "comp", **comp, "targets": targets}) or ""
+    out = re.sub(r"<p class='ws-fine'><span class='pill' title='([^']*)'>\? how it is read</span></p>",
+                 r"<p class='small muted'>\1</p>", out)  # shown, not on hover (the owner: no hover-only text)
+    return f"<div class='ws-answer raid-who'>{out}</div>"
+
+
+def raid_night_html(tools: dict) -> str:
+    """Your raid's pulls of this boss: the best pull's verdict and the night's numbers in a line, every pull and every
+    player in the tools (Your best pull, This boss in your raid's night)."""
+    wipe, night = tools.get("wipe"), tools.get("night")
+    if not (wipe or night):
+        return ""
+    from paf import workshop_views
+
+    out = ""
+    if wipe:
+        t = (wipe.get("kill") or {}).get("no_deaths_share")
+        big = _mmss(t) if t is not None and t != float("inf") else "&ndash;"
+        out += workshop_views._verdict(
+            "go", f"Your best pull: boss at {wipe['left']:.1%} after {_mmss(wipe['duration'])}",
+            f"<span>Without the deaths, and with the top kills' share of damage on the boss:</span> <span>kill at</span> "
+            f"<span class='num'>{big}</span>.", big)
+    links = []
+    if night:
+        pulls = night.get("pulls") or []
+        summary = night.get("summary") or {}
+        deaths = sum(v.get("deaths", 0) for v in summary.values())
+        bare = sum(v.get("bare", 0) for v in summary.values())
+        wipes = any(not r.get("kill") for r in pulls)
+        said = (f"{len(pulls)} {'pull' if len(pulls) == 1 else 'pulls'}, "
+                + (f"{deaths} {'death' if deaths == 1 else 'deaths'}{' before the wipes' if wipes else ''}" if deaths
+                   else "no death")
+                + (f", {bare} without a healthstone or a health potion first" if bare else ""))
+        out += f"<p>Your raid's night on this boss: <b>{e(said)}</b>.</p>"
+        links.append("<a href='/tool/night' target='_top'>Every pull and every player &rarr;</a>")
+    if wipe:
+        links.append("<a href='/tool/wipe' target='_top'>What each death cost &rarr;</a>")
+    return f"<h2>Your raid's pulls</h2><div class='raid-pulls'>{out}<p class='small'>{' &middot; '.join(links)}</p></div>"
+
+
+def raid_section(r: RaidInfo, gear: bool = True, who: str = "") -> str:
     you = (f"you ({e(r.you[0])}, {r.you[1] / 1000:,.0f}k DPS"
            + (f" <span class='pill'>your log: {e(r.logged_as)}</span>" if r.logged_as else "") + ")" if r.you_found else
            f"{'an' if r.you[0][:1].lower() in 'aeiou' else 'a'} {e(r.you[0])} at your raid's median DPS ({r.you[1] / 1000:,.0f}k; " + (f"you are in that log as {e(r.logged_as)}, swapped out)" if r.logged_as else f"you are not in that log as {e(r.you[0])})"))  # another spec of yours may be
@@ -427,7 +428,7 @@ def raid_section(r: RaidInfo, gear: bool = True) -> str:
             f"target='_blank' rel='noopener'>{e(r.report)}</a> ({e(r.fight)}, {r.players} players), with {you}.</p>")
     if not r.verdicts:
         return (f"<h2>Your raid and the adds</h2><div class='card'>{head}<p>No add takes a real share of the damage "
-                f"on this boss: nothing to decide, play for the boss.</p></div>")
+                f"on this boss: nothing to decide, play for the boss.</p>{who}</div>")
     rows = "".join(
         f"<tr><td>{e(v.add.name)}</td><td class='n'>{v.without_you:.0%}</td><td class='n'>{v.with_you:.0%}</td>"
         f"<td class='n'>{v.low:.0%}</td><td><b>{'boss' if v.verdict == 'boss' else 'pad'}</b>: "
@@ -470,14 +471,9 @@ def raid_section(r: RaidInfo, gear: bool = True) -> str:
 <th class="n">Top raids' weakest quarter</th><th>Verdict</th></tr>{rows}</table></div>
 <p class="small muted">Damage your raid puts on these adds, as a share of the top raids' (their median = 100%).</p>
 <p class="small">Your raid on this boss, by what each spec does with the adds:</p><ul class="small grp">{groups}</ul>{est}{build}
-<h4 class="small">How it is computed</h4><p class="small muted">Measured: on this boss, each spec puts
-a share of its damage on these adds while they are up (from the ranked kills): well above the median of all players =
-AoE / funnel, well below = single target. Computed: your raid's damage on the adds = every player's DPS in your log x
-their spec's share; the same for every top raid gives the reference range. Rule (not a measurement): if your raid
-without you is within the top raids' range (above their weakest quarter), the others cover the adds and you stay on
-the boss; otherwise you pad. Not promised: how long the adds will live. In the top kills it depends on the mechanics
-and the strategy, not on the raid's DPS (checked: no correlation). Top players pad whatever their raid (they are
-ranked on their own DPS), so their logs alone cannot tell what your raid needs.</p></div>"""
+{who}<p class="small muted"><b>How it is computed:</b> each player's DPS in your log &times; their spec's share on these
+adds in the ranked kills, set against the top raids'. Without you above their weakest quarter, you stay on the boss;
+below it, you pad.</p></div>"""
 
 
 @dataclass
@@ -744,74 +740,6 @@ def suggestions(d: PrepData) -> list[Suggestion]:
     return sorted(out, key=rank)
 
 
-def checklist_html(d: PrepData) -> str:
-    """One line per thing to do, in raid order: before the pull, then during the fight."""
-    items = [f"<li><label><input type='checkbox'> <span>{what}</span></label>{extra}</li>"
-             for what, extra in checklist_items(d)]
-    if not items:
-        return ""
-    return f'<div class="card checklist"><ul>{"".join(items)}</ul></div>'
-
-
-def checklist_items(d: PrepData) -> list[tuple[str, str]]:
-    """(what to do, a button) of each line of the raid checklist, in raid order."""
-    items: list[tuple[str, str]] = []
-
-    def item(what: str, extra: str = "") -> None:
-        items.append((what, extra))
-
-    best = best_build(d)
-    g = best.per_fight.get(d.talents.fights[0], (0.0, None))[0] if best else 0.0
-    if best is not None and g > 2 * d.talents.error:
-        item(f"Talents: import <b>{e(best.build.label)}</b> ({g:+.1f}%)",
-             " " + copy_button(best.build.code, "Copy") if best.build.code else "")
-    elif d.talents:
-        item("Talents: keep yours, they match the top players' on this fight")
-    if d.gear and d.gear[0][2] > 2 * d.gear_error:
-        changes, _, w = d.gear[0]
-        item(f"Gear ({w:+.2f}%): " + "; ".join(linkify(c, d.links) for c in changes.split("; ")))
-    elif d.gear:
-        item("Gear: keep what you wear")
-    want = wanted(d) or "boss"
-    plan = next((p for p in d.optimized if p.objective == want and p.gain > 2 * p.error), None)
-    if d.goal in ("boss", "total"):
-        item("Your role (your choice): <b>" + ("boss damage first" if d.goal == "boss" else "pad the adds") + "</b>")
-    elif d.raid and d.raid.objective:
-        item("Your role: <b>" + ("stay on the boss" if d.raid.objective == "boss" else "pad the adds") + "</b>")
-    elif not any(c for _t, c, _l, _n in d.waves):  # no adds on this boss: nothing to decide
-        item("Your role: <b>the boss</b> <span class='muted'>(no adds to pad on this boss)</span>")
-    else:
-        item("Your role: ask your raid lead whether you should pad the adds or focus the boss "
-             "<span class='muted'>(or set your guild in the app: the prep decides from your raid)</span>")
-    if plan is not None:
-        by_rule: dict[str, list[str]] = {}
-        for k, r in plan.choice.items():
-            if r.name != "default":
-                by_rule.setdefault(rule_phrase(d, r.name), []).append(cd_name(d, k))
-        rules = "; ".join(f"{', '.join(ks)}: {phrase}" for phrase, ks in by_rule.items())
-        item(f"Cooldowns ({_goal(plan.objective)} damage, {plan.gain:+.1f}%): {e(rules)}",
-             " " + copy_button(d.mrt[plan.objective], "Copy the MRT note") if d.mrt.get(plan.objective) else "")
-    elif any(p.objective == want for p in d.optimized):
-        item(f"Cooldowns ({_goal(want)} damage): use them as soon as they are ready; holding them for a moment of "
-             f"the fight gains nothing measurable here")
-    if getattr(d, "lust_spots", None):
-        item(f"{icons.img(d.icons.get('Bloodlust', '') or _sfallback(d, 'Bloodlust'), 'small')}{lust_line(d, True)}")
-    elif d.lust is not None:
-        item("Bloodlust goes out at the pull" if d.lust < 15 else f"Bloodlust usually comes around {_mmss(d.lust)}")
-    mine = [a for a in d.actions if a.kind in ("kill", "contact", "interrupt", "mechanic")
-            and not (a.kind == "interrupt" and not a.text.startswith("Interrupt"))]
-    for n, t in gate_kills(d):  # the add that ends the immunity, first
-        item(f"{icons.img(_sfallback(d, n), 'small')}{e(t)}")
-    for a in mine[:6]:
-        item(action_inner(d, a))
-    if not mine:
-        for b in d.role_bullets[:4]:
-            item(e(b))
-    for a in d.assigns:
-        item("Your assignment: " + e(a))
-    return items
-
-
 def export_html(d: PrepData) -> str:
     """The rebuilt fight as simc lines, to sim it on Raidbots or anywhere else."""
     buttons = " ".join(copy_button(text, "Copy the fight" if not label else f"Copy the fight + plan for {label}")
@@ -821,11 +749,10 @@ def export_html(d: PrepData) -> str:
                                            ("damage windows", "/vulnerable,"), ("movement", "/movement,"),
                                            ("Bloodlust", "bloodlust_time="), ("Power Infusion", "power_infusion="))
                           if key in lines]  # what the copied lines hold, none other
-    return f'''<h2>Sim this fight on Raidbots</h2><div class="card"><p class="small">The fight above as SimulationCraft
-lines: {e(", ".join(has))}. On
-<a href="https://www.raidbots.com/simbot/advanced" target="_blank" rel="noopener">Raidbots, Advanced</a>: paste your
-<code>/simc</code> export, then these lines under it, in the same box. Leave the fight style out (Patchwerk removes
-the raid events).</p><p>{buttons}</p></div>'''
+    return (f'<h3 class="small muted" style="margin-top:14px">Sim it on Raidbots</h3><p class="small">On '
+            '<a href="https://www.raidbots.com/simbot/advanced" target="_blank" rel="noopener">Raidbots, Advanced</a>: '
+            f'paste your <code>/simc</code> export, then these lines under it ({e(", ".join(has))}); leave the fight '
+            f'style out (Patchwerk removes the raid events).</p><p>{buttons}</p>')
 
 
 def fightview_support() -> float:
@@ -880,11 +807,30 @@ def _track_top(d) -> str:
     return f", the top of the {track} track" if track and d.loot_ilvl == LOOT_CAP.get(d.difficulty.lower()) else ""
 
 
-def nsrt_block(note: str) -> str:
-    if not note:
+def tops_cd_line(d: PrepData) -> str:
+    """What the top players do with their cooldowns, in one line: each cooldown's share of casts (after the opener)
+    during the add waves and on the burst targets, against the share of the fight they cover (a table, once)."""
+    if not d.alignment or not (d.alignment[0].adds_cover or d.alignment[0].units_cover):  # no adds: nothing to hold
         return ""
-    # the button alone: the raw reminders are for the addon, not to read (the owner, 2026-10-24)
-    return f'<div class="nb"><h4>Northern Sky Raid Tools reminders {copy_button(note, "Copy for NSRT")}</h4></div>'
+    a0 = d.alignment[0]
+    tested = {cd_name(d, k) for p in d.optimized for k in p.choice}  # the cooldowns the plans hold or release
+    rows = [a for a in d.alignment if (not tested or a.ability in tested) and (a.in_adds or a.in_units)]  # an AoE
+    if not rows:  # spender is on adds by nature, not held; a row of zeros says nothing
+        return ""
+
+    def held(v: float, cover: float, what: str) -> str:
+        return (f" (held for {what})" if v > cover * 1.5 and v - cover > 0.1 else
+                f" (leans to {what})" if v > cover * 1.25 and v - cover > 0.1 else "")
+    parts = []
+    if a0.adds_cover:
+        parts.append(f"during add waves ({a0.adds_cover:.0%} of the fight): " + ", ".join(
+            f"{linkify(a.ability, d.links)} {a.in_adds:.0%}{held(a.in_adds, a0.adds_cover, 'adds')}" for a in rows))
+    if a0.units_cover:
+        units = burst_names(d)[1] or "the burst targets"
+        parts.append(f"on {e(units)} ({a0.units_cover:.0%} of the fight): " + ", ".join(
+            f"{linkify(a.ability, d.links)} {a.in_units:.0%}{held(a.in_units, a0.units_cover, e(units))}" for a in rows))
+    return (f"<p class='small'><b>The top players' casts</b> (after the opener) {'; '.join(parts)}. Far above the "
+            "share of the fight: they hold it.</p>")
 
 
 def _pad_bar(text: str) -> str:
@@ -1122,7 +1068,7 @@ def in_time_order(note: str) -> str:
     return "\n".join(head + timed) + ("\n" if note.endswith("\n") else "")
 
 
-def lust_line(d: PrepData, chips: bool = False) -> str:
+def lust_line(d: PrepData) -> str:
     """Where the fight puts Bloodlust (the raid lead's pick, else the top raids' most used spot) and what the top
     raids' other spots would give you in the sim."""
     spots = d.lust_spots
@@ -1153,12 +1099,6 @@ def lust_line(d: PrepData, chips: bool = False) -> str:
                 + (": tell your raid lead." if not d.lust_pick else "."))
     elif gains:
         tail = " The top raids' other spots give you no more."
-    if chips:  # the checklist's form: its spot and who picked it as pills, the advice after (fresh DPS review)
-        spot = ("none" if sp.t is None else "at the pull" if sp.kind == "pull" else
-                f"{_mmss(sp.t)}, {sp.phrase.removeprefix('at ')}" if sp.kind == "phase" else _mmss(sp.t))
-        pick = "your raid lead&#39;s pick" if d.lust_pick else f"{sp.share:.0%} of the top raids"
-        return (f"<span class='act'><b>Bloodlust</b> <span class='pill'>{e(spot)}</span><span class='pill'>{pick}"
-                f"</span></span>{tail}")
     return f"{head} ({why}).{tail}"
 
 
@@ -1347,8 +1287,6 @@ def render(d: PrepData) -> str:
         notices.append(
             f'<p class="notice small"><b>Thin data:</b> only {d.kills} ranked kills of your spec on this boss and '
             f'difficulty. The timings of the fight and the habits of the top players are less reliable than usual.</p>')
-    tabs["overview"].append(briefing.moves_html(d))
-    tabs["overview"].append(briefing.checklist_html(d))
     if d.guide_summary or d.guide_abilities:
         tabs["boss"].append("<h2>The boss in 60 seconds</h2>" + bossguide.modernize(d.guide_summary, d.difficulty).replace(
             '<a href="#boss">Every ability, phase by phase &rarr;</a>', ""))
@@ -1408,10 +1346,6 @@ def render(d: PrepData) -> str:
                             "</div>")
     else:
         tabs["boss"].append(defensives_html(d))
-    if d.timeline_file:
-        tabs["overview"].append(f'<p class="small"><a href="{e(d.timeline_file)}">See when the top players use each '
-                                f'cooldown (timelines) &rarr;</a></p>')
-
     # the fight
     rows = "".join(f"<tr><td>{_mmss(t)}</td><td>{e('Stage One' if i == 0 and n.lower() == d.boss.lower() else n)}"
                    f"</td></tr>" for i, (n, t) in enumerate(sorted(d.phases, key=lambda p: p[1])))
@@ -1419,19 +1353,17 @@ def render(d: PrepData) -> str:
 
     def simmed(c: int, name: str) -> str:  # the sim's own count: the logs' scaled by add_scale (d.waves: the logs')
         return str(max(1, round(c * (d.add_scale or 1)))) if c and name in scalable else (str(c) if c else "-")
-    waves = "".join(f"<tr><td>{_mmss(t)}</td><td class='n'>{c or '-'}</td><td class='n'>{simmed(c, names)}</td>"
-                    f"<td class='n'>{alive(d.fight, t, life):.0f}s</td><td>{e(names)}</td></tr>" for t, c, life, names in d.waves)
-    extra = []
-    if d.lust is not None:
-        extra.append(f"Bloodlust at {_mmss(d.lust)}")
+    differs = any(simmed(c, names) != (str(c) if c else "-") for _t, c, _l, names in d.waves)  # the Simmed column
+    # only when the sims count other adds than the logs (a review: two identical columns)
+    waves = "".join(f"<tr><td>{_mmss(t)}</td><td class='n'>{c or '-'}</td>"
+                    + (f"<td class='n'>{simmed(c, names)}</td>" if differs else "")
+                    + f"<td class='n'>{alive(d.fight, t, life):.0f}s</td><td>{e(names)}</td></tr>" for t, c, life, names in d.waves)
+    extra = []  # what the lede above does not say already (duration, waves, Bloodlust, boss share: said there)
     if d.pi:
         extra.append("Power Infusion at " + ", ".join(_mmss(t) for t in d.pi))
     rv = getattr(d, "review", None)  # one figure on the sheet: the one "Your last pull" sets yours against
-    moving = rv.tops_moving if rv is not None and rv.tops_moving is not None else d.moving_share
-    extra.append(f"top {e(d.spec)} players move {moving:.0%} of the fight")
-    if d.add_share_spec:
-        off = 1 - d.boss_share_real if d.boss_share_real is not None else d.add_share_spec  # one figure, as the lede
-        extra.append(f"and do {off:.0%} of their damage off the boss")
+    if rv is None or rv.tops_moving is None:
+        extra.append(f"top {e(d.spec)} players move {d.moving_share:.0%} of the fight")
     focus = ""
     if d.fight is not None and d.fight.focus:
         n = d.fight.targets
@@ -1444,35 +1376,28 @@ def render(d: PrepData) -> str:
                  + "".join(f"<tr><td>{_mmss(f.start)}-{_mmss(f.start + f.duration)}</td><td>{e(f.name)}</td>"
                            f"<td class='n'>{f.support:.0%}</td></tr>" for f in d.fight.focus) + "</table></div>")
     adds_block = (f"""<h3 class="small muted" style="margin-top:14px">Add waves (typical timeline across kills)</h3>
-<p class="small muted">{simmed_note(d)}</p>
-<div class="scroll"><table class="fit"><tr><th>Time</th><th class="n">In the logs</th><th class="n">Simmed</th><th class="n">Alive</th><th>Types</th></tr>{waves}</table></div>
+{f'<p class="small muted">{simmed_note(d)}</p>' if differs else ""}
+<div class="scroll"><table class="fit"><tr><th>Time</th><th class="n">{"In the logs" if differs else "Adds"}</th>{'<th class="n">Simmed</th>' if differs else ""}<th class="n">Alive</th><th>Types</th></tr>{waves}</table></div>
 """ if waves else "")
-    tabs["fight"].append(f"""<h2>The fight</h2><div class="card"><p>Typical duration {_mmss(d.duration)}; {"; ".join(extra)}.</p>
+    lust = f"<p class='small'>{lust_line(d)}</p>" if getattr(d, "lust_spots", None) else ""  # the top raids' other
+    # spots, what each gives you (once in the checklist, gone: its other lines are on the other tabs)
+    tabs["fight"].append(f"""<h2>The rebuilt fight</h2><div class="card">{f'<p>{(said := "; ".join(extra))[:1].upper() + said[1:]}.</p>' if extra else ""}{lust}
 <div class="scroll"><table class="fit">{rows}</table></div>
-{adds_block}{focus}{f'<p><a href="{e(d.timeline_file)}">Cooldown timelines of the top players</a></p>' if d.timeline_file else ''}
-</div>""")
-    if d.export:
-        tabs["fight"].append(export_html(d))
+{adds_block}{focus}{f'<p class="small"><a href="{e(d.timeline_file)}">Cooldown timelines of the top players</a></p>' if d.timeline_file else ''}
+{export_html(d) if d.export else ""}</div>""")
     if d.assigns:
         tabs["fight"].append('<h2>Your assignments and plan</h2><div class="card small"><ul>'
                              + "".join(f"<li>{e(a)}</li>" for a in d.assigns) + "</ul></div>")
 
-    # your raid
-    if d.raid_tools:
-        from paf import workshop_views
-
-        tools = getattr(d, "raid_tools", {}) or {}
-        titles = {"comp": "Who hits what in your raid", "wipe": "Your best pull, in detail",
-                  "night": "This boss in your raid's night"}
-        for kind in ("comp", "wipe", "night"):
-            if tools.get(kind):
-                head = f"<h2>{e(titles[kind])}</h2>"  # every block under a section heading
-                tabs["raid"].append(f"{head}<div class='ws-answer'>"
-                                    f"{workshop_views.render({'kind': kind, **tools[kind]})}</div>")
-        tabs["raid"].append(workshop_views.CSS)
+    # your raid: who hits the adds (the comp's targets, the second boss in its tool), the best pull and the night
+    # as their verdicts, every detail in their tools (the owner: Dig deeper at 13k px)
+    tools = getattr(d, "raid_tools", {}) or {}
     adds = any(c for _t, c, _l, _n in d.waves)
+    who = raid_comp_html(tools.get("comp"))
     if d.raid and (d.raid.verdicts or adds):
-        tabs["raid"].append(raid_section(d.raid, bool(d.gear or d.loot)))
+        tabs["raid"].append(raid_section(d.raid, bool(d.gear or d.loot), who))
+    elif who:
+        tabs["raid"].append(f"<h2>Your raid and the adds</h2><div class='card'>{who}</div>")
     elif d.raid or not adds:  # no adds on this boss: nothing to decide, no section
         pass
     else:
@@ -1480,28 +1405,13 @@ def render(d: PrepData) -> str:
 on the home page of the app (its latest public log is used), or paste one of your raid's logs on the boss page: the prep
 then tells you whether the others cover the adds (stay on the boss) or you should pad them, and picks the cooldown plan
 and the gear for that.</p></div>""")
+    night = raid_night_html(tools)
+    if night:
+        tabs["raid"].append(night)
+    if tools:
+        from paf import workshop_views
 
-    # sim of the fight: number tiles, each sentence on hover (fresh DPS review: a paragraph of figures)
-    if d.sim_dps and d.patchwerk_dps:
-        def kpi(label: str, value: str, sub: str, why: str = "") -> str:
-            return (f"<div class='tile kpi'{f' title={chr(39)}{e(why)}{chr(39)}' if why else ''}><div class='l'>"
-                    f"{e(label)}</div><div class='v'>{value}</div><div class='s'>{e(sub)}</div></div>")
-        played = "the plan the sheet plays" if getattr(d, "aim_plan", False) else "SimC's default list"
-        tiles = [kpi("Rebuilt fight", f"{d.sim_dps:,.0f}", f"DPS · {(d.sim_dps / d.patchwerk_dps - 1):+.0%} vs a "
-                     f"Patchwerk ({d.patchwerk_dps:,.0f})", f"Your character on the fight rebuilt from the logs, vs a "
-                     f"Patchwerk of the same length; with its talents and {played}")]
-        if d.sim_boss_dps:
-            tiles.append(kpi("On the boss", f"{d.sim_boss_dps / d.sim_dps:.0%}", f"{d.sim_boss_dps:,.0f} DPS",
-                             f"Your character's own share on the boss in this sim, with its talents and {played}"))
-        if d.boss_share_real is not None and d.waves:
-            tiles.append(kpi("Top players on the boss", f"{d.boss_share_real:.0%}",
-                             f"in their logs · add waves ×{d.add_scale:g}" if (d.add_scale or 1) < 1
-                             else "in their logs · add waves at full size",
-                             "The rebuilt fight is tuned toward that share by counting each add wave at "
-                             f"{d.add_scale:g} of its size (SimC hits every add in range, real players do not)"
-                             if (d.add_scale or 1) < 1 else
-                             "The rebuilt fight keeps every add wave at its full size (the add counts come from the logs)"))
-        tabs["fight"].append(f"<h2>Your character on this fight</h2><div class='kpis'>{''.join(tiles)}</div>")
+        tabs["raid"].append(workshop_views.CSS)
 
     # talents
     if d.talents:
@@ -1567,6 +1477,7 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
 </div>""")
 
     # ideal play-by-play per objective
+    tops = tops_cd_line(d)  # what the top players do with their cooldowns, in one line over the plans
     flat = bool(d.optimized) and all(abs(p.gain) <= 2 * p.error for p in d.optimized)
     if flat:  # no plan beats the default priority list on any goal: one block, not three of the same
         p = d.optimized[0]
@@ -1577,12 +1488,13 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
             "on this fight:</b> play it as it is. No other plan beats it for boss, total "
             "or burst damage (every gap within the sims' noise)."
             + (f" The sims leave out {e(', '.join(unsimmed_amps(d)))}: see the fight tab." if unsimmed_amps(d) else "")
-            + "</p>"
+            + f"</p>{tops}"
             f"{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases, links=d.links)}"
             + (f"<h4>MRT note {copy_button(note, 'Copy the MRT note')}</h4><pre class='small note-pre'>{e(note)}</pre>"
                if note else "") + "</div>")
     if d.optimized and not flat:
-        blocks = []
+        blocks, same = [], []
+        warned = False  # the top players' other moments: said on the first card, not on each (the owner: less text)
         first = wanted(d) or simple._plan(d).objective if simple._plan(d) else None
         twins = {"adds"} if any(o.objective == "secondary" and {k for k, r in o.choice.items() if r.name != "default"}
                                  for o in d.optimized) else set()  # burst on the adds says what 'adds' would
@@ -1590,11 +1502,14 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
             if p.objective in twins:
                 continue
             changed = {k: r for k, r in p.choice.items() if r.name != "default"}
+            if not changed:  # the default list itself: one line for every such objective, not a card of 0.0%
+                same.append(objective_name(d, p.objective))
+                continue
             from paf.simple import _fallback
             rules = "".join(f"<tr><td>{icons.img(d.icons.get(k, '') or _fallback(d, cd_name(d, k)), 'small')} "
                             f"{link(cd_name(d, k), d.links.get(k))}</td>"
                             f"<td>{e(rule_phrase(d, r.name))}</td></tr>"
-                            for k, r in changed.items()) or "<tr><td>Every cooldown</td><td>as SimC's default priority list casts it</td></tr>"
+                            for k, r in changed.items())
             others = ", ".join(f"{_goal(o)} {_pct(v, 1)}" for o, v in p.totals.items() if o != p.objective)
             note = d.mrt.get(p.objective, "")
             checks = ""
@@ -1606,7 +1521,8 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
                 checks += "<p class='small'>Not checked on pessimistic variants of the fight.</p>"
             if _stall(d, p):
                 checks += f"<p class='small warn' title='{e(stall_why(d, p))}'>&#9888; {e(_stall(d, p))}</p>"
-            if off := off_tops(d, p):
+            if not warned and (off := off_tops(d, p)):
+                warned = True
                 checks += ("<p class='small warn'>&#9888; Not when the top players press it: " + e(" ".join(off))
                            + "</p>")
             flags = [f for f in p.flags if not (p.sensitivity and f.startswith("not robust"))]  # the sensitivity
@@ -1618,44 +1534,15 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
 {("<p class='small'>Played because " + ("your raid pads the adds" if p.objective == "total" else "your raid stays on the boss" if p.objective == "boss" else "it is your choice") + " (see Your raid and the adds, below)." + (" When the plan presses a burst while the boss is immune, the fight tab moves it onto the adds that spawn then." if d.fight is not None and d.fight.invulnerable else "") + "</p>") if p.objective == first and p.objective in ("boss", "total") and not _fallen(p) else ""}
 {"<p class='small muted'>Burst damage counts only the damage on " + e(burst_names(d)[1] or "the burst targets") + ": worth it only if your raid needs " + e(burst_names(d)[1] or "them") + " dead fast" + ("." if _stall(d, p) else ", at the cost of the boss and total damage above.") + "</p>" if p.objective == "secondary" else ""}
 {checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases, links=d.links, legend=not blocks)}
-<table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
-{"<p class='small muted'>The cooldowns not listed follow SimC's default priority list: their times can move with the ones the plan holds.</p>" if changed else ""}
-<div class="pp-grid">{(f'<div><div class="nb"><h4>MRT note {copy_button(note, "Copy the MRT note")}</h4><pre class="small note-pre">{e(note)}</pre></div>'
-  + nsrt_block(d.nsrt.get(p.objective, "")) + "</div>") if (changed or p.objective == first) and note else
- "<div><p class='small muted'>The default priority list as it is: no note to paste. The fight tab's note has its "
- "presses and your defensives.</p></div>"}</div>
+<div class="pp-grid"><div><table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
+<p class='small muted'>The cooldowns not listed follow SimC's default priority list: their times can move with the ones the plan holds.</p></div>
+{(f'<div class="nb"><h4>MRT note {copy_button(note, "Copy the MRT note")}'
+  + (copy_button(d.nsrt[p.objective], "Copy for NSRT") if d.nsrt.get(p.objective) else "")
+  + f'</h4><pre class="small note-pre">{e(note)}</pre></div>') if note else ""}</div>
 </div>""")
-        tabs["cooldowns"].append("<h2>Cooldown plans, per objective</h2>" + "".join(blocks))
-
-    if d.alignment and (d.alignment[0].adds_cover or d.alignment[0].units_cover):  # no adds: nothing to hold for
-        a0 = d.alignment[0]
-        units = bool(a0.units_cover)  # no burst target here: no column of zeros (DPS round 15)
-        rows = ""
-        tested = {cd_name(d, k) for p in d.optimized for k in p.choice}  # the cooldowns the plans hold or release
-        for a in d.alignment:
-            if (tested and a.ability not in tested) or not (a.in_adds or a.in_units):
-                continue  # an AoE spender is on adds by nature, not held; a row of zeros says nothing
-            held = []
-            if a.in_adds > a.adds_cover * 1.5 and a.in_adds - a.adds_cover > 0.1:
-                held.append("held for adds")
-            elif a.in_adds > a.adds_cover * 1.25 and a.in_adds - a.adds_cover > 0.1:
-                held.append("leans to the adds")
-            if a.units_cover and a.in_units > a.units_cover * 1.5 and a.in_units - a.units_cover > 0.1:
-                held.append("held for burst targets")
-            elif a.units_cover and a.in_units > a.units_cover * 1.25 and a.in_units - a.units_cover > 0.1:
-                held.append("leans to burst targets")
-            rows += (f"<tr><td>{icons.img(d.icons.get(a.ability, ''), 'small')} {lk(a.ability)}</td>"
-                     f"<td class='n'>{a.in_adds:.0%}</td>" + (f"<td class='n'>{a.in_units:.0%}</td>" if units else "") + ""
-                     f"<td>{e(' / '.join(held) or 'no clear hold')}</td></tr>")
-        burst = f" ({e(burst_names(d)[1])})" if burst_names(d)[1] else ""
-        burst_said = f", and on the burst targets{burst}, which cover {a0.units_cover:.0%}" if units else ""
-        burst_note = (" SimC does not know that a burst target must die fast, so compare with the simulated plans "
-                      "above." if units else "")
-        burst_th = '<th class="n">On burst targets</th>' if units else ""
-        tabs["cooldowns"].append(f"""<h2>What the top players do with their cooldowns</h2><div class="card scroll">
-<p class="small">Share of their casts (after the opener) during add waves, which cover <span title="each top kill's own waves, not the fight tab's median ones">{a0.adds_cover:.0%}</span> of the fight in the top kills{burst_said}. Much more
-than the coverage means they hold the cooldown.{burst_note}</p>
-<table><tr><th>Cooldown</th><th class="n">During adds</th>{burst_th}<th>Reading</th></tr>{rows}</table></div>""")
+        intro = tops + (f"<p class='small'><b>{e(', '.join(same))}:</b> no plan beats SimC's default list.</p>"
+                        if same else "")
+        tabs["cooldowns"].append("<h2>Cooldown plans, per objective</h2>" + intro + "".join(blocks))
 
     # gear
     if d.gear:

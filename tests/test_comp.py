@@ -108,8 +108,26 @@ def test_the_raid_tab_of_the_sheet_shows_the_raid_tools():
     d = PrepData("Boss", "mythic", "Elemental", "X", duration=300)
     d.raid_tools = {"comp": comp.to_dict("Boss", "this boss, kill of 1:40", rows())}
     html = render(d)
-    assert "Who hits what in your raid" in html and "put them on it" in html
-    assert "Your best pull, in detail" not in html  # no wipe in that log: nothing shown
+    raid = html.split("Your raid and the adds", 1)[1]  # one section: who hits the adds is in it
+    assert "Who hits what in your raid" not in html and "put them on it" in raid
+    assert "? how it is read" not in raid and "It compares specs" in raid  # how it is read: shown, not on hover
+    assert "Your raid&#39;s pulls" not in html and "Your raid's pulls" not in html  # no wipe in that log
+
+
+def test_the_sheet_says_the_raids_night_in_a_line_and_leaves_the_second_boss_to_its_tool():
+    from paf.prep_report import raid_comp_html, raid_night_html
+
+    night = {"pulls": [{"kill": False}, {"kill": False}, {"kill": True}],
+             "summary": {"A": {"deaths": 2, "bare": 1}, "B": {"deaths": 1, "bare": 0}}}
+    wipe = {"left": 0.516, "duration": 216.0, "kill": {"no_deaths_share": 305.0}}
+    out = raid_night_html({"night": night, "wipe": wipe})
+    assert "3 pulls, 3 deaths before the wipes, 1 without a healthstone or a health potion first" in out
+    assert "boss at 51.6% after 3:36" in out and "5:05" in out
+    assert "href='/tool/night'" in out and "href='/tool/wipe'" in out and "<table" not in out
+    assert raid_night_html({}) == ""
+    t = {"name": "Ithraz", "second_boss": True, "players": 0, "whole_raid": False, "ranking": [], "main": .45,
+         "tops": .45}
+    assert raid_comp_html({"boss": "Boss", "targets": [t]}) == ""  # the second boss: in the Comp tool
 
 
 def test_two_pulls_side_by_side():

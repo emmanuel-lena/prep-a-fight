@@ -86,11 +86,10 @@ th.n{text-align:right}
 .boss-top{display:grid;gap:8px 28px;align-items:start}
 @media (min-width:1100px){.boss-top{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 .boss-top>div>h2:first-child{margin-top:8px}
-/* a plan's play-by-play over its notes, the MRT note and the NSRT reminders side by side */
-.pp-grid{grid-template-columns:minmax(0,1fr)!important}
-@media (min-width:1100px){.pp-grid>div:last-child{column-count:2;column-gap:24px}
-  .pp-grid>div:last-child>h4{break-after:avoid} .pp-grid>div:last-child .note-pre,.pp-grid .nb{break-inside:avoid}}
-.pp-grid .pp{max-height:none}
+/* a plan's rules beside its MRT note (its NSRT button in the note's heading: no empty column) */
+.pp-grid{grid-template-columns:minmax(0,1fr)!important;align-items:start}
+@media (min-width:1100px){.pp-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}}
+.pp-grid .pp{max-height:none} .pp-grid table{margin-top:0}
 /* the plan the sheet plays carries the emphasis, not the biggest number */
 .sugg.major:not(.rec){border-left-color:var(--line)!important} .sugg.rec{border-left:3px solid var(--accent)!important}
 /* one column for every suggestion; the plan the sheet plays marked by an inset rule and the strongest chip */
@@ -122,3 +121,7 @@ ul.grp .plain{display:block;padding-top:9px} /* a text row on its label's line, 
 /* an action of the boss tab: its icon, name and chips on one line, its sentence on hover */
 .act{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px} .act b{margin-right:4px}
 tr.noise>td{opacity:.5} tr.noise:hover>td{opacity:1} /* a talent build within the sims' noise of yours: dimmed, not folded */
+/* Dig deeper: a tool's answer inside a card is part of it, not a box in a box; the raid's pulls as their verdict */
+.card .ws-answer{margin:18px 0 6px;padding:0;border:0;background:none;box-shadow:none}
+.raid-pulls{max-width:88ch} .raid-pulls>.verdict{margin-bottom:8px}
+.trust{margin-bottom:18px}

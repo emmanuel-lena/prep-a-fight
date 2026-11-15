@@ -53,16 +53,33 @@ def test_render_prep_sheet_with_wowhead_links():
     assert "wow.zamimg.com/js/tooltips.js" in page
 
 
-def test_checklist():
-    d = PrepData("Boss", "heroic", "Elemental", "Char")
+def test_dig_deeper_leaves_out_what_the_other_tabs_say():
+    """The owner's clean-up: no "What matters for you" (What to change says it), no "Once the pull starts" (The boss
+    and the fight tab say it), no tiles of your character (the aim tiles say them); the assignments stay."""
+    d = PrepData("Boss", "heroic", "Elemental", "Char", duration=300)
     d.lust = 120
     d.role_bullets = ["Kill the Clutch.", "Burst the Heart."]
     d.assigns = ["Malice: interrupt"]
-    d.waves = [(60.0, 4, 20.0, "Clutch")]  # adds: pad them or not is the raid's call
+    d.waves = [(60.0, 4, 20.0, "Clutch")]
+    d.sim_dps, d.sim_boss_dps, d.patchwerk_dps = 200000.0, 150000.0, 210000.0
     page = render(d)
-    assert "Once the pull starts" in page and "Bloodlust usually comes around 2:00" in page
-    assert "Kill the Clutch." in page and "Your assignment: Malice: interrupt" in page
-    assert "ask your raid lead" in page
+    assert "Once the pull starts" not in page and "What matters for you" not in page
+    assert "Your character on this fight" not in page
+    assert "Your assignments and plan" in page and "Malice: interrupt" in page
+
+
+def test_the_rebuilt_fight_shows_the_simmed_column_only_when_it_differs():
+    from paf.fight import AddWave, Fight
+
+    d = PrepData("Boss", "heroic", "Elemental", "Char", duration=300)
+    d.waves = [(60.0, 4, 20.0, "Clutch")]
+    d.fight = Fight("Boss", 300, add_waves=[AddWave(60.0, 4, 20.0, name="Clutch")])
+    d.export = {"": "fight_style=x\nraid_events+=/adds,count=4"}
+    page = render(d)
+    assert "The rebuilt fight" in page and "Simmed</th>" not in page and "Sim this fight on Raidbots" not in page
+    assert "Copy the fight" in page.split("The rebuilt fight", 1)[1].split("</section>", 1)[0]  # in its card
+    d.add_scale = 0.5
+    assert "Simmed</th>" in render(d)
 
 
 def test_goal_chosen_by_the_player():
@@ -74,7 +91,26 @@ def test_goal_chosen_by_the_player():
     p.totals = {"boss": 5.0}
     d.optimized = [p]
     page = render(d)
-    assert "Your role (your choice): <b>boss damage first</b>" in page and "your choice</span>" in page
+    assert "your choice</span>" in page
+
+
+def test_plans_that_change_nothing_are_one_line_and_nsrt_sits_beside_the_mrt_note():
+    from paf.optimize import Plan, Rule
+
+    d = PrepData("Boss", "heroic", "Elemental", "Char", duration=300)
+    d.goal = "total"
+    pad = Plan("total", {"ascendance": Rule("on_cooldown", "", None)}, 2.0, 0.1, totals={"total": 2.0, "boss": -1.0},
+               timeline=[(5.0, "Ascendance")])
+    boss = Plan("boss", {"ascendance": Rule("default", "", None)}, 0.0, 0.1, totals={"boss": 0.0})
+    d.optimized = [pad, boss]
+    d.mrt = {"total": "prep-a-fight: Boss\n{time:0:05} Ascendance"}
+    d.nsrt = {"total": "EncounterID:1\ntime:5;ph:1;tag:x;spellid:1;dur:5"}
+    deeper = render(d).split('id="deeper"', 1)[1]
+    assert "<b>Boss damage:</b> no plan beats SimC's default list" in deeper
+    assert "Boss damage: <span" not in deeper  # no card of 0.0%
+    assert "Northern Sky Raid Tools reminders" not in deeper  # its button in the MRT note's heading
+    head = deeper.split("MRT note", 1)[1].split("</h4>", 1)[0]
+    assert "Copy the MRT note" in head and "Copy for NSRT" in head
 
 
 def test_notes_read_in_time_order():
