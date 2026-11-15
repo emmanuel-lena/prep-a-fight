@@ -107,12 +107,12 @@ th.n{text-align:right}
 .sugg .gain.muted{color:var(--muted)} /* a plan not played: its gain is no call to take it */
 div.chips{display:grid;grid-template-columns:auto 1fr;gap:6px;align-items:start;margin:8px 0} div.chips .chip.rare{opacity:.6}
 div.chips .chip{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;margin:2px 4px 2px 0;border:1px solid var(--line);border-radius:999px} /* the defensives used, one chip each */
-.padbar{position:relative;height:8px;max-width:360px;margin:8px 0 28px;border-radius:4px;background:color-mix(in srgb,var(--fg) 12%,transparent)}
+.padcap{margin:8px 0 0;font-size:12px;color:var(--muted)} /* what the pad bar measures */
+.padbar{position:relative;height:8px;max-width:360px;margin:6px 0 28px;border-radius:4px;background:color-mix(in srgb,var(--fg) 12%,transparent)}
 .padbar>i{display:block;height:100%;border-radius:4px;background:var(--fg);opacity:.6}
-.padbar>b{position:absolute;top:-4px;width:2px;height:16px;background:var(--warn)}
+.padbar>b{position:absolute;top:-4px;width:2px;height:16px;background:var(--fg)} /* the weakest top raids: no gold */
 .padbar>span{position:absolute;top:10px;left:0;font-size:12px;color:var(--muted);white-space:nowrap}
-.padbar>span.lo{transform:translateX(-50%);color:var(--warn)}
-.padbar.ends::after{content:"100%";position:absolute;right:0;top:10px;font-size:11px;color:var(--muted)}
+.padbar>span.lo{margin-left:4px} .padbar>span.lo.end{margin-left:0;transform:translateX(calc(-100% + 2px))} /* ends at its mark near the right */
 ul.grp{list-style:none;padding:0} ul.grp>li{display:grid;grid-template-columns:150px 1fr;gap:4px 10px;align-items:start;margin:4px 0}
 ul.grp>li>b{grid-row:span 1} ul.grp .chip{margin:0 6px 4px 0}
 ul.grp>li>b{padding-top:9px} /* centred on the first chip row: a chip is 38 px, the label 21 (measured) */

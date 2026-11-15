@@ -288,6 +288,9 @@ def test_the_pad_verdict_draws_its_bar():
     bar = _pad_bar("Pad them: with you, your raid does 53% of the top raids' damage on them (the weakest top raids "
                    "do 84%); it lacks cleave.")
     assert "width:53%" in bar and "left:84%" in bar
+    # what it measures and who the mark is, in words (a review: "your raid 75%" beside a gold "93%")
+    assert "Damage on the adds, as a share of the top raids' median" in bar
+    assert ">your raid 53%</span>" in bar and ">weakest top raids 84%</span>" in bar and "warn" not in bar
     made = _pad_bar("pad them, you make the difference: your raid does 70% of the top raids' damage on them without "
                     "you, 90% with you (the weakest top raids do 84%)")
     assert "width:90%" in made and _pad_bar("Kill the adds.") == ""

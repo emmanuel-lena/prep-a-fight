@@ -873,11 +873,13 @@ def _pad_bar(text: str) -> str:
         return ""
     you, low = int(m[1]), int(m[2])
     top = max(100, you, low)
-    end = "" if low / top > 0.8 else " ends"  # "100%" only where it does not touch the mark's label (round 45)
-    return (f"<div class='padbar{end}' title='your raid {you}%, the weakest top raids {low}% of the top raids&#39; "
-            "damage'>"
-            f"<i style='width:{you / top * 100:.0f}%'></i><b style='left:{low / top * 100:.0f}%'></b>"
-            f"<span>your raid {you}%</span><span class='lo' style='left:{low / top * 100:.0f}%'>{low}%</span></div>")
+    side = " end" if low / top >= 0.7 else ""  # the mark's label ends at the mark near the right, else starts there
+    # what the bar measures and who the mark is, said (a review: "your raid 75%" beside a gold "93%" named neither);
+    # the mark in the text's colour: gold is rare
+    return (f"<p class='padcap'>Damage on the adds, as a share of the top raids' median</p>"
+            f"<div class='padbar'><i style='width:{you / top * 100:.0f}%'></i>"
+            f"<b style='left:{low / top * 100:.0f}%'></b><span>your raid {you}%</span>"
+            f"<span class='lo{side}' style='left:{low / top * 100:.0f}%'>weakest top raids {low}%</span></div>")
 
 
 def _without_shares(text: str) -> str:
