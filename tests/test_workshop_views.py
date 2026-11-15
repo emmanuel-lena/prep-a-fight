@@ -87,7 +87,7 @@ def test_two_pulls_with_other_talents_lead_with_the_build():
     assert "Tiny</b>" not in page and "the gap is gameplay" not in page and "not only gameplay" in page
     assert "class='verdict ok'" in page and "On the bosses" not in page  # all of it on the boss: one tile
     assert "<span class='pab-s a'>A</span> 1:44 &middot; <span class='pab-s b'>B</span> 2&times;" in page
-    assert "<span class='pab-s b'>B</span> &ndash;" in page and ">&minus;70</td>" in page
+    assert "<span class='pab-s b'>B</span> &ndash;" in page and ">&minus;70 pts</td>" in page
     assert ">60%</text>" in page and ">50%</text>" not in page  # the y axis from the 10% under the lowest point
     assert ">0:30</text>" in page  # 30 s ticks under 5 min
     page = _diff([{"name": "Both", "a": 50e3, "b": 60e3}])

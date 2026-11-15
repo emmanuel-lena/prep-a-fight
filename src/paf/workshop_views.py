@@ -178,7 +178,8 @@ def loot(d: dict) -> str:
     icons = _item_icons(rows)
     good = [r for r in rows if r["gain"] > 2 * err]
     bad = [r for r in rows if r["gain"] <= 2 * err]
-    where = ", ".join(d.get("bosses", [])[:3]) + ("…" if len(d.get("bosses", [])) > 3 else "")  # escaped below
+    from_ = list(dict.fromkeys(r["boss"] for r in good if r.get("boss"))) or d.get("bosses", [])  # where they drop
+    where = ", ".join(from_[:3]) + ("…" if len(from_) > 3 else "")  # escaped below
     if good:
         head = _verdict("go", "1 item worth it for you" if len(good) == 1 else f"{len(good)} items worth it for you",
                         f"From {e(where)}, at item level {d.get('ilvl')}.", _pct(good[0]["gain"]))
@@ -249,7 +250,8 @@ def topgear(d: dict) -> str:
         return (f"<li><span class='l-val{' pos' if r['gain'] > 2 * err else ''}'>{_pct(r['gain'], 2)}</span>"
                 f"<span>{' &middot; '.join(said) or 'the same items, placed otherwise'}</span></li>")
     others = [r for r in (rows[1:6] if good else rows[:5]) if r["changes"]]
-    title = "Other good sets, against the best one" if good else "The closest sets (within the error)"
+    title = "Other good sets, said against the best one (gain over what you wear)" if good else \
+        "The closest sets (within the error)"
     more = f"<ul class='glist alts'>{''.join(other(r) for r in others)}</ul>" if others else ""
     return (f"{head}" + (f"<h3>{title}</h3>{more}" if more else "")
             + f"<p class='ws-fine'>Differences under &plusmn;{2 * err:.2f}% are noise.</p>")
@@ -672,7 +674,8 @@ def pulldiff(d: dict) -> str:
     def times(ts: list[float], rate: float, dur: float) -> str:
         if ts:
             return " ".join(_mmss(t) for t in ts[:8])
-        return f"{round(rate * dur / 60)}&times;" if rate else "&ndash;"  # cast too often to list its times
+        # no times read for this pull: its count, and says so (a fresh review read "2×" as a value)
+        return f"{round(rate * dur / 60)}&times; <span class='muted'>(times not read)</span>" if rate else "&ndash;"
 
     def when(r: dict) -> str:
         return (f"<span class='pab-s a'>A</span> {times(r['times_a'], r['a'], a.get('duration', 0))} &middot; "
@@ -684,7 +687,7 @@ def pulldiff(d: dict) -> str:
     out += table("Uptime of your buffs and procs", ("Buff", "Change"), [
         f"<tr><td>{e(r['name'])}</td><td class='n'>{r['a']:.0%}</td><td class='n'>{r['b']:.0%}</td>"
         f"<td class='n {'pos' if r['b'] > r['a'] else 'neg'}'>"
-        + f"{(r['b'] - r['a']) * 100:+.0f}".replace("-", "&minus;") + "</td></tr>"
+        + f"{(r['b'] - r['a']) * 100:+.0f} pts".replace("-", "&minus;") + "</td></tr>"
         for r in pl.get("buffs", [])])
     cons = pl.get("consumables", {})
     out += ("<h3>Consumables and deaths</h3><div class='kts'>"
