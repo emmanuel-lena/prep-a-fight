@@ -487,7 +487,7 @@ def cmd_gear(args: argparse.Namespace) -> int:
         res = run_topgear(profile_text, pool, fights, root / "equip", objective=args.objective,
                           max_combos=max(args.max_combos, 20000) if thorough and args.max_combos == 1500 else
                           args.max_combos, crafted=crafted, thorough=thorough)
-        out["equip"] = results.topgear(res)
+        out["equip"] = results.topgear(res, pool=pool)
         best = res.best()
         if best is not None and best.weighted(weights) > 0:
             worn = profile_text.rstrip() + "\n" + best_set_simc(pool, best)  # the drops simmed on top of it
@@ -601,7 +601,7 @@ def cmd_topgear(args: argparse.Namespace) -> int:
     report = format_result(res, pool, top=args.top)
     from paf import results
 
-    results.write(root, "topgear", results.topgear(res))
+    results.write(root, "topgear", results.topgear(res, pool=pool))
     print()
     print(report)
     (root / "results.txt").write_text(report + "\n", encoding="utf-8")

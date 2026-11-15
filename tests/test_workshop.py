@@ -41,7 +41,7 @@ def test_result_views():
     loot = workshop_views.loot({"error": 0.2, "ilvl": 326, "bosses": ["B"], "ev": [], "rows": [
         {"name": "Shawl", "item_id": 0, "slot": "back", "boss": "B", "gain": 0.43},
         {"name": "Cleaver", "item_id": 0, "slot": "main_hand", "boss": "B", "gain": -17.3}]})
-    assert "1 item worth it for you" in loot and "Not upgrades (1)" in loot
+    assert "1 item worth it for you" in loot and "1 other item is no upgrade" in loot and "<details" not in loot
     cds = workshop_views.render({"kind": "cooldowns", "plans": [
         {"objective": "boss", "gain": 0.53, "error": 0.06, "rules": [{"cd": "Ascendance", "how": "for the adds"}]}]})
     assert "For boss damage" in cds and "Ascendance" in cds

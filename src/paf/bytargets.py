@@ -169,7 +169,7 @@ def run(profile_text: str, pool, builds: list[Build], secs: int, run_dir: Path, 
             log(f"== Gear on {c.label}" + (f", with the {row.build.label}" if row is not None else ""))
             res = run_topgear(text, pool, [FightProfile(c.fight, fights[c.fight])], run_dir / f"gear-{c.targets}",
                               objective=objective, max_combos=max_combos, log=log)
-            entry["gear"] = results.topgear(res, top=3)
+            entry["gear"] = results.topgear(res, top=3, pool=pool)
         out["counts"].append(entry)
     return out
 

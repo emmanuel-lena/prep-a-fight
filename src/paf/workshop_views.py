@@ -144,7 +144,7 @@ def loot(d: dict) -> str:
     icons = _item_icons(rows)
     good = [r for r in rows if r["gain"] > 2 * err]
     bad = [r for r in rows if r["gain"] <= 2 * err]
-    where = ", ".join(d.get("bosses", [])[:3]) + ("&hellip;" if len(d.get("bosses", [])) > 3 else "")
+    where = ", ".join(d.get("bosses", [])[:3]) + ("…" if len(d.get("bosses", [])) > 3 else "")  # escaped below
     if good:
         head = _verdict("go", "1 item worth it for you" if len(good) == 1 else f"{len(good)} items worth it for you",
                         f"From {e(where)}, at item level {d.get('ilvl')}.", _pct(good[0]["gain"]))
@@ -160,11 +160,15 @@ def loot(d: dict) -> str:
         return max((abs(r["gain"]) for r in lst), default=1) or 1
 
     body = f"<ul class='glist items'>{''.join(card(r, scale(good)) for r in good)}</ul>" if good else ""
-    if bad:
-        body += (f"<details class='more'><summary>Not upgrades ({len(bad)})</summary><ul class='glist items'>"
-                 f"{''.join(card(r, scale(bad)) for r in bad)}</ul></details>")
+    if bad and not good:  # nothing to farm: the closest ones, to see how far
+        body += f"<ul class='glist items'>{''.join(card(r, scale(bad[:5])) for r in bad[:5])}</ul>"
+    elif bad:  # the rest in a line, no fold (the owner): its count and the closest
+        near = ", ".join(f"{e(r['name'])} ({_pct(r['gain'])})" for r in bad[:3])
+        body += (f"<p class='ws-fine'>{len(bad)} other {'items are' if len(bad) > 1 else 'item is'} no upgrade; the "
+                 f"closest: {near}.</p>")
     evs = [x for x in d.get("ev", []) if x["ev"] > 0]
-    ev = ("<h3>Which boss is worth it</h3><ul class='glist'>" + "".join(
+    ev = ("<h3>Which boss is worth it</h3><p class='ws-fine'>What one kill brings you on average: each item's gain "
+          "times its chance to drop.</p><ul class='glist'>" + "".join(
         f"<li><span class='l-name'><b>{e(x['boss'])}</b><small>{x['n']} items for you</small></span>"
         f"{_bar(x['ev'], max(y['ev'] for y in evs))}<span class='l-val pos'>{_pct(x['ev'], 2)}</span></li>"
         for x in evs) + "</ul>") if len(evs) > 1 else ""
@@ -184,23 +188,35 @@ def topgear(d: dict) -> str:
     def item(slot: str, i: dict) -> str:
         meta = [SLOTS.get(slot, slot)] + ([str(i["ilvl"])] if i.get("ilvl") else [])
         meta += [i["source"]] if i.get("source") not in ("bags", "equipped", None) else []
+        was = f"<small class='was'>replaces {e(i['was'])}</small>" if i.get("was") else ""
         return (f"<li class='icard'>{_img(icons.get(i.get('item_id') or 0, ''))}<span class='l-name'>"
                 f"<b>{e(i['name'] or '?')}</b><small>{' &middot; '.join(f'<span>{e(m)}</span>' for m in meta)}</small>"
-                f"</span></li>")
+                f"{was}</span></li>")
+
+    def new(r: dict) -> list[tuple[str, dict]]:  # what the set puts on; an item it keeps on is no change
+        return [(c["slot"], i) for c in r["changes"] for i in c["items"] if i.get("source") != "equipped"]
 
     def changes(r: dict) -> str:
-        return "".join(item(c["slot"], i) for c in r["changes"] for i in c["items"])
-    if best["gain"] > 2 * err:
+        return "".join(item(slot, i) for slot, i in new(r))
+    good = best["gain"] > 2 * err
+    if good:
         head = _verdict("go", "Put on these items", f"The best set from your bags{' on ' + e(', '.join(d.get('fights', []))) if d.get('fights') else ''}.",
                         _pct(best["gain"], 2)) + f"<ul class='glist items'>{changes(best)}</ul>"
     else:
         head = _verdict("ok", "Keep what you wear", "No combination of your bags does better (the differences are "
                               "within the error).")
-    others = rows[1:6] if best["gain"] > 2 * err else rows[:5]
-    more = "".join(f"<details class='more'><summary><b>{_pct(r['gain'], 2)}</b> &middot; "
-                   f"{e(', '.join(i['name'] or '?' for c in r['changes'] for i in c['items']))}</summary>"
-                   f"<ul class='glist items'>{changes(r)}</ul></details>" for r in others if r["changes"])
-    title = "Other good sets" if best["gain"] > 2 * err else "The closest sets (within the error)"
+    mine = {(slot, i["name"]) for slot, i in new(best)} if good else set()
+
+    def other(r: dict) -> str:  # a set said by what it does differently from the best one
+        put = [(slot, i) for slot, i in new(r) if (slot, i["name"]) not in mine]
+        kept = sorted({SLOTS.get(slot, slot) for slot, name in mine} - {SLOTS.get(slot, slot) for slot, _i in new(r)})
+        said = [f"<b>{e(i['name'] or '?')}</b> <small>{e(SLOTS.get(slot, slot))}</small>" for slot, i in put]
+        said += [f"keeps your {e(k.lower())}" for k in kept]
+        return (f"<li><span class='l-val{' pos' if r['gain'] > 2 * err else ''}'>{_pct(r['gain'], 2)}</span>"
+                f"<span>{' &middot; '.join(said) or 'the same items, placed otherwise'}</span></li>")
+    others = [r for r in (rows[1:6] if good else rows[:5]) if r["changes"]]
+    title = "Other good sets, against the best one" if good else "The closest sets (within the error)"
+    more = f"<ul class='glist alts'>{''.join(other(r) for r in others)}</ul>" if others else ""
     return (f"{head}" + (f"<h3>{title}</h3>{more}" if more else "")
             + f"<p class='ws-fine'>Differences under &plusmn;{2 * err:.2f}% are noise.</p>")
 
@@ -745,8 +761,11 @@ def specgear(d: dict) -> str:
 
 def enchant_table(d: dict) -> str:
     """Each enchant and gem the top players wear, its gain on your set; the ones to change first (picked: beyond the
-    sims' noise), the share of the top players who wear it on hover."""
-    rows = sorted(d["rows"], key=lambda r: (not r.get("pick"), r["kind"] != "enchant", r["slot"], -(r["gain"] or 0)))
+    sims' noise), the share of the top players who wear it on hover. The ones you already wear are counted, not
+    listed."""
+    worn = [r for r in d["rows"] if r["gain"] == 0]
+    rows = sorted((r for r in d["rows"] if r["gain"] != 0),
+                  key=lambda r: (not r.get("pick"), r["kind"] != "enchant", r["slot"], -(r["gain"] or 0)))
     def gain(g: float) -> str:
         return "worn" if g == 0 else f"{g:+.2f}%"  # 0: what you already wear there
     body = "".join(
@@ -756,7 +775,9 @@ def enchant_table(d: dict) -> str:
         "</td></tr>" for r in rows)
     return (f"<div class='scroll'><table class='night'><tr><th></th><th>Slot</th><th>What the top players wear</th>"
             f"<th class='n' title='on your set, the sims&#39; error about ±{d.get('error', 0):.2f}%'>Gain</th></tr>"
-            f"{body}</table></div>")
+            f"{body}</table></div>"
+            + (f"<p class='ws-fine'>You already wear {len(worn)} of them: "
+               f"{e(', '.join(sorted({r['slot'].replace('_', ' ') or 'sockets' for r in worn})))}.</p>" if worn else ""))
 
 
 def by_targets(d: dict) -> str:

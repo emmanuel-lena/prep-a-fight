@@ -156,3 +156,8 @@ table.night th.n{text-align:right}
 .bt-card .btn{justify-self:start}
 @media (max-width:900px){.bt-grid{grid-template-columns:minmax(0,1fr)}}
 .bt-hero{margin:0} .bt-hero s{color:var(--muted);text-decoration-color:var(--neg)}
+/* the best set's items say what they replace; the other sets are said by what they do differently */
+.icard .was{display:block;color:var(--muted);font-size:12px}
+.glist.alts li{grid-template-columns:78px minmax(0,1fr);gap:12px;padding:7px 10px}
+.glist.alts .l-val{text-align:right}
+.glist.alts small{color:var(--muted)}

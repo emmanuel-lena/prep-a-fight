@@ -42,7 +42,7 @@ def test_the_gear_page_says_what_to_change():
          "pick": True},
         {"kind": "gem", "slot": "", "name": "Deadly Garnet", "id": 6001, "share": 0.7, "gain": 0, "pick": False}]}})
     assert "<b>&#10003; change</b>" in page and "Crystalline Radiance" in page and "+0.80%" in page
-    assert "every socket" in page and ">worn<" in page
+    assert "You already wear 1 of them: sockets." in page and ">worn<" not in page  # worn: counted, not listed
 
 
 def test_a_game_string_reads_as_a_player_reads_it():

@@ -51,13 +51,17 @@ def loot(items, weights: dict[str, float], evs, ilvl: int, bosses: list[str]) ->
             "ev": [{"boss": b, "ev": ev, "n": n} for b, ev, n in evs]}
 
 
-def topgear(res, top: int = 8) -> dict:
+def topgear(res, top: int = 8, pool=None) -> dict:
+    """The best sets; with the pool, each new item says what it replaces ("was")."""
     weights = {f.name: f.weight for f in res.fights}
     ranked = sorted(res.combos, key=lambda c: -c.weighted(weights))[:top]
+    worn = getattr(pool, "equipped", None) or {}
     rows = []
     for c in ranked:
-        changes = [{"slot": o.fam, "items": [{"name": g.name, "ilvl": g.ilvl, "item_id": g.item_id,
-                                               "source": g.source} for g in o.gears()]}
+        changes = [{"slot": o.fam, "items": [{"name": g.name, "ilvl": g.ilvl, "item_id": g.item_id, "source": g.source}
+                                             | ({"was": worn[s].name} if s in worn and g.source != "equipped"
+                                                and worn[s].name else {})
+                                             for s, g in o.slots if g]}
                    for o in c.options.values()]
         rows.append({"gain": c.weighted(weights), "changes": changes,
                      "per": {fight_label(f): v for f, v in c.scores.items()}})
