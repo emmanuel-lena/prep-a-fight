@@ -146,8 +146,8 @@ def performance(log: str = "") -> str:
 
         hist = history()
         if hist:
-            lines.append("last preps, median per step: " + ", ".join(
-                f"{k} {st.median(v):.0f} s" for k, v in sorted(hist.items(), key=lambda x: -st.median(x[1])) if v))
+            lines.append("last preps, median per step:\n" + "\n".join(  # a step a line (review: one long line)
+                f"  {k}: {st.median(v):.0f} s" for k, v in sorted(hist.items(), key=lambda x: -st.median(x[1])) if v))
     except Exception:  # noqa: BLE001
         pass
     return "\n".join(lines)

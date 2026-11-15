@@ -1834,14 +1834,13 @@ def feedback_page(jid: str = "", note: str = "") -> str:
     dest = ("sent to the prep-a-fight team" if feedback.endpoint() else
             "opened as a GitHub issue in your browser, for you to post (a free GitHub account is needed)")
     return f'''<h1>Send feedback</h1>{note}<p class="lead">A bug, a wrong number, an idea: it is {dest}.</p>
-<form method="post" action="/feedback" class="card"><input type="hidden" name="job" value="{e(jid)}">
+<form method="post" action="/feedback" class="card fb-form"><input type="hidden" name="job" value="{e(jid)}">
 <label>Your message <textarea name="message" required placeholder="What you did, what you expected, what you got.
 Your spec and the boss help us."></textarea></label>
 {f"""<label class="check-row"><input type="checkbox" name="log" checked><span> Attach the {"log of this prep" if jid else "app's log"}
 (below; your Warcraft Logs key, user folder and email addresses are removed)</span></label>""" if log.strip() else ""}
-<label class="check-row"><input type="checkbox" name="perf" checked><span> Attach performance measures: your computer's CPU,
-cores and memory, and how long each step took (nothing personal: no name, no log, no folder). They help make the app
-faster on every computer.</span></label>
+<label class="check-row"><input type="checkbox" name="perf" checked><span> Attach your computer's speed (CPU, cores,
+memory, time per step). Nothing personal.</span></label>
 <div class="cta"><button class="btn go">{"Send" if feedback.endpoint() else "Open it on GitHub"}</button></div></form>
 <h2>Exactly what is sent</h2><div class="card"><pre class="log">{e(preview[-20000:])}</pre></div>'''
 
