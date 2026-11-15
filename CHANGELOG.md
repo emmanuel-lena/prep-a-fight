@@ -17,6 +17,9 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 - Gear, without a boss: a new "1 · 2 · 3+" target choice answers for each target count at once, a card each: the
   talents to play (yours, SimulationCraft's, or the top players' builds on the bosses you prepared, taken only beyond
   the noise) and the set from your bags and vault with those talents, only what changes from what you wear (#43).
+- The prep sheet is cleaner and says each thing once: Dig deeper is less than half as long (your raid's night and
+  best pull as one line each, linked to their tools; no repeats of the other tabs), "keep yours" gear and talents show
+  the closest three, the boss's defensives are grouped by the ability they answer, and every tab's headings match.
 ## 0.8.30 (2026-11-12)
 
 - After an update, the app opens again by itself (it closed and stayed closed).

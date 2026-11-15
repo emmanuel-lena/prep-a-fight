@@ -3,7 +3,7 @@
 .rv{transition:opacity .6s ease,transform .6s ease}
 .js .rv.in{opacity:1;transform:none}
 .lede{font:400 22px/1.5 var(--font-reading);margin:8px 0 6px;color:var(--fg)}
-.trust{font-size:13.5px;color:var(--muted);margin:10px 0 0;padding-left:12px;border-left:2px solid var(--line)}
+.trust{font-size:13.5px;color:var(--muted);margin:10px 0 18px;padding-left:12px;border-left:2px solid var(--line)}
 .trust span{font-style:italic} .trust.high{border-color:var(--pos)} .trust.low{border-color:var(--neg)}
 .gain{font:600 18px var(--font-data);white-space:nowrap;color:var(--fg)}
 .gain.big{font-size:24px;color:var(--pos)} .gain.tiny{color:var(--muted);font-weight:500;font-size:15px}

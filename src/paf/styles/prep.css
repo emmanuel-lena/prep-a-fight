@@ -129,6 +129,6 @@ tr.noise>td{opacity:.5} tr.noise:hover>td{opacity:1} /* a talent build within th
 /* Dig deeper: a tool's answer inside a card is part of it, not a box in a box; the raid's pulls as their verdict */
 .card .ws-answer{margin:18px 0 6px;padding:0;border:0;background:none;box-shadow:none}
 .raid-pulls{max-width:88ch} .raid-pulls>.verdict{margin-bottom:8px}
-.trust{margin-bottom:18px}
+.raid-who .jobs>.job:only-child{max-width:680px} /* one target: a card its own width, its figures by its names */
 .rf-grid{display:grid;gap:0 32px}
 @media (min-width:1100px){.rf-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}}
