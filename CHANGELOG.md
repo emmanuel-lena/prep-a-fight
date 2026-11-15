@@ -21,6 +21,9 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 - Tool results read at a glance: two pulls played with other talents say so first, the raid night numbers its pulls
   and marks each one's first death, a long build is two columns (take, drop) with its Copy button on top, enchants
   within the noise are muted, and nothing hides behind a click any more.
+- The prep sheet is cleaner and says each thing once: Dig deeper is less than half as long (your raid's night and
+  best pull as one line each, linked to their tools; no repeats of the other tabs), "keep yours" gear and talents show
+  the closest three, the boss's defensives are grouped by the ability they answer, and every tab's headings match.
 ## 0.8.30 (2026-11-12)
 
 - After an update, the app opens again by itself (it closed and stayed closed).

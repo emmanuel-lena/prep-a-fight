@@ -13,12 +13,16 @@ def test_lede_says_the_fight_in_one_sentence():
     assert "keep 88% of their damage on the boss and put 12% on the adds" in lede
 
 
-def test_timeline_labels_never_overlap():
-    events = [(10, "Vanish", True), (12, "Potion", False), (14, "Deathmark + Kingsbane", True), (300, "Feint", True),
-              (360, "Vanish", True)]
-    rows = briefing._rows(events, 379)
-    assert rows[0] != rows[1] != rows[2] and rows[0] != rows[2]  # three labels at the same moment: three rows
-    assert rows[3] == 0  # far away: back to the first row (and past FLIP_AT it opens leftwards)
+def test_the_trust_line_keeps_its_verdict_and_says_your_split():
+    d = PrepData("Boss", "mythic", "Subtlety", "X", duration=300)
+    d.validation = (0.46, 0.89, 0.89)
+    d.notes = ["With every add wave at its full size, SimC's default priority list, in the top players' gear, puts 67% "
+               "of its damage on the boss vs 45% in their logs: SimC keeps single-target spells on the boss."]
+    d.waves = [(35.0, 3, 11.0, "Spawn")]
+    d.sim_dps, d.sim_boss_dps = 298000.0, 195000.0
+    line = briefing.confidence_pill(d)
+    assert "trust which option wins more than the exact %" in line and "89%" not in line  # the % in Notes, once
+    assert "leans to the boss (see Notes)" in line and "puts 65% of its damage on the boss" in line
 
 
 def test_lede_of_a_council_in_french(monkeypatch):

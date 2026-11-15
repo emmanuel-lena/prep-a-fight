@@ -86,11 +86,10 @@ th.n{text-align:right}
 .boss-top{display:grid;gap:8px 28px;align-items:start}
 @media (min-width:1100px){.boss-top{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 .boss-top>div>h2:first-child{margin-top:8px}
-/* a plan's play-by-play over its notes, the MRT note and the NSRT reminders side by side */
-.pp-grid{grid-template-columns:minmax(0,1fr)!important}
-@media (min-width:1100px){.pp-grid>div:last-child{column-count:2;column-gap:24px}
-  .pp-grid>div:last-child>h4{break-after:avoid} .pp-grid>div:last-child .note-pre,.pp-grid .nb{break-inside:avoid}}
-.pp-grid .pp{max-height:none}
+/* a plan's rules beside its MRT note (its NSRT button in the note's heading: no empty column) */
+.pp-grid{grid-template-columns:minmax(0,1fr)!important;align-items:start}
+@media (min-width:1100px){.pp-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}}
+.pp-grid .pp{max-height:none} .pp-grid table{margin-top:0}
 /* the plan the sheet plays carries the emphasis, not the biggest number */
 .sugg.major:not(.rec){border-left-color:var(--line)!important} .sugg.rec{border-left:3px solid var(--accent)!important}
 /* one column for every suggestion; the plan the sheet plays marked by an inset rule and the strongest chip */
@@ -107,7 +106,6 @@ th.n{text-align:right}
 .sugg .gain.muted{color:var(--muted)} /* a plan not played: its gain is no call to take it */
 div.chips{display:grid;grid-template-columns:auto 1fr;gap:6px;align-items:start;margin:8px 0} div.chips .chip.rare{opacity:.6}
 div.chips .chip{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;margin:2px 4px 2px 0;border:1px solid var(--line);border-radius:999px} /* the defensives used, one chip each */
-.other-build{font:600 12.5px var(--font-body);padding:1px 9px;border-radius:6px;border:1px solid var(--warn);white-space:nowrap}
 .padbar{position:relative;height:8px;max-width:360px;margin:8px 0 28px;border-radius:4px;background:color-mix(in srgb,var(--fg) 12%,transparent)}
 .padbar>i{display:block;height:100%;border-radius:4px;background:var(--fg);opacity:.6}
 .padbar>b{position:absolute;top:-4px;width:2px;height:16px;background:var(--warn)}
@@ -122,3 +120,15 @@ ul.grp .plain{display:block;padding-top:9px} /* a text row on its label's line, 
 /* an action of the boss tab: its icon, name and chips on one line, its sentence on hover */
 .act{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px} .act b{margin-right:4px}
 tr.noise>td{opacity:.5} tr.noise:hover>td{opacity:1} /* a talent build within the sims' noise of yours: dimmed, not folded */
+/* every tab's section headings as the fight tab's: serif sentences, ink (DESIGN.md, Headline); a badge in a
+   heading is a muted word after it, never a pill */
+.panel>h2,.panel>.boss-top>div>h2{font:600 22px/1.25 var(--font-reading);letter-spacing:0;text-transform:none;
+  color:var(--fg)}
+.panel h2 .h-note{font:400 14px var(--font-body);color:var(--muted);margin-left:8px;letter-spacing:0}
+.panel td .nw{white-space:nowrap} /* a defensive's name and share stay on one line */
+/* Dig deeper: a tool's answer inside a card is part of it, not a box in a box; the raid's pulls as their verdict */
+.card .ws-answer{margin:18px 0 6px;padding:0;border:0;background:none;box-shadow:none}
+.raid-pulls{max-width:88ch} .raid-pulls>.verdict{margin-bottom:8px}
+.raid-who .jobs>.job:only-child{max-width:680px} /* one target: a card its own width, its figures by its names */
+.rf-grid{display:grid;gap:0 32px}
+@media (min-width:1100px){.rf-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}}
