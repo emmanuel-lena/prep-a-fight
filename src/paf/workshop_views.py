@@ -10,8 +10,8 @@ from pathlib import Path
 from paf import theme
 
 SLOTS = {"head": "Head", "neck": "Neck", "shoulder": "Shoulders", "back": "Back", "chest": "Chest", "wrist": "Wrists",
-         "hands": "Hands", "waist": "Waist", "legs": "Legs", "feet": "Feet", "finger": "Ring", "finger1": "Ring",
-         "finger2": "Ring", "trinket": "Trinket", "trinket1": "Trinket", "trinket2": "Trinket",
+         "hands": "Hands", "waist": "Waist", "legs": "Legs", "feet": "Feet", "finger": "Ring", "finger1": "Ring 1",
+         "finger2": "Ring 2", "trinket": "Trinket", "trinket1": "Trinket 1", "trinket2": "Trinket 2",
          "main_hand": "Main hand", "off_hand": "Off hand", "two_hand": "Two-hand", "weapon": "Weapons", "rings": "Rings",
          "trinkets": "Trinkets"}
 _RUNS = re.compile(r"^Runs(?: and best set)?:\s*(.+?)\s*$", re.M)
@@ -31,8 +31,12 @@ def _pct(v: float | None, digits: int = 1) -> str:
     return "&ndash;" if v is None else f"{v:+.{digits}f}%".replace("-", "&minus;")
 
 
-def _bar(v: float, scale: float) -> str:
-    """A gain bar from a centre line: right and green for a gain, left and red for a loss."""
+def _bar(v: float, scale: float, signed: bool = True) -> str:
+    """A gain bar from a centre line: right and green for a gain, left and red for a loss. Unsigned (a list with no
+    loss in it): from the left edge, the whole width for the biggest."""
+    if not signed:
+        w = 0 if not scale else min(100.0, max(0.0, v) / scale * 100)
+        return f"<span class='gbar u'><span class='g pos' style='width:{w:.1f}%'></span></span>"
     w = 0 if not scale else min(50.0, abs(v) / scale * 50)
     side = "pos" if v >= 0 else "neg"
     return f"<span class='gbar'><span class='g {side}' style='width:{w:.1f}%'></span></span>"
@@ -54,9 +58,11 @@ def _img(icon: str, cls: str = "it-ic") -> str:
     return icons.img(icon, "large", cls) if icon else f"<span class='{cls} none'></span>"
 
 
-def _verdict(kind: str, title: str, text: str = "", big: str = "") -> str:
-    mark = {"go": "&#10140;", "ok": "&#10003;", "warn": "!"}[kind]
-    return (f"<div class='verdict {kind}'><span class='v-mark' aria-hidden='true'>{mark}</span><div><b>{title}</b>"
+def _verdict(kind: str, title: str, text: str = "", big: str = "", pic: str = "") -> str:
+    """The answer's block; `pic` (a spec's icon) in place of the round mark when the answer is about a player."""
+    mark = pic or ("<span class='v-mark' aria-hidden='true'>"
+                   + {"go": "&#10140;", "ok": "&#10003;", "warn": "!"}[kind] + "</span>")
+    return (f"<div class='verdict {kind}'>{mark}<div><b>{title}</b>"
             + (f"<p>{text}</p>" if text else "") + "</div>" + (f"<span class='v-big'>{big}</span>" if big else "")
             + "</div>")
 
@@ -86,10 +92,34 @@ def _talent(t, icons: dict[str, str]) -> str:
             f"rel='noopener'>{pic}<span>{e(name)}</span></a>")
 
 
+def _unique(swaps: list) -> list:
+    """The swaps once each: a pair listed twice (a name on two nodes) says nothing more the second time."""
+    seen, out = set(), []
+    for a, b in swaps:
+        key = (tuple(a) if a else None, tuple(b) if b else None)
+        if key not in seen:
+            seen.add(key)
+            out.append((a, b))
+    return out
+
+
 def _swaps(swaps: list, icons: dict[str, str]) -> str:
     return "<ul class='swaps'>" + "".join(
         f"<li class='sw'>{_talent(a, icons)}<span class='arr' aria-label='becomes'>&rarr;</span>{_talent(b, icons)}</li>"
-        for a, b in swaps) + "</ul>"
+        for a, b in _unique(swaps)) + "</ul>"
+
+
+def _take_drop(swaps: list, icons: dict[str, str]) -> str:
+    """A build's changes as two columns, what to take and what to drop: the pairs of a swap list are arbitrary when
+    many talents change at once."""
+    pairs = _unique(swaps)
+    take = [b for _a, b in pairs if b]
+    drop = [a for a, _b in pairs if a]
+
+    def col(cls: str, title: str, lst: list) -> str:
+        return (f"<div class='td-col {cls}'><span class='td-t'>{title}</span><ul>"
+                + "".join(f"<li>{_talent(t, icons)}</li>" for t in lst) + "</ul></div>") if lst else ""
+    return f"<div class='td'>{col('td-take', 'Take', take)}{col('td-drop', 'Drop', drop)}</div>"
 
 
 def _row_swaps(r: dict) -> list:
@@ -117,7 +147,10 @@ def talents(d: dict) -> str:
         return (f"<button type='button' class='{cls}' data-copy='{e(r['code'])}'>{label}</button>"
                 if r.get("code") else "")
     same = f" {yours['players']} of the top players play exactly your build." if yours else ""
-    if best and best["gain"] > noise:
+    go = bool(best and best["gain"] > noise)
+    if go:  # the best build is said once, in the verdict with its Copy button: not again in the list
+        others = [r for r in others if r is not best]
+    if go:
         n = len(_row_swaps(best))
         head = _verdict("go", f"Change {n} talent{'s' if n != 1 else ''}",
                         f"Played by {best['players']} of the top players: {_pct(best['gain'], 1)} on you on this "
@@ -130,9 +163,10 @@ def talents(d: dict) -> str:
     for r in sorted(others, key=lambda r: -r["gain"]):
         cls = "pos" if r["gain"] > noise else "neg" if r["gain"] < -noise else ""
         lines += (f"<li class='bd'><div class='bd-swaps'>{_swaps(_row_swaps(r), icons)}<small>played by "
-                  f"{r['players']} top players</small></div><div class='bd-side'><span class='l-val {cls}'>"
-                  f"{_pct(r['gain'], 1) if cls else 'same'}</span>{copy(r, 'Copy')}</div></li>")
-    return (f"{head}<h3>The top players' other builds, on you</h3><ul class='glist builds'>{lines}</ul>"
+                  f"{r['players']} top players</small></div><div class='bd-side'><span class='l-val {cls or 'same'}'>"
+                  f"{_pct(r['gain'], 1) if cls else 'same'}</span>{copy(r, 'Copy') if cls else ''}</div></li>")
+    lines = (f"<h3>The top players' other builds, on you</h3><ul class='glist builds'>{lines}</ul>" if lines else "")
+    return (f"{head}{lines}"
             f"<p class='ws-fine'>Each build shown by what it changes from yours; "
             f"simmed on your character on {e(d.get('boss', 'the boss'))}. Differences under &plusmn;{noise:.1f}% "
             f"are noise and shown as \"same\".</p>")
@@ -151,15 +185,15 @@ def loot(d: dict) -> str:
     else:
         head = _verdict("ok", "Nothing here is an upgrade for you", f"From {e(where)}, at item level {d.get('ilvl')}: "
                               "what you wear is already as good or better.")
-    def card(r: dict, scale: float) -> str:
+    def card(r: dict, scale: float, signed: bool = True) -> str:
         return (f"<li class='icard'>{_img(icons.get(r['item_id'], ''))}<span class='l-name'><b>{e(r['name'])}</b>"
                 f"<small><span>{e(SLOTS.get(r['slot'], r['slot']))}</span> &middot; {e(r['boss'])}</small></span>"
-                f"{_bar(r['gain'], scale)}<span class='l-val {'pos' if r['gain'] > 2 * err else 'neg'}'>"
+                f"{_bar(r['gain'], scale, signed)}<span class='l-val {'pos' if r['gain'] > 2 * err else 'neg'}'>"
                 f"{_pct(r['gain'])}</span></li>")
     def scale(lst: list[dict]) -> float:  # each list its own scale: a small gain is not lost next to big losses
         return max((abs(r["gain"]) for r in lst), default=1) or 1
 
-    body = f"<ul class='glist items'>{''.join(card(r, scale(good)) for r in good)}</ul>" if good else ""
+    body = f"<ul class='glist items'>{''.join(card(r, scale(good), False) for r in good)}</ul>" if good else ""
     if bad and not good:  # nothing to farm: the closest ones, to see how far
         body += f"<ul class='glist items'>{''.join(card(r, scale(bad[:5])) for r in bad[:5])}</ul>"
     elif bad:  # the rest in a line, no fold (the owner): its count and the closest
@@ -170,7 +204,7 @@ def loot(d: dict) -> str:
     ev = ("<h3>Which boss is worth it</h3><p class='ws-fine'>What one kill brings you on average: each item's gain "
           "times its chance to drop.</p><ul class='glist'>" + "".join(
         f"<li><span class='l-name'><b>{e(x['boss'])}</b><small>{x['n']} items for you</small></span>"
-        f"{_bar(x['ev'], max(y['ev'] for y in evs))}<span class='l-val pos'>{_pct(x['ev'], 2)}</span></li>"
+        f"{_bar(x['ev'], max(y['ev'] for y in evs), False)}<span class='l-val pos'>{_pct(x['ev'], 2)}</span></li>"
         for x in evs) + "</ul>") if len(evs) > 1 else ""
     return (f"{head}{body}{ev}<p class='ws-fine'>Each item simmed in its slot on your character; differences under "
             f"&plusmn;{2 * err:.2f}% are noise.</p>")
@@ -290,11 +324,12 @@ def review(d: dict) -> str:
         lst = [p for p in players if p["verdict"] == key]
         if not lst:
             continue
-        items = "".join(who(p) for p in lst)
-        if key in ("ok", "unknown"):
-            blocks += f"<details class='more'><summary>{e(title)} ({len(lst)})</summary><ul class='plist'>{items}</ul></details>"
+        if key in ("ok", "unknown"):  # nothing to do for them: their names in sight, in one row (no fold)
+            chips = "".join(f"<span class='who-chip' title='{e(_spaced(p['spec']))}'>{icons.spec_any(p['spec'])}"
+                            f"<b>{e(p['name'])}</b></span>" for p in lst)
+            blocks += f"<h3>{e(title)} ({len(lst)})</h3><div class='whos compact'>{chips}</div>"
         else:
-            blocks += f"<h3>{e(title)}</h3><ul class='plist'>{items}</ul>"
+            blocks += f"<h3>{e(title)}</h3><ul class='plist'>{''.join(who(p) for p in lst)}</ul>"
     return (f"{head}<h3>Where your raid's damage goes</h3><ul class='glist cov-list'>{rows}</ul>{blocks}"
             "<p class='ws-fine'>Your raid's share of damage on each target, the mark is the top raids'. This compares "
             "habits: it does not know your raid's assignments (a soak, a kick, an add someone must hold).</p>")
@@ -507,7 +542,7 @@ def night(d: dict) -> str:
         if name in clean:
             continue
         pot = v["pulls_damage_potion"]
-        rows += (f"<tr><td class='who-c{' bad' if v['bare'] else ''}'>{ic(name)}<b>{e(name)}</b></td><td class='n'>{v['deaths']}</td>"
+        rows += (f"<tr><td class='who-c'>{ic(name)}<b>{e(name)}</b></td><td class='n'>{v['deaths']}</td>"
                  f"<td class='n {'bad' if v['bare'] else ''}'>{v['bare']}</td><td class='n'>{v['healthstone']}</td>"
                  f"<td class='n'>{v['health']}</td><td class='n {'bad' if not pot else ''}'>{pot}/{len(pulls)}</td></tr>")
     table = (f"<div class='scroll'><table class='night'><tr><th>Player</th><th class='n'>Deaths</th><th class='n'>Without a "
@@ -519,49 +554,89 @@ def night(d: dict) -> str:
                   "a damage potion every pull: <span class='whos'>"
                   + "".join(f"<span class='who-chip'>{ic(n)}<b>{e(n)}</b></span>" for n in sorted(clean)) + "</span></p>")
     detail = ""
-    for r in pulls:
+    bosses = len({r["boss"] for r in pulls}) > 1  # one boss all night: its name on every card says nothing
+    for i, r in enumerate(pulls, 1):
         dead = sorted(((min(p["deaths"]), n, p["bare"]) for n, p in r["players"].items() if p["deaths"]))
-        end = "Kill" if r["kill"] else f"{(r['left'] or 0):.0%}"
-        who = "".join(f"<span class='who-chip {'bare' if b else ''}'>{ic(n)}<b>{e(n)}</b> {_mmss(t)}</span>"
-                      for t, n, b in dead[:12])
-        detail += (f"<li><div class='j-head'><b>{e(r['boss'])}</b><small><span class='num'>{_mmss(r['duration'])}</span>"
-                   f" &middot; {end}</small></div><div class='whos'>{who}</div></li>")
-    by_pull = (f"<h4 class='more'>Pull by pull ({len(pulls)})</h4><ul class='pulls'>{detail}</ul>"  # in sight, no fold
+        end = ("<span class='kill'>Kill</span>" if r["kill"]
+               else f"<span>wipe at</span> <span class='num'>{(r['left'] or 0):.0%}</span>")
+        first = dead[0][0] if dead else 0
+
+        def chip(t: float, n: str, b: bool, first: float = first) -> str:  # the first death (and who died with
+            # it, in the same second): marked
+            cls = " ".join(c for c in ("bare" if b else "", "first" if t - first < 1 else "") if c)
+            return f"<span class='who-chip {cls}'>{ic(n)}<b>{e(n)}</b> {_mmss(t)}</span>"
+        who = "".join(chip(t, n, b) for t, n, b in dead[:12])
+        who += f"<span class='more-n'>+{len(dead) - 12}</span>" if len(dead) > 12 else ""
+        title = f"Pull {i}" + (f" &middot; {e(r['boss'])}" if bosses else "")
+        detail += (f"<li><div class='j-head'><b>{title}</b><small><span class='num'>{_mmss(r['duration'])}</span>"
+                   f" &middot; {end}</small></div><div class='whos'>{who or '<small>no death</small>'}</div></li>")
+    by_pull = (f"<h3>Pull by pull ({len(pulls)})</h3><p class='night-key'><span class='who-chip first'>"
+               "<b>first</b></span><span>the first death of the pull</span><span class='who-chip bare'><b>red</b>"
+               "</span><span>died without a healthstone or a health potion first</span></p>"
+               f"<ul class='pulls'>{detail}</ul>"  # in sight, no fold
                if len(pulls) > 1 else "")  # one pull: the table above says it all
-    note = ("Read from the casts of the log: a damage potion counts from 10 s before the pull (the pre-pot); the deaths "
-            "of the wipe itself are left out. A red 0/1: no damage potion in that pull. A name in red died without a "
-            "healthstone or a health potion first.")  # on hover (DPS rounds 46-51)
-    return (f"{head}<h3>Over the night</h3>{table}{by_pull}<p class='ws-fine'><span class='pill' title='{note}'>"
-            "? how it is read</span></p>")
+    return (f"{head}<h3>Over the night</h3>{table}{by_pull}<p class='ws-fine'>Read from the casts of the log: a damage "
+            "potion counts from 10 s before the pull (the pre-pot). A wipe's deaths stop at the one that leaves half "
+            "the raid dead: the rest is the wipe itself.</p>")
+
+def _other_build(pl: dict) -> tuple[list[str], list[str]]:
+    """The abilities that deal damage in one pull only, (B's, A's): another build (a talent, an item's effect), so the
+    gap between the two pulls is not only how they were played. An ability counts from 2% of that pull's damage."""
+    rows = pl.get("abilities") or []
+    only_b = [r["name"] for r in rows if not r["a"] and r["b"] >= 0.02 * (pl.get("dps_b") or 1)]
+    only_a = [r["name"] for r in rows if not r["b"] and r["a"] >= 0.02 * (pl.get("dps_a") or 1)]
+    return only_b, only_a
+
 
 def pulldiff(d: dict) -> str:
-    """Two pulls side by side: the highlights first, the boss health, then the player's detail."""
+    """Two pulls side by side: another build first when there is one, the highlights, the boss health, then the
+    player's detail. A and B are names, not good and bad: A outlined and dashed, B solid."""
     from paf import icons
 
     a, b = d.get("a", {}), d.get("b", {})
     pl = d.get("player")
-    head = _verdict("go", f"{pl['name']}: pull B next to pull A" if pl else "Pull B next to pull A",
-                    f"<span class='pab a'>A</span> <span>{e(a.get('label', ''))}</span> &middot; "
-                    f"<span class='pab b'>B</span> <span>{e(b.get('label', ''))}</span>")
+    pulls = (f"<span class='pab a'>A</span> <span>{e(a.get('label', ''))}</span> &middot; "
+             f"<span class='pab b'>B</span> <span>{e(b.get('label', ''))}</span>")
+    only_b, only_a = _other_build(pl) if pl else ([], [])
+    if only_b or only_a:  # the build first: the rest of the page reads differently
+        took = ", ".join(e(n) for n in only_b) or "nothing new"
+        head = _verdict("ok", f"{e(pl['name'])}: other talents in pull B",
+                        f"<span class='pab b'>B</span> <b class='bd-new'>{took}</b>"
+                        + (f" <span>instead of</span> <s>{', '.join(e(n) for n in only_a)}</s>" if only_a else "")
+                        + f"</p><p>{pulls}")
+    else:
+        head = _verdict("ok", f"{e(pl['name'])}: pull B next to pull A" if pl else "Pull B next to pull A", pulls)
     hl = "".join(f"<li class='{h['kind']}'><span class='hm'>{'&#8593;' if h['kind'] == 'good' else '&#8595;'}</span>"
                  f"<span>{e(h['text'])}</span></li>" for h in d.get("highlights", []))
     out = head + (f"<h3>What changed, biggest first</h3><ul class='hl'>{hl}</ul>" if hl else "")
     curves = d.get("curves", {})
     span = max(a.get("duration", 0), b.get("duration", 0), 1)
-    W, H, L, B = 640, 200, 40, 26
+    W, H, L, B, T = 1100, 240, 46, 26, 10
+    vals = [v for k in ("a", "b") for v in curves.get(k, [])]
+    lo = max(0.0, int(min(vals, default=0) * 10) / 10)  # the y axis from the 10% under the lowest point
+    if lo >= 1:
+        lo = 0.9
+
+    def y(v: float) -> float:
+        return T + (1 - v) / (1 - lo) * (H - B - T)
+
+    def x(t: float) -> float:
+        return L + t / span * (W - L - 10)
 
     def pts(vals: list[float]) -> str:
-        return " ".join(f"{L + i * 15 / span * (W - L - 10):.1f},{10 + (1 - v) * (H - B - 20):.1f}"
-                        for i, v in enumerate(vals))
+        return " ".join(f"{x(i * 15):.1f},{y(v):.1f}" for i, v in enumerate(vals))
     if curves:
-        ticks = "".join(f"<text x='{L + t / span * (W - L - 10):.1f}' y='{H - 6}' class='tk'>{int(t // 60)}:00</text>"
-                        for t in range(0, int(span) + 1, 120))
-        out += (f"<h3>The boss's health</h3><svg class='hp' viewBox='0 0 {W} {H}' role='img' aria-label='Boss health'>"
-                f"<line class='ax' x1='{L}' x2='{W - 10}' y1='{H - B}' y2='{H - B}'/><text x='4' y='16' class='tk'>"
-                f"100%</text><text x='4' y='{H - B}' class='tk'>0%</text>{ticks}"
-                f"<polyline class='c-now' points='{pts(curves.get('a', []))}'/>"
-                f"<polyline class='c-best' points='{pts(curves.get('b', []))}'/></svg><div class='legend'>"
-                "<span class='c-now'>Pull A</span><span class='c-best'>Pull B</span></div>")
+        step = 30 if span < 300 else 60 if span < 600 else 120
+        ticks = "".join(f"<text x='{x(t):.1f}' y='{H - 6}' class='tk' text-anchor='middle'>{_mmss(t)}</text>"
+                        for t in range(0, int(span) + 1, step))
+        grid = "".join(f"<line class='gl' x1='{L}' x2='{W - 10}' y1='{y(v / 10):.1f}' y2='{y(v / 10):.1f}'/>"
+                       f"<text x='{L - 8}' y='{y(v / 10) + 4:.1f}' class='tk' text-anchor='end'>{v * 10}%</text>"
+                       for v in range(round(lo * 10), 11))
+        out += (f"<h3>The boss's health</h3><svg class='hp diff' viewBox='0 0 {W} {H}' role='img' "
+                f"aria-label='Boss health'>{grid}<line class='ax' x1='{L}' x2='{W - 10}' y1='{H - B}' y2='{H - B}'/>"
+                f"{ticks}<polyline class='c-a' points='{pts(curves.get('a', []))}'/>"
+                f"<polyline class='c-b' points='{pts(curves.get('b', []))}'/></svg><div class='legend'>"
+                "<span class='c-a'>Pull A</span><span class='c-b'>Pull B</span></div>")
     if not pl:
         return out + "<p class='ws-fine'>Pick a player to see their own damage, casts and buffs in both pulls.</p>"
     ic = icons.spec_any(pl["icon"]) if pl.get("icon") else ""
@@ -571,57 +646,81 @@ def pulldiff(d: dict) -> str:
 
     def pct(v: float | None) -> str:
         return "&ndash;" if v is None else f"{v:.0%}"
-    tiles = "".join(f"<div class='kt'><small>{label}</small><b>{va} <span>&rarr;</span> {vb}</b></div>" for label, va, vb in (
-        ("Damage per second", k(pl["dps_a"]), k(pl["dps_b"])), ("On the bosses", k(pl["boss_a"]), k(pl["boss_b"])),
-        ("Active", pct(pl["active_a"]), pct(pl["active_b"]))))
-    out += f"<h3 class='who-c'>{ic}<span>{e(pl['name'])}</span></h3><div class='kts'>{tiles}</div>"
+    tiles = [("Damage per second", k(pl["dps_a"]), k(pl["dps_b"]))]
+    if k(pl["boss_a"]) != k(pl["dps_a"]) or k(pl["boss_b"]) != k(pl["dps_b"]):  # all on the boss: one tile says it
+        tiles.append(("On the bosses", k(pl["boss_a"]), k(pl["boss_b"])))
+    tiles.append(("Active", pct(pl["active_a"]), pct(pl["active_b"])))
 
-    def table(title: str, head: tuple[str, str, str], rows: list[str]) -> str:
-        return (f"<h3>{title}</h3><div class='scroll'><table class='night'><tr><th>{head[0]}</th><th>A</th><th>B</th>"
-                f"<th>{head[1]}</th></tr>{''.join(rows)}</table></div>") if rows else ""
+    def tile(label: str, va, vb) -> str:
+        return f"<div class='kt'><small>{label}</small><b>{va} <span>&rarr;</span> {vb}</b></div>"
+    out += (f"<h3 class='who-c'>{ic}<span>{e(pl['name'])}</span></h3><div class='kts'>"
+            + "".join(tile(*t) for t in tiles) + "</div>")
 
-    def delta(va: float, vb: float, fmt: str) -> str:
+    def table(title: str, head: tuple[str, str], rows: list[str], last_n: bool = True) -> str:
+        return (f"<h3>{title}</h3><div class='scroll'><table class='night'><tr><th>{head[0]}</th><th class='n'>A</th>"
+                f"<th class='n'>B</th><th{' class=n' if last_n else ''}>{head[1]}</th></tr>{''.join(rows)}"
+                "</table></div>") if rows else ""
+
+    def delta(va: float, vb: float) -> str:
         cls = "pos" if vb > va else "neg" if vb < va else ""
-        return f"<td class='n {cls}'>{fmt.format(vb - va) if fmt else ''}</td>"
-    out += table("Damage per second of each ability", ("Ability", "Change", ""), [
+        sign = "+" if vb > va else "&minus;" if vb < va else ""
+        return f"<td class='n {cls}'>{sign}{abs(vb - va) / 1000:,.0f}k</td>"
+    out += table("Damage per second of each ability", ("Ability", "Change"), [
         f"<tr><td>{e(r['name'])}</td><td class='n'>{k(r['a'])}</td><td class='n'>{k(r['b'])}</td>"
-        f"{delta(r['a'], r['b'], '')}</tr>".replace("<td class='n pos'></td>", f"<td class='n pos'>+{(r['b'] - r['a']) / 1000:,.0f}k</td>")
-        .replace("<td class='n neg'></td>", f"<td class='n neg'>&minus;{(r['a'] - r['b']) / 1000:,.0f}k</td>")
-        for r in pl.get("abilities", [])])
+        f"{delta(r['a'], r['b'])}</tr>" for r in pl.get("abilities", [])])
 
-    def times(ts: list[float]) -> str:
-        return " ".join(_mmss(t) for t in ts[:8])
-    out += table("Casts per minute (cooldowns: when)", ("Ability", "Cast at, A / B", ""), [
+    def times(ts: list[float], rate: float, dur: float) -> str:
+        if ts:
+            return " ".join(_mmss(t) for t in ts[:8])
+        return f"{round(rate * dur / 60)}&times;" if rate else "&ndash;"  # cast too often to list its times
+
+    def when(r: dict) -> str:
+        return (f"<span class='pab-s a'>A</span> {times(r['times_a'], r['a'], a.get('duration', 0))} &middot; "
+                f"<span class='pab-s b'>B</span> {times(r['times_b'], r['b'], b.get('duration', 0))}")
+    out += table("Casts per minute (cooldowns: when)", ("Ability", "Cast at"), [
         f"<tr><td>{e(r['name'])}</td><td class='n'>{r['a']:.1f}</td><td class='n'>{r['b']:.1f}</td>"
-        f"<td class='small'>{(times(r['times_a']) + ' / ' + times(r['times_b'])) if r['cooldown'] else ''}</td></tr>"
-        for r in pl.get("casts", [])[:12]])
-    out += table("Uptime of your buffs and procs", ("Buff", "Change", ""), [
+        f"<td class='small'>{when(r) if r['cooldown'] else ''}</td></tr>"
+        for r in pl.get("casts", [])[:12]], last_n=False)
+    out += table("Uptime of your buffs and procs", ("Buff", "Change"), [
         f"<tr><td>{e(r['name'])}</td><td class='n'>{r['a']:.0%}</td><td class='n'>{r['b']:.0%}</td>"
-        f"<td class='n {'pos' if r['b'] > r['a'] else 'neg'}'>{(r['b'] - r['a']) * 100:+.0f}</td></tr>"
+        f"<td class='n {'pos' if r['b'] > r['a'] else 'neg'}'>"
+        + f"{(r['b'] - r['a']) * 100:+.0f}".replace("-", "&minus;") + "</td></tr>"
         for r in pl.get("buffs", [])])
     cons = pl.get("consumables", {})
-    out += ("<h3>Consumables and deaths</h3><ul class='hl'>"
-            + "".join(f"<li><span>{label}:</span> <b class='num'>{cons.get(key, [0, 0])[0]}</b> <span>&rarr;</span> "
-                      f"<b class='num'>{cons.get(key, [0, 0])[1]}</b></li>"
+    out += ("<h3>Consumables and deaths</h3><div class='kts'>"
+            + "".join(tile(label, cons.get(key, [0, 0])[0], cons.get(key, [0, 0])[1])
                       for key, label in (("healthstone", "Healthstones"), ("health", "Health potions"),
                                          ("damage_potion", "Damage potions")))
-            + f"<li><span>Deaths:</span> <b class='num'>{len(pl['deaths'][0])}</b> <span>&rarr;</span> "
-              f"<b class='num'>{len(pl['deaths'][1])}</b></li></ul>")
+            + tile("Deaths", len(pl["deaths"][0]), len(pl["deaths"][1])) + "</div>")
+    why = ("the two pulls were played with other talents (abilities that deal damage in one pull only): the gap is "
+           "not only gameplay" if only_b or only_a else "the gap is gameplay")
     return out + ("<p class='ws-fine'>Both pulls read from your log, 15 s at a time. The pulls compared by default are "
                   "your worst and your best by your own damage, among those where you did not die and of a similar "
-                  "length: the gap is gameplay. Buffs that players of other classes also have (a healer's) are left "
-                  "out.</p>")
+                  f"length; {why}. Buffs that players of other classes also have (a healer's) are left out.</p>")
+
+def _pressed_like_tops(text: str, d: dict) -> bool:
+    """A cooldown's "you pressed it N times, it was ready M times" when the top players of the spec press it no more
+    often than you: a movement or utility spell pressed when the fight asks, not a point to work on."""
+    if ": you pressed it" not in text and ": you never pressed it" not in text:
+        return False
+    name = text.split(":")[0]
+    casts = next((c["casts"] for c in d.get("cooldowns", []) if c["name"] == name), None)
+    tops = next((f.get("tops") or "" for f in d.get("findings", [])
+                 if f.get("kind") == "cooldown" and f.get("name") == name), "")
+    m = re.search(r"press it ([\d.]+) times", tops)
+    return casts is not None and m is not None and float(m.group(1)) <= casts
+
 
 def rotation(d: dict) -> str:
     """A player's rotation: the points to work on, each context's spells next to the rotation's, DoTs, cooldowns."""
     from paf import icons
 
     ic = icons.spec_any(d.get("spec", ""), "large") if d.get("spec") else ""
-    hl = d.get("highlights", [])
-    head = _verdict("go" if hl else "ok", f"{d['player']}: your rotation",
-                    f"<span>{e(d.get('spec', ''))}</span> &middot; <span>{e(d.get('boss', ''))}</span> &middot; "
-                    f"<span>{e(d.get('pull', ''))}</span> &middot; <span class='num'>{_mmss(d.get('duration'))}</span>")
-    out = f"<div class='rot-head'>{ic}{head}</div>"
+    hl = [t for t in d.get("highlights", []) if not _pressed_like_tops(t, d)]
+    out = _verdict("ok", f"{e(d['player'])}: your rotation",  # a reading, not an action to take: neutral
+                   f"<span>{e(d.get('spec', ''))}</span> &middot; <span>{e(d.get('boss', ''))}</span> &middot; "
+                   f"<span>{e(d.get('pull', ''))}</span> &middot; <span class='num'>{_mmss(d.get('duration'))}</span>",
+                   pic=f"<span class='v-pic'>{ic}</span>" if ic else "")
     if hl:
         out += ("<h3>To work on</h3><ol class='todo'>" + "".join(f"<li>{e(t)}</li>" for t in hl) + "</ol>")
     else:
@@ -669,7 +768,7 @@ def rotation(d: dict) -> str:
             f"{b['tops']:.0%}</small></span><span class='cov'><span class='c-raid "
             f"{'short' if b['player'] < b['tops'] else 'ok'}' style='width:{b['player'] * 100:.1f}%'></span>"
             f"<span class='c-tops' style='left:{b['tops'] * 100:.1f}%' title='top players'></span></span>"
-            f"<span class='l-val'>{b['player']:.0%}</span></li>" for b in buffs[:8]) + "</ul>")
+            f"<span class='l-val'><small>you</small> {b['player']:.0%}</span></li>" for b in buffs[:8]) + "</ul>")
     waste = [w for w in d.get("waste", []) if w["capped"]]
     if waste:
         out += "<h3>Resource lost</h3><ul class='hl'>" + "".join(
@@ -715,7 +814,7 @@ def bonusroll(d: dict) -> str:
                     if best and best["gain"] > 2 * err else "<span>no real upgrade</span>")
         out += (f"<li class='br'><span class='br-rank'>{i}</span>{face}<span class='l-name'><b>{e(x['boss'])}</b>"
                 f"<small><span>upgrades:</span> {len(ups)}/{x['n']} &middot; {best_txt}</small></span>"
-                f"{_bar(x['ev'], scale)}<span class='l-val {'pos' if x['ev'] > 0 else ''}'>{_pct(x['ev'], 2)}</span>"
+                f"{_bar(x['ev'], scale, any(y['ev'] < 0 for y in evs))}<span class='l-val {'pos' if x['ev'] > 0 else ''}'>{_pct(x['ev'], 2)}</span>"
                 "</li>")
     return (f"{head}<h3>Every boss, best roll first</h3><ul class='glist brs'>{out}</ul>"
             f"<p class='ws-fine'>Each item simmed in its slot on your character, at item level {d.get('ilvl')}; "
@@ -747,11 +846,27 @@ def specgear(d: dict) -> str:
                       f"{who}</small></span>{_bar(gain, scale)}<span class='l-val "
                       f"{'pos' if gain > noise else 'neg' if gain < -noise else ''}'>"
                       f"{'&ndash;' if r is mine else _pct(gain)}</span></li>")
-    you = (f"<p>{e(d['gear_sentence'])}</p>" if d.get("gear_sentence") else "")
-    you += f"<p>{e(d['kills_sentence'])}</p>" if d.get("kills_sentence") else ""
+    kills = d.get("kills") or {}
+    now = d.get("now")
+
+    def k(v: float) -> str:
+        return f"{v / 1000:,.0f}k"
+    tiles = ""
+    if now and kills.get("n"):  # your sim, your kills and the top players' figure, side by side
+        tiles = (f"<div class='kts'><div class='kt'><small>Your sim, as you are</small><b>{k(now)}</b></div>"
+                 f"<div class='kt'><small>Your best kill here</small><b>{k(kills['best'])}</b><span>"
+                 f"{kills['n']} ranked {'kill' if kills['n'] == 1 else 'kills'} &middot; {kills['best'] / now:.0%} of "
+                 f"your sim</span></div>"
+                 + (f"<div class='kt'><small>Top {e(mine['label'])} players</small><b>{k(mine['tops'])}</b>"
+                    "<span>median of the top 100</span></div>" if mine and mine.get("tops") else "")
+                 + "</div>")
+    you = tiles or (f"<p>{e(d['kills_sentence'])}</p>" if d.get("kills_sentence") else "")
+    if d.get("gear_sentence"):  # what the gear is worth, and where to act on it
+        you += (f"<p class='sg-gear'><span>{e(d['gear_sentence'])}</span> <a class='btn ghost' href='/tool/gear'>"
+                "What to equip and farm first</a></p>")
     notes = "".join(f"<p class='ws-fine'>{e(n)}</p>" for n in d.get("notes") or [])
     return (f"{head}<h3>Each spec on you, in the top players' gear at {ilvl}</h3><ul class='glist'>{lines}</ul>"
-            f"<h3>You</h3>{you}{notes}"
+            f"<h3>You, your kills and your gear</h3>{you}{notes}"
             f"<p class='ws-fine'>Boss damage per second on the fight rebuilt from the top kills. The top players' "
             f"figure is the median of the top 100 of each spec. Each spec is simmed in the set its top "
             f"{d.get('gear_tops', 20)} players wear most, slot by slot, at item level {ilvl}, with the best of three "
@@ -763,21 +878,32 @@ def enchant_table(d: dict) -> str:
     """Each enchant and gem the top players wear, its gain on your set; the ones to change first (picked: beyond the
     sims' noise), the share of the top players who wear it on hover. The ones you already wear are counted, not
     listed."""
+    err = d.get("error") or 0
+
+    def slot(r: dict) -> str:
+        return SLOTS.get(r["slot"], r["slot"].replace("_", " ").capitalize()) if r["slot"] else ""
+
+    def noise(r: dict) -> bool:  # within the sims' error: no real difference with what you wear
+        return not r.get("pick") and abs(r["gain"] or 0) < err
     worn = [r for r in d["rows"] if r["gain"] == 0]
-    rows = sorted((r for r in d["rows"] if r["gain"] != 0),
-                  key=lambda r: (not r.get("pick"), r["kind"] != "enchant", r["slot"], -(r["gain"] or 0)))
-    def gain(g: float) -> str:
-        return "worn" if g == 0 else f"{g:+.2f}%"  # 0: what you already wear there
+    rows = sorted((r for r in d["rows"] if r["gain"] != 0),  # the picks, then the real gains, then the noise
+                  key=lambda r: (not r.get("pick"), noise(r), -(r["gain"] or 0)))
+
+    def gain(r: dict) -> str:
+        g = r["gain"]
+        if noise(r):
+            return f"<td class='n muted'>&asymp; {g:+.2f}%</td>".replace("-", "&minus;")
+        return f"<td class='n {'pos' if g > 0 else 'neg'}'>{g:+.2f}%</td>".replace("-", "&minus;")
     body = "".join(
-        f"<tr><td>{'<b>&#10003; change</b>' if r.get('pick') else ''}</td>"
-        f"<td>{e(r['slot'].replace('_', ' ') or 'every socket')}</td>"
-        f"<td title='worn by {r['share']:.0%} of the top players'>{e(r['name'])}</td><td class='n'>{gain(r['gain'])}"
-        "</td></tr>" for r in rows)
+        f"<tr{' class=noise' if noise(r) else ''}><td>{'<b>&#10003; change</b>' if r.get('pick') else ''}</td>"
+        f"<td>{e(slot(r) or 'Every socket')}</td>"
+        f"<td title='worn by {r['share']:.0%} of the top players'>{e(r['name'])}</td>{gain(r)}</tr>" for r in rows)
     return (f"<div class='scroll'><table class='night'><tr><th></th><th>Slot</th><th>What the top players wear</th>"
-            f"<th class='n' title='on your set, the sims&#39; error about ±{d.get('error', 0):.2f}%'>Gain</th></tr>"
-            f"{body}</table></div>"
+            f"<th class='n'>Gain</th></tr>{body}</table></div>"
             + (f"<p class='ws-fine'>You already wear {len(worn)} of them: "
-               f"{e(', '.join(sorted({r['slot'].replace('_', ' ') or 'sockets' for r in worn})))}.</p>" if worn else ""))
+               f"{e(', '.join(sorted({slot(r) or 'sockets' for r in worn})))}. "
+               if worn else "<p class='ws-fine'>")
+            + f"&asymp;: within the sims' error (&plusmn;{err:.2f}%), no real difference.</p>")
 
 
 def by_targets(d: dict) -> str:
@@ -795,13 +921,16 @@ def by_targets(d: dict) -> str:
         err = (c.get("gear") or {}).get("error") or 0.2
         best = rows[0] if rows and rows[0]["gain"] > 2 * err else None
         if t:
-            talents = (f"<div class='bt-h'><b>Talents</b><span class='l-val pos'>{_pct(t['gain'], 1)}</span></div>"
+            label = t["label"] or ""
+            origin = (f"a build the top players play on {label[len('top players on '):]}"
+                      if label.startswith("top players on ") else f"the {label}")
+            talents = (f"<div class='bt-h'><b>Talents</b><button type='button' class='btn ghost' "
+                       f"data-copy='{e(t['code'])}'>Copy this build, {_pct(t['gain'], 1)}</button></div>"
                        + (f"<p class='bt-hero'>Hero talents: <s>{e(t['hero'][0])}</s> &rarr; <b>{e(t['hero'][1])}"
                           f"</b></p>" if t.get("hero") else "")
-                       + f"{_swaps(t['swaps'], icons)}<small class='muted'>the {e(t['label'])}</small>"
-                       f"<button type='button' class='btn ghost' data-copy='{e(t['code'])}'>Copy the talents</button>")
+                       + f"{_take_drop(t['swaps'], icons)}<small class='muted'>{e(origin)}</small>")
         else:
-            talents = "<div class='bt-h'><b>Talents</b><span class='l-val'>yours</span></div>"
+            talents = "<div class='bt-h'><b>Talents</b><span class='bt-keep'>yours</span></div>"
         if best:
             li = "".join(f"<li class='icard'>{_img(items.get(i.get('item_id') or 0, ''))}<span class='l-name'><b>"
                          f"{e(i['name'] or '?')}</b><small>{e(SLOTS.get(x['slot'], x['slot']))}"
@@ -810,18 +939,37 @@ def by_targets(d: dict) -> str:
             gear_ = (f"<div class='bt-h'><b>Gear</b><span class='l-val pos'>{_pct(best['gain'], 1)}</span></div>"
                      f"<ul class='glist items'>{li}</ul>")
         elif c.get("gear"):
-            gear_ = "<div class='bt-h'><b>Gear</b><span class='l-val'>what you wear</span></div>"
+            gear_ = "<div class='bt-h'><b>Gear</b><span class='bt-keep'>what you wear</span></div>"
         else:
             gear_ = ""
         said = ((t or {}).get("code"), tuple(str(x["items"]) for x in (best or {}).get("changes") or []))
-        same = before is not None and said == before[1]
-        cards.append(f"<section class='bt-card{' same' if same else ''}'><h3>{e(c['label'])}</h3>"
-                     + (f"<p class='muted'>Same as {e(before[0])}.</p>" if same else talents + gear_)
-                     + "</section>")
-        before = (c["label"], said) if not same else before
+        nothing = not t and not best
+        same = not nothing and before is not None and said == before[1]
+        wide = len(_unique((t or {}).get("swaps") or [])) > 6  # a long build: two columns of the grid
+        if nothing:  # one line, not two headers that each say "yours"
+            body = f"<p class='bt-none'>Nothing to change at {e(c['label'])}.</p>"
+        elif same:
+            body = f"<p class='muted'>Same as {e(before[0])}.</p>"
+        else:
+            body = talents + gear_
+        cls = " same" if same or nothing else " wide" if wide else ""
+        cards.append(f"<section class='bt-card{cls}'><h3>{e(c['label'])}</h3>{body}</section>")
+        before = (c["label"], said) if not same and not nothing else before
+    if any("bt-card wide" in c for c in cards):  # a long build takes twice the width; the cards around it stack in
+        # one column each side, in their order (not a third column left empty under a short card)
+        cols: list[list[str]] = []
+        for c in cards:
+            if "bt-card wide" in c or not cols or "bt-card wide" in cols[-1][0]:
+                cols.append([c])
+            else:
+                cols[-1].append(c)
+        grid = "<div class='bt-grid has-wide'>" + "".join(
+            col[0] if "bt-card wide" in col[0] else f"<div class='bt-stack'>{''.join(col)}</div>" for col in cols)
+    else:
+        grid = f"<div class='bt-grid'>{''.join(cards)}"
     secs = d.get("length") or 300
     return (f"<p class='ws-lead'>Simmed on a training dummy, {secs // 60} min, targets alive all fight; 3+ on 5 "
-            f"targets.</p><div class='bt-grid'>{''.join(cards)}</div><p class='ws-fine'>Talents: yours, "
+            f"targets.</p>{grid}</div><p class='ws-fine'>Talents: yours, "
             f"SimulationCraft's and the top players' builds on the bosses you prepared, one taken beyond the noise "
             f"only. Gear: your bags and vault, with that card's talents.</p>")
 
