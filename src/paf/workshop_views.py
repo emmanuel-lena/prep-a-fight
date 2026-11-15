@@ -882,35 +882,32 @@ def specgear(d: dict) -> str:
 
 
 def enchant_table(d: dict) -> str:
-    """Each enchant and gem the top players wear, its gain on your set; the ones to change first (picked: beyond the
-    sims' noise), the share of the top players who wear it on hover. The ones you already wear are counted, not
-    listed."""
+    """What to do slot by slot (a fresh review: a ✓ on 2 rows of 21 said neither what you wear nor what to put):
+    "Hands: X → Y +0.44%" for each change the sims pick (beyond their noise), then the slots where yours is already
+    the best or within the noise, in one line. The top players' other choices are losses on your set: not listed."""
     err = d.get("error") or 0
 
     def slot(r: dict) -> str:
-        return SLOTS.get(r["slot"], r["slot"].replace("_", " ").capitalize()) if r["slot"] else ""
-
-    def noise(r: dict) -> bool:  # within the sims' error: no real difference with what you wear
-        return not r.get("pick") and abs(r["gain"] or 0) < err
-    worn = [r for r in d["rows"] if r["gain"] == 0]
-    rows = sorted((r for r in d["rows"] if r["gain"] != 0),  # the picks, then the real gains, then the noise
-                  key=lambda r: (not r.get("pick"), noise(r), -(r["gain"] or 0)))
-
-    def gain(r: dict) -> str:
-        g = r["gain"]
-        if noise(r):
-            return f"<td class='n muted'>&asymp; {g:+.2f}%</td>".replace("-", "&minus;")
-        return f"<td class='n {'pos' if g > 0 else 'neg'}'>{g:+.2f}%</td>".replace("-", "&minus;")
-    body = "".join(
-        f"<tr{' class=noise' if noise(r) else ''}><td>{'<b>&#10003; change</b>' if r.get('pick') else ''}</td>"
-        f"<td>{e(slot(r) or 'Every socket')}</td>"
-        f"<td title='worn by {r['share']:.0%} of the top players'>{e(r['name'])}</td>{gain(r)}</tr>" for r in rows)
-    return (f"<div class='scroll'><table class='night'><tr><th></th><th>Slot</th><th>What the top players wear</th>"
-            f"<th class='n'>Gain</th></tr>{body}</table></div>"
-            + (f"<p class='ws-fine'>You already wear {len(worn)} of them: "
-               f"{e(', '.join(sorted({slot(r) or 'sockets' for r in worn})))}. "
-               if worn else "<p class='ws-fine'>")
-            + f"&asymp;: within the sims' error (&plusmn;{err:.2f}%), no real difference.</p>")
+        return SLOTS.get(r["slot"], r["slot"].replace("_", " ").capitalize()) if r["slot"] else "Every socket"
+    by: dict[str, list[dict]] = {}
+    for r in d["rows"]:
+        by.setdefault(slot(r), []).append(r)
+    moves, keep = [], []
+    for name, rs in by.items():
+        best = max(rs, key=lambda r: r["gain"] or 0)
+        worn = next((r for r in rs if r["gain"] == 0), None)
+        if best.get("pick"):
+            was = f"<s>{e(worn['name'])}</s> &rarr; " if worn else ""
+            moves.append((best["gain"], f"<li><span class='l-name'><b>{e(name)}</b><small>{was}<span title='worn by "
+                                        f"{best['share']:.0%} of the top players'>{e(best['name'])}</span></small>"
+                                        f"</span><span class='l-val pos'>{best['gain']:+.2f}%</span></li>"))
+        else:
+            keep.append(name)
+    out = (f"<ul class='glist ench'>{''.join(m for _g, m in sorted(moves, key=lambda m: -m[0]))}</ul>" if moves
+           else "<p class='ws-p'>Keep your enchants and gems: none of the top players' beats yours on your set.</p>")
+    if keep and moves:
+        out += f"<p class='ws-fine'>Keep yours: {e(', '.join(sorted(keep)))} (already the best, or within the noise).</p>"
+    return out + f"<p class='ws-fine'>Simmed on your set; a change is shown beyond the sims' noise (&plusmn;{2 * err:.2f}%).</p>"
 
 
 def by_targets(d: dict) -> str:

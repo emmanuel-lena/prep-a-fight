@@ -19,14 +19,16 @@ def test_the_class_colour_never_encodes_a_state():
     assert "var(--accent)" not in css  # the Class Signs Rule: covered, ready, put on it... are neutral
 
 
-def test_an_enchant_within_the_noise_is_muted_and_listed_last():
+def test_enchants_read_slot_by_slot_what_to_put_on():
+    # a fresh review (2026-11-15): a check mark on 2 rows of 21 said neither what you wear nor what to put
     page = wv.enchant_table({"error": 0.2, "rows": [
         {"kind": "enchant", "slot": "feet", "name": "Small", "id": 1, "share": 0.2, "gain": 0.1, "pick": False},
-        {"kind": "enchant", "slot": "finger1", "name": "Real", "id": 2, "share": 0.2, "gain": -0.5, "pick": False},
+        {"kind": "enchant", "slot": "finger1", "name": "Mine", "id": 4, "share": 0.5, "gain": 0, "pick": False},
+        {"kind": "enchant", "slot": "finger1", "name": "Real", "id": 2, "share": 0.2, "gain": 0.9, "pick": True},
         {"kind": "gem", "slot": "", "name": "Pick", "id": 3, "share": 0.6, "gain": 0.6, "pick": True}]})
-    assert page.index("Pick") < page.index("Real") < page.index("Small")
-    assert "&asymp; +0.10%" in page and "class=noise" in page
-    assert "<td class='n neg'>&minus;0.50%</td>" in page and "Ring 1" in page and "finger1" not in page
+    assert page.index("Real") < page.index("Pick")  # the biggest gain first
+    assert "<s>Mine</s> &rarr; " in page and "Ring 1" in page and "finger1" not in page
+    assert "Keep yours: Feet" in page and "Small" not in page  # within the noise: kept, not listed
 
 
 def test_rotation_leaves_out_a_cooldown_pressed_as_often_as_the_top_players_press_it():
