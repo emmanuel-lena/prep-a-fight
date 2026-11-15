@@ -147,8 +147,8 @@ SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
         ("corpus_points", "Quota for background reading",
          "Warcraft Logs points per hour (of 3,600) the reading in the background may use; a prep you wait for "
          "uses the whole quota."),
-        ("region", "Rankings from one region only", ""),
-        ("cache_max_mb", "Disk cache cap (MB)", "Sim results and Warcraft Logs answers; the oldest go first."),
+        ("region", "Top players from", "The region whose top players' logs are read; all regions by default."),
+        ("cache_max_mb", "Disk cache cap", "Sim results and Warcraft Logs answers; the oldest go first."),
     ]),
 ]
 
@@ -156,6 +156,8 @@ SETTINGS_FORM: list[tuple[str, bool, list[tuple[str, str, str]]]] = [
 SHOWN_HELP = {"share_packs": "Fight data only, no names.",  # what leaves the computer: always in sight
              "telemetry": "Step times and errors only, no names."}
 PLACEHOLDER = {"guild_server": "as the game writes it: Kazzak, Twisting Nether"}
+UNITS = {"corpus_size": "kills", "corpus_points": "pts/hour of 3,600", "cache_max_mb": "MB"}  # a number says what
+# it counts (review)
 
 
 def _setting_control(key: str) -> str:
@@ -201,6 +203,8 @@ def settings_form() -> str:
             # the help on hover, not a line under each row (the owner, 2026-10-24); what is shared stays said
             title = f" title='{e(help_)}'" if help_ else ""
             lab, ctl = f"<label for='s-{e(k)}'{title}>{e(label)}</label>", _setting_control(k)
+            if k in UNITS:
+                ctl = f"<span class='set-ctl'>{ctl}<span class='set-unit'>{e(UNITS[k])}</span></span>"
             return (f"<div class='set-row{' set-check' if check else ''}'>" + (ctl + lab if check else lab + ctl)
                     + (f"<p class='set-help'>{e(SHOWN_HELP[k])}</p>" if k in SHOWN_HELP else "") + "</div>")
         fields = "".join(row(k, label, help_) for k, label, help_ in rows)
@@ -284,19 +288,19 @@ def settings_page(message: str = "") -> str:
     cid = os.environ.get("WCL_CLIENT_ID", "")
     # the saved key shown in its own field, so empty fields never read as "no key" (fresh app review 4)
     key_ph = f' placeholder="{e(cid[:8])}… saved"' if cid else ""
-    current = ("" if cid else
-               "Not used: the app goes through your Warcraft Logs login." if wcllogin.logged_in() else
-               "<span class='neg'>No key yet.</span>")
-    if wcllogin.logged_in():
-        account = ("<p class='small'>Connected with your Warcraft Logs account.</p><form method='post' "
-                   "action='/wcl/logout'><button class='btn ghost'>Disconnect</button></form>")
+    current = "Not used while your account is connected." if wcllogin.logged_in() and cid else ""
+    if wcllogin.logged_in():  # which way the logs are read, said first (review); the key's first 8 characters
+        using = f"{OK_DOT}Reading with your Warcraft Logs account."  # only, never the secret
+        account = ("<form method='post' action='/wcl/logout'><button class='btn ghost'>Disconnect</button></form>")
     elif cid:  # the key works already: connecting is an option under it, not the page's action
-        account = ""
+        using, account = f"{OK_DOT}Reading with your own API key (<code>{e(cid[:8])}</code>&hellip;).", ""
     else:
+        using = "<span class='neg'>Not connected yet</span>: connect your account, or use an API key below."
         account = connect_block(lead=False)
-    alt = ("<hr class='set-hr'>" + connect_block(lead=False, ghost=True)) if cid and not wcllogin.logged_in() \
-        and wcllogin.available() else ""
-    account = (f"<h2>Warcraft Logs</h2><div class='set-wcl'>{account}<hr class='set-hr'>" if account else "")
+    alt = ("<hr class='set-hr'><p class='small'>Or use your Warcraft Logs account instead (no key):</p>"
+           + connect_block(lead=False, ghost=True)) if cid and not wcllogin.logged_in() and wcllogin.available() else ""
+    account = (f"<h2>Warcraft Logs</h2><div class='set-wcl'><p class='wcl-using'>{using}</p>{account}"
+               + ("<hr class='set-hr'>" if account else ""))
     said = ["SimulationCraft installed" if exe else "SimulationCraft <b>not installed</b> (Get nightly, below)"]
     said.append("Warcraft Logs connected with your account" if wcllogin.logged_in() else
                 "Warcraft Logs read with your own key" if cid else "Warcraft Logs <b>not connected</b> (below)")
@@ -308,10 +312,9 @@ def settings_page(message: str = "") -> str:
 <div class="cta"><button class="btn go">Save</button><span class="dirty-note">Unsaved changes</span></div></form>
 <p class="muted"><a href="/welcome">Show the welcome steps again</a></p>
 </div><div>
-{account if account else "<h2>Warcraft Logs</h2><div class='set-wcl'>"}\
-{'<h3 class="key-h">Your own API key</h3>' if account else ''}
+{account}<h3 class="key-h">Your own API key</h3>
 <p class="small measure">{current} <a href="https://www.warcraftlogs.com/api/clients"
-target="_blank" rel="noopener">Use another key &#8599;</a></p>
+target="_blank" rel="noopener">Create a key on warcraftlogs.com &#8599;</a></p>
 <form method="post" action="/credentials" class="row"><input type="hidden" name="back" value="settings">
 <label class="key-l">Client ID<input name="id" class="key-in" required{key_ph}></label>
 <label class="key-l">Client Secret<input name="secret" class="key-in"
