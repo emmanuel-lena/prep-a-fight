@@ -58,9 +58,11 @@ def _img(icon: str, cls: str = "it-ic") -> str:
     return icons.img(icon, "large", cls) if icon else f"<span class='{cls} none'></span>"
 
 
-def _verdict(kind: str, title: str, text: str = "", big: str = "") -> str:
-    mark = {"go": "&#10140;", "ok": "&#10003;", "warn": "!"}[kind]
-    return (f"<div class='verdict {kind}'><span class='v-mark' aria-hidden='true'>{mark}</span><div><b>{title}</b>"
+def _verdict(kind: str, title: str, text: str = "", big: str = "", pic: str = "") -> str:
+    """The answer's block; `pic` (a spec's icon) in place of the round mark when the answer is about a player."""
+    mark = pic or ("<span class='v-mark' aria-hidden='true'>"
+                   + {"go": "&#10140;", "ok": "&#10003;", "warn": "!"}[kind] + "</span>")
+    return (f"<div class='verdict {kind}'>{mark}<div><b>{title}</b>"
             + (f"<p>{text}</p>" if text else "") + "</div>" + (f"<span class='v-big'>{big}</span>" if big else "")
             + "</div>")
 
@@ -644,16 +646,29 @@ def pulldiff(d: dict) -> str:
                   "length: the gap is gameplay. Buffs that players of other classes also have (a healer's) are left "
                   "out.</p>")
 
+def _pressed_like_tops(text: str, d: dict) -> bool:
+    """A cooldown's "you pressed it N times, it was ready M times" when the top players of the spec press it no more
+    often than you: a movement or utility spell pressed when the fight asks, not a point to work on."""
+    if ": you pressed it" not in text and ": you never pressed it" not in text:
+        return False
+    name = text.split(":")[0]
+    casts = next((c["casts"] for c in d.get("cooldowns", []) if c["name"] == name), None)
+    tops = next((f.get("tops") or "" for f in d.get("findings", [])
+                 if f.get("kind") == "cooldown" and f.get("name") == name), "")
+    m = re.search(r"press it ([\d.]+) times", tops)
+    return casts is not None and m is not None and float(m.group(1)) <= casts
+
+
 def rotation(d: dict) -> str:
     """A player's rotation: the points to work on, each context's spells next to the rotation's, DoTs, cooldowns."""
     from paf import icons
 
     ic = icons.spec_any(d.get("spec", ""), "large") if d.get("spec") else ""
-    hl = d.get("highlights", [])
-    head = _verdict("go" if hl else "ok", f"{d['player']}: your rotation",
-                    f"<span>{e(d.get('spec', ''))}</span> &middot; <span>{e(d.get('boss', ''))}</span> &middot; "
-                    f"<span>{e(d.get('pull', ''))}</span> &middot; <span class='num'>{_mmss(d.get('duration'))}</span>")
-    out = f"<div class='rot-head'>{ic}{head}</div>"
+    hl = [t for t in d.get("highlights", []) if not _pressed_like_tops(t, d)]
+    out = _verdict("ok", f"{e(d['player'])}: your rotation",  # a reading, not an action to take: neutral
+                   f"<span>{e(d.get('spec', ''))}</span> &middot; <span>{e(d.get('boss', ''))}</span> &middot; "
+                   f"<span>{e(d.get('pull', ''))}</span> &middot; <span class='num'>{_mmss(d.get('duration'))}</span>",
+                   pic=f"<span class='v-pic'>{ic}</span>" if ic else "")
     if hl:
         out += ("<h3>To work on</h3><ol class='todo'>" + "".join(f"<li>{e(t)}</li>" for t in hl) + "</ol>")
     else:
@@ -701,7 +716,7 @@ def rotation(d: dict) -> str:
             f"{b['tops']:.0%}</small></span><span class='cov'><span class='c-raid "
             f"{'short' if b['player'] < b['tops'] else 'ok'}' style='width:{b['player'] * 100:.1f}%'></span>"
             f"<span class='c-tops' style='left:{b['tops'] * 100:.1f}%' title='top players'></span></span>"
-            f"<span class='l-val'>{b['player']:.0%}</span></li>" for b in buffs[:8]) + "</ul>")
+            f"<span class='l-val'><small>you</small> {b['player']:.0%}</span></li>" for b in buffs[:8]) + "</ul>")
     waste = [w for w in d.get("waste", []) if w["capped"]]
     if waste:
         out += "<h3>Resource lost</h3><ul class='hl'>" + "".join(

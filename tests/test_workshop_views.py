@@ -29,6 +29,22 @@ def test_an_enchant_within_the_noise_is_muted_and_listed_last():
     assert "<td class='n neg'>&minus;0.50%</td>" in page and "Ring 1" in page and "finger1" not in page
 
 
+def test_rotation_leaves_out_a_cooldown_pressed_as_often_as_the_top_players_press_it():
+    d = {"kind": "rotation", "player": "P", "spec": "", "boss": "B", "pull": "pull 1", "duration": 200,
+         "highlights": ["Sprint: you pressed it 1 time, it was ready 3 times in the pull.",
+                        "Burst: you pressed it 1 time, it was ready 3 times in the pull."],
+         "cooldowns": [{"name": n, "casts": 1, "possible": 3, "cooldown": 60, "times": [5]}
+                       for n in ("Sprint", "Burst")],
+         "findings": [{"kind": "cooldown", "name": "Sprint", "tops": "the top players of your spec press it 0.8 times "
+                                                                     "in a pull this long"},
+                      {"kind": "cooldown", "name": "Burst", "tops": "the top players of your spec press it 2.9 times "
+                                                                    "in a pull this long"}],
+         "buffs": [{"name": "Proc", "player": 0.59, "tops": 0.37}]}
+    page = wv.render(d)
+    assert "Sprint: you pressed" not in page and "Burst: you pressed" in page  # the tops press Sprint as rarely
+    assert "class='verdict ok'" in page and "<small>you</small> 59%" in page and "your spec:</span> 37%" in page
+
+
 def _talents_row(code, gain, swaps, players=3):
     return {"code": code, "gain": gain, "players": players, "swaps": swaps}
 

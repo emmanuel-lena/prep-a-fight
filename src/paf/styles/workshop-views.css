@@ -99,11 +99,11 @@ h3.who-c{display:flex;align-items:center;gap:8px} h3.who-c .it-ic{margin:0} td.w
 table.night td.pos{color:var(--pos)} table.night td.neg{color:var(--neg)}
 table.night td.muted{color:var(--muted)} table.night tr.noise td{opacity:.6} /* within the sims' error */
 .kt b span{color:var(--muted);font-weight:400}
-.rot-head{display:flex;gap:14px;align-items:center} .rot-head .verdict{flex:1;margin:0}
-.rot-head>.it-ic{width:56px;height:56px;border-radius:12px}
+.v-pic{flex:none;display:grid} .v-pic .it-ic{width:48px;height:48px;border-radius:10px;margin:0}
 .todo{margin:0;padding:0 0 0 22px;display:grid;gap:8px;font-size:15.5px;line-height:1.45}
 .todo li::marker{color:var(--muted);font-weight:700}
-.ctx .glist li{grid-template-columns:minmax(0,1.1fr) minmax(70px,1fr) 74px;padding:6px 4px}
+.ctx .glist li{grid-template-columns:minmax(0,1.1fr) minmax(70px,1fr) 96px;padding:6px 4px}
+.cov-list .l-val{white-space:nowrap}
 .ctx .glist li.far .l-val{color:var(--warn)}
 .dot-ic{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font:700 13px var(--font-data);
   border:2px solid color-mix(in srgb,var(--fg) 55%,transparent);color:var(--fg)}
