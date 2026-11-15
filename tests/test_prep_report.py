@@ -113,6 +113,35 @@ def test_plans_that_change_nothing_are_one_line_and_nsrt_sits_beside_the_mrt_not
     assert "Copy the MRT note" in head and "Copy for NSRT" in head
 
 
+def test_talents_that_all_lose_show_the_verdict_and_three_builds():
+    from pathlib import Path
+
+    from paf.talent_sim import Build, TalentComparison, TalentRow
+
+    d = PrepData("Boss", "mythic", "Subtlety", "Char", duration=300)
+    names = [f"T{i}" for i in range(40)]
+    rows = [TalentRow(Build(frozenset({i}), n=5, rank=50.0), {"boss fight": (-3.0 - i, -8.0 - i)}, names, [])
+            for i in range(6)]
+    d.talents = TalentComparison(["boss fight"], rows, 0.1, Path("."))
+    table = render(d).split("Talents of the top players", 1)[1].split("</table>", 1)[0]
+    assert "Keep your talents" in table and table.count("players, median rank") == 3
+    assert table.count("on the boss") == 1  # under the best build only
+    assert "other-build" not in table and "<span class='muted'>other build &middot; 40 talents apart" in table
+
+
+def test_nothing_to_change_offers_no_plan_it_does_not_play():
+    from paf.optimize import Plan, Rule
+
+    d = PrepData("Boss", "mythic", "Subtlety", "Char", duration=300)
+    d.goal = "total"
+    p = Plan("total", {"vanish": Rule("on_cooldown", "", None)}, 0.6, 0.1, totals={"total": 0.6, "boss": -1.1},
+             sensitivity={"slower": -0.4}, timeline=[(5.0, "Vanish")], default_timeline=[(2.0, "Vanish")])
+    d.optimized = [p]
+    d.mrt = {"total": "prep-a-fight: Boss\n{time:0:05} Vanish"}
+    change = render(d).split('id="change"', 1)[1].split("</section>", 1)[0]
+    assert "Nothing to change" in change and "Copy the MRT note" not in change  # Dig deeper keeps it
+
+
 def test_notes_read_in_time_order():
     from paf.prep_report import in_time_order
 
@@ -156,9 +185,21 @@ def test_gear_and_loot_inside_the_noise_get_one_verdict_and_no_colour():
     d.gear_fights, d.gear_error = ["boss fight"], 0.29
     d.loot, d.loot_error = [("Sanguine Rancor", "trinket", 0.31, -0.15)], 0.20
     page = render(d)
-    assert page.count("keep yours</span>") == 1 and "&asymp; best</span>" not in page
+    assert "<b>Keep yours:</b> the best swap, trinket: A (334), is +0.57% &plusmn;0.29, within the noise." in page
+    assert "keep yours</span>" not in page and "&asymp; best</span>" not in page  # the sentence says it once
     assert "&asymp; best: within" not in page
     assert '<span class="">+0.31%</span>' in page and '<span class="pos">' not in page.split("What this boss drops")[1]
+
+
+def test_keep_yours_shows_three_sets_and_no_drop_is_said_plainly():
+    d = PrepData("Boss", "mythic", "Subtlety", "Char", kills=10, duration=240)
+    d.gear = [(f"chest: Set {i} (321)", {"boss fight": 0.5 - i / 10}, 0.5 - i / 10) for i in range(6)]
+    d.gear_fights, d.gear_error = ["boss fight"], 0.29
+    d.loot, d.loot_error = [("Amulet", "neck", -0.17, -0.43), ("Fang", "main_hand", -2.73, -3.34)], 0.18
+    gear = render(d).split("Best gear from your bags", 1)[1].split("What this boss drops", 1)
+    assert gear[0].count("gearset") == 3  # the top 3 sets only
+    loot = gear[1].split("</section>", 1)[0]
+    assert "notice" not in loot and "the closest, Amulet, is" in loot and "-0.43%" in loot
 
 
 def test_a_plan_not_played_keeps_its_own_notes_on_its_card():

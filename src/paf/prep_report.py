@@ -579,7 +579,7 @@ def _severity(gain: float | None) -> str:
     return "major" if gain >= 3 else "moderate" if gain >= 1 else "minor"
 
 
-def suggestions(d: PrepData) -> list[Suggestion]:
+def suggestions(d: PrepData, quiet: bool = False) -> list[Suggestion]:
     """What to change, most valuable first (WoWAnalyzer-style): each with its measured gain."""
 
     def lk(text: str) -> str:
@@ -632,7 +632,8 @@ def suggestions(d: PrepData) -> list[Suggestion]:
 
     shown = card_plan(d)  # the change card's plan, with its rules and MRT button: not said twice (fresh DPS review)
     for p in sorted(d.optimized, key=lambda p: (p.objective != want, costly(p), -p.gain)):
-        if p.objective == "adds" or p.gain <= 2 * p.error or p is shown:
+        if p.objective == "adds" or p.gain <= 2 * p.error or p is shown or quiet:  # quiet: the card says nothing
+            # to change, so no plan the sheet does not play is offered with its notes (it stays in Dig deeper)
             continue
         by_rule: dict[str, list[str]] = {}
         for k, r in p.choice.items():
@@ -873,13 +874,14 @@ def places(g: float, gains: list[float]) -> int:
     return 2 if any(f"{g:.1f}" == f"{x:.1f}" and abs(g - x) >= 0.005 for x in gains) else 1
 
 
-def suggestions_html(d: PrepData) -> str:
+def suggestions_html(d: PrepData, quiet: bool = False) -> str:
     rows = []
-    gains = [x.gain for x in suggestions(d) if x.gain is not None]
+    said = suggestions(d, quiet)
+    gains = [x.gain for x in said if x.gain is not None]
     best = best_build(d) if d.talents else None  # the card's talent gain, left out of the list: still counted, so
     if best is not None:  # the plan's figure reads as the card's (+6.65% beside +6.55%, never +6.7%)
         gains.append(best.per_fight.get(d.talents.fights[0], (0.0, None))[0] or 0.0)
-    for s in suggestions(d):
+    for s in said:
         label = {"major": "Major", "moderate": "Moderate", "minor": "Minor", "info": "Info",
                  "alt": "Alternative"}[s.severity]
         if s.severity == "info" and s.gain is not None:  # a gain only for some raids (a burst they may not need)
@@ -1424,11 +1426,14 @@ and the gear for that.</p></div>""")
         head = "".join(f"<th class='n'>{e(names.get(f, f))} &plusmn;{2 * tc.error:.1f}%</th>" for f in tc.fights)
         body = f"<tr><td>your talents</td>{''.join('<td class=n>ref</td>' for _ in tc.fights)}<td></td></tr>"
         first = tc.fights[0]
-        for r in sorted(tc.rows, key=lambda r: -(r.per_fight.get(first, (0.0, None))[0] or 0.0)):
+        ranked = sorted(tc.rows, key=lambda r: -(r.per_fight.get(first, (0.0, None))[0] or 0.0))
+        lose = not ranked or (ranked[0].per_fight.get(first, (0.0, None))[0] or 0.0) <= 2 * tc.error  # keep yours:
+        for n, r in enumerate(ranked[:3] if lose else ranked):  # the verdict and the closest three (the owner)
             cells = ""
             for f in tc.fights:
                 tot, boss = r.per_fight.get(f, (None, None))
-                cells += f"<td class='n'>{_pct(tot, 1, err=2 * tc.error)}{'<br><span class=small>on the boss ' + _pct(boss, 1, err=2 * tc.error) + '</span>' if boss is not None else ''}</td>"
+                on_boss = boss is not None and not n  # the boss figure under the best build only (less text)
+                cells += f"<td class='n'>{_pct(tot, 1, err=2 * tc.error)}{'<br><span class=small>on the boss ' + _pct(boss, 1, err=2 * tc.error) + '</span>' if on_boss else ''}</td>"
             both = set(r.add) & set(r.drop)
             add = [t for t in dict.fromkeys(r.add) if t not in both]
             drop = [t for t in dict.fromkeys(r.drop) if t not in both]
@@ -1439,7 +1444,7 @@ and the gear for that.</p></div>""")
             diff = "<span class='muted'>only ranks or a choice node differ from yours</span>"
             if len(add) + len(drop) > OTHER_BUILD:  # another build altogether: one badge, not 40 names (the owner,
                 # 2026-10-24; as on the raid lead page)
-                diff = f"<span class='other-build'>other build &middot; {len(add) + len(drop)} talents apart</span>"
+                diff = f"<span class='muted'>other build &middot; {len(add) + len(drop)} talents apart</span>"
             elif add or drop:
                 diff = (f"<span class='plus'>+</span> {e(', '.join(add) or '-')}<br>"
                         f"<span class='minus'>&minus;</span> <span class='muted'>{e(', '.join(drop) or '-')}</span>")
@@ -1557,34 +1562,45 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
             if k not in seen_sets:
                 seen_sets.add(k)
                 uniq.append(g)
-        for i, (ch, per, w) in enumerate(uniq[:8]):
+        keep = -5 <= top <= 2 * d.gear_error  # no swap stands out: one sentence and the closest sets (the owner)
+        lead = ""
+        if keep:
+            best_set = "; ".join(lk(c) for c in d.gear[0][0].split("; "))
+            lead = (f"<p><b>Keep yours:</b> the best swap, {best_set}, is {top:+.2f}% &plusmn;{d.gear_error:.2f}, "
+                    "within the noise.</p>")
+        for i, (ch, per, w) in enumerate(uniq[:3] if keep else uniq[:8]):
             noise = (i and top > 2 * d.gear_error and top - w <= 2 * d.gear_error  # never "about the best" on a
                      and w >= 0)  # loss, nor under a best that is itself "keep yours" (a review: two verdicts)
             items = "".join(f"<div>{lk(c)}</div>" for c in ch.split("; "))
             body += (f"<tr class='{'noise' if noise else ''}'><td class='small gearset'>{items}"
                      + f"</td><td class='n'>{_pct(w, err=d.gear_error)}" + (" <span class='pill near'>&asymp; best</span>" if noise else
                                                           " <span class='pill near'>best</span>"
-                                                          if not i and w > 2 * d.gear_error else
-                                                          " <span class='pill near'>&asymp; keep yours</span>"
-                                                          if not i else "")  # the verdict's own rule (a review)
+                                                          if not i and w > 2 * d.gear_error else "")  # the verdict's
+                     # own rule (a review); "keep yours" is the sentence above the table
                      + "</td>"
                      + ("".join(f"<td class='n'>{_pct(per.get(f))}</td>" for f in d.gear_fights) if many else "")
                      + "</tr>")
         mine = ("on the fight with your assignments and plan: " + "; ".join(d.assigns)) if d.assigns else \
             "on the fight without personal assignments (tick yours in the app to see if they change your gear)"
         tabs["gear"].insert(0, f"""<h2>Best gear from your bags, for this fight</h2><div class="card scroll">
-{"<p class='small warn'>&#9888; Every set here loses more than 5%: a sim gone wrong, not a reading. Keep the gear you wear.</p>" if top < -5 else ""}
+{"<p class='small warn'>&#9888; Every set here loses more than 5%: a sim gone wrong, not a reading. Keep the gear you wear.</p>" if top < -5 else ""}{lead}
 <table><tr><th title="Simmed {e(d.gear_plan or 'with the default priority list')}, {e(mine)}">Swaps vs your equipped gear
 </th><th class="n">Gain &plusmn;{d.gear_error:.2f}%</th>{head}</tr>{body}</table>
-{"<p class='tiny muted'>" + "; ".join(t for k, t in (("&asymp; best<", "&asymp; best: within the error of the best set"), ("keep yours<", "&asymp; keep yours: no set beats yours by twice the error")) if k in body) + ".</p>" if "near" in body else ""}</div>""")
+{"<p class='tiny muted'>&asymp; best: within the error of the best set.</p>" if "&asymp; best<" in body else ""}</div>""")
 
     # loot
     if d.loot:
         body = "".join(f"<tr><td>{icons.img(d.icons.get(i, ''), 'small')} {lk(i)}</td><td>{e(s.replace('_', ' '))}</td>"
                        f"<td class='n'>{_pct(real, err=d.loot_error) if real is not None else '-'}</td>"
                        f"<td class='n'>{_pct(v, err=d.loot_error)}</td></tr>" for i, s, v, real in d.loot[:12])
+        worth = [(i, real if real is not None else v, real is not None) for i, _s, v, real in d.loot]
+        lead = ""
+        if all(x <= 0 for _i, x, _r in worth):  # a plain sentence naming the closest, no callout (the owner)
+            item, x, sets = max(worth, key=lambda w: w[1])
+            lead = (f"<p>Nothing this boss drops is an upgrade for you at item level {d.loot_ilvl}: the closest, "
+                    f"{lk(item)}, is {_pct(x, err=d.loot_error)}{' in your best sets' if sets else ''}.</p>")
         tabs["gear"].append(f"""<h2>What this boss drops, for you</h2><div class="card scroll">
-{'<p class="notice small">Nothing this boss drops is an upgrade for you at item level ' + str(d.loot_ilvl) + ': every value below is a loss vs what you already have.</p>' if all((real if real is not None else v) <= 0 for _, _, v, real in d.loot) else ''}
+{lead}
 <table><tr><th>Item</th><th>Slot</th><th class="n" title="vs your best set without it: the item inserted in your best
 Top Gear sets, the rest rearranged around it (its real value; below a single swap when your best set already beats what you
 wear)">In your best sets</th><th class="n" title="vs the gear you wear: the classic droptimizer value, one swap on your
@@ -1630,7 +1646,8 @@ equipped set">Single swap</th></tr>{body}</table>
     # the four sections: the fight to play, what to change, the boss, and everything else for who digs
     from paf import fightview
 
-    card, sugg = simple.change_card(d), suggestions_html(d)
+    card = simple.change_card(d)
+    sugg = suggestions_html(d, quiet="Nothing to change" in card)
     sections: dict[str, list[str]] = {
         "fight": notices + [fightview.html(d)],
         "change": [f"<div class='simple change-top'><div class='cards'>{card}</div></div>",
