@@ -201,7 +201,16 @@ def spec_html(d) -> str:
     return (f"<div class='specs rv'><p class='specs-head'><b>We simmed your character in each damage spec of your class"
             f"</b> <span class='muted'>for {e(spec_role(s))}, on this fight{', with your items' if own else ''}</span></p>"
             f"<div class='spt-row'>{tiles}</div>"
-            + _short_note(missing, short_specs, mine_label) + "</div>")
+            + _short_note(missing, short_specs, mine_label) + (_weapon_note(s) if own else "") + "</div>")
+
+
+def _weapon_note(s: dict) -> str:
+    """Said under the tiles, never only in a hover: a spec simmed with a main hand SimC will not let it use some of its
+    spells with (your Subtlety daggers on an Outlaw: -58%), so its tile is far too low."""
+    bad = [(r.get("label", r.get("spec", "")), r["own_weapon"]) for r in s.get("rows") or [] if r.get("own_weapon")]
+    return "".join(f"<p class='small muted'>{e(name)}: SimC will not use some of its spells with your "
+                   f"{e(kind.lower())} main hand, so that tile is far too low; the top players' set says what it can "
+                   f"do.</p>" for name, kind in bad)
 
 
 DEMAND_GAP = 3.0  # % a spec must gain in a window to be said ahead there (a window is a few seconds of the sims)

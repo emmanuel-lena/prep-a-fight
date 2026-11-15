@@ -3,6 +3,7 @@ bags, the items of that spec's main stat only, with the build paf.specgear found
 334 (paf.specgear) says what a spec can do; this says what switching gives you with what you own."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -15,6 +16,10 @@ class OwnGear:
     error: float  # the sim's standard error, in % of its mean
     changes: list[str] = field(default_factory=list)  # the swaps from what you wear ("trinket: X (639)")
     missing: list[str] = field(default_factory=list)  # slots no item of yours fits (another main stat everywhere)
+    weapon: str = ""  # a main-hand type SimC will not let this spec use some spells with ("Dagger" for Outlaw)
+
+
+WEAPON = re.compile(r"with invalid main-hand weapon type '([^']+)'")
 
 
 def spec_text(profile: str, spec: str, talents: list[str]) -> str:
@@ -61,5 +66,7 @@ def own_gear(profile: str, cls: str, spec: str, talents: list[str], fight_lines:
     base = simc.run(simc.build_input(text, fight_lines), run_dir / "worn")
     value = measured(base.baseline.get("prioritydps"), base.baseline["dps"], boss)
     missing = [s for s in wrong if s not in slots]  # still another spec's main stat: said, never hidden
+    log_path = run_dir / "worn" / "simc.log"  # your weapon the spec cannot fight with (an Outlaw with your
+    found = WEAPON.search(log_path.read_text(encoding="utf-8", errors="replace")) if log_path.is_file() else None
     return OwnGear(value * (1 + gain / 100), 100 * base.baseline["dps"].error / base.baseline["dps"].mean,
-                   changes, missing)
+                   changes, missing, found[1] if found else "")  # Subtlety daggers: -58%, a fresh review)

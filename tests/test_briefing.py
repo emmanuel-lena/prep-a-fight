@@ -89,3 +89,19 @@ def test_the_lede_names_a_boss_unit_beside_the_add_waves():
                                          AddWave(167, 14, 18, "Restless Amani")])
     d.waves = [(52, 6, 18, "Restless Amani"), (73, 1, 75, "Echo of Jawae"), (167, 14, 18, "Restless Amani")]
     assert "with 2 waves of adds and Echo of Jawae" in briefing.lede_html(d)
+
+
+def test_a_spec_simmed_with_a_main_hand_simc_refuses_says_so_under_the_tiles():
+    # a fresh review (2026-11-15): Outlaw at -58% with your Subtlety daggers read as a broken sim, unexplained
+    rows = [{"spec": "Subtlety", "label": "Subtlety", "sim": 100.0, "error": 0.1, "own": 100.0},
+            {"spec": "Outlaw", "label": "Outlaw", "sim": 94.0, "error": 0.1, "own": 42.0, "own_weapon": "Dagger"}]
+    out = briefing.spec_html(SimpleNamespace(specs={"verdict": "stay", "mine": "Subtlety", "role": "total",
+                                                    "now": 100.0, "rows": rows}))
+    assert "Outlaw: SimC will not use some of its spells with your dagger main hand" in out
+
+
+def test_a_simc_log_refusing_the_main_hand_is_read():
+    from paf import specown
+
+    log = "Trivial: Player 'X' attempting to use Action 'blade_rush' (1) with invalid main-hand weapon type 'Dagger'."
+    assert specown.WEAPON.search(log)[1] == "Dagger"
