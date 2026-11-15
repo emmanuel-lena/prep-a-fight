@@ -101,10 +101,19 @@ h3.who-c{display:flex;align-items:center;gap:8px} h3.who-c .it-ic{margin:0} td.w
 .hl li{display:flex;gap:10px;align-items:baseline;padding:8px 12px;border:1px solid var(--line);border-radius:10px}
 .hl .hm{font-weight:700} .hl li.good .hm{color:var(--pos)} .hl li.bad .hm{color:var(--neg)}
 .pab{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;font-weight:700;font-size:13px;color:var(--on-status)}
-.pab.a{background:var(--neg)} .pab.b{background:var(--pos)}
+/* pulls A and B are names, not good and bad: A outlined and dashed, B solid ink */
+.pab.a{background:none;border:1.5px solid var(--muted);color:var(--muted)} .pab.b{background:var(--fg);color:var(--bg)}
+.pab-s{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:4px;font:700 10.5px var(--font-body);vertical-align:.1em}
+.pab-s.a{border:1px solid var(--muted);color:var(--muted)} .pab-s.b{background:var(--fg);color:var(--bg)}
+.hp.diff{max-height:240px} .hp .gl{stroke:var(--line);opacity:.5}
+.hp .c-a{stroke:var(--muted);stroke-dasharray:7 5} .hp .c-b{stroke:var(--fg)}
+.legend .c-a{color:var(--muted)} .legend .c-a::before{background:repeating-linear-gradient(90deg,currentColor 0 5px,transparent 5px 8px)}
+.legend .c-b{color:var(--fg)}
+.verdict .bd-new{display:inline;font:600 15px var(--font-body);color:var(--fg)} .verdict s{text-decoration-color:var(--neg)}
+.verdict p+p{margin-top:6px}
 table.night td.pos{color:var(--pos)} table.night td.neg{color:var(--neg)}
 table.night td.muted{color:var(--muted)} table.night tr.noise td{opacity:.6} /* within the sims' error */
-.kt b span{color:var(--muted);font-weight:400}
+.kt b span{color:var(--muted);font-weight:400;font-size:.75em;vertical-align:.1em}
 .v-pic{flex:none;display:grid} .v-pic .it-ic{width:48px;height:48px;border-radius:10px;margin:0}
 .todo{margin:0;padding:0 0 0 22px;display:grid;gap:8px;font-size:15.5px;line-height:1.45}
 .todo li::marker{color:var(--muted);font-weight:700}

@@ -578,34 +578,64 @@ def night(d: dict) -> str:
             "potion counts from 10 s before the pull (the pre-pot). A wipe's deaths stop at the one that leaves half "
             "the raid dead: the rest is the wipe itself.</p>")
 
+def _other_build(pl: dict) -> tuple[list[str], list[str]]:
+    """The abilities that deal damage in one pull only, (B's, A's): another build (a talent, an item's effect), so the
+    gap between the two pulls is not only how they were played. An ability counts from 2% of that pull's damage."""
+    rows = pl.get("abilities") or []
+    only_b = [r["name"] for r in rows if not r["a"] and r["b"] >= 0.02 * (pl.get("dps_b") or 1)]
+    only_a = [r["name"] for r in rows if not r["b"] and r["a"] >= 0.02 * (pl.get("dps_a") or 1)]
+    return only_b, only_a
+
+
 def pulldiff(d: dict) -> str:
-    """Two pulls side by side: the highlights first, the boss health, then the player's detail."""
+    """Two pulls side by side: another build first when there is one, the highlights, the boss health, then the
+    player's detail. A and B are names, not good and bad: A outlined and dashed, B solid."""
     from paf import icons
 
     a, b = d.get("a", {}), d.get("b", {})
     pl = d.get("player")
-    head = _verdict("go", f"{pl['name']}: pull B next to pull A" if pl else "Pull B next to pull A",
-                    f"<span class='pab a'>A</span> <span>{e(a.get('label', ''))}</span> &middot; "
-                    f"<span class='pab b'>B</span> <span>{e(b.get('label', ''))}</span>")
+    pulls = (f"<span class='pab a'>A</span> <span>{e(a.get('label', ''))}</span> &middot; "
+             f"<span class='pab b'>B</span> <span>{e(b.get('label', ''))}</span>")
+    only_b, only_a = _other_build(pl) if pl else ([], [])
+    if only_b or only_a:  # the build first: the rest of the page reads differently
+        took = ", ".join(e(n) for n in only_b) or "nothing new"
+        head = _verdict("ok", f"{e(pl['name'])}: other talents in pull B",
+                        f"<span class='pab b'>B</span> <b class='bd-new'>{took}</b>"
+                        + (f" <span>instead of</span> <s>{', '.join(e(n) for n in only_a)}</s>" if only_a else "")
+                        + f"</p><p>{pulls}")
+    else:
+        head = _verdict("ok", f"{e(pl['name'])}: pull B next to pull A" if pl else "Pull B next to pull A", pulls)
     hl = "".join(f"<li class='{h['kind']}'><span class='hm'>{'&#8593;' if h['kind'] == 'good' else '&#8595;'}</span>"
                  f"<span>{e(h['text'])}</span></li>" for h in d.get("highlights", []))
     out = head + (f"<h3>What changed, biggest first</h3><ul class='hl'>{hl}</ul>" if hl else "")
     curves = d.get("curves", {})
     span = max(a.get("duration", 0), b.get("duration", 0), 1)
-    W, H, L, B = 640, 200, 40, 26
+    W, H, L, B, T = 1100, 240, 46, 26, 10
+    vals = [v for k in ("a", "b") for v in curves.get(k, [])]
+    lo = max(0.0, int(min(vals, default=0) * 10) / 10)  # the y axis from the 10% under the lowest point
+    if lo >= 1:
+        lo = 0.9
+
+    def y(v: float) -> float:
+        return T + (1 - v) / (1 - lo) * (H - B - T)
+
+    def x(t: float) -> float:
+        return L + t / span * (W - L - 10)
 
     def pts(vals: list[float]) -> str:
-        return " ".join(f"{L + i * 15 / span * (W - L - 10):.1f},{10 + (1 - v) * (H - B - 20):.1f}"
-                        for i, v in enumerate(vals))
+        return " ".join(f"{x(i * 15):.1f},{y(v):.1f}" for i, v in enumerate(vals))
     if curves:
-        ticks = "".join(f"<text x='{L + t / span * (W - L - 10):.1f}' y='{H - 6}' class='tk'>{int(t // 60)}:00</text>"
-                        for t in range(0, int(span) + 1, 120))
-        out += (f"<h3>The boss's health</h3><svg class='hp' viewBox='0 0 {W} {H}' role='img' aria-label='Boss health'>"
-                f"<line class='ax' x1='{L}' x2='{W - 10}' y1='{H - B}' y2='{H - B}'/><text x='4' y='16' class='tk'>"
-                f"100%</text><text x='4' y='{H - B}' class='tk'>0%</text>{ticks}"
-                f"<polyline class='c-now' points='{pts(curves.get('a', []))}'/>"
-                f"<polyline class='c-best' points='{pts(curves.get('b', []))}'/></svg><div class='legend'>"
-                "<span class='c-now'>Pull A</span><span class='c-best'>Pull B</span></div>")
+        step = 30 if span < 300 else 60 if span < 600 else 120
+        ticks = "".join(f"<text x='{x(t):.1f}' y='{H - 6}' class='tk' text-anchor='middle'>{_mmss(t)}</text>"
+                        for t in range(0, int(span) + 1, step))
+        grid = "".join(f"<line class='gl' x1='{L}' x2='{W - 10}' y1='{y(v / 10):.1f}' y2='{y(v / 10):.1f}'/>"
+                       f"<text x='{L - 8}' y='{y(v / 10) + 4:.1f}' class='tk' text-anchor='end'>{v * 10}%</text>"
+                       for v in range(round(lo * 10), 11))
+        out += (f"<h3>The boss's health</h3><svg class='hp diff' viewBox='0 0 {W} {H}' role='img' "
+                f"aria-label='Boss health'>{grid}<line class='ax' x1='{L}' x2='{W - 10}' y1='{H - B}' y2='{H - B}'/>"
+                f"{ticks}<polyline class='c-a' points='{pts(curves.get('a', []))}'/>"
+                f"<polyline class='c-b' points='{pts(curves.get('b', []))}'/></svg><div class='legend'>"
+                "<span class='c-a'>Pull A</span><span class='c-b'>Pull B</span></div>")
     if not pl:
         return out + "<p class='ws-fine'>Pick a player to see their own damage, casts and buffs in both pulls.</p>"
     ic = icons.spec_any(pl["icon"]) if pl.get("icon") else ""
@@ -615,46 +645,57 @@ def pulldiff(d: dict) -> str:
 
     def pct(v: float | None) -> str:
         return "&ndash;" if v is None else f"{v:.0%}"
-    tiles = "".join(f"<div class='kt'><small>{label}</small><b>{va} <span>&rarr;</span> {vb}</b></div>" for label, va, vb in (
-        ("Damage per second", k(pl["dps_a"]), k(pl["dps_b"])), ("On the bosses", k(pl["boss_a"]), k(pl["boss_b"])),
-        ("Active", pct(pl["active_a"]), pct(pl["active_b"]))))
-    out += f"<h3 class='who-c'>{ic}<span>{e(pl['name'])}</span></h3><div class='kts'>{tiles}</div>"
+    tiles = [("Damage per second", k(pl["dps_a"]), k(pl["dps_b"]))]
+    if k(pl["boss_a"]) != k(pl["dps_a"]) or k(pl["boss_b"]) != k(pl["dps_b"]):  # all on the boss: one tile says it
+        tiles.append(("On the bosses", k(pl["boss_a"]), k(pl["boss_b"])))
+    tiles.append(("Active", pct(pl["active_a"]), pct(pl["active_b"])))
 
-    def table(title: str, head: tuple[str, str, str], rows: list[str]) -> str:
-        return (f"<h3>{title}</h3><div class='scroll'><table class='night'><tr><th>{head[0]}</th><th>A</th><th>B</th>"
-                f"<th>{head[1]}</th></tr>{''.join(rows)}</table></div>") if rows else ""
+    def tile(label: str, va, vb) -> str:
+        return f"<div class='kt'><small>{label}</small><b>{va} <span>&rarr;</span> {vb}</b></div>"
+    out += (f"<h3 class='who-c'>{ic}<span>{e(pl['name'])}</span></h3><div class='kts'>"
+            + "".join(tile(*t) for t in tiles) + "</div>")
 
-    def delta(va: float, vb: float, fmt: str) -> str:
+    def table(title: str, head: tuple[str, str], rows: list[str], last_n: bool = True) -> str:
+        return (f"<h3>{title}</h3><div class='scroll'><table class='night'><tr><th>{head[0]}</th><th class='n'>A</th>"
+                f"<th class='n'>B</th><th{' class=n' if last_n else ''}>{head[1]}</th></tr>{''.join(rows)}"
+                "</table></div>") if rows else ""
+
+    def delta(va: float, vb: float) -> str:
         cls = "pos" if vb > va else "neg" if vb < va else ""
-        return f"<td class='n {cls}'>{fmt.format(vb - va) if fmt else ''}</td>"
-    out += table("Damage per second of each ability", ("Ability", "Change", ""), [
+        sign = "+" if vb > va else "&minus;" if vb < va else ""
+        return f"<td class='n {cls}'>{sign}{abs(vb - va) / 1000:,.0f}k</td>"
+    out += table("Damage per second of each ability", ("Ability", "Change"), [
         f"<tr><td>{e(r['name'])}</td><td class='n'>{k(r['a'])}</td><td class='n'>{k(r['b'])}</td>"
-        f"{delta(r['a'], r['b'], '')}</tr>".replace("<td class='n pos'></td>", f"<td class='n pos'>+{(r['b'] - r['a']) / 1000:,.0f}k</td>")
-        .replace("<td class='n neg'></td>", f"<td class='n neg'>&minus;{(r['a'] - r['b']) / 1000:,.0f}k</td>")
-        for r in pl.get("abilities", [])])
+        f"{delta(r['a'], r['b'])}</tr>" for r in pl.get("abilities", [])])
 
-    def times(ts: list[float]) -> str:
-        return " ".join(_mmss(t) for t in ts[:8])
-    out += table("Casts per minute (cooldowns: when)", ("Ability", "Cast at, A / B", ""), [
+    def times(ts: list[float], rate: float, dur: float) -> str:
+        if ts:
+            return " ".join(_mmss(t) for t in ts[:8])
+        return f"{round(rate * dur / 60)}&times;" if rate else "&ndash;"  # cast too often to list its times
+
+    def when(r: dict) -> str:
+        return (f"<span class='pab-s a'>A</span> {times(r['times_a'], r['a'], a.get('duration', 0))} &middot; "
+                f"<span class='pab-s b'>B</span> {times(r['times_b'], r['b'], b.get('duration', 0))}")
+    out += table("Casts per minute (cooldowns: when)", ("Ability", "Cast at"), [
         f"<tr><td>{e(r['name'])}</td><td class='n'>{r['a']:.1f}</td><td class='n'>{r['b']:.1f}</td>"
-        f"<td class='small'>{(times(r['times_a']) + ' / ' + times(r['times_b'])) if r['cooldown'] else ''}</td></tr>"
-        for r in pl.get("casts", [])[:12]])
-    out += table("Uptime of your buffs and procs", ("Buff", "Change", ""), [
+        f"<td class='small'>{when(r) if r['cooldown'] else ''}</td></tr>"
+        for r in pl.get("casts", [])[:12]], last_n=False)
+    out += table("Uptime of your buffs and procs", ("Buff", "Change"), [
         f"<tr><td>{e(r['name'])}</td><td class='n'>{r['a']:.0%}</td><td class='n'>{r['b']:.0%}</td>"
-        f"<td class='n {'pos' if r['b'] > r['a'] else 'neg'}'>{(r['b'] - r['a']) * 100:+.0f}</td></tr>"
+        f"<td class='n {'pos' if r['b'] > r['a'] else 'neg'}'>"
+        + f"{(r['b'] - r['a']) * 100:+.0f}".replace("-", "&minus;") + "</td></tr>"
         for r in pl.get("buffs", [])])
     cons = pl.get("consumables", {})
-    out += ("<h3>Consumables and deaths</h3><ul class='hl'>"
-            + "".join(f"<li><span>{label}:</span> <b class='num'>{cons.get(key, [0, 0])[0]}</b> <span>&rarr;</span> "
-                      f"<b class='num'>{cons.get(key, [0, 0])[1]}</b></li>"
+    out += ("<h3>Consumables and deaths</h3><div class='kts'>"
+            + "".join(tile(label, cons.get(key, [0, 0])[0], cons.get(key, [0, 0])[1])
                       for key, label in (("healthstone", "Healthstones"), ("health", "Health potions"),
                                          ("damage_potion", "Damage potions")))
-            + f"<li><span>Deaths:</span> <b class='num'>{len(pl['deaths'][0])}</b> <span>&rarr;</span> "
-              f"<b class='num'>{len(pl['deaths'][1])}</b></li></ul>")
+            + tile("Deaths", len(pl["deaths"][0]), len(pl["deaths"][1])) + "</div>")
+    why = ("the two pulls were played with other talents (abilities that deal damage in one pull only): the gap is "
+           "not only gameplay" if only_b or only_a else "the gap is gameplay")
     return out + ("<p class='ws-fine'>Both pulls read from your log, 15 s at a time. The pulls compared by default are "
                   "your worst and your best by your own damage, among those where you did not die and of a similar "
-                  "length: the gap is gameplay. Buffs that players of other classes also have (a healer's) are left "
-                  "out.</p>")
+                  f"length; {why}. Buffs that players of other classes also have (a healer's) are left out.</p>")
 
 def _pressed_like_tops(text: str, d: dict) -> bool:
     """A cooldown's "you pressed it N times, it was ready M times" when the top players of the spec press it no more

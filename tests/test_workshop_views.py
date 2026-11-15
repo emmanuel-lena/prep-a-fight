@@ -69,6 +69,31 @@ def test_night_cards_are_numbered_pulls_with_their_first_death_marked():
     assert "Pull 2 &middot; Other" in page  # two bosses in the night: each card names its boss
 
 
+def _diff(abilities):
+    pl = {"name": "Me", "icon": "", "boss_a": 100e3, "boss_b": 120e3, "dps_a": 100e3, "dps_b": 120e3,
+          "active_a": 0.9, "active_b": 0.95, "abilities": abilities, "consumables": {}, "deaths": [[], []],
+          "casts": [{"name": "Burst", "a": 0.4, "b": 0.8, "cooldown": True, "times_a": [104.0], "times_b": []},
+                    {"name": "Dash", "a": 0.4, "b": 0.0, "cooldown": True, "times_a": [5.0], "times_b": []}],
+          "buffs": [{"name": "Proc", "a": 0.8, "b": 0.1}]}
+    return wv.render({"kind": "diff", "boss": "Boss", "a": {"label": "wipe A", "duration": 150.0},
+                      "b": {"label": "wipe B", "duration": 150.0}, "highlights": [],
+                      "curves": {"a": [1.0, 0.9, 0.8], "b": [1.0, 0.85, 0.66]}, "player": pl})
+
+
+def test_two_pulls_with_other_talents_lead_with_the_build():
+    page = _diff([{"name": "New Strike", "a": 0, "b": 20e3}, {"name": "Old Strike", "a": 15e3, "b": 0},
+                  {"name": "Tiny", "a": 0, "b": 1e3}, {"name": "Both", "a": 50e3, "b": 60e3}])
+    assert "Me: other talents in pull B" in page and "New Strike</b> <span>instead of</span> <s>Old Strike</s>" in page
+    assert "Tiny</b>" not in page and "the gap is gameplay" not in page and "not only gameplay" in page
+    assert "class='verdict ok'" in page and "On the bosses" not in page  # all of it on the boss: one tile
+    assert "<span class='pab-s a'>A</span> 1:44 &middot; <span class='pab-s b'>B</span> 2&times;" in page
+    assert "<span class='pab-s b'>B</span> &ndash;" in page and ">&minus;70</td>" in page
+    assert ">60%</text>" in page and ">50%</text>" not in page  # the y axis from the 10% under the lowest point
+    assert ">0:30</text>" in page  # 30 s ticks under 5 min
+    page = _diff([{"name": "Both", "a": 50e3, "b": 60e3}])
+    assert "pull B next to pull A" in page and "the gap is gameplay" in page
+
+
 def _talents_row(code, gain, swaps, players=3):
     return {"code": code, "gain": gain, "players": players, "swaps": swaps}
 
