@@ -580,8 +580,21 @@ def night(d: dict) -> str:
             # it, in the same second): marked
             cls = " ".join(c for c in ("bare" if b else "", "first" if t - first < 1 else "") if c)
             return f"<span class='who-chip {cls}'>{ic(n)}<b>{e(n)}</b> {_mmss(t)}</span>"
-        who = "".join(chip(t, n, b) for t, n, b in dead[:12])
-        who += f"<span class='more-n'>+{len(dead) - 12}</span>" if len(dead) > 12 else ""
+        groups: list[list] = []  # three or more in the same second: one mechanic, one chip (a fresh review: 9 chips
+        for x in dead:  # all ringed "first" at 0:44)
+            if groups and x[0] - groups[-1][0][0] < 1:
+                groups[-1].append(x)
+            else:
+                groups.append([x])
+        who, shown = "", 0
+        for g in groups:
+            if len(g) >= 3:
+                names = ", ".join(n for _t, n, _b in g)
+                who += (f"<span class='who-chip{' first' if g[0][0] - first < 1 else ''}'><b>{len(g)} at once</b> "
+                        f"{_mmss(g[0][0])}</span><small class='at-once'>{e(names)}</small>")
+            else:
+                who += "".join(chip(t, n, b) for t, n, b in g if (shown := shown + 1) <= 12)
+        who += f"<span class='more-n'>+{shown - 12}</span>" if shown > 12 else ""
         title = f"Pull {i}" + (f" &middot; {e(r['boss'])}" if bosses else "")
         detail += (f"<li><div class='j-head'><b>{title}</b><small><span class='num'>{_mmss(r['duration'])}</span>"
                    f" &middot; {end}</small></div><div class='whos'>{who or '<small>no death</small>'}</div></li>")

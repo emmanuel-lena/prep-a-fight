@@ -196,3 +196,4 @@ table.night th.n{text-align:right}
 .glist.alts .l-val{text-align:right}
 .glist.alts small{color:var(--muted)}
 .glist.ench li{grid-template-columns:minmax(0,1fr) 90px} .glist.ench s{color:var(--muted)}
+.whos .at-once{flex-basis:100%;color:var(--muted);font-size:12px;margin:-2px 0 2px 4px}
