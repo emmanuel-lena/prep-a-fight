@@ -43,7 +43,7 @@ TOOLS: tuple[Tool, ...] = (
          "Every item worth it for you, with its gain in %, best first.", needs_prep=False),
     Tool("bonusroll", "Where to use your bonus rolls", "Which boss is worth your bonus roll.", "inv_misc_coin_17", "gear", "5-10", ("difficulty", "goal"),
          "Every boss of the raid ranked by what a bonus roll brings you, with its best item.", needs_prep=False),
-    Tool("specgear", "Should you switch spec?", "Your best spec here, in your items and in the top players'.", "achievement_bg_topdps", "gear", "1-3", ("boss", "difficulty"),
+    Tool("specgear", "Should you switch spec?", "Your best spec here, simmed on you in the top players' gear.", "achievement_bg_topdps", "gear", "1-3", ("boss", "difficulty"),
          "Your character simmed in each spec in the top players' gear, their gap in the logs, your own kills, and one "
          "sentence."),
     Tool("talents", "Best talents for this boss", "The top players' builds simmed on you: which does the most.", "inv_misc_book_11", "gear", "3-6", ("boss", "difficulty"),
@@ -377,7 +377,7 @@ def job_page(jid: str, job: dict, log: str, elapsed: int, reports: list[str]) ->
         return None
     status = job["status"]
     head = (f"<header class='ws-tool'>{_icon(t.icon, 'ws-big')}<div><h1>{e(t.title)}</h1><p class='lead'>"
-            f"{e(t.question)}</p></div></header>")
+            f"{e(t.question)}</p>{_context(job)}</div></header>")
     if status == "running":
         from paf import results, workshop_views
 
@@ -402,18 +402,67 @@ def job_page(jid: str, job: dict, log: str, elapsed: int, reports: list[str]) ->
     view = workshop_views.render(data) if data else None
     if view:  # a page made for this result
         again = f"<div class='ws-go'><a class='btn ghost' href='/tool/{e(t.cmd)}'>Run it again</a></div>"
-        return (f"<div class='ws'>{head}<div class='ws-answer'>{view}</div>{again}<details class='card'><summary>"
-                f"The whole log</summary><pre class='log'>{e(log[-20000:])}</pre></details></div>{CSS}"
-                f"{workshop_views.CSS}")
+        return f"<div class='ws'>{head}<div class='ws-answer'>{view}</div>{again}{_log(log, jid, ok)}</div>{CSS}{workshop_views.CSS}"
     links = "".join(f"<a class='btn go' href='/report/{e(r)}'>Open the page &rarr;</a>" for r in reports[:2])
     block = result_block(log)
-    answer = (f"<div class='ws-answer'><h2>{'The answer' if ok else 'It stopped'}</h2>"
-              + (f"<div class='ws-links'>{links}</div>" if links else "")
-              + (f"<div class='ws-out'>{render_result(block)}</div>" if block else "") + "</div>")
-    again = (f"<div class='ws-go'><a class='btn ghost' href='/tool/{e(t.cmd)}'>Run it again</a>"
-             + ("" if ok else f"<a class='btn' href='/feedback?job={e(jid)}'>Send this report</a>") + "</div>")
-    return (f"<div class='ws'>{head}{answer}{again}<details class='card'><summary>The whole log</summary>"
-            f"<pre class='log'>{e(log[-20000:])}</pre></details></div>{CSS}")
+    unread = None if ok else UNPREPARED.search(log)  # an expected stop the player fixes: prepare the boss
+    if unread:
+        boss, diff = unread["boss"], unread["diff"].capitalize()
+        answer = (f"<div class='ws-answer'><h2>No kill of {e(boss)} {e(diff)} read yet</h2><p class='ws-p'>This tool "
+                  f"reads the boss's prep: prepare it first, then run this again.</p></div>")
+        prep = f"/boss?boss={e(_arg(job, 1))}&difficulty={e(unread['diff'].lower())}"
+        again = (f"<div class='ws-go'><a class='btn go' href='{prep}'>Prepare {e(boss)} {e(diff)} &rarr;</a>"
+                 f"<a class='btn ghost' href='/tool/{e(t.cmd)}'>Back to the tool</a></div>")
+    else:
+        answer = (f"<div class='ws-answer'><h2>{'The answer' if ok else 'It stopped'}</h2>"
+                  + (f"<div class='ws-links'>{links}</div>" if links else "")
+                  + (f"<div class='ws-out'>{render_result(block)}</div>" if block else "") + "</div>")
+        again = (f"<div class='ws-go'><a class='btn ghost' href='/tool/{e(t.cmd)}'>Run it again</a>"
+                 + ("" if ok else f"<a class='btn' href='/feedback?job={e(jid)}'>Send this report</a>") + "</div>")
+    return f"<div class='ws'>{head}{answer}{again}{'' if unread else _log(log, jid, ok)}</div>{CSS}"
+
+
+UNPREPARED = re.compile(r"No (?:kill|rebuilt fight) of (?P<boss>.+?) (?P<diff>normal|heroic|mythic)\b[^:\n]*: prepare "
+                        r"this boss first", re.I)
+
+
+def _arg(job: dict, i: int) -> str:
+    args = job.get("args") or []
+    return args[i] if len(args) > i and not args[i].startswith("--") else ""
+
+
+def _context(job: dict) -> str:
+    """What this run was, under the tool's question: the boss, the difficulty, when (the reviews: a job page said only
+    the tool's question)."""
+    from paf.web import DIFF_LABELS
+
+    args = job.get("args") or []
+    said = []
+    boss = _arg(job, 1) or (args[args.index("--boss") + 1] if "--boss" in args[:-1] else "")
+    if boss.isdigit():
+        from paf.web import _encounters
+
+        boss = next((x.name for x in _encounters() if str(x.id) == boss), "")
+    said += [boss] if boss else []
+    if "--difficulty" in args[:-1]:
+        d = args[args.index("--difficulty") + 1]
+        said.append(DIFF_LABELS.get(d, d.capitalize()))
+    if job.get("started"):
+        import time
+
+        mins = max(0, int(time.time() - job["started"]) // 60)
+        said.append("started just now" if mins < 1 else f"started {mins} min ago" if mins < 90 else
+                    time.strftime("%d %b, %H:%M", time.localtime(job["started"])))
+    return f"<p class='ws-ctx'>{e(' · '.join(said))}</p>" if said else ""
+
+
+def _log(log: str, jid: str, ok: bool) -> str:
+    """The run's output: a link under an answer; under a stop, its last lines in a short scroll box (no fold)."""
+    if not log.strip():
+        return ""
+    if ok:
+        return f"<p class='ws-fine'><a href='/job/{e(jid)}?part=log'>Its log</a></p>"
+    return f"<div class='ws-log'><h3>Its log</h3><pre class='log'>{e(log[-20000:])}</pre></div>"
 
 
 CSS = "<style>" + theme.style("workshop") + "</style>"

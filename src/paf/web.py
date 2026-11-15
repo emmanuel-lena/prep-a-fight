@@ -1862,6 +1862,8 @@ def job_page(jid: str, part: str = "") -> bytes:
     if job is None:
         return page("Unknown job", "<p>This prep is unknown (its files were removed?). <a href='/'>Home</a></p>")
     log = job["log"].read_text(encoding="utf-8", errors="replace") if job["log"].is_file() else ""
+    if part == "log":  # a finished tool's whole output, a plain page (its result page links it)
+        return page("The log", f"<h1>The log</h1><pre class='log'>{e(log[-200000:])}</pre>", job=jid)
     elapsed = int(time.time() - job["started"])
     if job["status"] == "done" and job["result"] and job["result"].is_file():
         key = job["result"].stem.partition("-")[2]

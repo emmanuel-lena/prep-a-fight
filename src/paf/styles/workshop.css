@@ -76,3 +76,8 @@
 .ws-go .btn[hidden]{display:none}
 .ws-go button.btn:disabled{background:none;border:1px solid var(--line);color:var(--muted);filter:none;opacity:1}
 @media (min-width:1200px){.ws-cards.c3{grid-template-columns:repeat(3,minmax(0,1fr))}} /* the index: three a row, none alone */
+/* a job page: what this run was under the question; the log at the bottom, a short scroll box, never folded */
+.ws-ctx{margin:6px 0 0;font-size:13.5px;color:var(--muted)}
+.ws-log{margin-top:28px} .ws-log h3{font:600 12px/1 var(--font-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.ws-log .log{max-height:180px;overflow:auto;font-size:12px;color:var(--muted);background:var(--surface-2);padding:12px;border-radius:10px;margin:0}
+body.has-side>main .ws-answer>h2:first-child{margin-top:0}

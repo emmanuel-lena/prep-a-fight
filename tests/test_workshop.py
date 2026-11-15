@@ -72,3 +72,14 @@ def test_the_gear_tool_says_what_to_equip_then_what_to_farm(monkeypatch, tmp_pat
     assert "Simmed on a training dummy, 5 targets 3 min." in page and "<h2>Farm</h2>" in page and "Shawl" in page
     assert "<h2>Equip</h2>" not in page  # no bags: no set to say
     assert "Nothing to change" in workshop_views.render({"kind": "gear", "fights": []})
+
+
+def test_a_tool_stopped_for_a_boss_never_prepared_offers_to_prepare_it():
+    # the reviews (2026-11-15): "Send this report" was the main button for a stop the player fixes
+    from paf import workshop
+
+    job = {"args": ["wipe", "3420", "--difficulty", "mythic"], "status": "failed (exit 1)", "started": 0}
+    page = workshop.job_page("j1", job, "No kill of Sszorak mythic in the corpus yet: prepare this boss first.\n",
+                             1, [])
+    assert "No kill of Sszorak Mythic read yet" in page and "/boss?boss=3420&difficulty=mythic" in page
+    assert "Prepare Sszorak Mythic" in page and "Send this report" not in page and "<details" not in page
