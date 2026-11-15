@@ -105,3 +105,19 @@ def test_a_simc_log_refusing_the_main_hand_is_read():
 
     log = "Trivial: Player 'X' attempting to use Action 'blade_rush' (1) with invalid main-hand weapon type 'Dagger'."
     assert specown.WEAPON.search(log)[1] == "Dagger"
+
+
+def test_a_spec_that_refuses_your_main_hand_is_simmed_with_the_top_players_weapon():
+    # the owner (2026-11-15): "faut sim avec les bonnes armes par classe/spec, sinon c'est nul"
+    from paf import specown
+
+    text = "rogue=X\nspec=outlaw\nmain_hand=,id=1,ilevel=320\noff_hand=,id=2,ilevel=320\nhead=,id=3\n"
+    out, values = specown.lend(text, [{"id": 10, "bonusIDs": [5]}, {"id": 11}], 320)
+    assert "id=1," not in out and "head=,id=3" in out
+    assert values == {"main_hand": ",id=10,bonus_id=5,ilevel=320", "off_hand": ",id=11,ilevel=320"}
+    out, values = specown.lend(text, [{"id": 12}, {}], 320)  # a two-hander: no off-hand left
+    assert "off_hand" not in out and list(values) == ["main_hand"]
+    rows = [{"spec": "Outlaw", "label": "Outlaw", "sim": 94.0, "error": 0.1, "own": 90.0, "own_weapon": "Dagger",
+             "own_lent": "Sword (320)"}]
+    note = briefing._weapon_note({"rows": rows})
+    assert "Outlaw: simmed with Sword (320), the main hand its top players use" in note and "far too low" not in note

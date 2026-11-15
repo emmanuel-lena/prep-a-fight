@@ -205,12 +205,16 @@ def spec_html(d) -> str:
 
 
 def _weapon_note(s: dict) -> str:
-    """Said under the tiles, never only in a hover: a spec simmed with a main hand SimC will not let it use some of its
-    spells with (your Subtlety daggers on an Outlaw: -58%), so its tile is far too low."""
-    bad = [(r.get("label", r.get("spec", "")), r["own_weapon"]) for r in s.get("rows") or [] if r.get("own_weapon")]
-    return "".join(f"<p class='small muted'>{e(name)}: SimC will not use some of its spells with your "
-                   f"{e(kind.lower())} main hand, so that tile is far too low; the top players' set says what it can "
-                   f"do.</p>" for name, kind in bad)
+    """Said under the tiles, never only in a hover: a spec SimC will not let use some of its spells with your main hand
+    (your Subtlety daggers on an Outlaw: -58%) is simmed with the top players' weapon, or its tile is far too low."""
+    def say(r) -> str:
+        name, kind = e(r.get("label", r.get("spec", ""))), e(r["own_weapon"].lower())
+        if r.get("own_lent"):  # the top players' weapon simmed in its place: the tile is right, the note says how
+            return (f"{name}: simmed with {e(r['own_lent'])}, the main hand its top players use, at your weapon's "
+                    f"item level (SimC will not use some of its spells with your {kind} main hand).")
+        return (f"{name}: SimC will not use some of its spells with your {kind} main hand, so that tile is far too "
+                f"low; the top players' set says what it can do.")
+    return "".join(f"<p class='small muted'>{say(r)}</p>" for r in s.get("rows") or [] if r.get("own_weapon"))
 
 
 DEMAND_GAP = 3.0  # % a spec must gain in a window to be said ahead there (a window is a few seconds of the sims)

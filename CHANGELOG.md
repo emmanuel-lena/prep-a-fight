@@ -29,7 +29,7 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
   nothing to change into one line and counts players to retalent; Reclear says what your best clean pull did better;
   Characters puts the export's age on its update button; Settings says whether you read Warcraft Logs with a key or
   your account.
-- Your class's other specs with your items: a spec simmed with a main hand SimC will not let it use some of its spells with (an Outlaw with your Subtlety daggers: -58%) now says so under its tile, instead of a number that looked like a broken sim.
+- Your class's other specs with your items: a spec that cannot fight with your main hand (an Outlaw with your Subtlety daggers: -58%) is now simmed with the main hand its top players use, at your weapon's item level, and says so under its tile.
 - The sheet no longer contradicts itself: the boss's casts at the same times on every tab, the add counts of the same kill, one noise threshold said everywhere ("+0.56%, under the ±0.58% noise"), only the cooldown plan the fight tab plays can be copied, and a unit whose cast you kick says "kick its cast, don't kill it".
 ## 0.8.30 (2026-11-12)
 

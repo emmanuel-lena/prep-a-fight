@@ -231,6 +231,7 @@ class SpecRow:
     own_changes: list[str] = field(default_factory=list)  # the swaps from what you wear
     own_missing: list[str] = field(default_factory=list)  # slots none of your items fits (another main stat)
     own_weapon: str = ""  # your main hand's type when SimC will not let this spec use some spells with it
+    own_lent: str = ""  # then the top players' main hand simmed in its place, at your weapon's item level
     timeline: list[float] = field(default_factory=list)  # damage per second in the top players' set (paf.demands)
 
 
@@ -413,10 +414,10 @@ def compare(profile: str, client, enc, difficulty: int, diff_name: str, cls: str
             log(f"  {spec_label(spec)} with your own items...")
             try:
                 og = own_gear(profile, cls, spec, builds[best], fight_lines, run_dir / simc_spec(spec) / "own",
-                              boss=metric != "dps", log=log)
+                              boss=metric != "dps", weapons=t.gear[15:17], log=log)
                 row.own, row.own_error, row.own_changes, row.own_missing = (og.sim, og.error, og.changes,
                                                                             og.missing)
-                row.own_weapon = og.weapon
+                row.own_weapon, row.own_lent = og.weapon, og.lent
             except Exception as ex:  # noqa: BLE001 - the top players' set still compares the specs
                 res.notes.append(f"{spec_label(spec)} with your items could not be simmed ({str(ex)[-120:]}).")
         if "tops" in got and got["tops"] < 0.9 * got[best]:
@@ -443,7 +444,7 @@ def to_json(r: Result) -> dict:
     rows = [{"spec": x.spec, "label": spec_label(x.spec), "tops": x.tops, "tops_lo": x.tops_lo, "tops_hi": x.tops_hi,
              "sim": x.sim, "error": x.error, "gear": x.gear, "items": x.items, "own": x.own,
              "own_error": x.own_error, "own_changes": x.own_changes, "own_missing": x.own_missing,
-             "own_weapon": x.own_weapon} for x in r.rows]
+             "own_weapon": x.own_weapon, "own_lent": x.own_lent} for x in r.rows]
     return {"boss": r.boss, "difficulty": r.difficulty, "mine": r.mine, "ilvl": TOP_ILVL, "metric": r.metric,
             "gear_tops": GEAR_TOPS, "verdict": kind, "title": title, "sentence": text,
             "gear_sentence": gear_sentence(r), "kills_sentence": kills_sentence(r), "now": r.now, "rows": rows,
