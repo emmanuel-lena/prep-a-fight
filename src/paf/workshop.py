@@ -135,7 +135,10 @@ function update(init){
   if(init&&f.dataset.addsOnly&&opt().dataset.na){var w=[].filter.call(s.options,function(o){return !o.dataset.na})[0];if(w)s.value=w.value}
   var o=opt(),na=!!o.dataset.na;
   f.querySelectorAll('[name=objective]').forEach(function(r){var l=r.closest('label')||r;
-    if(r.value==='total'||r.value==='all'){l.hidden=na;if(na&&r.checked){var b=f.querySelector('[name=objective][value=boss]');if(b)b.checked=true}}});
+    if(r.value==='total'||r.value==='all'){l.hidden=na;if(na&&r.checked){var b=f.querySelector('[name=objective][value=boss]');if(b)b.checked=true}}
+    var g=r.closest('.ws-f');if(g)g.hidden=na;});  // boss damage alone: no choice to show
+  f.querySelectorAll('[name=targets],[name=length]').forEach(function(r){var g=r.closest('.ws-f');
+    if(g)g.hidden=!!o.value&&!!f.querySelector('option[value=""]')});  // a dummy's: a boss is its own fight (args)
   var why=f.dataset.addsOnly&&na?'noadds':(f.dataset.needsPrep&&!sheet(o,d)?'noprep':'');
   f.querySelectorAll('.ws-noadds,.ws-noprep').forEach(function(n){n.hidden=n.className.indexOf('ws-'+why)<0||!why});
   var g=f.querySelector('.ws-go .btn');if(g)g.disabled=!!why;
@@ -174,6 +177,8 @@ def _boss_select(encounters: list, optional: str = "", last: bool = False) -> st
                    f"{' selected' if x.id == first else ''}>{e(x.name)}{' · has a sheet' if x.id in ready else ''}</option>"
                    for x in encounters)
     body = opts + extra if last else extra + opts
+    if not encounters and not optional:  # offline or not connected: say why the list is empty, not a blank box
+        body = "<option value='' disabled selected>No bosses: connect to Warcraft Logs in Settings</option>"
     return f"<label class='ws-f'><span>Boss</span><select name='boss' class='big'>{body}</select></label>{READY_JS}"
 
 
