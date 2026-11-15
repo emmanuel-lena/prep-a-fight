@@ -126,7 +126,8 @@ def test_a_build_within_the_noise_says_same_without_a_copy_button():
     page = wv.render({"kind": "talents", "error": 0.1, "boss": "X", "rows": [
         _talents_row("MINE", 0, []), _talents_row("NOISE", 0.1, [[a, b], [a, b]]),
         _talents_row("WORSE", -2.0, [[b, a]])]})
-    assert "l-val same'>same<" in page and "data-copy='NOISE'" not in page and "data-copy='WORSE'" in page
+    assert "l-val same'>same<" in page and "data-copy='NOISE'" not in page
+    assert "data-copy='WORSE'" not in page  # a build that loses: nothing to copy
     assert page.count("Ethereal Cloak") == 2  # a pair listed twice is said once (and once in the worse build)
 
 

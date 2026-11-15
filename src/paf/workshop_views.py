@@ -164,11 +164,12 @@ def talents(d: dict) -> str:
         cls = "pos" if r["gain"] > noise else "neg" if r["gain"] < -noise else ""
         lines += (f"<li class='bd'><div class='bd-swaps'>{_swaps(_row_swaps(r), icons)}<small>played by "
                   f"{r['players']} top players</small></div><div class='bd-side'><span class='l-val {cls or 'same'}'>"
-                  f"{_pct(r['gain'], 1) if cls else 'same'}</span>{copy(r, 'Copy') if cls else ''}</div></li>")
+                  f"{_pct(r['gain'], 2 if abs(r['gain']) < 1 else 1) if cls else 'same'}</span>"  # two decimals near
+                  f"{copy(r, 'Copy') if cls == 'pos' else ''}</div></li>")  # the noise; a losing build: nothing to copy
     lines = (f"<h3>The top players' other builds, on you</h3><ul class='glist builds'>{lines}</ul>" if lines else "")
     return (f"{head}{lines}"
             f"<p class='ws-fine'>Each build shown by what it changes from yours; "
-            f"simmed on your character on {e(d.get('boss', 'the boss'))}. Differences under &plusmn;{noise:.1f}% "
+            f"simmed on your character on {e(d.get('boss', 'the boss'))}. Differences under &plusmn;{noise:.2f}% "
             f"are noise and shown as \"same\".</p>")
 
 
