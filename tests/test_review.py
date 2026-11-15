@@ -91,3 +91,19 @@ def test_your_character_of_another_class_is_swapped_out_and_said(monkeypatch):
 
     r.archetypes = {"AoE": ["Ann", "Bo"]}  # the log's 4: 2 grouped, a healer, and you as your rogue (DPS round 47)
     assert healers_left(r) == (1, True)
+
+
+def test_dig_deeper_names_what_the_pull_bars_measure_and_the_log_in_words():
+    # The Twin Fangs, Subtlety (a fresh review): "Moving: You 65%" read as casting while moving (it is the share of
+    # the fight spent moving); "Your raid and the adds" showed a raw report code as its link; the tools' icons, lazy
+    # on a tab hidden at load, stayed blank slots
+    from paf.prep_report import RaidInfo, _tools_html, raid_section, render
+
+    d = PrepData("Boss", "mythic", "Subtlety", "Char", duration=366)
+    d.review = review.Review("pull of 3:36", 0.66, 0.65, 0.65, 0.65, [], [])
+    deeper = render(d).split('id="deeper"', 1)[1]
+    assert "<b>Time casting" in deeper and "<b>Time moving" in deeper and "<b>Moving" not in deeper
+    r = RaidInfo("AbCdEf123", "this boss, pull of 3:36", 20, ("Subtlety Rogue", 255000.0), True)
+    head = raid_section(r)
+    assert ">your raid's log</a> (this boss, pull of 3:36, 20 players)" in head and ">AbCdEf123<" not in head
+    assert "ws-ic" in _tools_html() and 'loading="lazy"' not in _tools_html()

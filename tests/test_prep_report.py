@@ -163,6 +163,30 @@ def test_nothing_to_change_offers_no_plan_it_does_not_play():
     assert "Nothing to change" in change and "Copy the MRT note" not in change  # Dig deeper keeps it
 
 
+def test_only_the_plan_the_fight_tab_plays_can_be_copied():
+    # The Twin Fangs, Subtlety (a fresh review): the pad plan, not played, kept its copy buttons; the adds plan, not
+    # robust either, had no pill at all
+    from paf.optimize import Plan, Rule
+
+    d = PrepData("Boss", "mythic", "Subtlety", "Char", duration=300)
+    d.goal = "total"
+    pad = Plan("total", {"vanish": Rule("on_cooldown", "", None)}, 0.6, 0.1, totals={"total": 0.6},
+               sensitivity={"slower": -0.4}, timeline=[(5.0, "Vanish")], default_timeline=[(2.0, "Vanish")])
+    adds = Plan("adds", {"shadow_blades": Rule("on_cooldown", "", None)}, 6.1, 0.1, totals={"adds": 6.1},
+                sensitivity={"slower": -0.5}, timeline=[(5.0, "Shadow Blades")])
+    d.optimized = [pad, adds]
+    d.mrt = {"total": "prep-a-fight: Boss\n{time:0:05} Vanish", "adds": "prep-a-fight: Boss\n{time:0:05} Shadow Blades"}
+    d.nsrt = {"total": "EncounterID:1\ntime:5;ph:1;tag:x;spellid:1;dur:5"}
+    plans = render(d).split('id="deeper"', 1)[1].split("Cooldown plans, per objective</h2>", 1)[1].split("<h2", 1)[0]
+    assert plans.count("not played: not robust</span>") == 2 and "the sheet plays this plan" not in plans
+    assert "Copy the MRT note" not in plans and "Copy for NSRT" not in plans
+    assert "{time:0:05} Shadow Blades" in plans  # the note stays readable
+    pad.sensitivity = {"slower": 0.5}  # robust, the raid's goal: played, the only card with the buttons
+    plans = render(d).split('id="deeper"', 1)[1].split("Cooldown plans, per objective</h2>", 1)[1].split("<h2", 1)[0]
+    assert plans.count("Copy the MRT note") == 1 and "the sheet plays this plan" in plans
+    assert plans.count("not played: not robust</span>") == 1
+
+
 def test_notes_read_in_time_order():
     from paf.prep_report import in_time_order
 
@@ -206,7 +230,9 @@ def test_gear_and_loot_inside_the_noise_get_one_verdict_and_no_colour():
     d.gear_fights, d.gear_error = ["boss fight"], 0.29
     d.loot, d.loot_error = [("Sanguine Rancor", "trinket", 0.31, -0.15)], 0.20
     page = render(d)
-    assert "<b>Keep yours:</b> the best swap, trinket: A (334), is +0.57% &plusmn;0.29, within the noise." in page
+    # the threshold the colours use, twice the error, said as is (a review: "+0.56% ±0.29, within the noise")
+    assert "<b>Keep yours:</b> the best swap, trinket: A (334), is +0.57%, under the &plusmn;0.58% noise." in page
+    assert "Gain\n&plusmn;0.58%</th>" in page and "a gap under &plusmn;0.40% is noise" in page
     assert "keep yours</span>" not in page and "&asymp; best</span>" not in page  # the sentence says it once
     assert "&asymp; best: within" not in page
     assert '<span class="">+0.31%</span>' in page and '<span class="pos">' not in page.split("What this boss drops")[1]
@@ -262,6 +288,9 @@ def test_the_pad_verdict_draws_its_bar():
     bar = _pad_bar("Pad them: with you, your raid does 53% of the top raids' damage on them (the weakest top raids "
                    "do 84%); it lacks cleave.")
     assert "width:53%" in bar and "left:84%" in bar
+    # what it measures and who the mark is, in words (a review: "your raid 75%" beside a gold "93%")
+    assert "Damage on the adds, as a share of the top raids' median" in bar
+    assert ">your raid 53%</span>" in bar and ">weakest top raids 84%</span>" in bar and "warn" not in bar
     made = _pad_bar("pad them, you make the difference: your raid does 70% of the top raids' damage on them without "
                     "you, 90% with you (the weakest top raids do 84%)")
     assert "width:90%" in made and _pad_bar("Kill the adds.") == ""
@@ -291,7 +320,9 @@ def test_the_adds_to_kill_render_as_a_table():
     d.waves = [(52.0, 6, 18.0, "Restless Amani"), (73.0, 1, 75.0, "Echo of Jawae")]  # a unit no action names
     page = render(d)
     assert "Echo of Jawae</td><td class='n'>&times;1</td>" in page and "Kill the Echo of Jawae" not in page
-    assert "<table class='kills fit'>" in page and "&times;21" in page and "19 s" in page and "width:23%" in page
+    assert "<table class='kills fit'>" in page and "19 s" in page and "width:23%" in page
+    # as many as the fight tab's waves of the median kill, not the mean of every kill (a review: x14 beside "15 adds")
+    assert ">in 4:15</th>" in page and "Restless Amani</td><td class='n'>&times;6</td>" in page
     assert "Kill the Odd Add whenever it comes." in page  # a line the table cannot read keeps its words
 
 
@@ -317,3 +348,24 @@ def test_actions_read_as_a_short_muted_line():
     assert "stays ~3 min" in jawae and "leave it" in jawae
     odd = action_row(d, Action("contact", "X", "X: handled by contact."))
     assert "X: handled by contact." in odd and "title=" not in odd
+
+
+def test_a_unit_whose_cast_is_kicked_is_not_called_a_soak():
+    # The Twin Fangs, Subtlety (a fresh review): "Units handled by contact (soak)" said the top raids do not damage
+    # the Broodling while Interrupts said "Visceral Burst ~50 kicks a kill, your job" (its cast)
+    from paf.actions import Action
+
+    d = PrepData("The Twin Fangs", "mythic", "Subtlety", "Char", duration=366)
+    d.guide_summary = "<div class='guide'><p>x</p></div>"
+    brood = Action("contact", "Broodling", "Broodling: the top raids do not damage it; players get its debuffs "
+                   "instead: Visceral Burst (~2 per kill). It is handled by contact (soak / breaking it), not by "
+                   "damage.")
+    kick = Action("interrupt", "Visceral Burst", "Interrupt Visceral Burst: top Subtlety players kick it in 34% of the "
+                  "kills (~50 kicks per kill), far more than one player in twenty would: it is part of your job.")
+    d.actions = [brood, kick]
+    boss = render(d).split('id="boss"', 1)[1].split("</section>", 1)[0]
+    assert "Units to kick, not kill" in boss and "(soak)" not in boss and "soak" not in boss
+    assert "<b>Broodling</b> <span class='muted small'>kick its cast (Visceral Burst), don&#x27;t kill it" in boss
+    d.actions = [brood]  # nobody kicks it: handled by contact, said shortly
+    boss = render(d).split('id="boss"', 1)[1].split("</section>", 1)[0]
+    assert "Units handled by contact (soak)" in boss and "Visceral Burst (~2 a kill): handled by contact" in boss

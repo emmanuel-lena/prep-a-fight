@@ -424,8 +424,9 @@ def raid_section(r: RaidInfo, gear: bool = True, who: str = "") -> str:
     you = (f"you ({e(r.you[0])}, {r.you[1] / 1000:,.0f}k DPS"
            + (f" <span class='pill'>your log: {e(r.logged_as)}</span>" if r.logged_as else "") + ")" if r.you_found else
            f"{'an' if r.you[0][:1].lower() in 'aeiou' else 'a'} {e(r.you[0])} at your raid's median DPS ({r.you[1] / 1000:,.0f}k; " + (f"you are in that log as {e(r.logged_as)}, swapped out)" if r.logged_as else f"you are not in that log as {e(r.you[0])})"))  # another spec of yours may be
-    head = (f"<p class='small'>From your raid's log <a href='https://www.warcraftlogs.com/reports/{e(r.report)}' "
-            f"target='_blank' rel='noopener'>{e(r.report)}</a> ({e(r.fight)}, {r.players} players), with {you}.</p>")
+    head = (f"<p class='small'>From <a href='https://www.warcraftlogs.com/reports/{e(r.report)}' target='_blank' "
+            f"rel='noopener'>your raid's log</a> ({e(r.fight)}, {r.players} players), with {you}.</p>")  # never a raw
+    # report code as words (a review); the log's date is not in the prep's data
     if not r.verdicts:
         return (f"<h2>Your raid and the adds</h2><div class='card'>{head}<p>No add takes a real share of the damage "
                 f"on this boss: nothing to decide, play for the boss.</p>{who}</div>")
@@ -780,12 +781,24 @@ def defensives_html(d: PrepData) -> str:
                 names.append(lead[1])
         return f" <span class='muted small'>({e(' / '.join(names))} starts just before)</span>" if names else ""
 
+    casts = dict(d.boss_casts)
+
+    def cast_times(ability: str, ms: list) -> str:  # the boss's cast each moment answers, at the fight tab's time
+        out = []  # (a review: Ravenous Feast 1:03 here, 1:01 there; a moment's time is the top players' median
+        for m in ms:  # press, the fight tab's the boss cast's); no cast close by (a hit long after it): the press
+            near = [c for c in casts.get(ability, []) if m.time - 8 <= c <= m.time + 12]  # as the fight tab reads it
+            said = (_mmss(min(near, key=lambda c: abs(c - m.time))) if near else
+                    f"{_mmss(m.time)} <span class='muted'>pressed</span>")
+            if said not in out:
+                out.append(said)
+        return ", ".join(out)
+
     def row(ability: str, ms: list) -> str:
         sid = ms[0].boss_spell_id
         who = (f"{icons.img(d.icons.get(ability, ''), 'small')}{link(ability, f'spell={sid}')}" if ability else
                "<span class='muted'>None tied in the logs</span>")
         who += (f" <span class='muted'>&times;{len(ms)}</span>" if len(ms) > 1 else "") + ("" if ability else leads(ms))
-        times = ", ".join(_mmss(m.time) for m in ms)
+        times = cast_times(ability, ms) if ability else "pressed at " + ", ".join(_mmss(m.time) for m in ms)
         lo, hi = min(m.share for m in ms), max(m.share for m in ms)
         share = f"{lo:.0%}" if f"{lo:.0%}" == f"{hi:.0%}" else f"{lo:.0%}&ndash;{hi:.0%}"
         spells: dict[tuple, float] = {}
@@ -801,7 +814,7 @@ def defensives_html(d: PrepData) -> str:
     method = (f"Top players: the share of them pressing a defensive then ({df.kills} kills; the fight tab calls the "
               f"moments where {fightview_support():.0%} or more of them press one). A defensive answers a boss cast "
               "within about 10 s, or one long before for damage that lands later.")
-    table = (f"<div class='scroll'><table><tr><th>Boss ability</th><th>When</th><th class='n'>Top players</th>"
+    table = (f"<div class='scroll'><table><tr><th>Boss ability</th><th>Cast at</th><th class='n'>Top players</th>"
              f"<th>Defensive</th></tr>{rows}</table></div><p class='small muted'>{e(method)}</p>") if df.moments else (
         "<p class='small'>The top players do not press their defensives at one shared moment on this boss: use them "
         "when you take damage.</p>")
@@ -860,11 +873,13 @@ def _pad_bar(text: str) -> str:
         return ""
     you, low = int(m[1]), int(m[2])
     top = max(100, you, low)
-    end = "" if low / top > 0.8 else " ends"  # "100%" only where it does not touch the mark's label (round 45)
-    return (f"<div class='padbar{end}' title='your raid {you}%, the weakest top raids {low}% of the top raids&#39; "
-            "damage'>"
-            f"<i style='width:{you / top * 100:.0f}%'></i><b style='left:{low / top * 100:.0f}%'></b>"
-            f"<span>your raid {you}%</span><span class='lo' style='left:{low / top * 100:.0f}%'>{low}%</span></div>")
+    side = " end" if low / top >= 0.7 else ""  # the mark's label ends at the mark near the right, else starts there
+    # what the bar measures and who the mark is, said (a review: "your raid 75%" beside a gold "93%" named neither);
+    # the mark in the text's colour: gold is rare
+    return (f"<p class='padcap'>Damage on the adds, as a share of the top raids' median</p>"
+            f"<div class='padbar'><i style='width:{you / top * 100:.0f}%'></i>"
+            f"<b style='left:{low / top * 100:.0f}%'></b><span>your raid {you}%</span>"
+            f"<span class='lo{side}' style='left:{low / top * 100:.0f}%'>weakest top raids {low}%</span></div>")
 
 
 def _without_shares(text: str) -> str:
@@ -969,9 +984,20 @@ def _tools_html() -> str:
     """The tools that dig further into this boss (the sheet is shown in a frame: they open in the app's window)."""
     from paf import workshop
 
-    return ("<h2>Dig further, one question at a time</h2>"
-            + workshop.cards(("topgear", "droptimizer", "talents", "specgear", "optimize", "timeline", "assigns",
-                              "mechanics"), target="_top"))
+    cards = workshop.cards(("topgear", "droptimizer", "talents", "specgear", "optimize", "timeline", "assigns",
+                            "mechanics"), target="_top")
+    # the last thing on a long tab hidden at load: lazy icons there stayed blank slots (a review: a 54 px indent
+    # with no icon); eight small icons, loaded with the page
+    return "<h2>Dig further, one question at a time</h2>" + cards.replace(' loading="lazy"', "")
+
+
+def _review_html(d: PrepData) -> str:
+    """Your last pull (paf.simple) with its bars named by what they measure: the share of the fight spent casting,
+    spent moving (a review: "Moving: You 65%" read as casting while moving)."""
+    from paf import simple
+
+    return (simple.review_card(d).replace("<div class='cmp'><b>Casting", "<div class='cmp'><b>Time casting")
+            .replace("<div class='cmp'><b>Moving", "<div class='cmp'><b>Time moving"))
 
 
 # the other actions' sentences (paf.actions), read back into a short muted line after the name: (its facts, what it
@@ -1000,9 +1026,29 @@ ACTION_CHIPS.insert(0, (KILL_TEXT, lambda m: ([f"&times;{m['n'] or 1} a kill", f
                                               + ([f"your spec {m['share']}% on them"] if m["share"] else []), "")))
 
 
+# a unit nobody kills, handled by its debuffs (paf.actions): its name, the debuffs players get, "Name (~2 per kill)"
+CONTACT_TEXT = re.compile(r"(?P<name>.+?): the top raids do not (?:kill|damage) it; players get its debuffs instead: "
+                          r"(?P<how>.+)\. It is handled by contact \(soak / breaking it\), not by damage\.")
+
+
+def kicked_casts(d, a) -> list[str]:
+    """The debuffs of a unit handled by contact that are casts the logs interrupt (the Broodling's Visceral Burst,
+    ~50 kicks a kill): the unit is kicked, not soaked (a review: "soak" beside "Interrupts: your job")."""
+    m = CONTACT_TEXT.fullmatch(a.text) if a.kind == "contact" else None
+    if not m:
+        return []
+    kicks = {x.name for x in (d.actions or []) if x.kind == "interrupt"}
+    return [n for n, _k in re.findall(r"(.+?) \(~(\d+) per kill\)(?:, |$)", m["how"]) if n in kicks]
+
+
 def action_inner(d, a) -> str:
     """An action as its icon, its name and a muted line of its facts; a sentence no pattern reads stays as is."""
     pic = icons.img(d.icons.get(a.name, "") or _sfallback(d, a.name), "small")
+    if (m := CONTACT_TEXT.fullmatch(a.text) if a.kind == "contact" else None) is not None:
+        kicked = kicked_casts(d, a)
+        what = (f"kick its cast ({', '.join(kicked)}), don't kill it" if kicked else
+                f"{m['how'].replace(' per kill', ' a kill')}: handled by contact (soak / breaking it), not by damage")
+        return f"<span class='act'>{pic}<b>{e(m['name'])}</b> <span class='muted small'>{e(what)}</span></span>"
     for pat, read in ACTION_CHIPS:
         m = pat.fullmatch(a.text)
         if m:
@@ -1315,6 +1361,8 @@ def render(d: PrepData) -> str:
             blocks = ""
             for kind, title in groups.items():
                 rows = [a for a in d.actions if a.kind == kind]
+                if kind == "contact" and rows and all(kicked_casts(d, a) for a in rows):
+                    title = "Units to kick, not kill"  # their casts are interrupted in the logs: no soak to say
                 gates = gate_kills(d) if kind == "kill" else []  # the unit that ends an immunity comes first
                 if kind == "kill":  # a wave's unit no action names, as Your job says it (Nek'zali's Echo of Jawae)
                     named = {a.name for a in d.actions} | {re.sub(r"\s*\([^)]*\)", "", n).strip() for n, _t in gates}
@@ -1345,13 +1393,20 @@ def render(d: PrepData) -> str:
                     # (fresh DPS review: bullet sentences)
                     done = [x for x, _m in parsed]  # by identity: an Action is no set member (it crashed a prep)
                     rows = [a for a in rows if not any(a is x for x in done)]
+                    def count(m: re.Match) -> str:  # how many in the rebuilt kill, as the fight tab counts them
+                        n = sum(w[1] for w in d.waves if w[1] and (re.sub(r"\s*\([^)]*\)", "", w[3]).strip()
+                                                                   or w[3]) == m["name"])  # (a review: "x14"
+                        return f"&times;{n}" if n else f"&times;{m['n'] or 1}"  # here, "15 adds" there: the mean
+                    # of every kill against the waves of the median one)
+                    head_n = f"in {_mmss(d.duration)}" if d.duration else "a kill"
                     blocks += (f"<h3>{e(title)}</h3><table class='kills fit'><thead><tr><th>Add</th>"
-                               "<th class='n'>a kill</th><th class='n' title='how long they live in the top kills: the median of every add; "
+                               f"<th class='n' title='how many in the rebuilt kill, the median top kill, as the fight "
+                               f"tab counts them'>{head_n}</th><th class='n' title='how long they live in the top kills: the median of every add; "
                                "the fight tab gives each wave its own'>"  # (a review: 18 s there, 19 s here)
                                "&#9201; killed in</th><th title='the share of the top players&#39; damage on them while "
                                "they are up'>your spec on them</th></tr></thead><tbody>" + "".join(
                                    f"<tr><td>{icons.img(d.icons.get(a.name, '') or _sfallback(d, a.name), 'small')}"
-                                   f"{e(m['name'])}</td><td class='n'>&times;{m['n'] or 1}</td><td class='n'>"
+                                   f"{e(m['name'])}</td><td class='n'>{count(m)}</td><td class='n'>"
                                    f"{m['life']} s</td><td>" + (
                                        f"<span class='kbar'><span style='width:{m['share']}%'></span></span> "
                                        f"{m['share']}%" if m['share'] else "<span class='muted' title='not measured "
@@ -1559,16 +1614,21 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
             if flags:  # line above says it, with its numbers (DPS round 15: "not robust" three lines in a row)
                 checks += "<ul class='small'>" + "".join(f"<li class='warn'>&#9888; {e(re.sub(r'[-+]0[.]0%', 'about 0%', f))}</li>"
                                                          for f in flags) + "</ul>"
+            played = p.objective == first and not _fallen(p)  # what the fight tab plays: the only card to copy from
+            shaky = not getattr(p, "robust", True) or _fallen(p)  # every other card: one pill (a review: the adds
+            pill = (" <span class='pill gold'>the sheet plays this plan</span>" if played else  # plan, not robust,
+                    f" <span class='pill near'>not played{': not robust' if shaky else ''}</span>")  # had none)
+            copies = (copy_button(note, "Copy the MRT note")
+                      + (copy_button(d.nsrt[p.objective], "Copy for NSRT") if d.nsrt.get(p.objective) else "")
+                      if played else "")
             blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, 1, err=1e9 if p.objective == "secondary" or _stall(d, p) else 0.0)}
-<span class="small muted">vs the default priority list{'; ' + others if others else ''}</span>{(" <span class='pill near'>not played: not robust</span>" if _fallen(p) else " <span class='pill gold'>the sheet plays this plan</span>") if p.objective == first else ""}</h3>
+<span class="small muted">vs the default priority list{'; ' + others if others else ''}</span>{pill}</h3>
 {("<p class='small'>Played because " + ("your raid pads the adds" if p.objective == "total" else "your raid stays on the boss" if p.objective == "boss" else "it is your choice") + " (see Your raid and the adds, below)." + (" When the plan presses a burst while the boss is immune, the fight tab moves it onto the adds that spawn then." if d.fight is not None and d.fight.invulnerable else "") + "</p>") if p.objective == first and p.objective in ("boss", "total") and not _fallen(p) else ""}
 {"<p class='small muted'>Burst damage counts only the damage on " + e(burst_names(d)[1] or "the burst targets") + ": worth it only if your raid needs " + e(burst_names(d)[1] or "them") + " dead fast" + ("." if _stall(d, p) else ", at the cost of the boss and total damage above.") + "</p>" if p.objective == "secondary" else ""}
 {checks}{plan_timeline_svg(p, d.fight, d.tops_casts, d.tops_players, names=d.cd_names, phases=d.phases, links=d.links, legend=not blocks)}
 <div class="pp-grid"><div><table><tr><th>Cooldown</th><th>Rule</th></tr>{rules}</table>
 <p class='small muted'>The cooldowns not listed follow SimC's default priority list: their times can move with the ones the plan holds.</p></div>
-{(f'<div class="nb"><h4>MRT note {copy_button(note, "Copy the MRT note")}'
-  + (copy_button(d.nsrt[p.objective], "Copy for NSRT") if d.nsrt.get(p.objective) else "")
-  + f'</h4><pre class="small note-pre">{e(note)}</pre></div>') if note else ""}</div>
+{(f'<div class="nb"><h4>MRT note {copies}</h4><pre class="small note-pre">{e(note)}</pre></div>') if note else ""}</div>
 </div>""")
         intro = tops + (f"<p class='small'><b>{e(', '.join(same))}:</b> no plan beats SimC's default list.</p>"
                         if same else "")
@@ -1591,8 +1651,9 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
         lead = ""
         if keep:
             best_set = "; ".join(lk(c) for c in d.gear[0][0].split("; "))
-            lead = (f"<p><b>Keep yours:</b> the best swap, {best_set}, is {top:+.2f}% &plusmn;{d.gear_error:.2f}, "
-                    "within the noise.</p>")
+            lead = (f"<p><b>Keep yours:</b> the best swap, {best_set}, is {top:+.2f}%, "  # the threshold used,
+                    + (f"under the &plusmn;{2 * d.gear_error:.2f}% noise.</p>" if top >= -2 * d.gear_error else  # 2x
+                       "a loss: every swap loses.</p>"))  # the error (a review: "+0.56% ±0.29, within the noise")
         for i, (ch, per, w) in enumerate(uniq[:3] if keep else uniq[:8]):
             noise = (i and top > 2 * d.gear_error and top - w <= 2 * d.gear_error  # never "about the best" on a
                      and w >= 0)  # loss, nor under a best that is itself "keep yours" (a review: two verdicts)
@@ -1610,8 +1671,9 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
         tabs["gear"].insert(0, f"""<h2>Best gear from your bags, for this fight</h2><div class="card scroll">
 {"<p class='small warn'>&#9888; Every set here loses more than 5%: a sim gone wrong, not a reading. Keep the gear you wear.</p>" if top < -5 else ""}{lead}
 <table><tr><th title="Simmed {e(d.gear_plan or 'with the default priority list')}, {e(mine)}">Swaps vs your equipped gear
-</th><th class="n">Gain &plusmn;{d.gear_error:.2f}%</th>{head}</tr>{body}</table>
-{"<p class='tiny muted'>&asymp; best: within the error of the best set.</p>" if "&asymp; best<" in body else ""}</div>""")
+</th><th class="n" title="a gain under &plusmn;{2 * d.gear_error:.2f}% (twice the sims&#39; error) is noise">Gain
+&plusmn;{2 * d.gear_error:.2f}%</th>{head}</tr>{body}</table>
+{f"<p class='tiny muted'>&asymp; best: within {2 * d.gear_error:.2f}% of the best set.</p>" if "&asymp; best<" in body else ""}</div>""")
 
     # loot
     if d.loot:
@@ -1630,7 +1692,7 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
 Top Gear sets, the rest rearranged around it (its real value; below a single swap when your best set already beats what you
 wear)">In your best sets</th><th class="n" title="vs the gear you wear: the classic droptimizer value, one swap on your
 equipped set">Single swap</th></tr>{body}</table>
-<p class="small muted">At item level {d.loot_ilvl}{_track_top(d)}; statistical error about &plusmn;{d.loot_error:.2f}%.</p></div>""")
+<p class="small muted">At item level {d.loot_ilvl}{_track_top(d)}; a gap under &plusmn;{2 * d.loot_error:.2f}% is noise.</p></div>""")
 
     notes = [re.sub(r"^SimC puts (\d+%) of your damage on the boss vs (\d+%) in the top players' logs, even with more "
                     r"adds:", r"Even with the add waves counted at the minimum, SimC's default priority list puts \1 "
@@ -1681,7 +1743,7 @@ equipped set">Single swap</th></tr>{body}</table>
                    + sugg]
         + tabs["gear"],
         "boss": tabs["boss"],
-        "deeper": tabs["overview"] + [f"<div class='simple'>{simple.review_card(d)}</div>"] + tabs["cooldowns"] + tabs["raid"] + tabs["fight"]
+        "deeper": tabs["overview"] + [f"<div class='simple'>{_review_html(d)}</div>"] + tabs["cooldowns"] + tabs["raid"] + tabs["fight"]
         + [_tools_html()],
     }
     sections["deeper"] = [_contents("".join(sections["deeper"]))]

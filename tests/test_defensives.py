@@ -35,10 +35,13 @@ def test_defensives_are_grouped_by_the_boss_ability_they_answer():
     loose = [DefensiveMoment(t, 0.3, [("Feint", 1966, 0.8)], "", 0) for t in (170.0, 234.0)]
     p = PrepData(boss="B", difficulty="mythic", spec="Subtlety", character="X")
     p.defensives = Defensives(feast + loose, [], 187)
-    p.boss_casts = [("Envenomed", [164.0, 225.0])]
+    p.boss_casts = [("Envenomed", [164.0, 225.0]), ("Ravenous Feast", [61.0, 122.0, 216.0, 371.0])]
     html = defensives_html(p)
     assert html.count("<tr>") == 3  # the header, Ravenous Feast, the untied ones
-    assert "&times;3" in html and "1:03, 2:04, 3:39" in html and "45%&ndash;59%" in html
+    # the boss's casts at the fight tab's times, not the top players' median presses (a review: 1:03 here, 1:01
+    # there); the untied ones are presses, said so
+    assert "&times;3" in html and "1:01, 2:02, 3:36" in html and "45%&ndash;59%" in html
+    assert "pressed at 2:50, 3:54" in html and ">Cast at</th>" in html
     assert "None tied in the logs</span> <span class='muted'>&times;2</span>" in html and "Envenomed starts" in html
 
 
