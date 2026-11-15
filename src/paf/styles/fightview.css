@@ -173,13 +173,11 @@
 .fv .ftl .win em{font:500 11px var(--font-data);font-style:normal;color:var(--muted)}
 .fv .ftl .win.lust{background:color-mix(in srgb,var(--lust) 22%,transparent);border:1px solid color-mix(in srgb,var(--lust) 60%,transparent)}
 .fv .ftl .win.imm{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--muted) 22%,transparent) 0 5px,transparent 5px 10px);border:1px solid color-mix(in srgb,var(--muted) 45%,transparent)}
-/* a move: the dashed bar as long as it lasts, then the boss spell that starts it */
-.fv .ftl .r.mvr,.fv .ftl .r.mvr .tr{min-height:24px;height:24px}
-.fv .ftl .mvw{position:absolute;top:2px;bottom:2px;display:flex;align-items:center;gap:5px;overflow:hidden;white-space:nowrap;font:500 11.5px/1 var(--font-body);color:var(--fg)}
-.fv .ftl .mvw .ic{width:16px;height:16px;border-radius:3px;flex:none}
-.fv .ftl .mvw span{overflow:hidden;text-overflow:ellipsis}
-.fv .ftl .mv{flex:none;height:4px;border-radius:2px;background:repeating-linear-gradient(90deg,var(--muted) 0 4px,transparent 4px 7px)}
-.fv .ftl .r.boss .mv{position:absolute;bottom:3px}
+/* a boss spell the top players move for: a small runner on its icon */
+.fv .run{width:13px;height:13px;fill:currentColor;color:var(--fg)}
+.fv .ftl .bm{overflow:visible}
+.fv .ftl .bm .run{position:absolute;left:-6px;bottom:-5px;width:14px;height:14px;padding:1px;border-radius:50%;background:var(--surface);box-shadow:0 0 0 1px var(--line)}
+.fv .fbar b .run{margin-left:6px;vertical-align:-2px}
 /* your marks: an icon at the press, a bar as long as it lasts, its time beside */
 .fv .ftl .ev{position:absolute;top:50%;transform:translateY(-50%);height:24px;display:flex;align-items:center;z-index:1}
 .fv .ftl .ev .ic{width:24px;height:24px;border-radius:4px;box-shadow:0 0 0 1px #000,0 0 0 2.5px var(--kc)}
@@ -245,7 +243,7 @@
 .fv .btn#ss-sound[aria-pressed="true"]::after{content:" on"/"";color:var(--fg)}
 body.playing .fv #play.btn.primary{background:var(--surface-2);color:var(--fg);border-color:var(--line)}
 .fv .lv-tl{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
-.fv .lv-tl .r.boss,.fv .lv-tl .r.mvr,.fv .lv-tl .sec.sb{display:none}
+.fv .lv-tl .r.boss,.fv .lv-tl .sec.sb{display:none}
 .fv .lv-tl .ftl{--gut:180px}
 .fv .lv-main{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);gap:18px;align-items:start}
 .fv .lv-now{display:grid;gap:10px}
@@ -282,7 +280,7 @@ body.playing .fv #play.btn.primary{background:var(--surface-2);color:var(--fg);b
 .fv .fkey .kk{display:inline-block;width:18px;height:9px;border-radius:3px;background:color-mix(in srgb,var(--kc) 22%,transparent);border:1px solid color-mix(in srgb,var(--kc) 55%,transparent)}
 .fv .fkey .k-cd{--kc:var(--off)} .fv .fkey .k-pot{--kc:var(--pot)} .fv .fkey .k-def{--kc:var(--def)} .fv .fkey .k-kill{--kc:var(--fg)}
 .fv .fkey .ghostk{width:0;height:10px;border:0;border-left:2px solid var(--warn);border-radius:0;background:none}
-.fv .fkey .mvk{height:4px;border:0;background:repeating-linear-gradient(90deg,var(--muted) 0 4px,transparent 4px 7px)}
+.fv .fkey .runk{border:0;background:none;width:auto;height:auto;display:inline-flex}
 .fv .fkey .badgek{width:13px;height:13px;border-radius:50%;background:var(--warn);color:var(--on-status);font:700 10px/13px var(--font-data);text-align:center}
 .fv .tlh{flex-wrap:wrap}
 .fv .tlh .kill-switch{margin:0 0 0 auto}

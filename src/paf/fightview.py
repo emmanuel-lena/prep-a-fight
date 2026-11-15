@@ -34,6 +34,10 @@ DEF_SNAP = 10.0  # a defensive this close before its boss ability is moved to ju
 MOVE_CUE = 10.0  # a movement window this long gets a "keep up" cue (with the spell the top players use)
 MOVE_LONG = 20.0  # longer: a stretch of moving around, not one move
 MOVE_ICON = "inv_misc_map_01"  # a neutral picture: no spell of yours
+# a boss spell the top players move for: a small runner on its icon, no words (the owner: "you move" reads oddly)
+RUN = ("<svg class='run' viewBox='0 0 16 16' aria-hidden='true'><circle cx='10.5' cy='2.6' r='1.9'/>"
+       "<path d='M8.6 5.4 6 9l2.6 1.6-1.4 4M8.6 5.4l1.9 3.3 3 .6M8.6 5.4 5.2 6 3.6 8M8.6 10.6l3 1.4.6 2.8' fill='none'"
+       " stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/></svg>")
 IMMUNE_ICON = "spell_holy_divineshield"
 PHASE_ICON = "inv_misc_pocketwatch_01"  # a stage begins: the clock, never an empty square
 
@@ -575,7 +579,6 @@ class Timeline:
     phases: list[tuple[str, float, float]]
     lust: list[tuple[float, Item]]
     immune: list[tuple[float, Item]]
-    moves: list[tuple[float, float, Item | None]]  # the repositions no boss cast starts (those are on its lane)
     you: list[Lane]
     boss: list[Lane]
     others: list[tuple[float, Item]]  # the other boss casts: a dot each
@@ -621,11 +624,6 @@ def move_cause(t: float, boss: list[tuple[float, Item]]) -> Item | None:
     return min(near, key=lambda p: p[:2])[2] if near else None
 
 
-def move_tip(a: float, b: float, cause: Item | None) -> str:
-    said = f"The top players move {_mmss(a)} to {_mmss(b)} ({b - a:.0f} s)"
-    return f"{_clean(cause.name)}: {said[0].lower()}{said[1:]}" if cause else f"{said}\nNo boss spell starts it"
-
-
 def timeline(d) -> Timeline | None:
     """The fight as lanes (generic, every boss): yours first, a lane a spell (spells always pressed together share
     one), a lane a unit you kill; then the boss's spells that concern you (one you answer, one that may target you,
@@ -637,7 +635,7 @@ def timeline(d) -> Timeline | None:
     boss = [(t, x) for t, x in its if x.side == "boss"]
     mine = [(t, x) for t, x in its if x.side == "you"]
     moves = [(a, b, move_cause(a, boss)) for a, b in _moves(boss, end)]
-    moved: dict[str, list[tuple[float, float]]] = {}  # a boss cast that makes you move: its lane, the move under it
+    moved: dict[str, list[tuple[float, float]]] = {}  # a boss cast the top players move for: its lane, a runner
     for a, b, c in moves:
         if c is not None and c.kind in ("cast", "mech"):
             moved.setdefault(c.name, []).append((a, b))
@@ -682,16 +680,13 @@ def timeline(d) -> Timeline | None:
                                               ["Your plan has no defensive for this one"] if by else
                                               ["It may target you"] if x.kind == "mech" else [])
             mv = next(((a, b) for a, b in moved.get(name, []) if t - MOVE_CAUSE[1] <= a <= t + MOVE_CAUSE[0]), None)
-            tip += [f"You move {_mmss(mv[0])} to {_mmss(mv[1])} ({mv[1] - mv[0]:.0f} s), as the top players do"] if mv \
-                else []
+            tip += [f"The top players move for it, {mv[1] - mv[0]:.0f} s"] if mv else []
             tip += [hint] if hint else []
             lane.marks.append(Mark(t, icon=x.icon, tip="\n".join(tip), label=_mmss(t), flag=bool(by) and not now,
                                    move=mv))
         secs = sorted(b - a for a, b in moved.get(name, []))
         lane.sub = "\n".join(filter(None, [
             f"you: {', '.join(by)}" + (f" ({answered_} of {len(occ)})" if answered_ < len(occ) else "") if by else "",
-            f"you move {secs[len(secs) // 2]:.0f} s" + (f" ({len(secs)} of {len(occ)})" if len(secs) < len(occ) else "")
-            if secs else "",
             "may target you" if key and not by and not secs else "",
             "in the journal" if not key else ""]))
         boss_lanes.append(lane)
@@ -755,8 +750,7 @@ def timeline(d) -> Timeline | None:
     at = next((i for i, m in enumerate(you) if m.kind == "do"), len(you))
     you[at:at] = kills.values()
     return Timeline(end, _phases(d, end), [(t, x) for t, x in boss if x.kind == "lust"],
-                    [(t, x) for t, x in boss if x.kind == "immune"],
-                    [m for m in moves if m[2] is None or m[2].kind not in ("cast", "mech")], you, boss_lanes, others,
+                    [(t, x) for t, x in boss if x.kind == "immune"], you, boss_lanes, others,
                     sorted({x.name for _t, x in boss if x.kind == "tank"}))
 
 
@@ -799,18 +793,6 @@ def timeline_html(d, tl: Timeline) -> str:
                     f"<em>{it.dur:.0f} s</em></span>" for t, it in tl.immune)
     if wins:
         rows.append(row("raid", "<span class='lb'>Raid</span>", wins))
-    if tl.moves:
-        mv = ""
-        for k, (a, b, c) in enumerate(tl.moves):
-            room = ((tl.moves[k + 1][0] if k + 1 < len(tl.moves) else end) - a) * px
-            bar = max(4.0, (b - a) * px)
-            name = _clean(c.name) if c else ""
-            fits = 21 + bar + 5 + 6.6 * len(name) <= room - 6  # the name whole or not at all: its icon says it
-            mv += (f"<span class='mvw' style='left:{x(a)};max-width:{room - 6:.0f}px'{_tip(move_tip(a, b, c))}>"
-                   + (_ic(c.icon) if c else "") + f"<i class='mv' style='width:{bar:.0f}px'></i>"
-                   + (f"<span>{e(name)}</span>" if name and fits else "") + "</span>")
-        other = any(m.move for lane in tl.boss for m in lane.marks)  # the others are on their cast's lane
-        rows.append(row("mvr", f"<span class='lb'>{'Other moves' if other else 'You move'}</span>", mv))
     rows.append("<div class='sec'><span>You</span></div>")
     for lane in tl.you:
         track = ""
@@ -837,10 +819,8 @@ def timeline_html(d, tl: Timeline) -> str:
     if tl.boss:
         rows.append("<div class='sec sb'><span>The boss <i>what concerns you</i></span></div>")
     for lane in tl.boss:
-        track = "".join(f"<i class='mv' style='left:{x(m.move[0])};width:{w(m.move[0], m.move[1] - m.move[0])}'></i>"
-                        for m in lane.marks if m.move)  # the move it starts: a dashed line under its icon
-        track += "".join(f"<span class='bm{' open' if m.flag else ''}' style='left:{x(m.t)}'{_tip(m.tip)}>"
-                        f"{_ic(m.icon)}"
+        track = "".join(f"<span class='bm{' open' if m.flag else ''}' style='left:{x(m.t)}'{_tip(m.tip)}>"
+                        f"{_ic(m.icon)}{RUN if m.move else ''}"
                         + (f"<span class='tm'>{m.label}</span>" if lane.kind == "key" and (
                             (lane.marks[k + 1].t if k + 1 < len(lane.marks) else end) - m.t) * px > 48 else "")
                         + "</span>" for k, m in enumerate(lane.marks))
@@ -857,8 +837,8 @@ def timeline_html(d, tl: Timeline) -> str:
         legend += "<span><i class='kk ghostk'></i>where most top players press it</span>"
     if any(m.flag for lane in tl.you for m in lane.marks):
         legend += "<span><b class='badgek'>!</b>held by the plan, or pressed elsewhere by the tops</span>"
-    if tl.moves or any(m.move for b in tl.boss for m in b.marks):
-        legend += "<span><i class='kk mvk'></i>you move</span>"
+    if any(m.move for b in tl.boss for m in b.marks):
+        legend += f"<span><i class='kk runk'>{RUN}</i>the top players move for it</span>"
     return (f"<div class='ftl' data-end='{end:.1f}' role='img' aria-label='The fight on one clock: your presses, the "
             f"adds you kill and the boss spells that concern you'>{''.join(rows)}<div class='ov'>{grid}</div></div>"
             f"<div class='fkey' aria-hidden='true'>{legend}</div>")
@@ -963,11 +943,6 @@ def live_html(d) -> str:
             "<div class='bars' id='ss-bars' role='list' aria-label='Coming up'></div></aside></div></dialog>")
 
 
-def _move_said(t: float, boss: list[tuple[float, Item]]) -> str:
-    c = move_cause(t, boss)
-    return f"Move for {_clean(c.name)}" if c else "Move"
-
-
 def data(d, dur: float) -> dict:
     """What the page's script needs, each event at its own time on the plan's clock."""
     its = items(d)
@@ -978,7 +953,7 @@ def data(d, dur: float) -> dict:
 
     phase_starts = [s for _n, s, _e in phases[1:]]
     boss = [(t, x) for t, x in its if x.side == "boss"]
-    moves = _moves(boss, dur)  # the repositions the page draws, no other
+    run = {id(c) for a, _b in _moves(boss, dur) if (c := move_cause(a, boss))}  # the casts a runner marks
     acts = [{"t": _t1(t), "n": x.text, "k": x.kind, "ic": x.icon, "d": round(x.dur, 1),
              "c": "" if x.kind == "move" else (_ctx(t, its, x.kind)
                                                or ("default list timing" if x.kind == "cd" else "")),
@@ -990,12 +965,12 @@ def data(d, dur: float) -> dict:
         "phases": [[n, _t1(s), _t1(t)] for n, s, t in phases],
         "acts": acts,
         "anchors": [PULL] + [{"t": _t1(t), "n": x.name if x.kind in ("phase", "immune") else x.text, "k": x.kind,
-                     "p": ph(t), "ic": x.icon} for t, x in its if x.side == "boss" and x.kind in ANCHORS and t >= 1
+                     "p": ph(t), "ic": x.icon, "mv": int(id(x) in run)}
+                    for t, x in its if x.side == "boss" and x.kind in ANCHORS and t >= 1
                     and not (x.kind != "phase" and any(abs(t - s) <= 1 for s in phase_starts))],
-        "boss": [{"t": _t1(t), "d": round(x.dur, 1), "k": x.kind, "ic": x.icon,
-                  "n": _move_said(t, boss) if x.kind == "move" else x.text} for t, x in its
-                 if x.side == "boss" and x.kind not in ("phase",)
-                 and (x.kind != "move" or any(a - 0.5 <= t <= b for a, b in moves))],
+        "boss": [{"t": _t1(t), "d": round(x.dur, 1), "k": x.kind, "ic": x.icon, "n": x.text, "mv": int(id(x) in run)}
+                 for t, x in its if x.side == "boss" and x.kind not in ("phase", "move")],
+        "run": RUN,
     }
 
 

@@ -154,10 +154,7 @@
       return b.k !== 'tank' && b.k !== 'cast' && b.k !== 'mech' && !gone(b.t) && e <= t && t < until(b);
     });
     if (hb && hb.a.k === 'phase' && !on.some(function (b) { return b.k === 'immune'; })) on.unshift({ k: 'due', n: hb.a.n + ' due', t: hb.a.t, d: 0 });
-    var moves = on.filter(function (b) { return b.k === 'move'; }).sort(function (a, b) { return until(b) - until(a); });
-    on = on.filter(function (b) { return b.k !== 'move' || b === moves[0]; });  // overlapping moves: the longest
     return on.length ? on.map(function (b) {
-      if (b.k === 'move') return b.n + ' until ' + mmss(moveEnd(b));
       if (b.k === 'immune') return waiting(b.t) ? 'Intermission due: the boss goes immune any moment' : 'Boss immune, back in ' + secs(until(b) - t);
       return b.n;
     }).join(' · ') : '—';
@@ -191,14 +188,6 @@
       if (t >= (a >= 0 ? eff(N[a].t) : x[1])) p = x[0];
     });
     return p;
-  }
-  function moveEnd(b) {  // a move cut at a stage's start goes on in the next one: until the last of the chain
-    var end = until(b), more = true;
-    while (more) {
-      more = false;
-      B.forEach(function (m) { if (m.k === 'move' && !gone(m.t) && Math.abs(eff(m.t) - end) <= 1 && until(m) > end) { end = until(m); more = true; } });
-    }
-    return end;
   }
   function nextAnchor(t) { for (var i = 0; i < N.length; i++) if (N[i].k !== 'pull' && !gone(N[i].t) && eff(N[i].t) > t) return i; return -1; }
 
@@ -325,8 +314,8 @@
   }
 
   /* the live view: what comes in the next minute, yours and the boss's, as bars that empty */
-  function bar(e, t, cls, ic, who, n) {
-    return [e, '<div class="fbar ' + cls + '" role="listitem"><i class="fill" style="transform:scaleX(' + Math.max(0, Math.min(1, (e - t) / 60)).toFixed(3) + ')"></i>' + icon(ic) + '<b><span class="vh">' + who + ': </span>' + esc(n) + '</b><span>' + (e - t <= 0.5 ? 'now' : secs(e - t)) + '</span></div>'];
+  function bar(e, t, cls, ic, who, n, mv) {  // mv: the top players move for this boss spell (its runner)
+    return [e, '<div class="fbar ' + cls + '" role="listitem"><i class="fill" style="transform:scaleX(' + Math.max(0, Math.min(1, (e - t) / 60)).toFixed(3) + ')"></i>' + icon(ic) + '<b><span class="vh">' + who + ': </span>' + esc(n) + (mv ? FV.run : '') + '</b><span>' + (e - t <= 0.5 ? 'now' : secs(e - t)) + '</span></div>'];
   }
   function bars(t) {
     if (!$('ss').open) return;
@@ -341,22 +330,18 @@
       if (g) g.n.push(a.n); else groups.push({ e: e, ic: a.ic, n: [a.n] });
     });
     groups.forEach(function (g) { out.push(bar(g.e, t, 'mine', g.ic, 'You', g.n.join(' + '))); });
-    B.forEach(function (b) {  // the moves to come: a boss mod shows them too
-      var e = eff(b.t);
-      if (b.k === 'move' && b.d >= 5 && !gone(b.t) && e >= t - 0.5 && e <= t + 60) out.push(bar(e, t, 'boss', b.ic || '', 'Boss', b.n + ', ' + Math.round(b.d) + ' s'));
-    });
     N.forEach(function (a) {
       var e = eff(a.t);
       if (a.k === 'pull' || gone(a.t) || e < t - 0.5 || e > t + 60) return;
       var unit = a.n.replace(/^\d+ × /, '');  // "12 × Restless Amani": "Kill Restless Amani" says it
       if (mine.some(function (m) { return Math.abs(m[0] - e) <= 1 && m[1].indexOf(unit) >= 0; })) return;
-      out.push(bar(e, t, 'boss', a.ic, 'Boss', a.n));
+      out.push(bar(e, t, 'boss', a.ic, 'Boss', a.n, a.mv));
     });
     B.forEach(function (b) {  // a boss cast that is no sync point (Dig In on its stage's start): still announced
       var e = eff(b.t);
       if ((b.k !== 'cast' && b.k !== 'mech') || gone(b.t) || e < t - 0.5 || e > t + 60) return;
       if (N.some(function (a) { return a.n === b.n && Math.abs(a.t - b.t) <= 1; })) return;
-      out.push(bar(e, t, 'boss', b.ic || '', 'Boss', b.n));
+      out.push(bar(e, t, 'boss', b.ic || '', 'Boss', b.n, b.mv));
     });
     if (FV.end - t > 0.5 && FV.end - t <= 60) out.push(bar(FV.end, t, 'boss', 'inv_misc_bone_humanskull_01', 'Boss', 'The kill, around ' + mmss(FV.end)));
     out.sort(function (a, b) { return a[0] - b[0]; });

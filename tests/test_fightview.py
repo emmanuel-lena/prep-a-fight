@@ -55,27 +55,27 @@ def test_the_page_carries_its_data_and_one_script(monkeypatch):
     assert fightview.JS.strip().startswith("/*") and "</script" not in fightview.JS
 
 
-def test_movement_is_a_bar_not_an_event(monkeypatch):
+def test_a_boss_spell_the_top_players_move_for_carries_a_runner(monkeypatch):
+    # the owner (2026-11-14): "everyone moves" says nothing, "you move" reads oddly: a small icon on the boss spell
     from paf.movement import Movement, Window
 
     d = sheet(monkeypatch)
-    d.movement = Movement(windows=[Window(100.0, 15.0, [("Shadowstep", 0.8)])])
-    tl = fightview.timeline(d)
-    assert [m[:2] for m in tl.moves] == [(100.0, 115.0)] and any(lane.kind == "move" and lane.names == ["Shadowstep"]
-                                                                 for lane in tl.you)
-    data = json.loads(re.search(r"var FV=(\{.*?\});</script>", fightview.html(d)).group(1))
-    assert not any(a["k"] == "move" for a in data["anchors"])
-    assert "The top players move 1:40 to 1:55 (15 s)\nNo boss spell starts it" in fightview.html(d)
-    assert "Everyone moves" not in fightview.html(d)  # the owner (2026-11-14): "everyone moves" says nothing
+    d.movement = Movement(windows=[Window(100.0, 15.0, [("Shadowstep", 0.8)])])  # no boss spell then: not drawn
+    drawn = fightview.timeline_html(d, fightview.timeline(d))
+    assert "class='run'" not in drawn and "everyone moves" not in drawn.lower() and "you move" not in drawn.lower()
+    assert any(lane.kind == "move" and lane.names == ["Shadowstep"] for lane in fightview.timeline(d).you)
     d.movement = Movement(windows=[Window(158.0, 10.0, [])])  # Soul Transfer cast at 2:40 starts it
+    tl = fightview.timeline(d)
+    soul = next(lane for lane in tl.boss if lane.names == ["Soul Transfer"])  # its own lane, no words about moving
+    assert "move" not in soul.sub and soul.marks[0].move is None and soul.marks[1].move == (158.0, 168.0)
+    assert "The top players move for it, 10 s" in soul.marks[1].tip
+    assert fightview.timeline_html(d, tl).count("<svg class='run'") == 2  # the cast's icon and the key
     page = fightview.html(d)
-    soul = next(lane for lane in fightview.timeline(d).boss if lane.names == ["Soul Transfer"])  # its own lane
-    assert soul.sub == "you move 10 s (1 of 2)" and fightview.timeline(d).moves == []
-    assert "You move 2:38 to 2:48 (10 s), as the top players do" in soul.marks[1].tip and soul.marks[0].move is None
     data = json.loads(re.search(r"var FV=(\{.*?\});</script>", page).group(1))
-    assert [b["n"] for b in data["boss"] if b["k"] == "move"] == ["Move for Soul Transfer"]
+    assert not any(b["k"] == "move" for b in data["boss"]) and not any(a["k"] == "move" for a in data["anchors"])
+    assert [b["mv"] for b in data["boss"] if b["n"] == "Soul Transfer"] == [0, 1]
     d.movement = Movement(windows=[Window(60.0, 104.0, [])])  # the boss kited around for 104 s: the fight's rhythm
-    assert fightview.timeline(d).moves == []
+    assert not any(m.move for lane in fightview.timeline(d).boss for m in lane.marks)
 
 
 def test_no_fight_no_view():
