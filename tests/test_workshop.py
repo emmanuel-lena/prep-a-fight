@@ -81,5 +81,5 @@ def test_a_tool_stopped_for_a_boss_never_prepared_offers_to_prepare_it():
     job = {"args": ["wipe", "3420", "--difficulty", "mythic"], "status": "failed (exit 1)", "started": 0}
     page = workshop.job_page("j1", job, "No kill of Sszorak mythic in the corpus yet: prepare this boss first.\n",
                              1, [])
-    assert "No kill of Sszorak Mythic read yet" in page and "/boss?boss=3420&difficulty=mythic" in page
+    assert "Sszorak Mythic isn't prepared yet" in page and "/boss?boss=3420&difficulty=mythic" in page
     assert "Prepare Sszorak Mythic" in page and "Send this report" not in page and "<details" not in page

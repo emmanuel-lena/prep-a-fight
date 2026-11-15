@@ -572,6 +572,7 @@ class Lane:
     icons: list[str]
     sub: str = ""
     marks: list[Mark] = field(default_factory=list)
+    second: bool = False  # a unit on the field half the fight or more: a second target, not adds to kill
 
 
 @dataclass
@@ -640,8 +641,8 @@ def timeline(d) -> Timeline | None:
     for a, b, c in moves:
         if c is not None and c.kind in ("cast", "mech"):
             moved.setdefault(c.name, []).append((a, b))
-    waves = [{"t": t, "it": x, "name": _clean(x.name), "dur": min(x.dur, end - t), "mine": False, "with": []}
-             for t, x in boss if x.kind == "adds"]
+    waves = [{"t": t, "it": x, "name": _clean(x.name), "dur": min(x.dur, end - t), "cut": x.dur > end - t + 1,
+              "full": x.dur, "mine": False, "with": []} for t, x in boss if x.kind == "adds"]
     answered = {_answers(x) for _t, x in mine} - {""}
     casts: dict[str, list[tuple[float, Item]]] = {}
     for t, x in boss:
@@ -736,15 +737,22 @@ def timeline(d) -> Timeline | None:
         if not w["mine"]:
             continue
         x = w["it"]
-        lane = kills.setdefault(w["name"], Lane("kill", [f"Kill {w['name']}"], [x.icon]))
+        up = sum(v["dur"] for v in waves if v["name"] == w["name"])  # on the field half the fight or more: a second
+        second = up >= end / 2  # target to keep hitting (Ithraz), not adds to kill (a fresh review: "Kill Ithraz")
+        lane = kills.setdefault(w["name"], Lane("kill", [w["name"] if second else f"Kill {w['name']}"], [x.icon],
+                                                second=second))
         n = re.match(r"(\d+)\s*×", x.text.replace(" ", " "))
-        tip = [f"Kill {x.text} · {_mmss(w['t'])} · alive {w['dur']:.0f} s in the top kills"]
+        alive = f"up {w['full']:.0f} s in the top kills" + (f", cut by the kill at {_mmss(end)}" if w["cut"] else "")
+        tip = [f"{x.text if second else 'Kill ' + x.text} · {_mmss(w['t'])} · {alive}"]
         tip += [f"Comes with {', '.join(f'{c} (+{o:.0f} s)' for c, o in w['with'])}"] if w["with"] else []
         tip += [x.hint] if x.hint else []
         lane.marks.append(Mark(w["t"], w["dur"], x.icon, "\n".join(tip), _mmss(w["t"]),
                                n[1] if n and n[1] != "1" else ""))
     for lane in kills.values():
         total = sum(int(m.count or 1) for m in lane.marks)
+        if lane.second:
+            lane.sub = f"a second target · up {len(lane.marks)} time{'s' if len(lane.marks) > 1 else ''}"
+            continue
         lane.sub = f"{len(lane.marks)} wave{'s' if len(lane.marks) > 1 else ''}" + (
             f" · {total} adds" if any(m.count for m in lane.marks) else "")
     you = merged[:]

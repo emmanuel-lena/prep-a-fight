@@ -666,12 +666,20 @@ def pulldiff(d: dict) -> str:
                 f"<th class='n'>B</th><th{' class=n' if last_n else ''}>{head[1]}</th></tr>{''.join(rows)}"
                 "</table></div>") if rows else ""
 
+    def only(va: float, vb: float) -> bool:  # in one pull only (other talents): neither a gain nor a loss (a review)
+        return (not va) != (not vb)
+
+    def kk(v: float, other: float) -> str:
+        return "&mdash;" if not v and other else k(v)
+
     def delta(va: float, vb: float) -> str:
+        if only(va, vb):
+            return f"<td class='n muted'>only in {'B' if vb else 'A'}</td>"
         cls = "pos" if vb > va else "neg" if vb < va else ""
         sign = "+" if vb > va else "&minus;" if vb < va else ""
         return f"<td class='n {cls}'>{sign}{abs(vb - va) / 1000:,.0f}k</td>"
     out += table("Damage per second of each ability", ("Ability", "Change"), [
-        f"<tr><td>{e(r['name'])}</td><td class='n'>{k(r['a'])}</td><td class='n'>{k(r['b'])}</td>"
+        f"<tr><td>{e(r['name'])}</td><td class='n'>{kk(r['a'], r['b'])}</td><td class='n'>{kk(r['b'], r['a'])}</td>"
         f"{delta(r['a'], r['b'])}</tr>" for r in pl.get("abilities", [])])
 
     def times(ts: list[float], rate: float, dur: float) -> str:
@@ -687,10 +695,16 @@ def pulldiff(d: dict) -> str:
         f"<tr><td>{e(r['name'])}</td><td class='n'>{r['a']:.1f}</td><td class='n'>{r['b']:.1f}</td>"
         f"<td class='small'>{when(r) if r['cooldown'] else ''}</td></tr>"
         for r in pl.get("casts", [])[:12]], last_n=False)
+    def buff(r: dict) -> str:  # a buff's uptime in each pull and its change; one in one pull only is neither
+        a, b = (("&mdash;" if not v and only(r["a"], r["b"]) else f"{v:.0%}") for v in (r["a"], r["b"]))
+        if only(r["a"], r["b"]):
+            change = f"<td class='n muted'>only in {'B' if r['b'] else 'A'}</td>"
+        else:
+            change = (f"<td class='n {'pos' if r['b'] > r['a'] else 'neg'}'>"
+                      + f"{(r['b'] - r['a']) * 100:+.0f} pts".replace("-", "&minus;") + "</td>")
+        return f"<td class='n'>{a}</td><td class='n'>{b}</td>{change}"
     out += table("Uptime of your buffs and procs", ("Buff", "Change"), [
-        f"<tr><td>{e(r['name'])}</td><td class='n'>{r['a']:.0%}</td><td class='n'>{r['b']:.0%}</td>"
-        f"<td class='n {'pos' if r['b'] > r['a'] else 'neg'}'>"
-        + f"{(r['b'] - r['a']) * 100:+.0f} pts".replace("-", "&minus;") + "</td></tr>"
+        f"<tr><td>{e(r['name'])}</td>{buff(r)}</tr>"
         for r in pl.get("buffs", [])])
     cons = pl.get("consumables", {})
     out += ("<h3>Consumables and deaths</h3><div class='kts'>"

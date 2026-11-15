@@ -408,7 +408,7 @@ def job_page(jid: str, job: dict, log: str, elapsed: int, reports: list[str]) ->
     unread = None if ok else UNPREPARED.search(log)  # an expected stop the player fixes: prepare the boss
     if unread:
         boss, diff = unread["boss"], unread["diff"].capitalize()
-        answer = (f"<div class='ws-answer'><h2>No kill of {e(boss)} {e(diff)} read yet</h2><p class='ws-p'>This tool "
+        answer = (f"<div class='ws-answer'><h2>{e(boss)} {e(diff)} isn't prepared yet</h2><p class='ws-p'>This tool "
                   f"reads the boss's prep: prepare it first, then run this again.</p></div>")
         prep = f"/boss?boss={e(_arg(job, 1))}&difficulty={e(unread['diff'].lower())}"
         again = (f"<div class='ws-go'><a class='btn go' href='{prep}'>Prepare {e(boss)} {e(diff)} &rarr;</a>"
