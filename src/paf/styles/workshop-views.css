@@ -8,7 +8,7 @@
 .verdict>div{flex:1;min-width:0} .verdict b{font:600 22px/1.25 var(--font-reading);display:block}
 .verdict b span{color:var(--pos)} .verdict p{margin:4px 0 0;color:var(--muted);font-size:15px}
 .v-big{font:700 30px/1 var(--font-data);color:var(--pos);white-space:nowrap}
-.ok .v-big{color:var(--accent)}
+.ok .v-big{color:var(--fg)}
 .ws-answer .chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
 .ws-answer .chip{padding:4px 10px;border-radius:999px;font-size:14px;font-weight:600;border:1px solid var(--line);cursor:default}
 .ws-answer .chip.add{color:var(--pos);border-color:color-mix(in srgb,var(--pos) 45%,transparent)}
@@ -28,6 +28,7 @@
 .gbar::before{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;border-left:1.5px solid var(--line)}
 .gbar .g{position:absolute;top:0;bottom:0;border-radius:4px}
 .gbar .pos{left:50%;background:var(--pos)} .gbar .neg{right:50%;background:var(--neg);opacity:.75}
+.gbar.u::before{display:none} .gbar.u .pos{left:0} /* a list with no loss in it: from the left edge */
 .it-ic{width:40px;height:40px;border-radius:8px;margin:0;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 .it-ic.none{display:inline-block;background:var(--surface-2);border:1px solid var(--line)}
 .ws-answer details.more{margin:6px 0} .ws-answer details.more>summary{cursor:pointer;color:var(--muted);padding:6px 4px}
@@ -38,7 +39,7 @@
 .rules{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:8px}
 .rules li{display:flex;gap:10px;flex-wrap:wrap} .rules li b{min-width:150px} .rules li span{color:var(--muted)}
 .cov{position:relative;height:12px;border-radius:6px;background:var(--surface-2)}
-.cov .c-raid{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:var(--accent)}
+.cov .c-raid{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:color-mix(in srgb,var(--fg) 45%,transparent)}
 .cov .c-raid.short{background:var(--warn)}
 .cov .c-tops{position:absolute;top:-4px;bottom:-4px;width:3px;margin-left:-1.5px;border-radius:2px;background:var(--fg)}
 .cov-list .l-val small{color:var(--muted);font-weight:500}
@@ -46,7 +47,7 @@
 .plist .pl{display:grid;grid-template-columns:40px minmax(140px,220px) minmax(0,1fr);gap:12px;align-items:center;
   padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface)}
 .plist .pl.to_target{border-color:color-mix(in srgb,var(--warn) 55%,var(--line))}
-.plist .pl.to_boss{border-color:color-mix(in srgb,var(--accent) 50%,var(--line))}
+.plist .pl.to_boss{border-color:color-mix(in srgb,var(--fg) 35%,var(--line))}
 .p-say{display:flex;flex-direction:column;gap:3px;font-size:14.5px;line-height:1.4}
 .p-say b{font:700 15px var(--font-data)} .p-say i{font-style:normal;font-weight:600}
 .p-tops{color:var(--muted);font-size:13.5px} .p-tops b{color:var(--fg);font-size:13.5px}
@@ -54,7 +55,7 @@
 .jobs{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
 .job{padding:14px 16px;border-radius:14px;border:1px solid var(--line);background:var(--surface);display:grid;gap:10px;
   align-content:start}
-.job.main{border-color:color-mix(in srgb,var(--accent) 50%,var(--line))}
+.job.main{border-color:color-mix(in srgb,var(--fg) 35%,var(--line))}
 .j-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
 .j-head b{font:600 17px var(--font-reading)} .j-head small{color:var(--muted);font-size:13px;white-space:nowrap}
 .job ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
@@ -74,13 +75,13 @@
 .hp{width:100%;height:auto;max-width:100%;display:block}
 .hp polyline{fill:none;stroke-width:2.5;stroke-linejoin:round}
 .hp .c-now{stroke:var(--neg)} .hp .c-alive{stroke:var(--warn)} .hp .c-best{stroke:var(--pos)}
-.hp .c-tops{stroke:var(--accent);stroke-dasharray:6 4}
+.hp .c-tops{stroke:var(--muted);stroke-dasharray:6 4}
 .hp .ax{stroke:var(--line)} .hp .kl{stroke:var(--fg);stroke-dasharray:4 4;opacity:.6}
 .hp .dm{stroke:var(--neg);opacity:.35} .hp .tk{fill:var(--muted);font-size:11px}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin:6px 0 4px}
 .legend span::before{content:"";display:inline-block;width:14px;height:3px;margin-right:6px;vertical-align:middle;background:currentColor}
 .legend .c-now{color:var(--neg)} .legend .c-alive{color:var(--warn)} .legend .c-best{color:var(--pos)}
-.legend .c-tops{color:var(--accent)} .p-say .chips{margin:2px 0 4px}
+.legend .c-tops{color:var(--muted)} .p-say .chips{margin:2px 0 4px}
 .legend .kl::before{background:var(--fg)} .legend .dm::before{background:var(--neg);opacity:.4}
 table.night{width:100%;border-collapse:collapse;font-size:14.5px}
 table.night th{text-align:left;color:var(--muted);font-weight:500;font-size:13px;padding:6px 8px}
@@ -96,16 +97,17 @@ h3.who-c{display:flex;align-items:center;gap:8px} h3.who-c .it-ic{margin:0} td.w
 .pab{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;font-weight:700;font-size:13px;color:var(--on-status)}
 .pab.a{background:var(--neg)} .pab.b{background:var(--pos)}
 table.night td.pos{color:var(--pos)} table.night td.neg{color:var(--neg)}
+table.night td.muted{color:var(--muted)} table.night tr.noise td{opacity:.6} /* within the sims' error */
 .kt b span{color:var(--muted);font-weight:400}
 .rot-head{display:flex;gap:14px;align-items:center} .rot-head .verdict{flex:1;margin:0}
 .rot-head>.it-ic{width:56px;height:56px;border-radius:12px}
 .todo{margin:0;padding:0 0 0 22px;display:grid;gap:8px;font-size:15.5px;line-height:1.45}
-.todo li::marker{color:var(--accent);font-weight:700}
+.todo li::marker{color:var(--muted);font-weight:700}
 .ctx .glist li{grid-template-columns:minmax(0,1.1fr) minmax(70px,1fr) 74px;padding:6px 4px}
 .ctx .glist li.far .l-val{color:var(--warn)}
 .dot-ic{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font:700 13px var(--font-data);
-  border:2px solid var(--accent);color:var(--fg)}
-.pips{font-size:15px;letter-spacing:1px;color:var(--accent);white-space:nowrap}
+  border:2px solid color-mix(in srgb,var(--fg) 55%,transparent);color:var(--fg)}
+.pips{font-size:15px;letter-spacing:1px;color:var(--fg);white-space:nowrap}
 .glist.items.three.cds li{grid-template-columns:104px minmax(0,1fr) 78px}
 .ctx .cov .c-raid.ok{background:color-mix(in srgb,var(--fg) 45%,transparent)}
 .ctx .cov .c-raid.short{background:var(--warn)}
@@ -142,8 +144,8 @@ table.night td.pos{color:var(--pos)} table.night td.neg{color:var(--neg)}
 table.night th.n{text-align:right}
 .night-ok{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:10px 0;color:var(--pos);font-weight:600} .night-ok .whos{display:contents;color:var(--fg);font-weight:400}
 /* Who hits what: one roster, each player's state a mark (→ put on it, ✓ on it, ✗ hardly hit it) */
-.st{font-style:normal;font-weight:700;margin-left:2px} .st.go{color:var(--accent)} .st.ok{color:var(--pos)} .st.warn{color:var(--neg)}
-.who-chip.st-go{border-color:var(--accent)} .roster-key{display:flex;flex-wrap:wrap;gap:4px 14px}
+.st{font-style:normal;font-weight:700;margin-left:2px} .st.go{color:var(--fg)} .st.ok{color:var(--pos)} .st.warn{color:var(--neg)}
+.who-chip.st-go{border-color:var(--fg)} .roster-key{display:flex;flex-wrap:wrap;gap:4px 14px}
 .st.away{color:var(--muted);font-weight:600} .who-chip.st-away{opacity:.75}
 /* the Gear tool by target count (#43): a card per count, side by side */
 .bt-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0}

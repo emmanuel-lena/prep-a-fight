@@ -10,8 +10,8 @@ from pathlib import Path
 from paf import theme
 
 SLOTS = {"head": "Head", "neck": "Neck", "shoulder": "Shoulders", "back": "Back", "chest": "Chest", "wrist": "Wrists",
-         "hands": "Hands", "waist": "Waist", "legs": "Legs", "feet": "Feet", "finger": "Ring", "finger1": "Ring",
-         "finger2": "Ring", "trinket": "Trinket", "trinket1": "Trinket", "trinket2": "Trinket",
+         "hands": "Hands", "waist": "Waist", "legs": "Legs", "feet": "Feet", "finger": "Ring", "finger1": "Ring 1",
+         "finger2": "Ring 2", "trinket": "Trinket", "trinket1": "Trinket 1", "trinket2": "Trinket 2",
          "main_hand": "Main hand", "off_hand": "Off hand", "two_hand": "Two-hand", "weapon": "Weapons", "rings": "Rings",
          "trinkets": "Trinkets"}
 _RUNS = re.compile(r"^Runs(?: and best set)?:\s*(.+?)\s*$", re.M)
@@ -31,8 +31,12 @@ def _pct(v: float | None, digits: int = 1) -> str:
     return "&ndash;" if v is None else f"{v:+.{digits}f}%".replace("-", "&minus;")
 
 
-def _bar(v: float, scale: float) -> str:
-    """A gain bar from a centre line: right and green for a gain, left and red for a loss."""
+def _bar(v: float, scale: float, signed: bool = True) -> str:
+    """A gain bar from a centre line: right and green for a gain, left and red for a loss. Unsigned (a list with no
+    loss in it): from the left edge, the whole width for the biggest."""
+    if not signed:
+        w = 0 if not scale else min(100.0, max(0.0, v) / scale * 100)
+        return f"<span class='gbar u'><span class='g pos' style='width:{w:.1f}%'></span></span>"
     w = 0 if not scale else min(50.0, abs(v) / scale * 50)
     side = "pos" if v >= 0 else "neg"
     return f"<span class='gbar'><span class='g {side}' style='width:{w:.1f}%'></span></span>"
@@ -151,15 +155,15 @@ def loot(d: dict) -> str:
     else:
         head = _verdict("ok", "Nothing here is an upgrade for you", f"From {e(where)}, at item level {d.get('ilvl')}: "
                               "what you wear is already as good or better.")
-    def card(r: dict, scale: float) -> str:
+    def card(r: dict, scale: float, signed: bool = True) -> str:
         return (f"<li class='icard'>{_img(icons.get(r['item_id'], ''))}<span class='l-name'><b>{e(r['name'])}</b>"
                 f"<small><span>{e(SLOTS.get(r['slot'], r['slot']))}</span> &middot; {e(r['boss'])}</small></span>"
-                f"{_bar(r['gain'], scale)}<span class='l-val {'pos' if r['gain'] > 2 * err else 'neg'}'>"
+                f"{_bar(r['gain'], scale, signed)}<span class='l-val {'pos' if r['gain'] > 2 * err else 'neg'}'>"
                 f"{_pct(r['gain'])}</span></li>")
     def scale(lst: list[dict]) -> float:  # each list its own scale: a small gain is not lost next to big losses
         return max((abs(r["gain"]) for r in lst), default=1) or 1
 
-    body = f"<ul class='glist items'>{''.join(card(r, scale(good)) for r in good)}</ul>" if good else ""
+    body = f"<ul class='glist items'>{''.join(card(r, scale(good), False) for r in good)}</ul>" if good else ""
     if bad and not good:  # nothing to farm: the closest ones, to see how far
         body += f"<ul class='glist items'>{''.join(card(r, scale(bad[:5])) for r in bad[:5])}</ul>"
     elif bad:  # the rest in a line, no fold (the owner): its count and the closest
@@ -170,7 +174,7 @@ def loot(d: dict) -> str:
     ev = ("<h3>Which boss is worth it</h3><p class='ws-fine'>What one kill brings you on average: each item's gain "
           "times its chance to drop.</p><ul class='glist'>" + "".join(
         f"<li><span class='l-name'><b>{e(x['boss'])}</b><small>{x['n']} items for you</small></span>"
-        f"{_bar(x['ev'], max(y['ev'] for y in evs))}<span class='l-val pos'>{_pct(x['ev'], 2)}</span></li>"
+        f"{_bar(x['ev'], max(y['ev'] for y in evs), False)}<span class='l-val pos'>{_pct(x['ev'], 2)}</span></li>"
         for x in evs) + "</ul>") if len(evs) > 1 else ""
     return (f"{head}{body}{ev}<p class='ws-fine'>Each item simmed in its slot on your character; differences under "
             f"&plusmn;{2 * err:.2f}% are noise.</p>")
@@ -715,7 +719,7 @@ def bonusroll(d: dict) -> str:
                     if best and best["gain"] > 2 * err else "<span>no real upgrade</span>")
         out += (f"<li class='br'><span class='br-rank'>{i}</span>{face}<span class='l-name'><b>{e(x['boss'])}</b>"
                 f"<small><span>upgrades:</span> {len(ups)}/{x['n']} &middot; {best_txt}</small></span>"
-                f"{_bar(x['ev'], scale)}<span class='l-val {'pos' if x['ev'] > 0 else ''}'>{_pct(x['ev'], 2)}</span>"
+                f"{_bar(x['ev'], scale, any(y['ev'] < 0 for y in evs))}<span class='l-val {'pos' if x['ev'] > 0 else ''}'>{_pct(x['ev'], 2)}</span>"
                 "</li>")
     return (f"{head}<h3>Every boss, best roll first</h3><ul class='glist brs'>{out}</ul>"
             f"<p class='ws-fine'>Each item simmed in its slot on your character, at item level {d.get('ilvl')}; "
@@ -763,21 +767,32 @@ def enchant_table(d: dict) -> str:
     """Each enchant and gem the top players wear, its gain on your set; the ones to change first (picked: beyond the
     sims' noise), the share of the top players who wear it on hover. The ones you already wear are counted, not
     listed."""
+    err = d.get("error") or 0
+
+    def slot(r: dict) -> str:
+        return SLOTS.get(r["slot"], r["slot"].replace("_", " ").capitalize()) if r["slot"] else ""
+
+    def noise(r: dict) -> bool:  # within the sims' error: no real difference with what you wear
+        return not r.get("pick") and abs(r["gain"] or 0) < err
     worn = [r for r in d["rows"] if r["gain"] == 0]
-    rows = sorted((r for r in d["rows"] if r["gain"] != 0),
-                  key=lambda r: (not r.get("pick"), r["kind"] != "enchant", r["slot"], -(r["gain"] or 0)))
-    def gain(g: float) -> str:
-        return "worn" if g == 0 else f"{g:+.2f}%"  # 0: what you already wear there
+    rows = sorted((r for r in d["rows"] if r["gain"] != 0),  # the picks, then the real gains, then the noise
+                  key=lambda r: (not r.get("pick"), noise(r), -(r["gain"] or 0)))
+
+    def gain(r: dict) -> str:
+        g = r["gain"]
+        if noise(r):
+            return f"<td class='n muted'>&asymp; {g:+.2f}%</td>".replace("-", "&minus;")
+        return f"<td class='n {'pos' if g > 0 else 'neg'}'>{g:+.2f}%</td>".replace("-", "&minus;")
     body = "".join(
-        f"<tr><td>{'<b>&#10003; change</b>' if r.get('pick') else ''}</td>"
-        f"<td>{e(r['slot'].replace('_', ' ') or 'every socket')}</td>"
-        f"<td title='worn by {r['share']:.0%} of the top players'>{e(r['name'])}</td><td class='n'>{gain(r['gain'])}"
-        "</td></tr>" for r in rows)
+        f"<tr{' class=noise' if noise(r) else ''}><td>{'<b>&#10003; change</b>' if r.get('pick') else ''}</td>"
+        f"<td>{e(slot(r) or 'Every socket')}</td>"
+        f"<td title='worn by {r['share']:.0%} of the top players'>{e(r['name'])}</td>{gain(r)}</tr>" for r in rows)
     return (f"<div class='scroll'><table class='night'><tr><th></th><th>Slot</th><th>What the top players wear</th>"
-            f"<th class='n' title='on your set, the sims&#39; error about ±{d.get('error', 0):.2f}%'>Gain</th></tr>"
-            f"{body}</table></div>"
+            f"<th class='n'>Gain</th></tr>{body}</table></div>"
             + (f"<p class='ws-fine'>You already wear {len(worn)} of them: "
-               f"{e(', '.join(sorted({r['slot'].replace('_', ' ') or 'sockets' for r in worn})))}.</p>" if worn else ""))
+               f"{e(', '.join(sorted({slot(r) or 'sockets' for r in worn})))}. "
+               if worn else "<p class='ws-fine'>")
+            + f"&asymp;: within the sims' error (&plusmn;{err:.2f}%), no real difference.</p>")
 
 
 def by_targets(d: dict) -> str:
