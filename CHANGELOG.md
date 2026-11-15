@@ -21,6 +21,11 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 - Tool results read at a glance: two pulls played with other talents say so first, the raid night numbers its pulls
   and marks each one's first death, a long build is two columns (take, drop) with its Copy button on top, enchants
   within the noise are muted, and nothing hides behind a click any more.
+- The main pages are tidier: the home board only rings a boss green when it is ready in the difficulty you picked, your
+  last raid sits beside "Prepare a boss", and only your own sheets light up "to redo"; Raid lead turns a boss with
+  nothing to change into one line and counts players to retalent; Reclear says what your best clean pull did better;
+  Characters puts the export's age on its update button; Settings says whether you read Warcraft Logs with a key or
+  your account.
 ## 0.8.30 (2026-11-12)
 
 - After an update, the app opens again by itself (it closed and stayed closed).
