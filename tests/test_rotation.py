@@ -65,7 +65,13 @@ def test_the_raid_board(tmp_path, monkeypatch):
     encs = [SimpleNamespace(id=1, name="Nek'zali"), SimpleNamespace(id=2, name="Vashnik")]
     html = web.raid_board(encs, "Shaman", "Elemental")
     assert html.count("rb-d ok") == 1 and html.count("rb-d no") == 5  # 2 bosses x 3 difficulties
-    assert html.count("rb-boss grey") == 1  # Vashnik: nothing prepared
+    assert html.count("rb-boss grey") == 2  # heroic chosen: a mythic sheet leaves Nek'zali grey, as its word says
+    from paf import settings
+
+    settings.set_value("difficulty", "mythic")
+    html = web.raid_board(encs, "Shaman", "Elemental")
+    assert html.count("rb-boss grey") == 1 and "rb-boss st-ok" in html  # Vashnik: nothing prepared
+    settings.set_value("difficulty", "heroic")
     assert "/view/nek-zali-mythic-elemental-shaman" in html and "/boss?boss=2&amp;difficulty=heroic" in html
     assert "rb-frame tri" in html and "rb-frame sq" in html and "rb-frame penta" in html
 

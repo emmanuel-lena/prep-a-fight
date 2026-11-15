@@ -59,7 +59,6 @@ pre.log{max-height:460px;overflow:auto;background:var(--surface-2);border-radius
 .rb-face .rb-img:not(.none),.rb-in .rb-img:not(.none){position:absolute;inset:0;background:#15121c}
 .rb-in{position:relative} .rb-face .rb-img.none,.rb-in .rb-img.none{position:absolute;inset:0}
 .rb-boss.grey .rb-face{filter:grayscale(1) brightness(.75);box-shadow:0 0 0 2px var(--line)}
-.rb-boss:not(.grey) .rb-face{box-shadow:0 0 0 2px var(--pos)}
 .rb-n{position:absolute;left:50%;bottom:3px;transform:translateX(-50%);min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:rgba(0,0,0,.65);
   color:#fff;font:700 11px/18px var(--font-data);text-align:center}
 .rb-name{font-size:12px;font-weight:600;text-align:center;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;
@@ -349,7 +348,8 @@ textarea[name=plan],textarea[name=notes]{white-space:pre;overflow-x:auto;max-hei
 body.has-side>main .hero-week.lr h2{font-size:30px;line-height:1.15;margin:4px 0 8px}
 /* round 11 */
 .home-hero .rq{justify-content:flex-start} .home-hero .rq-txt{flex:0 1 auto}
-@media (min-width:1100px){.home-hero{grid-template-columns:minmax(0,1fr)}}
+@media (min-width:1100px){.home-hero{grid-template-columns:minmax(0,1fr)}
+  .home-hero:has(>.hero-side){grid-template-columns:minmax(0,1fr) minmax(0,1fr)}} /* the last raid on the right, or one column */
 .status .btn{white-space:nowrap} .status .val form{width:176px}
 .ws-cards{max-width:1000px} .lr-grid{max-width:80ch}
 .lr-row{margin:6px 0 0} .lr-row h2{margin-top:10px}
@@ -447,7 +447,6 @@ table.mx a.mx.nosim.old{border:1px dashed var(--warn)} /* no sim first, its age'
 textarea.fit-rows{height:auto;min-height:0} /* sized to its lines (rows), not a fixed box */
 table.lr-cmp th small{text-transform:none;letter-spacing:0;font:500 12px var(--font-data)} table.lr-cmp th a{text-transform:none;letter-spacing:0;font:500 13px var(--font-body)} /* a link reads as one */
 .mx-legend .pill.nosim{border:1px dashed var(--muted)} /* the cells' own dashed outline (fresh app review) */
-.mx-legend .pill{text-transform:none;letter-spacing:0} /* the cells' own case (fresh app review 2) */
 section.adv textarea{max-width:920px} /* the content column, never to the window's edge */
 .rl-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:6px;margin:8px 0 16px;max-width:1000px} /* the ten bosses on one row */
 .rl-sb{display:grid;justify-items:center;gap:3px;padding:8px 6px;border:1px solid var(--line);border-radius:var(--radius);text-decoration:none;color:var(--fg);text-align:center;font-size:12px}
@@ -487,3 +486,24 @@ table.status td:first-child{padding-right:18px;white-space:nowrap}
 .rl-edit form{display:flex;gap:6px;align-items:center;margin:0}
 .rl-edit input,.rl-edit select{font-size:13.5px;padding:6px 10px}
 .rl-edit input[name=name]{width:150px} .rl-edit input[name=log]{width:230px}
+/* home review: the gold button and "Prepare the whole raid" on one row; the last raid in the right column */
+.go-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:14px 0 0}
+.go-row .rq,.home-hero .go-row .rq{margin:0;flex:0 1 auto;max-width:none} .go-row .rq.on{flex-basis:100%}
+.start-next .pill.diff{font-size:13px;vertical-align:3px}
+.hero-side{margin:0} body.has-side>main .hero-side h2{margin:4px 0 12px}
+.lr-lines{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:0;max-width:560px}
+.lr-lines .lr-line{display:grid;grid-template-columns:34px max-content max-content 1fr;align-items:center;gap:10px;
+  padding:8px 0;border-top:1px solid var(--line);font-size:15px;max-width:none}
+.lr-lines .lr-line:last-child{border-bottom:1px solid var(--line)} .lr-lines .lr-line b{font-weight:600}
+.lr-k{justify-self:end;display:inline-flex;align-items:center;gap:8px;color:var(--muted);font:500 14px var(--font-body);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.lr-lines .lr-hp{width:90px}
+/* the sheets: your spec's row alone keeps the amber "to redo"; the active row on Surface 2 with an accent edge */
+.mx-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;margin:34px 0 10px}
+body.has-side>main .mx-head h2{margin:0} .mx-head .mx-legend{margin:0}
+table.mx tr.mine td,table.mx tr.mine th{background:var(--surface-2)}
+table.mx tr.mine th{box-shadow:inset 2px 0 0 var(--accent)}
+table.mx tr:not(.mine) a.mx.old{border:1px solid var(--line)}
+table.mx tr:not(.mine) a.mx.nosim.old{border:1px dashed var(--muted)}
+.mx-legend .pill.mx{text-transform:none;letter-spacing:0} /* the marks in the cells' case; difficulties as everywhere */
+.home-hero .me{flex-wrap:wrap;row-gap:6px} .home-hero .me .stale{margin-left:0} /* the age badge wraps in its column */
