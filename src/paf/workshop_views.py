@@ -221,9 +221,12 @@ def topgear(d: dict) -> str:
     best = rows[0]
     icons = _item_icons([i for r in rows[:4] for c in r["changes"] for i in c["items"]])
 
+    optional: set = set()  # the best set's items a set within the noise does without (a recraft for +0.1%)
+
     def item(slot: str, i: dict) -> str:
         meta = [SLOTS.get(slot, slot)] + ([str(i["ilvl"])] if i.get("ilvl") else [])
         meta += [i["source"]] if i.get("source") not in ("bags", "equipped", None) else []
+        meta += ["optional: within the noise without it"] if (slot, i["name"]) in optional else []
         was = f"<small class='was'>replaces {e(i['was'])}</small>" if i.get("was") else ""
         return (f"<li class='icard'>{_img(icons.get(i.get('item_id') or 0, ''))}<span class='l-name'>"
                 f"<b>{e(i['name'] or '?')}</b><small>{' &middot; '.join(f'<span>{e(m)}</span>' for m in meta)}</small>"
@@ -235,7 +238,13 @@ def topgear(d: dict) -> str:
     def changes(r: dict) -> str:
         return "".join(item(slot, i) for slot, i in new(r))
     good = best["gain"] > 2 * err
-    if good:
+    if good:  # a set that puts on fewer of these items and is within the noise of the best: the rest is optional
+        mine_ = {(slot, i["name"]) for slot, i in new(best)}
+        fewer = [r for r in rows[1:] if best["gain"] - r["gain"] <= 2 * err
+                 and {(slot, i["name"]) for slot, i in new(r)} < mine_]
+        if fewer:
+            least = min(fewer, key=lambda r: len(new(r)))
+            optional = mine_ - {(slot, i["name"]) for slot, i in new(least)}
         head = _verdict("go", "Put on these items", f"The best set from your bags{' on ' + e(', '.join(d.get('fights', []))) if d.get('fights') else ''}.",
                         _pct(best["gain"], 2)) + f"<ul class='glist items'>{changes(best)}</ul>"
     else:

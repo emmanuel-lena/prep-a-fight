@@ -149,3 +149,14 @@ def test_gear_by_target_count_says_nothing_to_change_and_gives_a_long_build_the_
     assert "Copy this build, +2.8%" in page and "a build the top players play on Some Boss" in page
     assert "bt-card wide" in page and "has-wide" in page
     assert page.index(">Take<") < page.index("New 0") < page.index(">Drop<") < page.index("Old 0")
+
+
+def test_an_item_a_set_within_the_noise_does_without_is_optional():
+    # a fresh review (2026-11-15): "put on these items" asked for a wrists recraft worth 0.11 pt, under the noise
+    def it(name):
+        return {"name": name, "ilvl": 300, "item_id": 0, "source": "bags"}
+    best = {"gain": 2.27, "changes": [{"slot": "chest", "items": [it("Poncho")]},
+                                      {"slot": "wrist", "items": [it("Cuffs")]}]}
+    near = {"gain": 2.16, "changes": [{"slot": "chest", "items": [it("Poncho")]}]}
+    page = wv.topgear({"error": 0.15, "rows": [best, near]})
+    assert page.count("optional: within the noise without it") == 1 and page.index("Cuffs") < page.index("optional")
