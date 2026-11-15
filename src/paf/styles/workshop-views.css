@@ -91,6 +91,12 @@ h3.who-c{display:flex;align-items:center;gap:8px} h3.who-c .it-ic{margin:0} td.w
 .pulls{list-style:none;margin:0;padding:0;display:grid;gap:10px}
 .pulls li{padding:10px 12px;border:1px solid var(--line);border-radius:12px;display:grid;gap:8px}
 .who-chip.bare{border-color:color-mix(in srgb,var(--neg) 60%,var(--line));color:var(--neg)}
+.pulls{grid-template-columns:repeat(auto-fill,minmax(min(100%,500px),1fr))} .pulls li{align-content:start}
+.who-chip.first{outline:2px solid var(--fg);outline-offset:1px}
+.pulls .kill{color:var(--pos);font-weight:600} .pulls .whos>small{color:var(--muted)}
+.more-n{align-self:center;color:var(--muted);font-size:13px}
+.night-key{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:0 0 10px;color:var(--muted);font-size:13.5px}
+.night-key .who-chip{padding:1px 9px;font-size:12.5px} .night-key .who-chip+span{margin-right:14px}
 .hl{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .hl li{display:flex;gap:10px;align-items:baseline;padding:8px 12px;border:1px solid var(--line);border-radius:10px}
 .hl .hm{font-weight:700} .hl li.good .hm{color:var(--pos)} .hl li.bad .hm{color:var(--neg)}

@@ -541,7 +541,7 @@ def night(d: dict) -> str:
         if name in clean:
             continue
         pot = v["pulls_damage_potion"]
-        rows += (f"<tr><td class='who-c{' bad' if v['bare'] else ''}'>{ic(name)}<b>{e(name)}</b></td><td class='n'>{v['deaths']}</td>"
+        rows += (f"<tr><td class='who-c'>{ic(name)}<b>{e(name)}</b></td><td class='n'>{v['deaths']}</td>"
                  f"<td class='n {'bad' if v['bare'] else ''}'>{v['bare']}</td><td class='n'>{v['healthstone']}</td>"
                  f"<td class='n'>{v['health']}</td><td class='n {'bad' if not pot else ''}'>{pot}/{len(pulls)}</td></tr>")
     table = (f"<div class='scroll'><table class='night'><tr><th>Player</th><th class='n'>Deaths</th><th class='n'>Without a "
@@ -553,20 +553,30 @@ def night(d: dict) -> str:
                   "a damage potion every pull: <span class='whos'>"
                   + "".join(f"<span class='who-chip'>{ic(n)}<b>{e(n)}</b></span>" for n in sorted(clean)) + "</span></p>")
     detail = ""
-    for r in pulls:
+    bosses = len({r["boss"] for r in pulls}) > 1  # one boss all night: its name on every card says nothing
+    for i, r in enumerate(pulls, 1):
         dead = sorted(((min(p["deaths"]), n, p["bare"]) for n, p in r["players"].items() if p["deaths"]))
-        end = "Kill" if r["kill"] else f"{(r['left'] or 0):.0%}"
-        who = "".join(f"<span class='who-chip {'bare' if b else ''}'>{ic(n)}<b>{e(n)}</b> {_mmss(t)}</span>"
-                      for t, n, b in dead[:12])
-        detail += (f"<li><div class='j-head'><b>{e(r['boss'])}</b><small><span class='num'>{_mmss(r['duration'])}</span>"
-                   f" &middot; {end}</small></div><div class='whos'>{who}</div></li>")
-    by_pull = (f"<h4 class='more'>Pull by pull ({len(pulls)})</h4><ul class='pulls'>{detail}</ul>"  # in sight, no fold
+        end = ("<span class='kill'>Kill</span>" if r["kill"]
+               else f"<span>wipe at</span> <span class='num'>{(r['left'] or 0):.0%}</span>")
+        first = dead[0][0] if dead else 0
+
+        def chip(t: float, n: str, b: bool, first: float = first) -> str:  # the first death (and who died with
+            # it, in the same second): marked
+            cls = " ".join(c for c in ("bare" if b else "", "first" if t - first < 1 else "") if c)
+            return f"<span class='who-chip {cls}'>{ic(n)}<b>{e(n)}</b> {_mmss(t)}</span>"
+        who = "".join(chip(t, n, b) for t, n, b in dead[:12])
+        who += f"<span class='more-n'>+{len(dead) - 12}</span>" if len(dead) > 12 else ""
+        title = f"Pull {i}" + (f" &middot; {e(r['boss'])}" if bosses else "")
+        detail += (f"<li><div class='j-head'><b>{title}</b><small><span class='num'>{_mmss(r['duration'])}</span>"
+                   f" &middot; {end}</small></div><div class='whos'>{who or '<small>no death</small>'}</div></li>")
+    by_pull = (f"<h3>Pull by pull ({len(pulls)})</h3><p class='night-key'><span class='who-chip first'>"
+               "<b>first</b></span><span>the first death of the pull</span><span class='who-chip bare'><b>red</b>"
+               "</span><span>died without a healthstone or a health potion first</span></p>"
+               f"<ul class='pulls'>{detail}</ul>"  # in sight, no fold
                if len(pulls) > 1 else "")  # one pull: the table above says it all
-    note = ("Read from the casts of the log: a damage potion counts from 10 s before the pull (the pre-pot); the deaths "
-            "of the wipe itself are left out. A red 0/1: no damage potion in that pull. A name in red died without a "
-            "healthstone or a health potion first.")  # on hover (DPS rounds 46-51)
-    return (f"{head}<h3>Over the night</h3>{table}{by_pull}<p class='ws-fine'><span class='pill' title='{note}'>"
-            "? how it is read</span></p>")
+    return (f"{head}<h3>Over the night</h3>{table}{by_pull}<p class='ws-fine'>Read from the casts of the log: a damage "
+            "potion counts from 10 s before the pull (the pre-pot). A wipe's deaths stop at the one that leaves half "
+            "the raid dead: the rest is the wipe itself.</p>")
 
 def pulldiff(d: dict) -> str:
     """Two pulls side by side: the highlights first, the boss health, then the player's detail."""

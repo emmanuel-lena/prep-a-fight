@@ -45,6 +45,30 @@ def test_rotation_leaves_out_a_cooldown_pressed_as_often_as_the_top_players_pres
     assert "class='verdict ok'" in page and "<small>you</small> 59%" in page and "your spec:</span> 37%" in page
 
 
+def _pull(boss, kill, deaths):
+    players = {n: {"deaths": [t] if t is not None else [], "healthstone": [], "health": [], "damage": [1.0],
+                   "bare": t is not None} for n, t in deaths.items()}
+    return {"boss": boss, "kill": kill, "duration": 120.0, "left": None if kill else 0.84, "players": players}
+
+
+def _night(pulls):
+    names = {n for p in pulls for n in p["players"]}
+    summary = {n: {"deaths": 1, "bare": 1, "healthstone": 0, "health": 0, "damage": 2,
+                   "pulls_damage_potion": len(pulls)} for n in names}
+    return wv.render({"kind": "night", "pulls": pulls, "summary": summary, "icons": {}})
+
+
+def test_night_cards_are_numbered_pulls_with_their_first_death_marked():
+    page = _night([_pull("Boss", False, {"Aa": 40.0, "Bb": 40.5, "Cc": 70.0}), _pull("Boss", True, {"Aa": None})])
+    assert "<b>Pull 1</b>" in page and "<b>Pull 2</b>" in page and "&middot; Boss" not in page  # one boss
+    assert "wipe at</span> <span class='num'>84%" in page and "class='kill'>Kill<" in page
+    assert page.count("who-chip bare first") == 2 and "who-chip bare'>" in page  # Aa and Bb in the same second
+    assert "class='pill'" not in page and "who-c bad" not in page and "<h3>Pull by pull (2)</h3>" in page
+    assert "died without a healthstone or a health potion first" in page  # the red chip said in sight
+    page = _night([_pull("Boss", False, {"Aa": 40.0}), _pull("Other", True, {"Aa": None})])
+    assert "Pull 2 &middot; Other" in page  # two bosses in the night: each card names its boss
+
+
 def _talents_row(code, gain, swaps, players=3):
     return {"code": code, "gain": gain, "players": players, "swaps": swaps}
 
