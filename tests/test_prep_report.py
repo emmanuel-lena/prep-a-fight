@@ -178,13 +178,13 @@ def test_only_the_plan_the_fight_tab_plays_can_be_copied():
     d.mrt = {"total": "prep-a-fight: Boss\n{time:0:05} Vanish", "adds": "prep-a-fight: Boss\n{time:0:05} Shadow Blades"}
     d.nsrt = {"total": "EncounterID:1\ntime:5;ph:1;tag:x;spellid:1;dur:5"}
     plans = render(d).split('id="deeper"', 1)[1].split("Cooldown plans, per objective</h2>", 1)[1].split("<h2", 1)[0]
-    assert plans.count("not played: not robust</span>") == 2 and "the sheet plays this plan" not in plans
+    assert plans.count("not played: not robust") == 2 and "the sheet plays this plan" not in plans
     assert "Copy the MRT note" not in plans and "Copy for NSRT" not in plans
-    assert "{time:0:05} Shadow Blades" in plans  # the note stays readable
+    assert "{time:0:05} Shadow Blades" not in plans  # a plan not played: one line, no note (a second fresh review)
     pad.sensitivity = {"slower": 0.5}  # robust, the raid's goal: played, the only card with the buttons
     plans = render(d).split('id="deeper"', 1)[1].split("Cooldown plans, per objective</h2>", 1)[1].split("<h2", 1)[0]
     assert plans.count("Copy the MRT note") == 1 and "the sheet plays this plan" in plans
-    assert plans.count("not played: not robust</span>") == 1
+    assert plans.count("not played: not robust") == 1
 
 
 def test_notes_read_in_time_order():
@@ -249,9 +249,9 @@ def test_keep_yours_shows_three_sets_and_no_drop_is_said_plainly():
     assert "notice" not in loot and "the closest, Amulet, is" in loot and "-0.43%" in loot
 
 
-def test_a_plan_not_played_keeps_its_own_notes_on_its_card():
-    # Subtlety Rogue, Vashnik (DPS round 11): the pad card's MRT note was the default list's (potion 0:02) beside
-    # the plan's NSRT times (potion 1:48)
+def test_a_plan_not_played_is_one_line_without_a_note():
+    # Subtlety Rogue, Vashnik (DPS round 11): the pad card's note was the default list's; a second fresh review
+    # (2026-11-15): a plan the sheet does not play shows no note at all, one line with its rules
     from paf.optimize import Plan, Rule
 
     d = PrepData("Vashnik", "heroic", "Subtlety", "Char", kills=10, duration=240)
@@ -260,7 +260,8 @@ def test_a_plan_not_played_keeps_its_own_notes_on_its_card():
                         timeline=[(108.0, "potion")], default_timeline=[(2.0, "potion")])]
     d.mrt = {"total": "prep-a-fight: Vashnik, cooldowns for total damage (pad) (+0.6%)\n{time:1:48} Potion"}
     page = render(d)
-    assert "{time:1:48} Potion" in page and "{time:0:02} Potion" not in page.split("not played")[1]
+    rest = page.split("Plans the sheet does not play")[1]
+    assert "{time:1:48} Potion" not in rest and "{time:0:02} Potion" not in rest and "not played: not robust" in rest
 
 
 def test_a_mechanics_times_find_its_name_in_a_wowhead_link():

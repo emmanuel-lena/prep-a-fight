@@ -1578,7 +1578,7 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
             + (f"<h4>MRT note {copy_button(note, 'Copy the MRT note')}</h4><pre class='small note-pre'>{e(note)}</pre>"
                if note else "") + "</div>")
     if d.optimized and not flat:
-        blocks, same = [], []
+        blocks, same, off_plans = [], [], []
         warned = False  # the top players' other moments: said on the first card, not on each (the owner: less text)
         first = wanted(d) or simple._plan(d).objective if simple._plan(d) else None
         twins = {"adds"} if any(o.objective == "secondary" and {k for k, r in o.choice.items() if r.name != "default"}
@@ -1621,6 +1621,13 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
             copies = (copy_button(note, "Copy the MRT note")
                       + (copy_button(d.nsrt[p.objective], "Copy for NSRT") if d.nsrt.get(p.objective) else "")
                       if played else "")
+            if not played:  # a plan the sheet does not play: one line, its rules and why, no note to paste and no
+                said = "; ".join(f"{cd_name(d, k)}: {rule_phrase(d, r.name)}" for k, r in changed.items())  # big
+                why = "not robust" if shaky else "your raid's goal is another"  # green number (a fresh review)
+                off_plans.append(f"<li><b>{e(objective_name(d, p.objective))}</b> <span class='num'>"
+                                 f"{_pct(p.gain, 1, err=1e9)}</span> <span class='muted'>&middot; not played: {why} "
+                                 f"&middot; {e(said)}</span></li>")
+                continue
             blocks.append(f"""<div class="card"><h3 style="margin:0 0 6px">{e(objective_name(d, p.objective))}: {_pct(p.gain, 1, err=1e9 if p.objective == "secondary" or _stall(d, p) else 0.0)}
 <span class="small muted">vs the default priority list{'; ' + others if others else ''}</span>{pill}</h3>
 {("<p class='small'>Played because " + ("your raid pads the adds" if p.objective == "total" else "your raid stays on the boss" if p.objective == "boss" else "it is your choice") + " (see Your raid and the adds, below)." + (" When the plan presses a burst while the boss is immune, the fight tab moves it onto the adds that spawn then." if d.fight is not None and d.fight.invulnerable else "") + "</p>") if p.objective == first and p.objective in ("boss", "total") and not _fallen(p) else ""}
@@ -1632,7 +1639,9 @@ noise, and a build can lose on the dummy and win on this fight">Build</th>{head}
 </div>""")
         intro = tops + (f"<p class='small'><b>{e(', '.join(same))}:</b> no plan beats SimC's default list.</p>"
                         if same else "")
-        tabs["cooldowns"].append("<h2>Cooldown plans, per objective</h2>" + intro + "".join(blocks))
+        off = (f"<h3>Plans the sheet does not play</h3><ul class='pp-off small'>{''.join(off_plans)}</ul>"
+               if off_plans else "")
+        tabs["cooldowns"].append("<h2>Cooldown plans, per objective</h2>" + intro + "".join(blocks) + off)
 
     # gear
     if d.gear:

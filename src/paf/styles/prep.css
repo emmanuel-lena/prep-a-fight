@@ -133,3 +133,4 @@ tr.noise>td{opacity:.5} tr.noise:hover>td{opacity:1} /* a talent build within th
 .raid-who .jobs>.job:only-child{max-width:680px} /* one target: a card its own width, its figures by its names */
 .rf-grid{display:grid;gap:0 32px}
 @media (min-width:1100px){.rf-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}}
+.pp-off{margin:6px 0 0;padding-left:18px;display:grid;gap:6px} .pp-off .num{font-family:var(--font-data)}
