@@ -18,3 +18,4 @@ src/paf/telemetry_url.txt
 
 # impeccable live mode (runtime)
 .impeccable/live/
+.claude/worktrees/
