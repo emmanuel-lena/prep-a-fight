@@ -163,6 +163,30 @@ def test_nothing_to_change_offers_no_plan_it_does_not_play():
     assert "Nothing to change" in change and "Copy the MRT note" not in change  # Dig deeper keeps it
 
 
+def test_only_the_plan_the_fight_tab_plays_can_be_copied():
+    # The Twin Fangs, Subtlety (a fresh review): the pad plan, not played, kept its copy buttons; the adds plan, not
+    # robust either, had no pill at all
+    from paf.optimize import Plan, Rule
+
+    d = PrepData("Boss", "mythic", "Subtlety", "Char", duration=300)
+    d.goal = "total"
+    pad = Plan("total", {"vanish": Rule("on_cooldown", "", None)}, 0.6, 0.1, totals={"total": 0.6},
+               sensitivity={"slower": -0.4}, timeline=[(5.0, "Vanish")], default_timeline=[(2.0, "Vanish")])
+    adds = Plan("adds", {"shadow_blades": Rule("on_cooldown", "", None)}, 6.1, 0.1, totals={"adds": 6.1},
+                sensitivity={"slower": -0.5}, timeline=[(5.0, "Shadow Blades")])
+    d.optimized = [pad, adds]
+    d.mrt = {"total": "prep-a-fight: Boss\n{time:0:05} Vanish", "adds": "prep-a-fight: Boss\n{time:0:05} Shadow Blades"}
+    d.nsrt = {"total": "EncounterID:1\ntime:5;ph:1;tag:x;spellid:1;dur:5"}
+    plans = render(d).split('id="deeper"', 1)[1].split("Cooldown plans, per objective</h2>", 1)[1].split("<h2", 1)[0]
+    assert plans.count("not played: not robust</span>") == 2 and "the sheet plays this plan" not in plans
+    assert "Copy the MRT note" not in plans and "Copy for NSRT" not in plans
+    assert "{time:0:05} Shadow Blades" in plans  # the note stays readable
+    pad.sensitivity = {"slower": 0.5}  # robust, the raid's goal: played, the only card with the buttons
+    plans = render(d).split('id="deeper"', 1)[1].split("Cooldown plans, per objective</h2>", 1)[1].split("<h2", 1)[0]
+    assert plans.count("Copy the MRT note") == 1 and "the sheet plays this plan" in plans
+    assert plans.count("not played: not robust</span>") == 1
+
+
 def test_notes_read_in_time_order():
     from paf.prep_report import in_time_order
 
