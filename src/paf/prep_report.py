@@ -767,37 +767,52 @@ def defensives_html(d: PrepData) -> str:
     df = d.defensives
     if not df or not (df.moments or df.usage):
         return ""
-    casts = dict(d.boss_casts)
+    # one row a boss ability (the owner: 14 rows of times), its moments' times, then the defensives pressed for it
+    groups: dict[str, list] = {}
+    for m in sorted(df.moments, key=lambda m: m.time):
+        groups.setdefault(m.boss_ability or "", []).append(m)
 
-    def cast_note(m) -> str:  # the ability's cast long before the defensive: a hit that lands later, said with its cast
-        near = [c for c in casts.get(m.boss_ability, []) if m.time - 8 <= c <= m.time + 12]  # its hit, around
-        before = [c for c in casts.get(m.boss_ability, []) if c < m.time]
-        return "" if near or not before else f" <span class='muted small'>(its damage; cast at {_mmss(max(before))})</span>"
-    def untied(m) -> str:  # no ability tied in the logs: the boss's cast just before, said as a lead, not a fact
-        lead = max(((c, n) for n, ts in d.boss_casts for c in ts if m.time - 10 <= c <= m.time), default=None)
-        return (f"<span class='muted small'>none tied in the logs ({e(lead[1])} starts at {_mmss(lead[0])})</span>"
-                if lead else "<span class='muted small'>none tied in the logs</span>")
-    rows = "".join(
-        f"<tr><td class='n'>{_mmss(m.time)}</td><td>{m.share:.0%}</td><td>"
-        + ", ".join(f"{icons.img(d.icons.get(n, ''), 'small')}{link(n, f'spell={sid}')} "
-                    f"<span class='muted small'>{s:.0%}</span>" for n, sid, s in m.spells)
-        + f"</td><td>{link(m.boss_ability, f'spell={m.boss_spell_id}') + cast_note(m) if m.boss_ability else untied(m)}"
-        + "</td></tr>" for m in df.moments)
-    method = (f"When the top players of your spec press one ({df.kills} kills); the fight tab calls the moments where "
-              f"{fightview_support():.0%} or more of them press one")
-    answers = "cast within about 10 s, or long before for damage that lands later"
-    table = (f"<div class='scroll'><table><tr><th>When</th><th title='{e(method)}'>Top players</th><th>Defensive</th>"
-             f"<th title='{answers}'>The boss ability it answers</th></tr>{rows}</table></div>") if df.moments else (
+    def leads(ms: list) -> str:  # no ability tied in the logs: the boss's casts just before, said as a lead
+        names: list[str] = []
+        for m in ms:
+            lead = max(((c, n) for n, ts in d.boss_casts for c in ts if m.time - 10 <= c <= m.time), default=None)
+            if lead and lead[1] not in names:
+                names.append(lead[1])
+        return f" <span class='muted small'>({e(' / '.join(names))} starts just before)</span>" if names else ""
+
+    def row(ability: str, ms: list) -> str:
+        sid = ms[0].boss_spell_id
+        who = (f"{icons.img(d.icons.get(ability, ''), 'small')}{link(ability, f'spell={sid}')}" if ability else
+               "<span class='muted'>None tied in the logs</span>")
+        who += (f" <span class='muted'>&times;{len(ms)}</span>" if len(ms) > 1 else "") + ("" if ability else leads(ms))
+        times = ", ".join(_mmss(m.time) for m in ms)
+        lo, hi = min(m.share for m in ms), max(m.share for m in ms)
+        share = f"{lo:.0%}" if f"{lo:.0%}" == f"{hi:.0%}" else f"{lo:.0%}&ndash;{hi:.0%}"
+        spells: dict[tuple, float] = {}
+        for m in ms:
+            for n, s_id, s in m.spells:
+                spells[(n, s_id)] = spells.get((n, s_id), 0.0) + s / len(ms)  # its mean share of the presses
+        top = sorted(spells.items(), key=lambda x: -x[1])[:2]  # the two it is mostly answered with
+        return (f"<tr><td>{who}</td>"
+                f"<td class='small'>{times}</td><td class='n'>{share}</td><td>"
+                + ", ".join(f"<span class='nw'>{icons.img(d.icons.get(n, ''), 'small')}{link(n, f'spell={s_id}')} "
+                            f"<span class='muted small'>{s:.0%}</span></span>" for (n, s_id), s in top) + "</td></tr>")
+    rows = "".join(row(a, ms) for a, ms in groups.items() if a) + (row("", groups[""]) if "" in groups else "")
+    method = (f"Top players: the share of them pressing a defensive then ({df.kills} kills; the fight tab calls the "
+              f"moments where {fightview_support():.0%} or more of them press one). A defensive answers a boss cast "
+              "within about 10 s, or one long before for damage that lands later.")
+    table = (f"<div class='scroll'><table><tr><th>Boss ability</th><th>When</th><th class='n'>Top players</th>"
+             f"<th>Defensive</th></tr>{rows}</table></div><p class='small muted'>{e(method)}</p>") if df.moments else (
         "<p class='small'>The top players do not press their defensives at one shared moment on this boss: use them "
         "when you take damage.</p>")
     usage = "".join(f"<span class='chip{' rare' if per < 0.2 else ''}'>{icons.img(d.icons.get(n, ''), 'small')}"
                     f"{link(n, f'spell={sid}')} <b>{per:.1f}</b>/kill on average &middot; {share:.0%} of the kills</span>"
                     for n, sid, per, share in df.usage[:6])  # chips, the rare ones muted, never dropped (DPS c. 14)
-    return (f"<h2>Defensives <span class='pill near'>advice, not simmed</span></h2><div class='card'>{table}"  # the
+    return (f"<h2>Defensives <span class='h-note'>advice, not simmed</span></h2><div class='card'>{table}"
             + (f"<div class='small chips'><span class='muted'>Used{'' if df.moments else f', {df.kills} ranked kills'}:"
                f"</span><span>{usage}</span></div>" if usage
                else "")  # the label its own column, the chips wrapping beside it (DPS confirm round 14)
-            + "</div>")  # the table's method on its header (DPS rounds 36-40: three lines under it)  # no table: no columns told, the source in the chips' label (DPS confirm round 15)
+            + "</div>")
 
 
 def _track_top(d) -> str:
@@ -959,42 +974,42 @@ def _tools_html() -> str:
                               "mechanics"), target="_top"))
 
 
-# the other actions' sentences (paf.actions), read back into chips (fresh DPS review: sentence bullets)
+# the other actions' sentences (paf.actions), read back into a short muted line after the name: (its facts, what it
+# means for you); never uppercase pills carrying a sentence, nor an instruction for another page (the owner)
 ACTION_CHIPS = [
     (re.compile(r"(?P<name>.+?): (?P<n>\d+) players? per kill, an assignment(?:, ~(?P<mv>[\d.]+) s of movement when "
                 r"it is you)?\. If it is yours, tick it in the app \(the boss's prep page\)\."),
-     lambda m: [f"&#128101; {m['n']} a kill"] + ([f"&harr; ~{m['mv']} s moving"] if m["mv"] else [])
-     + ["yours? tick it on the boss page"]),
+     lambda m: ([f"&#128101; {m['n']} a kill"] + ([f"~{m['mv']} s of movement when it is you"] if m["mv"] else []),
+                "an assignment")),
     (re.compile(r"(?P<name>.+?): hits ~(?P<n>\d+) players per kill; .+? take it in (?P<p>\d+)% of the kills: "
                 r"(?P<v>expect it|it can be you)\."),
-     lambda m: [f"&#128101; ~{m['n']} a kill", f"{m['p']}% of the kills &middot; "
-                + ("expect it" if m["v"] == "expect it" else "you?")]),
+     lambda m: ([f"&#128101; ~{m['n']} a kill", f"you in {m['p']}% of the kills"], m["v"])),
     (re.compile(r"(?P<name>.+?): the top raids do not kill it with damage \(it stays ~(?P<min>\d+) min\); do not "
                 r"spend your damage on it unless your raid's strategy says so\."),
-     lambda m: [f"&#9719; stays ~{m['min']} min", "leave it"]),
+     lambda m: ([f"stays ~{m['min']} min"], "leave it")),
     (re.compile(r"Interrupt (?P<name>.+?): .+? kick it in (?P<p>\d+)% of the kills \(~(?P<k>\d+) kicks per kill\), "
                 r"far more than one player in twenty would: it is part of your job\."),
-     lambda m: [f"{m['p']}% of the kills", f"~{m['k']} kicks a kill", "your job"]),
+     lambda m: ([f"~{m['k']} kicks a kill", f"your spec in {m['p']}% of the kills"], "your job")),
     (re.compile(r"(?P<name>.+?) is interrupted ~(?P<k>\d+) times per kill, mostly by other classes \(.+?: "
                 r"(?P<p>\d+)% of the kills\); kick it if your raid asks\."),
-     lambda m: [f"~{m['k']} kicks a kill", f"you: {m['p']}% of the kills", "if your raid asks"]),
+     lambda m: ([f"~{m['k']} kicks a kill", f"your spec in {m['p']}% of the kills"], "if your raid asks")),
 ]
 
 
-ACTION_CHIPS.insert(0, (KILL_TEXT, lambda m: [f"&times;{m['n'] or 1} a kill", f"&#9201; ~{m['life']} s"]
-                       + ([f"your spec {m['share']}%"] if m["share"] else [])))
+ACTION_CHIPS.insert(0, (KILL_TEXT, lambda m: ([f"&times;{m['n'] or 1} a kill", f"killed in ~{m['life']} s"]
+                                              + ([f"your spec {m['share']}% on them"] if m["share"] else []), "")))
 
 
 def action_inner(d, a) -> str:
-    """An action as its icon, its name and chips, its sentence on hover; a sentence no pattern reads stays as is
-    (the boss tab and the checklist: one form, fresh DPS review)."""
+    """An action as its icon, its name and a muted line of its facts; a sentence no pattern reads stays as is."""
     pic = icons.img(d.icons.get(a.name, "") or _sfallback(d, a.name), "small")
-    for pat, chips in ACTION_CHIPS:
+    for pat, read in ACTION_CHIPS:
         m = pat.fullmatch(a.text)
         if m:
+            facts, verdict = read(m)
             verb = "Kill the " if pat is KILL_TEXT else ""  # a line to tick: what to do (a table says it in its head)
-            return (f"<span class='act' title='{e(a.text)}'>{pic}<b>{verb}{e(m['name'])}</b> "
-                    + "".join(f"<span class='pill'>{c}</span>" for c in chips(m)) + "</span>")
+            return (f"<span class='act'>{pic}<b>{verb}{e(m['name'])}</b> <span class='muted small'>"
+                    + " &middot; ".join(facts) + (f": {verdict}" if verdict else "") + "</span></span>")
     return f"{pic}{e(a.text)}"
 
 
@@ -1290,7 +1305,9 @@ def render(d: PrepData) -> str:
             f'<p class="notice small"><b>Thin data:</b> only {d.kills} ranked kills of your spec on this boss and '
             f'difficulty. The timings of the fight and the habits of the top players are less reliable than usual.</p>')
     if d.guide_summary or d.guide_abilities:
-        tabs["boss"].append("<h2>The boss in 60 seconds</h2>" + bossguide.modernize(d.guide_summary, d.difficulty).replace(
+        summary = re.sub(r"<h3>The fight</h3><div class='over'>.*?</div>", "",  # the journal's story: what you
+                         bossguide.modernize(d.guide_summary, d.difficulty), flags=re.S)  # do is the "For you" list
+        tabs["boss"].append("<h2>The boss in 60 seconds</h2>" + summary.replace(
             '<a href="#boss">Every ability, phase by phase &rarr;</a>', ""))
         if d.actions:
             groups = {"kill": "Adds to kill", "contact": "Units handled by contact (soak)", "interrupt": "Interrupts", "assignment": "Assignments",
@@ -1311,11 +1328,19 @@ def render(d: PrepData) -> str:
                 # a boss unit to kill (an Echo of Jawae): a row of the table too, its count and life from the waves
                 # (fresh DPS review: a bullet under the table)
                 unit_waves = [(n, w) for n, _say in gates for w in d.waves if w[1] and w[3] == n][:4] if parsed else []
-                unit_rows = [f"<tr><td>{icons.img(_sfallback(d, n), 'small')}{e(re.sub(r' *[(].*', '', n))}</td>"
-                             f"<td class='n'>&times;{w[1]}</td><td class='n' title='alive this long in the top kills, "
-                             f"not a kill time: it goes with its phase'>{w[2]:.0f} s alive</td><td><span class='muted' "
-                             f"title='not measured: the share is read on the adds, not on a boss unit'>&mdash;</span>"
-                             f"</td></tr>" for n, w in unit_waves]
+                by_unit: dict[str, list] = {}  # a unit back in several windows (Ithraz x3): one row, its windows
+                for n, w in unit_waves:
+                    by_unit.setdefault(n, []).append(w)
+
+                def alive_s(ws: list) -> str:  # how long it stays up: a time, or the range of its windows
+                    lo, hi = min(w[2] for w in ws), max(w[2] for w in ws)
+                    return f"{lo:.0f} s" if round(lo) == round(hi) else f"{lo:.0f}&ndash;{hi:.0f} s"
+                unit_rows = [f"<tr><td>{icons.img(_sfallback(d, n), 'small')}{e(re.sub(r' *[(].*', '', n))}"
+                             + (f" <span class='muted small'>at {', '.join(_mmss(w[0]) for w in ws)}</span>"
+                                if len(ws) > 1 else "")
+                             + f"</td><td class='n'>&times;{sum(w[1] for w in ws)}</td><td class='n'>up "
+                             f"{alive_s(ws)}</td><td><span class='muted'>&mdash;</span></td></tr>"
+                             for n, ws in by_unit.items()]
                 if parsed:  # the adds as a table: how many, how fast the top raids kill them, your share on them
                     # (fresh DPS review: bullet sentences)
                     done = [x for x, _m in parsed]  # by identity: an Action is no set member (it crashed a prep)
@@ -1384,9 +1409,9 @@ def render(d: PrepData) -> str:
     lust = f"<p class='small'>{lust_line(d)}</p>" if getattr(d, "lust_spots", None) else ""  # the top raids' other
     # spots, what each gives you (once in the checklist, gone: its other lines are on the other tabs)
     tabs["fight"].append(f"""<h2>The rebuilt fight</h2><div class="card">{f'<p>{(said := "; ".join(extra))[:1].upper() + said[1:]}.</p>' if extra else ""}{lust}
-<div class="scroll"><table class="fit">{rows}</table></div>
-{adds_block}{focus}{f'<p class="small"><a href="{e(d.timeline_file)}">Cooldown timelines of the top players</a></p>' if d.timeline_file else ''}
-{export_html(d) if d.export else ""}</div>""")
+<div class="rf-grid"><div><div class="scroll"><table class="fit">{rows}</table></div>
+{adds_block}{focus}{f'<p class="small"><a href="{e(d.timeline_file)}">Cooldown timelines of the top players</a></p>' if d.timeline_file else ''}</div>
+<div>{export_html(d) if d.export else ""}</div></div></div>""")  # the Raidbots lines beside the waves they hold
     if d.assigns:
         tabs["fight"].append('<h2>Your assignments and plan</h2><div class="card small"><ul>'
                              + "".join(f"<li>{e(a)}</li>" for a in d.assigns) + "</ul></div>")
@@ -1663,9 +1688,9 @@ equipped set">Single swap</th></tr>{body}</table>
     b = sections["boss"]  # the boss tab opens on what the top players do beside the boss in 60 seconds
     if len(b) >= 2 and b[0].startswith("<h2>What the top players do") and b[1].startswith("<h2>The boss in 60"):
         rest = b[2:]
-        defs = next((x for x in rest if x.startswith("<h2>Defensives</h2>")), "")  # the left column's second card
-        rest = [x for x in rest if x is not defs]
-        sections["boss"] = [f"<div class='boss-top'><div>{b[0]}{defs}</div><div>{b[1]}</div></div>"] + rest
+        defs = next((x for x in rest if x.startswith("<h2>Defensives")), "")  # under the boss in 60 seconds: the
+        rest = [x for x in rest if x is not defs]  # shorter column once the journal's story is gone
+        sections["boss"] = [f"<div class='boss-top'><div>{b[0]}</div><div>{b[1]}{defs}</div></div>"] + rest
     byline = f"{e(d.character)} &middot; {e(d.spec)} &middot; {d.kills} ranked kills"
     return sheet_page(d.boss, d.difficulty, byline, d.class_name, sections, spec=d.spec)
 

@@ -120,7 +120,15 @@ ul.grp .plain{display:block;padding-top:9px} /* a text row on its label's line, 
 /* an action of the boss tab: its icon, name and chips on one line, its sentence on hover */
 .act{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px} .act b{margin-right:4px}
 tr.noise>td{opacity:.5} tr.noise:hover>td{opacity:1} /* a talent build within the sims' noise of yours: dimmed, not folded */
+/* every tab's section headings as the fight tab's: serif sentences, ink (DESIGN.md, Headline); a badge in a
+   heading is a muted word after it, never a pill */
+.panel>h2,.panel>.boss-top>div>h2{font:600 22px/1.25 var(--font-reading);letter-spacing:0;text-transform:none;
+  color:var(--fg)}
+.panel h2 .h-note{font:400 14px var(--font-body);color:var(--muted);margin-left:8px;letter-spacing:0}
+.panel td .nw{white-space:nowrap} /* a defensive's name and share stay on one line */
 /* Dig deeper: a tool's answer inside a card is part of it, not a box in a box; the raid's pulls as their verdict */
 .card .ws-answer{margin:18px 0 6px;padding:0;border:0;background:none;box-shadow:none}
 .raid-pulls{max-width:88ch} .raid-pulls>.verdict{margin-bottom:8px}
 .trust{margin-bottom:18px}
+.rf-grid{display:grid;gap:0 32px}
+@media (min-width:1100px){.rf-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}}

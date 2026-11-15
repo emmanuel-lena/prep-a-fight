@@ -129,6 +129,27 @@ def test_talents_that_all_lose_show_the_verdict_and_three_builds():
     assert "other-build" not in table and "<span class='muted'>other build &middot; 40 talents apart" in table
 
 
+def test_the_boss_tab_says_facts_in_plain_words_and_a_unit_once():
+    from paf.actions import Action
+
+    d = PrepData("Boss", "mythic", "Subtlety", "Char", duration=380)
+    d.guide_summary = ("<div class=\"guide\"><h3>For you, as a damage dealer</h3><ul><li>Dodge the pools.</li></ul>"
+                       "<h3>The fight</h3><div class='over'><p>The twins hunt together.</p></div></div>")
+    d.actions = [Action("kill", "Spawn", "Kill the Spawn (~14 per kill): the top raids kill them in ~11 s; top "
+                        "Subtlety players put 49% of their damage on them while they are up."),
+                 Action("assignment", "Vile Flood", "Vile Flood: 3 players per kill, an assignment. If it is yours, "
+                        "tick it in the app (the boss's prep page)."),
+                 Action("mechanic", "Noxious Slick", "Noxious Slick: hits ~5 players per kill; top Subtlety players "
+                        "take it in 45% of the kills: it can be you.")]
+    d.waves = [(0.0, 1, 140.0, "Ithraz"), (35.0, 3, 11.0, "Spawn"), (147.0, 1, 150.0, "Ithraz"),
+               (302.0, 1, 78.0, "Ithraz")]
+    boss = render(d).split('id="boss"', 1)[1].split("</section>", 1)[0]
+    assert "Dodge the pools." in boss and "The twins hunt together." not in boss  # the "For you" list only
+    assert "tick it" not in boss and "class='pill'" not in boss  # facts as muted words, no page to go to
+    assert "you in 45% of the kills: it can be you" in boss
+    assert boss.count(">Ithraz") == 1 and "at 0:00, 2:27, 5:02" in boss and "up 78&ndash;150 s" in boss
+
+
 def test_nothing_to_change_offers_no_plan_it_does_not_play():
     from paf.optimize import Plan, Rule
 
@@ -274,8 +295,9 @@ def test_the_adds_to_kill_render_as_a_table():
     assert "Kill the Odd Add whenever it comes." in page  # a line the table cannot read keeps its words
 
 
-def test_actions_read_as_chips_with_their_sentence_on_hover():
-    # Nek'zali, Elemental (fresh DPS review): the assignment, the mechanic and the unit left alive were sentences
+def test_actions_read_as_a_short_muted_line():
+    # Nek'zali, Elemental (fresh DPS review): the assignment, the mechanic and the unit left alive were sentences;
+    # then uppercase pills carrying sentences (the owner's clean-up): a muted line, no page to go to
     from paf.actions import Action
     from paf.prep_report import action_row
 
@@ -284,11 +306,11 @@ def test_actions_read_as_chips_with_their_sentence_on_hover():
                                 "~4 s of movement when it is you. If it is yours, tick it in the app (the boss's prep "
                                 "page)."))
     assert "<span class='act'" in well and "<b>Soulcoil Well</b>" in well
-    assert "&#128101; 4 a kill" in well and "~4 s moving" in well
-    assert "title='Soulcoil Well: 4 players" in well
+    assert "&#128101; 4 a kill &middot; ~4 s of movement when it is you: an assignment" in well
+    assert "tick it" not in well and "pill" not in well
     rend = action_row(d, Action("mechanic", "Essence Rend", "Essence Rend: hits ~11 players per kill; top Elemental "
                                 "players take it in 52% of the kills: it can be you."))
-    assert "52% of the kills &middot; you?" in rend
+    assert "you in 52% of the kills: it can be you" in rend
     jawae = action_row(d, Action("ignore", "Summoner Jawae", "Summoner Jawae: the top raids do not kill it with "
                                  "damage (it stays ~3 min); do not spend your damage on it unless your raid's strategy "
                                  "says so."))

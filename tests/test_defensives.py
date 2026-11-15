@@ -23,8 +23,23 @@ def test_notes_and_sheet():
     p.defensives = d
     html = defensives_html(p)
     assert "Defensives" in html and "2:17" in html and "Soul Transfer" in html and "74% of the kills" in html
+    assert "title=" not in html.split("<table>", 1)[1].split("</tr>", 1)[0]  # the method shown, not on a header
+    assert "A defensive answers a boss cast within about 10 s" in html and "class='pill" not in html
     p.defensives = Defensives([], [("Astral Shift", 108271, 1.1, 0.64)], 199)
     assert "do not press their defensives at one shared moment" in defensives_html(p)
+
+
+def test_defensives_are_grouped_by_the_boss_ability_they_answer():
+    feast = [DefensiveMoment(t, s, [("Feint", 1966, 0.9), ("Crimson Vial", 185311, 0.1)], "Ravenous Feast", 9)
+             for t, s in ((63.0, 0.45), (124.0, 0.51), (219.0, 0.59))]
+    loose = [DefensiveMoment(t, 0.3, [("Feint", 1966, 0.8)], "", 0) for t in (170.0, 234.0)]
+    p = PrepData(boss="B", difficulty="mythic", spec="Subtlety", character="X")
+    p.defensives = Defensives(feast + loose, [], 187)
+    p.boss_casts = [("Envenomed", [164.0, 225.0])]
+    html = defensives_html(p)
+    assert html.count("<tr>") == 3  # the header, Ravenous Feast, the untied ones
+    assert "&times;3" in html and "1:03, 2:04, 3:39" in html and "45%&ndash;59%" in html
+    assert "None tied in the logs</span> <span class='muted'>&times;2</span>" in html and "Envenomed starts" in html
 
 
 def test_defensives_travel_in_the_pack(tmp_path, monkeypatch):
