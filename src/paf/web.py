@@ -901,7 +901,7 @@ def characters_page() -> str:
         logs = (f'<form method="post" action="/character/autologs" class="cc-logs"><input type="hidden" name="slug" '
                 f'value="{e(c.slug)}"><input type="hidden" name="on" value="{"0" if c.slug in auto else "1"}">'
                 f'<label><input type="checkbox"{" checked" if c.slug in auto else ""} onchange="this.form.submit()"> '
-                f'<span>Auto-read its last raid (<a href="/reclear">Reclear</a>)</span>'
+                f'<span>Read its raid log after each raid night (<a href="/reclear">Reclear</a>)</span>'
                 f'</label></form>')
         ic = icons.img(icons.CLASS_ICON.format(cls=c.class_name.lower()), "large", "cc-ic")
         badge = ('<span class="muted small">from a log: no bags</span>' if c.imported else
@@ -909,19 +909,25 @@ def characters_page() -> str:
         updated = ("" if stale_days(c) else  # the age badge says it (fresh app review 5: the dates twice)
                    f"<span class='muted small'>&middot; updated <span>{ago(c.mtime)}</span></span>")
         rg, _, sv = c.realm.partition("/")
+        old = stale_days(c)  # an old export: its age on the button that updates it, no badge apart (review)
+        age = (f' &middot; {old} days old' if old else "")
+        dot = '<span class="stale-dot" aria-hidden="true"></span>' if old else ""
         refresh = (f"<form method='post' action='/character/import'><input type='hidden' name='name' value='{e(c.name)}'>"
                    f"<input type='hidden' name='server' value='{e(sv)}'><input type='hidden' name='region' "
-                   f"value='{e(rg.lower())}'><button class='btn ghost'>Refresh from Warcraft Logs</button></form>"
+                   f"value='{e(rg.lower())}'><button class='btn ghost cc-up'>{dot}Refresh from Warcraft Logs{age}"
+                   "</button></form>"
                    if c.imported and sv else "")  # its latest logged fight again (issue #37: no way to update it)
-        play = ('<span class="cc-on">Playing now</span>' if c.current else
+        paste = (f"{dot}Update export{age}" if old and not refresh else "Paste a new export")
+        play = ("" if c.current else
                 f'<form method="post" action="/character/select"><input type="hidden" name="slug" value="{e(c.slug)}">'
                 f'<button class="btn ghost">Play this character</button></form>')
         cards += (f'<div class="ccard{" on" if c.current else ""}">{ic}<div class="cc-txt"><b>{e(c.name)}'
-                  f'{(" <small class=muted>" + e(c.realm) + "</small>") if c.realm else ""}</b>'
+                  f'{(" <small class=muted>" + e(c.realm) + "</small>") if c.realm else ""}'
+                  f'{" <span class=cc-on>Playing now</span>" if c.current else ""}</b>'
                   f'<span class="cc-spec">{e(c.spec.title())} {e(c.class_name.title())}'
                   f'{f" <span class=cc-ilvl>ilvl {c.ilvl}</span>" if c.ilvl else ""}</span><span>{badge} '
-                  f'{updated}</span>{stale_badge(c, "#simc-box")}</div><div class="cc-act">{play}{refresh}'
-                  f'<a class="btn ghost" href="#simc-box" onclick="setTimeout(function(){{document.getElementById(\'simc-box\').focus()}},50)">Paste a new export</a>'
+                  f'{updated}</span></div><div class="cc-act">{play}{refresh}'
+                  f'<a class="btn ghost cc-up" href="#simc-box" onclick="setTimeout(function(){{document.getElementById(\'simc-box\').focus()}},50)">{paste}</a>'
                   f'<details class="rm"><summary class="btn ghost cc-rm">Remove</summary><div class="rm-ask">'
                   f'<span>Remove this character? Its /simc export is deleted.</span>'
                   f'<form method="post" action="/character/remove"><input type="hidden" name="slug" value="{e(c.slug)}">'
@@ -947,7 +953,7 @@ def characters_page() -> str:
              "account's characters in one click.</p>") if not mine and wcllogin.available() and not wcllogin.logged_in() \
         else ""
     return (f"<h1>Your characters</h1><p class='lead'>{lead}</p><div class='ccards'>{cards}</div>{empty}"
-            f"<h2 id='add'>Add a character</h2>{acc}{ADD_FORM}{after}")
+            f"<h2 id='add'>Add or update a character</h2>{acc}{ADD_FORM}{after}")
 
 
 DIFF_SHAPES = (("normal", "tri"), ("heroic", "sq"), ("mythic", "penta"))  # WoW's green, blue, purple
