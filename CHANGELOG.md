@@ -5,6 +5,8 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
 
 ## Unreleased
 
+## 0.8.31 (2026-11-16)
+
 - "Are you assigned to something?" lists only what you choose to do: the soaks (found by the mark the game
   puts on whoever soaked) and the kicks; what the boss targets you with (Dreadmarch, Venomfang) is gone. A soak has a box
   per time: tick the ones your group takes (Guillotine's groups take turns), the sim moves you only then and the
@@ -31,6 +33,7 @@ the weekly release (Tuesday) publishes that section as its patch notes (`python 
   your account.
 - Your class's other specs with your items: a spec that cannot fight with your main hand (an Outlaw with your Subtlety daggers: -58%) is now simmed with the main hand its top players use, at your weapon's item level, and says so under its tile.
 - The sheet no longer contradicts itself: the boss's casts at the same times on every tab, the add counts of the same kill, one noise threshold said everywhere ("+0.56%, under the ±0.58% noise"), only the cooldown plan the fight tab plays can be copied, and a unit whose cast you kick says "kick its cast, don't kill it".
+
 ## 0.8.30 (2026-11-12)
 
 - After an update, the app opens again by itself (it closed and stayed closed).
